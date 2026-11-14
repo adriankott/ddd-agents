@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- npm: `AgentsStateAction` carries the index signature of redux 5's `UnknownAction`, so a redux 5 / react-redux 9 host
+  store that registers `WidgetHydrationReducer` stays assignable to `Store<any, UnknownAction>` (before: "Index
+  signature for type 'string' is missing in type 'AgentsStateAction'" at every `<Provider store>`).
+
 ## 0.1.0-alpha.26
 
 - `[SIGNAL:answer-step]`: a third wording for the text-only step after a platform-written widget that ends the purpose

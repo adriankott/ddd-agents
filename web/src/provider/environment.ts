@@ -18,10 +18,14 @@ export interface AgentsGalleryImage {
   name?: string;
 }
 
-/** An action the package dispatches into the state store. */
+/**
+ * An action the package dispatches into the state store. The index signature is the shape of redux 5's
+ * `UnknownAction`, so a host store that registers the package's reducers keeps the action type react-redux 9 expects.
+ */
 export interface AgentsStateAction {
   type: string;
   payload?: unknown;
+  [extraProps: string]: unknown;
 }
 
 /**
