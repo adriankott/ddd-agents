@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DDD\Tests\Agents\Domain\AI\Entities\Conversations\Agent;
 
 use DDD\Domain\AI\Entities\Conversations\Agent\AgentModelInput;
+use DDD\Domain\AI\Entities\Conversations\Agent\Context\AgentModelInputTailEntry;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
 use DDD\Domain\AI\Entities\Conversations\Messages\ToolCall;
 use DDD\Tests\Agents\Domain\AI\Entities\Conversations\Agent\Probes\PurposeStubbingConversation;
@@ -13,7 +14,8 @@ use DDD\Tests\Agents\Support\UnitTestCase;
 
 /**
  * No answer contract once a tool of the turn made the platform write the widget that ends the purpose: that widget
- * reports the turn, and the tool's result asks for one closing line. Every other turn keeps the contract.
+ * reports the turn, and the tool's result asks for one closing line. Every other turn keeps the contract. The
+ * `[SIGNAL:answer-step]` entry of that text-only step asks for the closing text, not for the owed plan item's result.
  */
 class AgentModelInputAnswerContractAfterPurposeEndingWidgetTest extends UnitTestCase
 {
@@ -140,5 +142,75 @@ class AgentModelInputAnswerContractAfterPurposeEndingWidgetTest extends UnitTest
         $withoutPurposeModelInput = new AgentModelInput();
         $conversation->putDirectivesIntoModelInput($withoutPurposeModelInput);
         self::assertSame([], $withoutPurposeModelInput->widgetTypesThatEndThePurpose);
+    }
+    protected const string DEFAULT_ANSWER_STEP_TEXT = '[SIGNAL:answer-step] Tools are intentionally paused for '
+        . 'this ONE step: the next move is owner-visible TEXT — what the previous step asks for (a rejection\'s '
+        . 'instruction, a delivery, the one open question): the RESULT the owed plan item promises, or its ONE question. '
+        . 'A report of what is done or what happens next is not an answer — never end on it. '
+        . 'Nothing is unavailable and you never lack access — NEVER tell the user so. Write it in the '
+        . 'owner\'s confirmed language.';
+
+    protected const string BUDGET_CLOSING_ANSWER_STEP_TEXT = '[SIGNAL:answer-step] Tools are intentionally paused for '
+        . 'this ONE step: the next move is owner-visible TEXT — what the previous step asks for (a rejection\'s '
+        . 'instruction, a delivery, the one open question), or a plain report of what IS done and what happens next. '
+        . 'Nothing is unavailable and you never lack access — NEVER tell the user so. Write it in the '
+        . 'owner\'s confirmed language.';
+
+    /** The text of the `[SIGNAL:answer-step]` entry; null when the tail holds none */
+    protected function findAnswerStepText(AgentModelInput $agentModelInput, string|array|null $forceToolChoice, bool $isBudgetClosingStep = false): ?string
+    {
+        foreach ($agentModelInput->buildTailEntries($forceToolChoice, $isBudgetClosingStep)->getElements() as $agentModelInputTailEntry) {
+            /** @var AgentModelInputTailEntry $agentModelInputTailEntry */
+            if ($agentModelInputTailEntry->kind === AgentModelInputTailEntry::KIND_ANSWER_STEP) {
+                return $agentModelInputTailEntry->text;
+            }
+        }
+        return null;
+    }
+
+    public function testTheTextOnlyStepAfterThePurposeEndingWidgetAsksForTheClosingText(): void
+    {
+        $answerStepText = (string)$this->findAnswerStepText($this->buildModelInput([
+            $this->buildOwnerTextMessage('Hand it over.'),
+            $this->buildCompletedToolCallMessage('recordAim'),
+            $this->buildCompletedToolCallMessage('deliverSummary'),
+            $this->buildPlatformWrittenWidgetRow('Summary'),
+        ]), 'none');
+
+        self::assertStringContainsString('the closing text the last tool result asks for', $answerStepText);
+        self::assertStringNotContainsString('never end on it', $answerStepText);
+    }
+
+    public function testWithoutThatWidgetRowTheAnswerStepKeepsTheDefaultWording(): void
+    {
+        $calls = [$this->buildOwnerTextMessage('Hand it over.'), $this->buildCompletedToolCallMessage('recordAim'), $this->buildCompletedToolCallMessage('deliverSummary')];
+        $otherWidgetRow = $this->buildPlatformWrittenWidgetRow('Selection');
+        $agentsOwnBlock = $this->buildWidgetRow('Summary', AIConversationMessage::MESSAGE_TEXT, AIConversationMessage::AUTHOR_ASSISTANT);
+
+        foreach ([[], [$otherWidgetRow], [$agentsOwnBlock]] as $rowsAfterTheCalls) {
+            self::assertSame(self::DEFAULT_ANSWER_STEP_TEXT, $this->findAnswerStepText($this->buildModelInput([...$calls, ...$rowsAfterTheCalls]), 'none'));
+        }
+    }
+
+    public function testTheBudgetClosingStepKeepsItsWordingBesideThePurposeEndingWidget(): void
+    {
+        $agentModelInput = $this->buildModelInput([
+            $this->buildOwnerTextMessage('Hand it over.'),
+            $this->buildCompletedToolCallMessage('deliverSummary'),
+            $this->buildPlatformWrittenWidgetRow('Summary'),
+        ]);
+
+        self::assertSame(self::BUDGET_CLOSING_ANSWER_STEP_TEXT, $this->findAnswerStepText($agentModelInput, 'none', true));
+    }
+
+    public function testAStepWithToolsHasNoAnswerStepEntry(): void
+    {
+        $agentModelInput = $this->buildModelInput([
+            $this->buildOwnerTextMessage('Hand it over.'),
+            $this->buildCompletedToolCallMessage('deliverSummary'),
+            $this->buildPlatformWrittenWidgetRow('Summary'),
+        ]);
+
+        self::assertNull($this->findAnswerStepText($agentModelInput, null));
     }
 }

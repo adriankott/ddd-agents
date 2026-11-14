@@ -198,6 +198,7 @@ renews no inputs version and runs no warm-up itself; its chat traits only queue 
 |---|---|
 | Calls | `AgentBaseSystemPromptCacheService::bumpInputsVersionOfAgentSpace()` with the space, or `bumpInputsVersionForAccountId()` with the account id |
 | When | in every host write path that changes data the prompt renders: what the host's same-path `DDD\Domain\AI\Services\AgentSpaces\AgentSpacesService` answers for the prompt (`buildAgentSpaceContextPromptSegment()`, `buildOwnerAddressingInstruction()` and their siblings), and the account data it reads (the owner's name, the register). Data the host already returns from `findUnversionedPromptInputsOfConversation()` needs no bump |
+| The other half | the builder the bump makes run again (`buildAgentSpaceContextPromptSegment()`, `buildOwnerAddressingInstruction()` and their siblings) reads the host's records fresh — never an entity or settings object the process loaded before the write. A bump followed by a builder that reads a held object caches the OLD text under the new version for one hour |
 | Account | any; the bump writes only a cache token |
 | Envelope | none, no model call |
 | Returns | nothing; never throws (inside an open database transaction it takes effect at the transaction's end) |

@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.1.0-alpha.26
+
+- `[SIGNAL:answer-step]`: a third wording for the text-only step after a platform-written widget that ends the purpose
+  — the closing text the last tool result asks for, no recap of the widget and no list of completed steps; the "never
+  a report" sentence is absent there (`AgentModelInput::buildAnswerStepTailHint()`, under the same condition as the
+  absent answer contract, `hasPlatformWrittenWidgetThatEndsThePurposeAfterPosition()` from the owner's newest input,
+  `findNewestOwnerInputPosition()`). The budget closing step keeps its own wording when both apply; every other forced
+  step keeps the default wording byte for byte.
+- The host's builders read fresh: the docblocks of `AgentBaseSystemPromptCacheService::resolveAgentSpaceContext()` and
+  `AgentSpacesService::buildAgentSpaceContextPromptSegment()` and the skills (stable prefix, host duties 7a) state that
+  a builder the inputs version makes run again reads the host's records at that moment, never an object loaded before
+  the write — else the old text is cached under the new version for the TTL.
+- npm: `CUSTOM_VISUALIZATION_SANDBOX_CONFIG` and `resolveCustomVisualizationFrameUrl` are exported from
+  `@mgamadeus/ddd-agents/widgets`, so a host can serve the sandbox frame from another site.
+
 ## 0.1.0-alpha.25
 
 - Task plan: a leaf that asks for a tool call AND a rendered widget closes in the completed-call pass when the tool

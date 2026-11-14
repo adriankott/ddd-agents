@@ -334,6 +334,7 @@
   "./widgets": {
     "values": [
       "CANVAS_VIABLE_MIN_WIDTH",
+      "CUSTOM_VISUALIZATION_SANDBOX_CONFIG",
       "CanvasWidgetCard",
       "CanvasWidgetSwitch",
       "CardFooter",
@@ -374,6 +375,7 @@
       "pickText",
       "readConceptExplainerNumber",
       "readConceptExplainerValue",
+      "resolveCustomVisualizationFrameUrl",
       "useCanvasViable",
       "useElementVisible"
     ],

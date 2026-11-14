@@ -475,6 +475,9 @@ class AgentSpacesService extends EntitiesService
     /**
      * The context segment the space contributes to the conversation's prompt (`{%AGENT_SPACE_CONTEXT%}`). The default
      * has none.
+     * Called on a cache miss of {@see \DDD\Domain\AI\Services\SystemPrompts\AgentBaseSystemPromptCacheService::resolveAgentSpaceContext()},
+     * which is the first read after a write: an override reads the host's records fresh in here, never an object
+     * loaded earlier in the process.
      *
      * @param AIConversation $conversation
      * @return string|null

@@ -8,6 +8,12 @@ export { ConceptExplainerConversationWidget } from "../widgets/ConceptExplainerC
 export { ConversationSearchResultsConversationWidget } from "../widgets/ConversationSearchResultsConversationWidget/ConversationSearchResultsConversationWidget";
 export { CurrencyConverterConversationWidget } from "../widgets/CurrencyConverterConversationWidget/CurrencyConverterConversationWidget";
 export { CustomVisualizationConversationWidget } from "../widgets/CustomVisualizationConversationWidget/CustomVisualizationConversationWidget";
+// Where the custom visualization's sandbox frame loads from: a host sets `frameUrl` (e.g. to a host of another
+// registrable domain, so the frame runs out of process) before the first widget renders.
+export {
+  CUSTOM_VISUALIZATION_SANDBOX_CONFIG,
+  resolveCustomVisualizationFrameUrl,
+} from "../widgets/CustomVisualizationConversationWidget/shared/custom-visualization-sandbox-config";
 export { EntityMentionConversationWidget } from "../widgets/EntityMentionConversationWidget/EntityMentionConversationWidget";
 export { MultiChoiceConversationWidget } from "../widgets/MultiChoiceConversationWidget/MultiChoiceConversationWidget";
 export { QuickRepliesConversationWidget } from "../widgets/QuickRepliesConversationWidget/QuickRepliesConversationWidget";

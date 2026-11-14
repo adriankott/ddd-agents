@@ -1232,6 +1232,25 @@ class AgentModelInput extends ValueObject
     }
 
     /**
+     * The position in {@see $messages} of the owner's newest input — their genuine text message (or the orchestrator's
+     * task text) or, newer than it, their own signal (a widget submit, an action confirmation); -1 without one. The turn
+     * boundary of {@see completedWritesAnswerContractHint()} and of the answer-step wording. Pure.
+     */
+    protected function findNewestOwnerInputPosition(): int
+    {
+        for ($i = count($this->messages) - 1; $i >= 0; $i--) {
+            $candidate = $this->messages[$i];
+            $isOwnerSignal = ($candidate->messageType ?? null) === AIConversationMessage::MESSAGE_SIGNAL
+                && $candidate->isOwnerAuthoredInbound();
+            if ($isOwnerSignal
+                || ($candidate->isOwnerOrOrchestratorTaskText() && trim((string)($candidate->message ?? '')) !== '')) {
+                return $i;
+            }
+        }
+        return -1;
+    }
+
+    /**
      * Whether a row the platform wrote during a tool call (a tool message authored by the tool) after
      * `$messagePosition` holds a widget of one of {@see $widgetTypesThatEndThePurpose}: that widget shows the owner
      * what the turn's calls did and the result of the tool that wrote it asks for one closing line, so the answer
@@ -1277,17 +1296,7 @@ class AgentModelInput extends ValueObject
      */
     public function completedWritesAnswerContractHint(): ?string
     {
-        $newestOwnerMessagePosition = -1;
-        for ($i = count($this->messages) - 1; $i >= 0; $i--) {
-            $candidate = $this->messages[$i];
-            $isOwnerSignal = ($candidate->messageType ?? null) === AIConversationMessage::MESSAGE_SIGNAL
-                && $candidate->isOwnerAuthoredInbound();
-            if ($isOwnerSignal
-                || ($candidate->isOwnerOrOrchestratorTaskText() && trim((string)($candidate->message ?? '')) !== '')) {
-                $newestOwnerMessagePosition = $i;
-                break;
-            }
-        }
+        $newestOwnerMessagePosition = $this->findNewestOwnerInputPosition();
         if ($this->hasPlatformWrittenWidgetThatEndsThePurposeAfterPosition($newestOwnerMessagePosition)) {
             return null;
         }
@@ -1550,7 +1559,11 @@ class AgentModelInput extends ValueObject
             $agentModelInputTailEntry = AgentModelInputTailEntry::ofText(
                 AgentModelInputTailEntry::KIND_ANSWER_STEP,
                 AgentContextSegmentType::SIGNAL,
-                self::buildAnswerStepTailHint($toolLessStepIsTheBudgetClosingStep)
+                self::buildAnswerStepTailHint(
+                    $toolLessStepIsTheBudgetClosingStep,
+                    !$toolLessStepIsTheBudgetClosingStep
+                        && $this->hasPlatformWrittenWidgetThatEndsThePurposeAfterPosition($this->findNewestOwnerInputPosition())
+                )
             );
             $agentModelInputTailEntries->add($agentModelInputTailEntry);
         }
@@ -1578,15 +1591,21 @@ class AgentModelInput extends ValueObject
     /**
      * The `[SIGNAL:answer-step]` line of a step whose tools are paused. The budget closing step's owed text IS the
      * report of what was saved (its own note says so) — the "never a report" sentence belongs to every other forced step.
+     * After a platform-written widget that ends the purpose the owed text is the closing text that widget's tool result
+     * asks for; the 'never a report' sentence is absent there too. The budget closing step keeps its own wording when
+     * both apply.
      */
-    protected static function buildAnswerStepTailHint(bool $isBudgetClosingStep): string
+    protected static function buildAnswerStepTailHint(bool $isBudgetClosingStep, bool $followsPlatformWrittenWidgetThatEndsThePurpose = false): string
     {
         return '[SIGNAL:answer-step] Tools are intentionally paused for '
             . 'this ONE step: the next move is owner-visible TEXT — what the previous step asks for (a rejection\'s '
             . 'instruction, a delivery, the one open question)'
-            . ($isBudgetClosingStep
-                ? ', or a plain report of what IS done and what happens next. '
-                : ': the RESULT the owed plan item promises, or its ONE question. A report of what is done or what happens next is not an answer — never end on it. ')
+            . match (true) {
+                $isBudgetClosingStep => ', or a plain report of what IS done and what happens next. ',
+                $followsPlatformWrittenWidgetThatEndsThePurpose => ': here the closing text the last tool result asks for, as that result describes it. The widget written '
+                    . 'in this turn already shows the owner what was done — no recap of it and no list of completed steps. ',
+                default => ': the RESULT the owed plan item promises, or its ONE question. A report of what is done or what happens next is not an answer — never end on it. ',
+            }
             . 'Nothing is unavailable and you never lack access — NEVER tell the user so. Write it in the '
             . 'owner\'s confirmed language.';
     }

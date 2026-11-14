@@ -163,6 +163,12 @@ On both paths:
   ends (`AgentBaseSystemPromptTransactionEndListener` on commit and rollback; a rollback renews too, an outer
   transaction level still open defers it further): a reader that took the new token before the commit would cache the
   old rows under it.
+- **The host's builders read fresh.** A bump changes only the key. The text stored under the new key is whatever the
+  host's builder returns on the first read after it. A builder that takes its values from an object the process
+  loaded before the write (the entity a conversation's space holds, a settings object filled once per process)
+  returns the old text, and the old text is then cached under the new token for `BASE_SYSTEM_PROMPT_TTL_SECONDS`.
+  How it shows: a write tool ran, the token changed, the prompt text did not, and no change note of the state
+  delivery names the written field. Inside the builder, read the records past the entity registry.
 - **Warm-up after the response.** `queueBaseSystemPromptWarmAfterResponse()` (called by the chat controller) remembers
   the conversation on the service instance of the request; `warmQueuedBaseSystemPrompts()` builds every queued entry
   that is not cached yet. Under `onceWhenChanged` the warm-up builds the template and the space's context text, without

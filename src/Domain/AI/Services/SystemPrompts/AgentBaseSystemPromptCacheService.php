@@ -294,6 +294,14 @@ class AgentBaseSystemPromptCacheService extends Service
      * {@see buildAgentSpaceContextCacheKey()}, else built and cached. A conversation without a space has no key of a
      * space — its account-level text is built on every read and never cached (a key without a space id would be
      * shared by every account).
+     *
+     * The host's builder runs here once per inputs version: on the first read after a bump or after the entry
+     * expired. What it returns is stored under the NEW version for {@see BASE_SYSTEM_PROMPT_TTL_SECONDS} and every
+     * later reader gets it. The builder therefore reads the host's records at the moment of this call, never an
+     * object the process loaded before the write that caused the bump (an entity the conversation's space holds, a
+     * settings object filled once per process). A builder that reads such an object returns the text of before the
+     * write; that text then stands under the new version, no prompt shows the write, and the change note of the
+     * state delivery never names it, because the old and the new text are equal.
      */
     protected function resolveAgentSpaceContext(AIConversation $conversation, ArgusAIAgentConversation $argusAIAgentConversation): ?string
     {

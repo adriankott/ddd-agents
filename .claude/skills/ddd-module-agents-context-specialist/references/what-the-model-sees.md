@@ -102,7 +102,10 @@ user-role wire entry after the whole history, never stored. Order:
 9. the host's local-situation hint (`AgentModelInput::getLocalSituationTailHint()`, null by default);
 10. `[SIGNAL:time-zone]` for an unverified zone (`everyCall` only);
 11. `[SIGNAL:clock]` with the one instant captured for this call;
-12. `[SIGNAL:answer-step]` on a step whose tool choice is `none`;
+12. `[SIGNAL:answer-step]` on a step whose tool choice is `none`, in one of three wordings: the budget closing step
+    (a plain report of what is done), the step after a platform-written widget that ends the purpose (the closing
+    text that widget's tool result asks for, no recap), every other forced step (the result the owed plan item
+    promises or its one question, never a report);
 13. the reply-language cue `[SIGNAL:reply-language]`, always last.
 
 ## 5. The core prompts
