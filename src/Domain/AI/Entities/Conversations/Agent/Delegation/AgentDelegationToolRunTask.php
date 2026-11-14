@@ -7,7 +7,9 @@ namespace DDD\Domain\AI\Entities\Conversations\Agent\Delegation;
 use DDD\Domain\AI\Entities\Conversations\Purposes\AIConversationPurpose;
 use DDD\Domain\AI\Entities\Conversations\Purposes\BackgroundMechanicalOperationPurpose;
 use DDD\Domain\AI\Entities\Conversations\Messages\ToolCall;
+use DDD\Domain\AI\Entities\MCPPackages\MCPToolAttributeCatalog;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolEffectCatalog;
+use DDD\Domain\AI\Entities\MCPPackages\MCPToolRequiresOwnerWordsAsEvidence;
 use DDD\Domain\AI\Entities\Skills\AISkill;
 use DDD\Domain\AI\Entities\Skills\AISkills;
 
@@ -170,6 +172,15 @@ class AgentDelegationToolRunTask extends AgentDelegationTask
         $repeatCheckToolCall->arguments = $this->toolArguments;
         $repeatCheckToolCall->stampEffect(MCPToolEffectCatalog::getEffectForToolName($this->toolName));
         return $repeatCheckToolCall;
+    }
+
+    /**
+     * Whether the tool of this run is judged on the owner's own words ({@see MCPToolRequiresOwnerWordsAsEvidence}): a
+     * sub-agent never holds them, so the spawn refuses such a run.
+     */
+    public function callsToolRequiringOwnerWords(): bool
+    {
+        return $this->toolName !== '' && MCPToolAttributeCatalog::hasAttributeOnToolName($this->toolName, MCPToolRequiresOwnerWordsAsEvidence::class);
     }
 
     /**

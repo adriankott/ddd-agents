@@ -31,6 +31,9 @@ class ToolResult extends ValueObject
     /** @var string|null Set when the executor's gate refused the call before it ran ({@see \DDD\Presentation\Mcp\Dtos\MCPToolResponse::$refusalKind}). */
     public ?string $refusalKind = null;
 
+    /** True when the executor refused the call finally: the same arguments are refused again ({@see \DDD\Presentation\Mcp\Dtos\MCPToolResponse::isFinalRefusal()}). */
+    public bool $refusalIsFinal = false;
+
     /**
      * @var array<string, mixed>|null What a bindable result keeps for a `ComposedView` (the stored
      *      form of {@see \DDD\Domain\AI\Entities\Conversations\Widgets\Composed\Bindings\ComposedViewBindableResultRecord}).

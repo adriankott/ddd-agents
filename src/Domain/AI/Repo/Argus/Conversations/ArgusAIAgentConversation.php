@@ -976,9 +976,11 @@ class ArgusAIAgentConversation extends ArgusAIConversation
     /**
      * The system content as text parts whose concatenation is {@see AgentModelInput::composeSystemContent()} byte for
      * byte, with a cache breakpoint after each part a later call shares: the base prompt (the same for the space),
-     * everything up to the loaded skills (the same for the conversation; a time-zone change changes it), and the
-     * whole system content (a skill load, a variant value change or a compaction changes the last part only; the
-     * provenance of the zone and of the variants rides the volatile tail).
+     * everything up to the loaded skills (the same as long as the loaded set is the same: it ends with the skill
+     * catalog, whose lines mark the loaded skills; a time-zone change changes it too), and the whole system content (a
+     * variant value change or a compaction changes the last part only; a skill load changes the catalog lines of the
+     * skills it loads in the middle part, the loaded-skills part and the top-level tools; the provenance of the zone
+     * and of the variants rides the volatile tail).
      *
      * @param AgentContextSegment[] $systemSegments {@see AgentModelInput::buildSystemSegments()} of this call
      * @return array<int, array<string, mixed>>

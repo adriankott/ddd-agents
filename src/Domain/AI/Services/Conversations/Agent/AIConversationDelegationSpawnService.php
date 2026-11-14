@@ -692,8 +692,9 @@ class AIConversationDelegationSpawnService extends Service
 
     /**
      * Why the model's task is refused, or null (the model-only guards): an agent task without
-     * `skill_names` under a skill rail; a tool run of a tool the model is not offered, or one repeating a completed
-     * write or a read of this turn; on the sync path a call after a sub-agent of the same step failed.
+     * `skill_names` under a skill rail; a tool run of a tool that needs the owner's own words, of a tool the model is not
+     * offered, or one repeating a completed write or a read of this turn; on the sync path a call after a sub-agent of
+     * the same step failed.
      *
      * @param AgentRun $agentRun
      * @param AIConversation $parentConversation
@@ -723,6 +724,10 @@ class AIConversationDelegationSpawnService extends Service
             );
         }
         if ($task instanceof AgentDelegationToolRunTask) {
+            // a tool judged on the owner's own words is refused in a child: the conversation with the owner calls it
+            if ($task->callsToolRequiringOwnerWords()) {
+                return DelegationSubAgentRefusal::forToolRequiringOwnerWords($task->toolName, $parentConversation->isDelegation());
+            }
             if (!$parentConversation->buildOfferedTools(true, null, $agentRun)->offersToolForASubAgentToolRun($task->toolName)) {
                 return DelegationSubAgentRefusal::forFailureReasonAndCorrective(
                     DelegationSubAgentRun::FAILURE_REASON_REFUSED,
@@ -1083,8 +1088,10 @@ class AIConversationDelegationSpawnService extends Service
     }
 
     /**
-     * Run k+1 of the sub-agent on `$delegateCallMessageId` — ONE transaction (READ COMMITTED): the
-     * `delegate` row locked first (the lock order of the run end and the timeout), the current run checked to have ended
+     * Run k+1 of the sub-agent on `$delegateCallMessageId` — ONE transaction (READ COMMITTED): with a deadline row to
+     * write, the parent's conversation row locked first (that row's foreign key points at it; the lock order of the
+     * run-end notification, {@see AIConversationMessagesService::lockConversationRowOfStoredDelegateCall()}), then the
+     * `delegate` row locked (the lock of the run end and the timeout), the current run checked to have ended
      * with a recorded end, the new run's deadline row (`$withDeadline`: the async run; the sync path has none), the child
      * re-armed QUEUED with its `delegationBatchId` on the new deadline row (guarded on a terminal child), the record's
      * compare-and-set onto run k+1. Any step that finds nothing to do rolls everything back. Returns the record with the
@@ -1102,6 +1109,10 @@ class AIConversationDelegationSpawnService extends Service
         $connection = EntityManagerFactory::getInstance()->getConnection();
         $this->transactionsService()->beginReadCommittedTransactionOrNestInOpenTransaction($connection);
         try {
+            if ($withDeadline) {
+                // the parent's conversation row before the `delegate` row: the order of the run-end notification
+                $this->messagesService()->lockConversationRowOfStoredDelegateCall($delegateCallMessageId);
+            }
             $lockedDelegateCallRow = $this->messagesService()->lockStoredDelegateCallRow($delegateCallMessageId);
             $lockedRecord = $lockedDelegateCallRow !== null && isset($lockedDelegateCallRow->delegationResults) && !$lockedDelegateCallRow->delegationResults->isLegacyMap()
                 ? $lockedDelegateCallRow->delegationResults->subAgent

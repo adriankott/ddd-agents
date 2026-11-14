@@ -155,7 +155,19 @@ class AgentToolCallDispatchService extends Service
         $agentToolCallWorkRequest = null;
         try {
             $agentToolCallWorkRequest = AgentMetaTools::findWorkRequest($toolCall);
-            if ($repeatGuardVerdict === AgentRepeatedToolCallCheck::VERDICT_ABORT) {
+            if (($finallyRefusedCall = $repeatedCallCheck->findFinalRefusalOfTheSameWriteInTurn()) !== null) {
+                // The identical WRITE after its FINAL refusal in this turn (a plan without the feature, a missing account
+                // right, a mandate a sub-agent cannot obtain, a tool a delegated run is never offered): the same
+                // arguments meet the same refusal, so the call does not run again. Decided before the repeat guard, so
+                // the second, third and every later identical call read the refusal itself — with a gate kind or
+                // without one — never the guard's "if the call SUCCEEDED earlier, the work IS done". Like the repeated
+                // `load_skills`, the next step answers without tools.
+                $resultContent = $repeatedCallCheck->buildRepeatAfterFinalRefusalCorrective($finallyRefusedCall);
+                $toolCall->markFailed();
+                $toolCall->wasRefusedAsDuplicate = true;
+                $toolCall->wasRefusedAsFinal = true;
+                $forceToolLessAnswerStep = true;
+            } elseif ($repeatGuardVerdict === AgentRepeatedToolCallCheck::VERDICT_ABORT) {
                 // The model ignored the corrective below and is STILL re-issuing the identical call → abort the
                 // loop gracefully instead of spending the remaining steps on it.
                 $resultContent = 'Aborted: this exact tool call was repeated without progress.';
@@ -373,6 +385,14 @@ class AgentToolCallDispatchService extends Service
                 $resultContent = $repeatedCallCheck->buildUnsavedRepeatCorrective($earlierUnsavedCall);
                 $toolCall->markCompleted();
                 $toolCall->wasRefusedAsDuplicate = true;
+            } elseif (in_array($toolName, $conversation->findToolNamesLeftOutOfADelegatedRun(), true)) {
+                // A delegated run calls a tool that needs the owner's own words as evidence by name (it is left off the
+                // wire, {@see AIConversation::findToolNamesLeftOutOfADelegatedRun()}): the child holds only its task,
+                // and an approval would read that task as the owner's words. Refused before the execution, finally —
+                // the same call meets the same refusal.
+                $resultContent = $this->buildRefusalOfToolLeftOutOfADelegatedRun($toolName);
+                $toolCall->markFailed();
+                $toolCall->wasRefusedAsFinal = true;
             } elseif (($skillNamesProvidingTool = $callMessage->findSkillNamesProvidingUnloadedTool($toolName, $conversation)) !== []) {
                 // The model called a CATALOG tool whose SKILL is NOT loaded — it knows the name (from a task-plan
                 // gate like `doneRequiresToolCall: getBookings`, or from prior context) but the tool's schema is not in
@@ -438,6 +458,8 @@ class AgentToolCallDispatchService extends Service
                         $toolName
                     );
                     $toolCall->markCompleted();
+                    // the deletion is done: no refusal of this call stands
+                    $toolCall->wasRefusedAsFinal = null;
                 }
                 // What this call means for the plan is said by the loop AFTER the platform looked at the open items
                 // ({@see AIConversationTaskPlanRecordService::closeLeavesProvenByCompletedToolCallAndAppendPlanNote()}): said here, before that look, the tick instruction
@@ -521,6 +543,21 @@ class AgentToolCallDispatchService extends Service
             $toolName,
             implode(' or ', array_map(static fn (string $skillName): string => "`$skillName`", $namedSkillNames)),
             '[' . implode(', ', array_map(static fn (string $skillName): string => "'$skillName'", array_slice($namedSkillNames, 0, 1))) . ']',
+            $toolName
+        );
+    }
+
+    /**
+     * The refusal of a call a delegated run makes of a tool that needs the owner's own words as evidence
+     * ({@see AIConversation::findToolNamesLeftOutOfADelegatedRun()}). True for a delegated run that itself delegates:
+     * only the main conversation with the owner holds the owner's words.
+     */
+    public function buildRefusalOfToolLeftOutOfADelegatedRun(string $toolName): string
+    {
+        return sprintf(
+            'Not executed: `%s` needs the owner\'s own words as evidence, and a sub-agent sees only its task, never the '
+            . 'conversation with the owner. The main conversation with the owner makes this call. Nothing was done. Finish the '
+            . 'rest of your task and name this open step in your answer.',
             $toolName
         );
     }
@@ -667,13 +704,68 @@ class AgentToolCallDispatchService extends Service
     /**
      * A `load_tool` request: tools of loaded skills are promoted as before; a tool of a not-yet-loaded sub-skill
      * loads its sub-skill first ({@see loadSkillsThroughGates()}), then the tool. The result names the sub-skill that
-     * came with the tool, because its instructions are new in the context.
+     * came with the tool, because its instructions are new in the context. A requested tool this conversation is never
+     * offered ({@see AIConversation::findBlockedToolNamesOfConversationTree()}) is taken out before anything is loaded or
+     * promoted: it is named in a sentence of its own ({@see buildAnswerToToolsNeverOffered()}), and a request of such tools
+     * only loads nothing, no sub-skill either.
      *
      * @param array<string, mixed> $toolArguments
      */
     protected function loadToolsIncludingSubSkillTools(AgentRun $agentRun, array $toolArguments, AIConversation $conversation, AIConversationMessage $callMessage): string
     {
         $requestedToolNames = array_map('strval', is_array($toolArguments['tool_names'] ?? null) ? $toolArguments['tool_names'] : []);
+        $blockedRequestedToolNames = array_values(array_unique(array_intersect($requestedToolNames, $conversation->findBlockedToolNamesOfConversationTree($agentRun))));
+        if ($blockedRequestedToolNames === []) {
+            return $this->loadOfferedToolsIncludingSubSkillTools($agentRun, $toolArguments, $requestedToolNames, $conversation, $callMessage);
+        }
+        $answerToToolsNeverOffered = $this->buildAnswerToToolsNeverOffered($blockedRequestedToolNames, $conversation);
+        $offeredRequestedToolNames = array_values(array_diff($requestedToolNames, $blockedRequestedToolNames));
+        if ($offeredRequestedToolNames === []) {
+            return $answerToToolsNeverOffered;
+        }
+        $toolArguments['tool_names'] = $offeredRequestedToolNames;
+        return $this->loadOfferedToolsIncludingSubSkillTools($agentRun, $toolArguments, $offeredRequestedToolNames, $conversation, $callMessage)
+            . ' ' . $answerToToolsNeverOffered;
+    }
+
+    /**
+     * What a `load_tool` call reads about the requested tools this conversation is never offered: for a tool a delegated
+     * run is never offered ({@see AIConversation::findToolNamesLeftOutOfADelegatedRun()}) the dispatch's refusal of its
+     * call ({@see buildRefusalOfToolLeftOutOfADelegatedRun()}), so a sub-agent reads the reason at the load already; for
+     * the other blocked tools (the purpose's `blockedToolNames`) one sentence that names them.
+     *
+     * @param string[] $blockedRequestedToolNames
+     */
+    protected function buildAnswerToToolsNeverOffered(array $blockedRequestedToolNames, AIConversation $conversation): string
+    {
+        $toolNamesLeftOutOfADelegatedRun = $conversation->findToolNamesLeftOutOfADelegatedRun();
+        $answerSentences = [];
+        $otherBlockedToolNames = [];
+        foreach ($blockedRequestedToolNames as $blockedRequestedToolName) {
+            if (in_array($blockedRequestedToolName, $toolNamesLeftOutOfADelegatedRun, true)) {
+                $answerSentences[] = $this->buildRefusalOfToolLeftOutOfADelegatedRun($blockedRequestedToolName);
+            } else {
+                $otherBlockedToolNames[] = $blockedRequestedToolName;
+            }
+        }
+        if ($otherBlockedToolNames !== []) {
+            $answerSentences[] = 'Not available in this conversation: '
+                . implode(', ', array_map(static fn (string $toolName): string => "`$toolName`", $otherBlockedToolNames))
+                . (count($otherBlockedToolNames) === 1
+                    ? '. It cannot be loaded or called here; continue without it.'
+                    : '. They cannot be loaded or called here; continue without them.');
+        }
+        return implode(' ', $answerSentences);
+    }
+
+    /**
+     * The body of {@see loadToolsIncludingSubSkillTools()} for the requested tools the conversation is offered.
+     *
+     * @param array<string, mixed> $toolArguments
+     * @param string[] $requestedToolNames
+     */
+    protected function loadOfferedToolsIncludingSubSkillTools(AgentRun $agentRun, array $toolArguments, array $requestedToolNames, AIConversation $conversation, AIConversationMessage $callMessage): string
+    {
         $loadableSubSkillTools = $conversation->buildLoadableSubSkillTools(
             $conversation->buildOfferedSkillCatalog($callMessage, [], $agentRun),
             $callMessage->getLoadedCapabilities()

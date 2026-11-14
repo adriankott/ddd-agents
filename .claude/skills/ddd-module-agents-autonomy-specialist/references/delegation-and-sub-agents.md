@@ -173,7 +173,9 @@ calls — the host's cancel endpoint does; it stops the whole tree and writes no
 
 `AIConversationDelegationNotificationsService::notifyParentOfSubAgentRunEnd()`:
 
-- under the parent's message-index lock, in one transaction: the compare-and-set on the run's `reportedToParentAt`
+- in a fenced write on the parent without a run token (`AIConversationMessagesService::openClaimFencedWrite()`: the
+  parent's message-index lock, then one transaction whose first statement locks the parent's conversation row, so a
+  concurrent change of that row cannot fail the INSERT with MariaDB's error 1020): the compare-and-set on the run's `reportedToParentAt`
   (already set = already reported, nothing written), the record re-read, the text rendered by
   `DelegationRunEndNotification::buildFor()`, the signal row written WAITING;
 - after the commit, for a notification that resumes: one `AIConversationResumeMessage` when the parent is not terminal

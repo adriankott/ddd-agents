@@ -62,6 +62,10 @@ export const registerEntityDetailBodies = (definitions: readonly EntityDetailBod
   );
 };
 
+/** The body registered for one entity type (the package's or an app's), or undefined when none is. */
+export const getEntityDetailBody = (entityType: string): EntityDetailBodyDefinition | undefined =>
+  Object.prototype.hasOwnProperty.call(entityDetailBodies, entityType) ? entityDetailBodies[entityType] : undefined;
+
 /** The registry the canvas body uses — the folder's by default; a spec or a story may provide stubs. */
 export const EntityDetailBodiesContext =
   createContext<Readonly<Record<string, EntityDetailBodyDefinition>>>(entityDetailBodies);

@@ -44,8 +44,12 @@ class AgentRecordedRunComparison extends ValueObject
     ];
 
     /** How many differences a comparison reports at most. */
-    /** Stored tool-call keys newer than the goldens; compared only when the recording holds them. */
-    protected const array TOOL_CALL_KEYS_ADDED_AFTER_RECORDINGS = ['effect', 'executionCosts'];
+    /**
+     * Stored tool-call keys newer than the goldens; compared only when the recording holds them. `wasRefusedAsFinal` is
+     * stored only when true, so a recording made before the key existed holds it nowhere, while its replay holds it on
+     * every call the executor refuses finally.
+     */
+    protected const array TOOL_CALL_KEYS_ADDED_AFTER_RECORDINGS = ['effect', 'executionCosts', 'wasRefusedAsFinal'];
 
     public const int MAX_REPORTED_DIFFERENCES = 40;
 
@@ -325,7 +329,8 @@ class AgentRecordedRunComparison extends ValueObject
 
     /**
      * The replayed tool call without the keys a stored tool call gained after the recording was made
-     * (`effect`, stamped at append time): an older recording does not hold them, and every row would differ on them.
+     * ({@see TOOL_CALL_KEYS_ADDED_AFTER_RECORDINGS}): an older recording does not hold them, and every row would differ on
+     * them.
      */
     protected static function withoutToolCallKeysTheRecordingPredates(mixed $expectedToolCall, mixed $actualToolCall): mixed
     {

@@ -63,4 +63,17 @@ describe("installWidgetHydrationStandIns", () => {
     expect(getWidgetHydrator(UNREGISTERED_TYPE)).toBeUndefined();
     expect(getWidgetHydrator(REGISTERED_TYPE)?.hydrator).toBe(realHydrator);
   });
+
+  test("restore() ends the reads left pending, so the next mount of the same key with a fresh store reads anew", async () => {
+    standIns = installWidgetHydrationStandIns({ [`${REGISTERED_TYPE}:5`]: { __pending: true } });
+    const pending = renderHook(() => useWidgetHydration(REGISTERED_TYPE, { itemId: 5 }));
+    expect(pending.result.current.isLoading).toBe(true);
+    pending.unmount();
+    standIns.restore();
+
+    setAgentsEnvironment({ stateStore: createAgentsWidgetHydrationStateStore() });
+    standIns = installWidgetHydrationStandIns({ [`${REGISTERED_TYPE}:5`]: { answered: true } });
+    const answered = renderHook(() => useWidgetHydration(REGISTERED_TYPE, { itemId: 5 }));
+    await waitFor(() => expect(answered.result.current.data).toEqual({ answered: true }));
+  });
 });

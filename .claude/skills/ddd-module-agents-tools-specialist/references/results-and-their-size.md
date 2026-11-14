@@ -54,6 +54,7 @@ an example output into the method's docblock. Three details:
 | a framework exception with a 400–499 code (bad request, forbidden, not found) or `AgentToolExecutionTimeoutException` | "Execution failed for Tool '<tool>': <message>" | yes |
 | any other throwable | "… an internal error occurred (issue id <id>)…" — the message is written to the issues log (`IssuesLogService`), never shown | yes |
 | a refusal of an executor gate | the gate's text; `MCPToolResponse::$refusalKind` set (`REFUSAL_MANDATE_REQUIRED`, `REFUSAL_OWNER_CONFIRMATION_REQUIRED`, `REFUSAL_SCOPE_NOT_ELIGIBLE`, `REFUSAL_ADMIN_ACCESS_REQUIRED`) | yes |
+| a FINAL refusal — the same arguments are refused again (`MCPToolResponse::finalRefusal()`: a missing feature or account right, an ineligible scope, a space the account may not use, a mandate a sub-agent or a scheduled run cannot obtain) | the refusal's text; `MCPToolResponse::isFinalRefusal()` (public; the property `$refusalIsFinal` it reads is protected, never in the response); the loop answers the identical repeat of such a write in the same turn without running it and the next step has no tools | yes |
 | `OwnerGateRefusal::because($reason)` thrown by the tool | "… REFUSED — <reason>"; the loop forces the next step to be text (present, ask, end the turn) | yes |
 | a result whose `structuredContent` says `outcome: incomplete` or `applied: false` | the result; the loop counts the call as "ran, saved nothing" — it proves no plan item and a retry is no identical repeat | no |
 

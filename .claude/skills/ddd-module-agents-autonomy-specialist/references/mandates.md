@@ -91,6 +91,13 @@ The unit of a ONE_INSTRUCTION grant is **the owner's request, never the tool cal
   conversation's one-instruction mandates of earlier requests (`closeOutOneInstructionMandatesFromEarlierRequests()`),
   so while a turn runs only its own grant is active. The skill tells the model to make the first gated call itself
   before delegating gated work.
+- `grantMandate` declares `MCPToolRequiresOwnerWordsAsEvidence`: the grant is judged on the conversation's transcript,
+  and a sub-agent's child conversation holds only its task. A delegated run is never offered it (resident, `load_tool`
+  catalog and sub-skill tools); a call of it by name in a delegated run is refused finally by the dispatch before it
+  executes (`AgentToolCallDispatchService::buildRefusalOfToolLeftOutOfADelegatedRun()`), and the fork admission does not
+  fork it; a `delegate` tool run of it is refused (`DelegationSubAgentRefusal::forToolRequiringOwnerWords()`: the root
+  makes the grant itself, a delegated run is told that the main conversation makes it). Gated tools
+  (`MCPToolRequiresMandate`) stay offered to a sub-agent and pass with the parent's active mandate.
 - The served owner message is `AgentToolCallProvenance::$sourceUserMessage`, set per call by
   `AgentToolCallExecutionService::executeToolCall()` to `AIConversation::getNewestUserMessage()` (the newest
   owner-authored loaded row); the dialogue the approval check reads is the provenance's loaded message set. An owner

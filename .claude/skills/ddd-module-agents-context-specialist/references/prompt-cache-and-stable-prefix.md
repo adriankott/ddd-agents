@@ -46,8 +46,8 @@ settings:
   (`chatCompletions` without a value). `responses` is allowed for an OpenAI model over the direct OpenRouter egress
   only. `RunSettings::AGENT_WIRE_API_RESPONSES_SERVER_STATE` is a test arm (OpenAI keeps the state,
   `AgentResponsesServerStateChain`).
-- **Skill-loading strategy.** `systemPromptSwap` (a load changes the LOADED_SKILLS segment and the top-level tools) or
-  `conversationAppend` (Responses only).
+- **Skill-loading strategy.** `systemPromptSwap` (a load changes the catalog lines of the loaded skills in the
+  SKILL_CATALOG segment, the LOADED_SKILLS segment and the top-level tools) or `conversationAppend` (Responses only).
 - **Rejections** carry a reason instead of a silent switch: `REJECTION_CONVERSATION_APPEND_NEEDS_RESPONSES`,
   `REJECTION_RESPONSES_NEEDS_OPENAI_MODEL`, `REJECTION_RESPONSES_NEEDS_DIRECT_OPENROUTER`,
   `REJECTION_SERVER_STATE_NEEDS_CONVERSATION_APPEND`, `REJECTION_SERVER_STATE_WITH_STATE_NOTES`.
@@ -175,7 +175,7 @@ On both paths:
 
 | Cause | Where it hits | What contains it |
 |---|---|---|
-| A skill load or unload under the swap | tools and LOADED_SKILLS | append-only loading; skill-granular unloading once per owner turn |
+| A skill load or unload under the swap | tools, the SKILL_CATALOG lines of the skills it loads or unloads (in the part before the loaded skills, so from the catalog on) and LOADED_SKILLS | append-only loading; skill-granular unloading once per owner turn |
 | A changed base-prompt input (space text, addressing) | from the base prompt on | state epochs: one note instead (`onceWhenChanged`) |
 | A compaction round | the COMPACTION_SUMMARY and the history after it | deliberate; batched by the compaction trigger |
 | A new prefix epoch (cover, situation, cold state epoch) | from the base prompt or the skills on | one miss per epoch |

@@ -74,7 +74,9 @@ class TaskPlan extends ValueObject
             . ' done, and mark it blocked or not_applicable only for an obstacle or a reason its record cannot show; never tick an'
             . ' item listed under ✓ done again. Before your final answer every item is done, blocked, not_applicable or waiting for'
             . ' the answer your text asks for, and the answer reports each outcome'
-            . ' to the owner (statusNotes are internal bookkeeping the owner never sees).';
+            . ' to the owner (statusNotes are internal bookkeeping the owner never sees).'
+            . ' A stop the owner ordered comes first: when the owner says stop, wait or not now, end the turn there; the open'
+            . ' items stay open and are not worked off in this turn.';
     }
 
     /**

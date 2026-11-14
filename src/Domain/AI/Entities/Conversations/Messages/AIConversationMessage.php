@@ -1623,7 +1623,9 @@ class AIConversationMessage extends Entity
 
     /**
      * Load the tools named in a `load_tool` call's arguments onto THIS message (cumulatively, via {@see loadTools()})
-     * and return the agent-facing status line. `tool_names` is the tool's argument key.
+     * and return the agent-facing status line. `tool_names` is the tool's argument key. The names reach it without the
+     * tools the conversation is never offered: the dispatch takes them out and answers them itself
+     * ({@see \DDD\Domain\AI\Services\Conversations\Agent\AgentToolCallDispatchService::loadToolsIncludingSubSkillTools()}).
      *
      * @param array<string, mixed> $arguments
      */

@@ -12,8 +12,8 @@ const readToken = (computedStyle: CSSStyleDeclaration | undefined, token: string
   computedStyle?.getPropertyValue(token).trim() || fallback;
 
 /**
- * The chart's colours, read from the theme tokens (`--sc-charts-*` for the series, `--agents-fg-light` for the axis text,
- * `--agents-fg` for a donut's total,
+ * The chart's colours, read from the theme tokens (`--agents-chart-01` … `--agents-chart-08` for the series,
+ * `--agents-fg-light` for the axis text, `--agents-fg` for a donut's total,
  * `--agents-divider-gl` for the grid, `--agents-bg-surface` for the slice gaps). ApexCharts writes colours into SVG attributes
  * and computes shades from them, where a `var()` does not resolve — so the values are read once per scheme from the
  * element's computed style, never written as hex in the component.

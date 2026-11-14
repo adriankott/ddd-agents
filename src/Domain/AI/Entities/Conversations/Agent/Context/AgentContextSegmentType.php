@@ -48,7 +48,8 @@ enum AgentContextSegmentType: string
     /**
      * The skill CATALOG the model may load from: one line per offered skill — name, purpose, the sub-skills
      * a root unlocks — rendered in the system prompt right before the loaded skills. Lists EVERY offered skill,
-     * loaded ones included, so the block is byte-stable across loads; `load_skills` keeps only the enum.
+     * loaded ones included, and marks the lines of the skills the LOADED_SKILLS segment renders, so the block changes
+     * exactly when that segment's set changes; `load_skills` keeps only the enum.
      */
     case SKILL_CATALOG = 'SKILL_CATALOG';
     case LOADED_SKILLS = 'LOADED_SKILLS';

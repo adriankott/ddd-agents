@@ -65,9 +65,12 @@ $this->commitClaimFencedWrite($writeScope);
 
 **Open:** the outermost write forgets stale undos and queues the restore of the conversation's loaded message set;
 the index lock; `beginTransaction()` (a begin that throws closes the connection, so the nesting level of DBAL is reset);
-a transaction left rollback-only is restarted clean; with a token, a locking read of `runToken` on the conversation
-row — a different token throws `AgentRunClaimLostException`. The row stays locked until the write ends, so a claim
-steal waits for it. A null token (console, evaluation, a sync admin drive, an outsider) skips only that check.
+a transaction left rollback-only is restarted clean; a locking read of `runToken` on the conversation row, in every
+fenced write — with a token, a different token throws `AgentRunClaimLostException`. The row stays locked until the
+write ends, so a claim steal waits for it. A null token (console, evaluation, a sync admin drive, an outsider) skips
+only the token comparison: the row is locked all the same, so it cannot change after the write's snapshot — under
+MariaDB's `innodb_snapshot_isolation` a message INSERT whose conversation row changed after the snapshot fails with
+error 1020 and rolls back the whole transaction.
 
 **Nested writes** join the outer lock and transaction (`AIConversationMessageWriteScope::isAnyWriteOpen()`). DBAL
 opens no savepoint: a failure inside a nested write makes the whole outer write roll back.

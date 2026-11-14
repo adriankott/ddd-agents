@@ -44,6 +44,20 @@ class MCPToolResponse extends ValueObject
     public ?string $refusalKind = null;
 
     /**
+     * Whether this response is a FINAL refusal: the same call with the same arguments is refused the same way again (a
+     * plan without the feature, a missing account right, a mandate a sub-agent or a scheduled run cannot obtain). The
+     * agent loop answers an identical repeat of such a write in the same turn without running it and lets the next step
+     * answer without tools. PROTECTED like the platform note: a platform fact for the loop, never part of the HTTP MCP
+     * response.
+     */
+    protected bool $refusalIsFinal = false;
+
+    public function isFinalRefusal(): bool
+    {
+        return $this->refusalIsFinal;
+    }
+
+    /**
      * @var array<string, int|float|string>|null The FACTS of a markdown-rendered result, extracted by the platform
      *      from the result's serialized shape: every number and state the result carries, keyed by path. PERSISTED
      *      with the result so the application's account record can preserve what a tool read, verbatim; NEVER on the
@@ -151,6 +165,17 @@ class MCPToolResponse extends ValueObject
     {
         $response = self::error($message);
         $response->refusalKind = $refusalKind;
+        return $response;
+    }
+
+    /**
+     * A FINAL refusal ({@see isFinalRefusal()}): an error response the same call meets again. With `$refusalKind` it is
+     * also a gate refusal ({@see gateRefusal()}) — the repeat guards keep not counting it.
+     */
+    public static function finalRefusal(string $message, ?string $refusalKind = null): self
+    {
+        $response = $refusalKind !== null ? self::gateRefusal($message, $refusalKind) : self::error($message);
+        $response->refusalIsFinal = true;
         return $response;
     }
 

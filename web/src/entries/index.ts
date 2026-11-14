@@ -17,6 +17,7 @@ export {
 } from "../renderer/widget-tree/composed-view-data-sources";
 // Each registration with what it takes: the definition type and the reader of a folder's modules (an app's glob).
 export {
+  getEntityDetailBody,
   readEntityDetailBodyDefinitions,
   registerEntityDetailBodies,
   type EntityDetailBodyDefinition,

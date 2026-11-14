@@ -14,6 +14,7 @@ use DDD\Domain\AI\Entities\Conversations\Compaction\AIConversationMessageFootpri
 use DDD\Domain\AI\Entities\Conversations\Compaction\AIConversationCompactionLeafRanges;
 use DDD\Domain\AI\Entities\Conversations\Compaction\AIConversationCompactionLeafRange;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolAttributeCatalog;
+use DDD\Domain\AI\Entities\MCPPackages\MCPToolRequiresOwnerWordsAsEvidence;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolResultIsNeverStubbedByTheBudget;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolWritesAgentMemoryOnly;
 use DDD\Domain\AI\Entities\MCPPackages\ToolDefinitions;
@@ -1188,16 +1189,39 @@ class AIConversation extends Entity
     }
 
     /**
-     * The tools the purpose of this conversation's tree blocks (`blockedToolNames` frontmatter; `Schedule.Run` blocks
-     * the owner-messaging send tools): never on the wire, and never named to the model as callable — a "call them
-     * directly NOW" naming a blocked tool sent a run into six `load_skills` calls until its budget was gone.
+     * The tools this conversation is never offered: the ones the purpose of its tree blocks (`blockedToolNames`
+     * frontmatter; `Schedule.Run` blocks the owner-messaging send tools) and, in a delegated run, the tools that need
+     * the owner's own words ({@see findToolNamesLeftOutOfADelegatedRun()}). Never on the wire, and never named to the
+     * model as callable: a model told to call a tool it is not offered keeps trying to load it.
      *
      * @return string[]
      */
     public function findBlockedToolNamesOfConversationTree(?AgentRun $agentRun = null): array
     {
         $purposeOfConversationTree = $this->findPurposeOfConversationTree($agentRun);
-        return $purposeOfConversationTree !== null ? $purposeOfConversationTree->blockedToolNames : [];
+        $purposeBlockedToolNames = $purposeOfConversationTree !== null ? $purposeOfConversationTree->blockedToolNames : [];
+        $toolNamesLeftOutOfADelegatedRun = $this->findToolNamesLeftOutOfADelegatedRun();
+        if ($toolNamesLeftOutOfADelegatedRun === []) {
+            return $purposeBlockedToolNames;
+        }
+        return array_values(array_unique(array_merge($purposeBlockedToolNames, $toolNamesLeftOutOfADelegatedRun)));
+    }
+
+    /**
+     * The tools a delegated run (a conversation started by `delegate`, {@see isDelegation()}) is never offered: every tool
+     * whose call is judged on the owner's own words ({@see MCPToolRequiresOwnerWordsAsEvidence}). The child conversation
+     * holds only the task text, never the owner's words: the tool is left off the wire, and a call of it by name is
+     * refused by the dispatch ({@see \DDD\Domain\AI\Services\Conversations\Agent\AgentToolCallDispatchService::buildRefusalOfToolLeftOutOfADelegatedRun()}).
+     * Empty for a conversation that is no delegation.
+     *
+     * @return string[]
+     */
+    public function findToolNamesLeftOutOfADelegatedRun(): array
+    {
+        if (!$this->isDelegation()) {
+            return [];
+        }
+        return MCPToolAttributeCatalog::getToolNamesDeclaringAttribute(MCPToolRequiresOwnerWordsAsEvidence::class);
     }
 
     /**
@@ -1272,7 +1296,7 @@ class AIConversation extends Entity
     /**
      * The tools one model call of this conversation is offered as of `$anchorMessage`:
      * the world reads are gathered here — the offered catalog, the entitlement, the loaded skills' package
-     * tools, the tree purpose's blocked tools, the phone line, the plan-dynamics site, the report channel — the offer
+     * tools, the blocked tools ({@see findBlockedToolNamesOfConversationTree()}), the phone line, the plan-dynamics site, the report channel — the offer
      * itself is {@see AgentOfferedTools::buildFor()}. The anchor is the same as the catalog's: null = the newest
      * message that CARRIES a capability set (a voice transcript line or an owner row written from an unhydrated view
      * carries none; a row carrying an EMPTY set is a carrier and stays the anchor), a past message = the point-in-time
@@ -1318,8 +1342,7 @@ class AIConversation extends Entity
         $loadedSkills = $entitlement->filterSkills($anchorMessage?->findLoadedAISkills() ?? new AISkills());
         $agentOfferedToolsInputs->loadedSkillToolDefinitions = $entitlement->filterToolDefinitions(ToolDefinitions::forPackages($loadedSkills->getPackages()));
         $agentOfferedToolsInputs->residentToolNames = $anchorLoadedCapabilities?->getLoadedToolNames() ?? [];
-        $purposeOfConversationTree = $this->findPurposeOfConversationTree($agentRun);
-        $agentOfferedToolsInputs->purposeBlockedToolNames = $purposeOfConversationTree !== null ? $purposeOfConversationTree->blockedToolNames : [];
+        $agentOfferedToolsInputs->purposeBlockedToolNames = $this->findBlockedToolNamesOfConversationTree($agentRun);
         // only a conversation WITH a space has arguments the executor fills from it — a conversation at account
         // level keeps every argument as declared, the model must name the target
         $agentOfferedToolsInputs->descriptionPrefixesOfToolArgumentsFilledFromAgentSpace = $this->getDescriptionPrefixesOfToolArgumentsFilledFromAgentSpace();
@@ -1343,7 +1366,7 @@ class AIConversation extends Entity
     /**
      * Which tools this append-only conversation's epoch carries top-level: the tools of the reachable
      * skill catalog ({@see buildReachableSkillCatalog()} — the purpose rail, the sub-skills), gated by the entitlement,
-     * without the tree purpose's blocked tools, decided against the configured ceiling
+     * without the blocked tools ({@see findBlockedToolNamesOfConversationTree()}), decided against the configured ceiling
      * ({@see ContextRetentionSettings::resolveAppendOnlyReachableToolSetCeilingTokens()}). Memoized on the run.
      */
     public function buildAppendOnlyToolSet(?AgentRun $agentRun = null): AgentAppendOnlyToolSet
@@ -1355,10 +1378,9 @@ class AIConversation extends Entity
         $entitlement = $this->getEntitlement();
         $reachableSkills = $entitlement->filterSkills($this->buildReachableSkillCatalog()->skills);
         $reachableToolDefinitions = $entitlement->filterToolDefinitions(ToolDefinitions::forPackages($reachableSkills->getPackages()));
-        $purposeOfConversationTree = $this->findPurposeOfConversationTree($agentRun);
-        $purposeBlockedToolNames = $purposeOfConversationTree !== null ? $purposeOfConversationTree->blockedToolNames : [];
-        if ($purposeBlockedToolNames !== []) {
-            $reachableToolDefinitions = $reachableToolDefinitions->withoutNames($purposeBlockedToolNames);
+        $blockedToolNames = $this->findBlockedToolNamesOfConversationTree($agentRun);
+        if ($blockedToolNames !== []) {
+            $reachableToolDefinitions = $reachableToolDefinitions->withoutNames($blockedToolNames);
         }
         $appendOnlyToolSet = AgentAppendOnlyToolSet::decideFor(
             $reachableToolDefinitions,

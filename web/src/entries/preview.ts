@@ -22,5 +22,8 @@ export {
 export { installWidgetPreviewRequests, isPendingResponse, widgetPreviewRequestKey } from "../preview/widget-preview-requests";
 export { installWidgetPreviewHydration } from "../preview/widget-preview-hydration";
 export { buildPreviewComposedViewComponents } from "../preview/preview-stub-components";
+// A ready-made story body: the "Ask about this" flow of `EntityMention` (the real ask button beside the real composer
+// strip of the chat input), for an app's story of the widget.
+export { EntityMentionAskFlowStory } from "../widgets/EntityMentionConversationWidget/stories/EntityMentionAskFlowStory";
 // A package fixture as the app reads it, with the app's own agent space key field.
 export { mapFixtureToDeclaredAgentSpaceKeyFieldName } from "../renderer/_agent-space/declared-agent-space-key-field-name";

@@ -7,6 +7,7 @@ namespace DDD\Tests\Agents\Domain\AI\Entities\Conversations\TaskPlan\Keys;
 use DDD\Domain\AI\Entities\Conversations\Agent\TaskPlan;
 use DDD\Domain\AI\Entities\Conversations\Agent\TaskPlanUpdateRejection;
 use DDD\Domain\AI\Entities\Conversations\Agent\Tools\UpdateTaskPlanArguments;
+use DDD\Tests\Agents\Domain\AI\Entities\Conversations\TaskPlan\Characterization\TaskPlanHolidayPlanFixture as Holiday;
 
 /**
  * One test per rejection line, R1–R25 with the four R4 variants and the second forms of R7, R9, R11,
@@ -192,6 +193,69 @@ class UpdateTaskPlanRejectionLinesTest extends KeyedTaskPlanUpdateTestCase
         ]);
         $this->assertRejectedWithLines($seededPlan, [['key' => '1'], ['key' => '2', 'remove' => true], ['key' => '3']], [
             '"2.1" is part of the seeded plan and cannot be dropped; dropping "2" would drop it.',
+        ]);
+    }
+
+    /** A removal is no move: R7 never names it, wherever in the call it stands; R14, R5 and R18 still refuse through it. */
+    public function testARemovalSentAtAnotherLevelIsNoMoveButKeepsTheOtherRefusals(): void
+    {
+        self::assertFalse(self::s1()->checkUpdate(UpdateTaskPlanArguments::fromArguments(['items' => [
+            ['key' => '1', 'remove' => true], ['key' => '2', 'remove' => true], ['key' => '2.1', 'remove' => true], ['key' => '2.2', 'remove' => true],
+            ['key' => '3', 'remove' => true], ['text' => 'Find three new keywords'],
+        ]]))->hasRejections(), 'the removals of 2.1 and 2.2 beside their removed parent are redundant');
+        self::assertFalse(self::s1()->checkUpdate(UpdateTaskPlanArguments::fromArguments(['items' => [...self::S1_KEPT_TOP_LEVEL, ['key' => '2.1', 'remove' => true]]]))->hasRejections());
+
+        // R14: a seeded item removed at another level, and inside a subtree the call drops
+        $seededPlan = self::s1();
+        $seededPlan->items->getItemByKey('2.1')->seededByPurpose = true;
+        $this->assertRejectedWithLines($seededPlan, [...self::S1_KEPT_TOP_LEVEL, ['key' => '2.1', 'remove' => true]], [
+            '"2.1" is part of the seeded plan and cannot be dropped — close it with set_task_status: not_applicable and the reason it does not apply.',
+        ]);
+        $this->assertRejectedWithLines($seededPlan, [['key' => '1'], ['key' => '2', 'remove' => true], ['key' => '3'], ['key' => '2.2', 'remove' => true]], [
+            '"2.1" is part of the seeded plan and cannot be dropped; dropping "2" would drop it.',
+        ]);
+        // R5: the same key kept in its list and removed at another level
+        $this->assertRejectedWithLines(self::s1(), [['key' => '1'], ['key' => '2', 'subtasks' => [['key' => '2.1'], ['key' => '2.2']]], ['key' => '3'], ['key' => '2.1', 'remove' => true]], [
+            'Key "2.1" appears 2 times — each existing item appears exactly once.',
+        ]);
+        // R18: every subtask of a kept item removed, its list not sent or sent with a removal only
+        $containerLeftEmptyLine = 'This call drops every subtask of "2" \'Answer the newest reviews\' — an item that has subtasks keeps at least one. Drop "2" itself ({"key": "2", "remove": true}), keep one of its subtasks, or close the subtasks with set_task_status (not_applicable with the reason).';
+        $this->assertRejectedWithLines(self::s1(), [...self::S1_KEPT_TOP_LEVEL, ['key' => '2.1', 'remove' => true], ['key' => '2.2', 'remove' => true]], [$containerLeftEmptyLine]);
+        $this->assertRejectedWithLines(self::s1(), [['key' => '1'], ['key' => '2', 'subtasks' => [['key' => '2.1', 'remove' => true]]], ['key' => '3'], ['key' => '2.2', 'remove' => true]], [$containerLeftEmptyLine]);
+    }
+
+    /**
+     * Three levels (2 → 2.2 → 2.2.1, 2.2.2): the call removes 2 and, at the top level, both subtasks of 2.2. 2.2 leaves
+     * with its removed ancestor 2, so it is no container that stays with every subtask dropped (R18 does not apply), and
+     * the subtree is named once, with 2.
+     */
+    public function testARemovedAncestorTakesAContainerWhoseSubtasksAreRemovedElsewhereAlong(): void
+    {
+        $items = [['key' => '1'], ['key' => '2', 'remove' => true], ['key' => '3'], ['key' => '2.2.1', 'remove' => true], ['key' => '2.2.2', 'remove' => true]];
+
+        self::assertSame([], self::threeLevelPlan()->checkUpdate(UpdateTaskPlanArguments::fromArguments(['items' => $items]))->getLines());
+
+        $taskPlanUpdateOutcome = $this->update(self::threeLevelPlan(), $items);
+        self::assertFalse($taskPlanUpdateOutcome->isRejected());
+        self::assertSame(['1', '3'], array_map('strval', array_keys(self::treeByKey($taskPlanUpdateOutcome->taskPlan))));
+        $appliedSummary = $taskPlanUpdateOutcome->renderAppliedSummary();
+        self::assertSame(1, substr_count($appliedSummary, '2.2.1'), $appliedSummary);
+        self::assertStringNotContainsString("2.2.1 'Reply to the negative review'", $appliedSummary, 'named with 2, not on its own');
+    }
+
+    /** 1; 2 with 2.1 and the container 2.2 (2.2.1, 2.2.2); 3. */
+    protected static function threeLevelPlan(): TaskPlan
+    {
+        return Holiday::plan([
+            Holiday::item('Set the holiday hours'),
+            Holiday::container('Answer the newest reviews', [
+                Holiday::item('Read the newest reviews'),
+                Holiday::container('Draft and post the replies', [
+                    Holiday::item('Reply to the negative review'),
+                    Holiday::item('Thank the positive reviewers'),
+                ]),
+            ]),
+            Holiday::item('Write the holiday post'),
         ]);
     }
 

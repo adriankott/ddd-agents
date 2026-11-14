@@ -490,6 +490,7 @@ class AgentToolCallForkJoinService extends Service
             $toolCall->executionStartedAt = $outcome->executionStartedAt;
             $toolCall->imageReferences = $outcome->imageReferences;
             $toolCall->wasRefusedByGate = $outcome->wasRefusedByGate;
+            $toolCall->wasRefusedAsFinal = $outcome->wasRefusedAsFinal;
             $toolCall->executionLease = $outcome->executionLease;
             // what the child's execution booked (the search fee, the page readings) and the endpoints it called: the
             // loop's next persist rewrites the whole toolCall column from this VO, so a field not copied is erased
@@ -516,6 +517,8 @@ class AgentToolCallForkJoinService extends Service
                 $toolName
             );
             $toolCall->markCompleted();
+            // the deletion is done: no refusal of this call stands
+            $toolCall->wasRefusedAsFinal = null;
         }
         $callMessage->recordCapabilityUseOf($toolCall, $conversation);
         $this->aiTrace('turn.toolResult', ['conversationId' => $conversation->id ?? null, 'name' => $toolName, 'status' => $toolCall->status, 'forked' => true]);

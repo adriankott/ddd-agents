@@ -5,6 +5,7 @@ import {
   unregisterWidgetHydrator,
 } from "../../renderer/widget-hydration/widget-hydration.registry";
 import type { RegisteredWidget, WidgetHydratorContext } from "../../renderer/widget-hydration/widget-hydration.types";
+import { abandonWidgetHydrationReads } from "../../renderer/widget-hydration/use-widget-hydration";
 
 /**
  * What a stand-in answers for one hydration: the data itself (a copy is handed out), `{ __status: <code> }` for a
@@ -25,12 +26,17 @@ const isStatusAnswer = (answer: unknown): answer is { __status: number } =>
  * hydrator. A key that names no registered hydrator gets a stand-in hydrator of that type, so a widget hydrates even
  * when the spec did not import the app's hydrator module. The widget runs its live code path (`useWidgetHydration`
  * with the provider's state store); the answer arrives asynchronously, as a real read does. `restore()` puts the
- * real hydrators back and removes the added ones.
+ * real hydrators back, removes the added ones and abandons every read started through the stand-ins that has not
+ * settled yet: the hydration hook keeps one in-flight read per key beyond a store and a mount, so a read left pending
+ * would otherwise hold every later mount of the same key in loading.
  */
 export class WidgetHydrationStandIns {
   protected readonly replacedHydrators = new Map<string, RegisteredWidget<unknown, unknown>>();
 
   protected readonly addedTypes: string[] = [];
+
+  /** The hydration key of every read started through the stand-ins that has not settled yet, by its rejection. */
+  protected readonly unsettledReadKeys = new Map<(reason: Error) => void, string>();
 
   constructor(protected readonly answers: Readonly<Record<string, WidgetHydrationStandInAnswer>>) {
     for (const type of listWidgetHydratorTypes()) {
@@ -46,8 +52,14 @@ export class WidgetHydrationStandIns {
     }
   }
 
-  /** Puts the real hydrators back and removes the stand-ins added for types nothing had registered. */
+  /**
+   * Puts the real hydrators back, removes the stand-ins added for types nothing had registered, and aborts and
+   * forgets the reads still pending, so the next mount of their keys reads anew.
+   */
   restore(): void {
+    abandonWidgetHydrationReads(new Set(this.unsettledReadKeys.values()));
+    for (const rejectRead of this.unsettledReadKeys.keys()) rejectRead(new Error("hydration stand-ins restored"));
+    this.unsettledReadKeys.clear();
     for (const type of this.addedTypes) unregisterWidgetHydrator(type);
     for (const [type, registered] of this.replacedHydrators) {
       unregisterWidgetHydrator(type);
@@ -64,8 +76,23 @@ export class WidgetHydrationStandIns {
     });
   }
 
-  /** The answer for one read: the derived key's entry, else the type's, else the real hydrator (none: a failed read). */
+  /** One read, abandoned by `restore()` while it has not settled. */
   protected answer(
+    type: string,
+    derivedKey: string,
+    payload: unknown,
+    context: WidgetHydratorContext,
+    registered: RegisteredWidget<unknown, unknown> | undefined,
+  ): Promise<unknown> {
+    const read = this.readAnswer(type, derivedKey, payload, context, registered);
+    return new Promise<unknown>((resolve, reject) => {
+      this.unsettledReadKeys.set(reject, derivedKey);
+      read.then(resolve, reject).finally(() => this.unsettledReadKeys.delete(reject));
+    });
+  }
+
+  /** The answer for one read: the derived key's entry, else the type's, else the real hydrator (none: a failed read). */
+  protected readAnswer(
     type: string,
     derivedKey: string,
     payload: unknown,

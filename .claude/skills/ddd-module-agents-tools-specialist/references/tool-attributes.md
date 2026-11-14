@@ -82,8 +82,9 @@ All live in `DDD\Domain\AI\Entities\MCPPackages`. They are read by reflection, n
 | `MCPToolResultIsNeverStubbedByTheBudget(reason)` | method | The result is exempt from the tool-result budget while its turn is kept (`AIConversation::resolveToolResultRetention()`); a turn that leaves the kept window is stubbed as usual. For page reads and searches a long research turn works from. |
 | `MCPToolShowsNoActivityLine(reason)` | method | `AgentActivityLinesService::buildElement()` writes no activity line for the call. For a tool the owner does not need to see working. |
 | `MCPToolSendsMessageToOwner(reason)` | method | A scheduled run blocks the tool: `ScheduleRunPurpose::getToolNamesBlockedByDeclaration()` adds every declaring tool to the purpose's `blockedToolNames`, so the run's report has one delivery path. Declare it on every host tool that sends the owner an e-mail or a text message. |
+| `MCPToolRequiresOwnerWordsAsEvidence(reason)` | method | The call is judged on the owner's own words in the transcript, which a sub-agent never holds. A delegated run is never offered the tool (`AIConversation::findToolNamesLeftOutOfADelegatedRun()`, part of `findBlockedToolNamesOfConversationTree()`), a call of it by name there is refused finally before it executes (`AgentToolCallDispatchService::buildRefusalOfToolLeftOutOfADelegatedRun()`), and a `delegate` tool run of it is refused (`DelegationSubAgentRefusal::forToolRequiringOwnerWords()`). The package's `grantMandate` declares it; declare it on a host grant tool of the same kind. |
 
-These five are read from the method of the class the application binds: a host that redeclares a package tool on its own
+These six are read from the method of the class the application binds: a host that redeclares a package tool on its own
 package class repeats the attribute there.
 
 ## Schema shaping (method and property)

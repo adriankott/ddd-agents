@@ -1,5 +1,99 @@
 # Changelog
 
+## 0.1.0-alpha.24
+
+- Final refusals: `MCPToolResponse::finalRefusal()` marks a refusal the same arguments meet again (missing feature
+  flags or account rights, an ineligible scope, a space the account may not use, a mandate a sub-agent or a scheduled
+  run cannot obtain); it travels as `ToolResult::$refusalIsFinal` (recorded runs keep it) and
+  `ToolCall::$wasRefusedAsFinal` (`isRefusedAsFinal()`; true or null, so a stored call carries the key only when true).
+  The recorded-run comparison leaves `wasRefusedAsFinal` out of a replayed call while the recording does not hold it
+  (`AgentRecordedRunComparison::TOOL_CALL_KEYS_ADDED_AFTER_RECORDINGS`).
+- Repeat after a final refusal: every identical write after a final refusal in the same turn — the second, third and
+  every later call, with a gate kind or without one — does not run; the dispatch decides it before the repeat guard
+  (`AgentRepeatedToolCallCheck::findFinalRefusalOfTheSameWriteInTurn()`), answers it with the refusal the first call met
+  (`buildRepeatAfterFinalRefusalCorrective()`), stores it FAILED with `wasRefusedAsDuplicate` and `wasRefusedAsFinal`,
+  and the next step runs without tools. The quoted refusal is cut at a sentence end at or below
+  `MAX_QUOTED_FINAL_REFUSAL_CHARS` (1000, above the longest refusal the package writes; `cutAtSentenceEnd()`). A signal
+  row of any source or a completed write between the refusal and the repeat lets the repeat run. A forked call keeps
+  the flag its child stored; a DELETE rewritten to "already completed" keeps no final refusal, inline and forked.
+- `#[MCPToolRequiresOwnerWordsAsEvidence]`: a tool judged on the owner's own words is never offered to a delegated run
+  (`AIConversation::findToolNamesLeftOutOfADelegatedRun()`, part of `findBlockedToolNamesOfConversationTree()`, which the
+  offer and the append-only tool set read; the `load_tool` sub-skill tools are filtered by the same names,
+  `LoadableSubSkillTools::withoutToolNames()`). A call of it by name in a delegated run is refused finally before it
+  executes (`AgentToolCallDispatchService::buildRefusalOfToolLeftOutOfADelegatedRun()`; the refusal tells the sub-agent
+  to finish the rest of its task and name the open step), and the fork admission does not fork it. A `delegate` tool
+  run of it is refused (`DelegationSubAgentRefusal::forToolRequiringOwnerWords()`, with its own text when the
+  delegating conversation is itself a delegated run). `AgentMandatesMCPPackage::grantMandate` declares it; a host that
+  redeclares the grant tool repeats the attribute.
+- `load_tool` and the tools a conversation is never offered: requested names that
+  `findBlockedToolNamesOfConversationTree()` returns are taken out before anything is loaded or promoted — no sub-skill
+  is loaded for them. A tool left out of a delegated run is answered with the dispatch's refusal text, a tool the
+  purpose blocks with "Not available in this conversation: `<name>`. It cannot be loaded or called here; continue
+  without it."; the other requested tools load as before.
+- Task plan: the tick rules (plan header, `set_task_status` description, maintenance rules) put a stop the owner
+  ordered first — the turn ends there and the open items stay open. The checked-stop bounce text names that stop: no
+  item is worked, the final answer repeats what was said and names the items that stay open; otherwise the final
+  answer reports every item.
+- Skill catalog: `LoadSkillsTool::renderCatalogBlock()` takes the skills the same prompt build renders in its
+  loaded-skills block and marks their lines `- <name> — LOADED, its tools are in your tool list — <description>`
+  (`renderCatalogLineOfLoadedSkill()`), under a header that names the mark, the loaded-skills block and a skill
+  announced as loaded later in the conversation (`CATALOG_HEADER`; under append-only loading a skill loaded inside the
+  epoch is unmarked and announced by the appended item). Without such names the block is byte for byte as in
+  alpha.23 (`CATALOG_HEADER_WITHOUT_LOADED_MARKS`). `AgentModelInput` passes the names exactly when it renders the
+  loaded-skills block. Under the system-prompt swap a skill load therefore also changes the catalog lines of the
+  skills it loads, inside the cached part before the loaded skills. The `load_skills` schema is unchanged.
+- Message writes: `AIConversationMessagesService::openClaimFencedWrite()` locks the conversation row in every fenced
+  write and compares the run token only when one is held; the parent's notification of a sub-agent run end
+  (`AIConversationDelegationNotificationsService::notifyParentOfSubAgentRunEnd()`) is such a fenced write on the
+  parent. A fenced write without a run claim (an inline console drive) and that notification do not fail with
+  MariaDB error 1020 under `innodb_snapshot_isolation` when another session changes the conversation row after the
+  write's snapshot. The inbound writers `persistInboundRowIndexSafe()` and `persistSignalWaitingForRunningTurn()` take
+  the message index lock without that row lock. A continuation run with a deadline row
+  (`AIConversationDelegationSpawnService::openContinuationRunOfRecord()`) locks the parent's conversation row before
+  the `delegate` row (`AIConversationMessagesService::lockConversationRowOfStoredDelegateCall()`), the order of that
+  notification: the deadline row's foreign key points at the parent's row, and with the `delegate` row locked first
+  the continuation and the notification of the same sub-agent would end as a deadlock on both database engines.
+- Repeat guard: `AIConversationToolCallHistory::countCallsWithSignature()` does not count a repeat the loop answered
+  with an earlier final refusal — that call ran nothing, and counted it refused the identical call a later signal row
+  lets run again.
+- `update_task_plan`: an element that removes an item names it by key at any level of the call — no move rejection
+  for it; a removal inside a subtree the call drops anyway is accepted and named once with that subtree; the seeded-item,
+  repeated-key and "a container stays a container" rejections apply through it as before.
+- npm package (`web/`): `./chat` exports `PHONE_CALL_LIFECYCLE_SIGNAL_SOURCES` and `SIGNAL_SOURCES_THAT_OWE_NO_WORK`
+  (the SIGNAL sources the message list shows as a call marker and the ones that never make a failed run retryable);
+  `./renderer` exports `getWidgetClickSignalSources` and `isWidgetClickSignalSource` (the package's widget click
+  sources plus `AgentsEnvironment.furtherWidgetClickSignalSources`). `public-api.json` declares the new names.
+- `./client/testing` adds `simulateGoogleMapsAuthFailure` and `resetGoogleMapsAuthFailureForTests`: a spec or story
+  makes the `Map` node act as if Google refused the Maps key, and resets the flag afterwards. Both act on the same
+  module the map component reads; the entry imports no chunk it did not import before.
+- The chart palette's documentation names the tokens it reads (`--agents-chart-01` … `--agents-chart-08`). No
+  behaviour change.
+- `./renderer` exports `composedViewTreeToWire`: the kept tree `readComposedViewTree` returns, in the wire form the
+  backend writes for the block, so an app compares its own widgets' reading with its backend's.
+- `./renderer` exports `readOpenEntityActionTarget(action, currentRow?)` and its result type `OpenEntityActionTarget`
+  (entity type, entity id, agent space key): the entity an `openEntity` action opens, from the backend-resolved
+  `entity` of the action or, for a row-bound action, of the row it fires in. A host's own `onOpenEntity` of
+  `ComposedViewRenderer` reads the action with it.
+- The root entry exports `getEntityDetailBody(entityType)`: the registered entity detail body of one entity type (the
+  package's or an app's), or `undefined` when none is registered.
+- `./preview` exports `EntityMentionAskFlowStory`: the "Ask about this" flow of `EntityMention` (the real ask button
+  beside the real composer strip of the chat input) as a ready-made story body; `maxWidth` narrows it. `public-api.json` declares the new names of this release.
+- `./client/testing`: `restore()` of `installWidgetHydrationStandIns` aborts and forgets the reads started through the
+  stand-ins that have not settled. Before, a read left pending (`{ __pending: true }`) kept its hydration key in
+  flight past the unmount and the restore, and the next mount of the same key, also with a fresh state store, stayed
+  loading.
+- `./contract` exports `buildChangedMessagesRequest(messages, pageSize)`: the request a live update reads (the highest
+  loaded id, the lowest index that can still change, the page size), or `null` when nothing is loaded. A binding tests
+  its own endpoint filter against the requests the chat sends.
+- `./chat` exports `ConversationDeepLinkedWidget` and its props: the mount of one deep-linkable widget a page opens
+  (`?agentWidget=`), with `openedByPage`, the entry's feature gate and the widget error boundary.
+- `./client/testing` exports `storeOpenCanvas`, `readStoredCanvas`, `clearStoredCanvas` and the type
+  `StoredCanvasPointer`: the pointer a conversation keeps in `sessionStorage` for its open canvas, written, read and
+  cleared as the chat does.
+- The package suite covers `readMapView` (aliases, dropped and capped points, the route line) and the message reads
+  of `useConversationMessagePages` (a changed-tail read held while the open's newest page loads, dropped after a reset,
+  retried as the newest page after a failure). No behaviour change.
+
 ## 0.1.0-alpha.23
 
 - Chart legend markers: `radius` and `shape` are both set, so the peer range of ApexCharts (`^3.35`) type-checks and renders round markers before and after 3.45.

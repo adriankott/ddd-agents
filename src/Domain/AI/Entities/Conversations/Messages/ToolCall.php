@@ -450,6 +450,24 @@ class ToolCall extends ValueObject
     public bool $wasRefusedByGate = false;
 
     /**
+     * @var bool|null True when this call was refused FINALLY — the same arguments are refused again: the executor said
+     *                so ({@see ToolResult::$refusalIsFinal}), the dispatch refused a tool a delegated run is never
+     *                offered, or the loop answered the identical repeat of such a refusal. The dispatch answers the
+     *                next identical write of the turn without running it and forces the tool-less step
+     *                ({@see \DDD\Domain\AI\Entities\Conversations\Agent\Turns\AgentRepeatedToolCallCheck::findFinalRefusalOfTheSameWriteInTurn()}).
+     *                Null otherwise, never false: the serializer leaves a null key out, so a stored row carries the key
+     *                only when it is true and reads like a row stored before the flag existed. Read it with
+     *                {@see isRefusedAsFinal()}.
+     */
+    public ?bool $wasRefusedAsFinal = null;
+
+    /** Whether this call was refused finally ({@see $wasRefusedAsFinal}). */
+    public function isRefusedAsFinal(): bool
+    {
+        return $this->wasRefusedAsFinal === true;
+    }
+
+    /**
      * @var bool True when the dispatch refused this call because the step HELD ITS TOOL BACK while the tool stayed on the
      *           wire (append-only loading keeps the cached `tools`, {@see \DDD\Domain\AI\Entities\Conversations\Agent\Turns\AgentStepToolRestriction}).
      *           The call is FAILED, but it is no verdict on the call's content: the plan-tick brake's counters skip it, or
@@ -1145,7 +1163,8 @@ class ToolCall extends ValueObject
     }
 
     /**
-     * Records the executor's outcome on this call: COMPLETED / FAILED, whether a gate refused it, and the bytes-free
+     * Records the executor's outcome on this call: COMPLETED / FAILED, whether a gate refused it, whether the refusal is
+     * final, and the bytes-free
      * references of any images the result carried (also on an error result: the reference records what
      * was captured even though the image stays off the wire).
      */
@@ -1153,6 +1172,7 @@ class ToolCall extends ValueObject
     {
         $toolResult->isError ? $this->markFailed() : $this->markCompleted();
         $this->wasRefusedByGate = $toolResult->refusalKind !== null;
+        $this->wasRefusedAsFinal = $toolResult->isError && $toolResult->refusalIsFinal ? true : null;
         $this->bindableResult = $toolResult->isError ? null : $toolResult->bindableResult;
         $this->dictatedWidgetType = $toolResult->isError ? null : $toolResult->dictatedWidgetType;
         $this->applyResultImages($toolResult);

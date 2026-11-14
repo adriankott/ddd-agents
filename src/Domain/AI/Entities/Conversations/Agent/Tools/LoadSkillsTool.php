@@ -100,12 +100,28 @@ class LoadSkillsTool extends ValueObject implements AgentMetaTool
     }
 
     /**
-     * The system-prompt catalog header — `renderCatalogBlock()` emits it, the composition labels it. Its second line
-     * says what the list holds: the block lists loaded skills too, so that it stays the same for the whole
-     * conversation, and a model that reads only "load when a request needs them" loads a loaded skill again.
+     * The system-prompt catalog header of a block that marks the loaded skills — `renderCatalogBlock()` emits it when
+     * it is given the skills of the prompt build's loaded-skills block, the composition labels it. Its second line says
+     * what the list holds: the block lists loaded skills too, and a model that reads only "load when a request needs
+     * them" loads a loaded skill again — the line of a loaded skill says LOADED ({@see CATALOG_LINE_LOADED_MARK}). Under
+     * append-only loading the block marks the skills of the epoch's start; a skill loaded later in the epoch is announced
+     * by the appended item ("# Skills loaded now … Now loaded: <name>",
+     * {@see \DDD\Domain\AI\Entities\Conversations\Agent\Wire\AgentAppendOnlyCall::HEADER_SKILLS_LOADED}), which the
+     * header names as the third sign of a loaded skill.
      */
     public const string CATALOG_HEADER = "\n\n# Available skills — load with load_skills when a request needs them\n"
+        . "This list names every skill, loaded or not. A skill marked LOADED, named under \"Loaded skills\", or announced as loaded later in this conversation is loaded: its tools are in your tool list — call them, never load that skill again.\n";
+
+    /**
+     * The header of a block that marks no skill (`renderCatalogBlock()` without loaded skill names: a prompt build that
+     * renders no loaded-skills block, a measurement): it names the loaded-skills block as the only sign of a loaded
+     * skill.
+     */
+    public const string CATALOG_HEADER_WITHOUT_LOADED_MARKS = "\n\n# Available skills — load with load_skills when a request needs them\n"
         . "This list names every skill, loaded or not. A skill that \"Loaded skills\" names is loaded: its tools are in your tool list — call them, never load that skill again.\n";
+
+    /** What the catalog line of a loaded skill says between its name and its description ({@see renderCatalogLineOfLoadedSkill()}). */
+    public const string CATALOG_LINE_LOADED_MARK = 'LOADED, its tools are in your tool list — ';
 
     /**
      * ONE catalog line: `- <name> — <description>` plus, for a ROOT, the sub-skills it unlocks (names only, no
@@ -134,34 +150,64 @@ class LoadSkillsTool extends ValueObject implements AgentMetaTool
     }
 
     /**
-     * The whole catalog block for the system prompt: header + one line per offered skill, loaded ones included (which
-     * skills are loaded is stated by the loaded-skills block). With `$topLevelOnly` the block holds the top-level
-     * skills only and is the same for the whole conversation; without it the sub-skills of the loaded skills are
+     * The catalog line of a skill the prompt build renders as loaded: `- <name> — LOADED, its tools are in your tool
+     * list — <description>`, the suffixes of {@see renderCatalogLine()} unchanged. The mark keeps a model that matches
+     * the owner's request against the descriptions from loading a loaded skill again.
+     *
+     * @param array<string, string> $toolSummaries tool name => one-line summary, for a sub-skill's line
+     */
+    public static function renderCatalogLineOfLoadedSkill(AISkill $skill, array $toolSummaries = [], bool $namesSubSkills = true): string
+    {
+        $namePrefix = "- {$skill->name} — ";
+        return $namePrefix . self::CATALOG_LINE_LOADED_MARK . substr(self::renderCatalogLine($skill, $toolSummaries, $namesSubSkills), strlen($namePrefix));
+    }
+
+    /**
+     * The whole catalog block for the system prompt: header + one line per offered skill, loaded ones included. With
+     * `$topLevelOnly` the block holds the top-level skills only; without it the sub-skills of the loaded skills are
      * listed too. Empty string for an empty catalog (the segment is then omitted).
+     *
+     * `$skillNamesOfTheLoadedSkillsBlock` are the skills the SAME prompt build renders in its loaded-skills block, and
+     * only those: their lines are marked LOADED ({@see renderCatalogLineOfLoadedSkill()}) under {@see CATALOG_HEADER}.
+     * The block's bytes therefore change exactly when that block's set changes and stay the same as long as the loaded
+     * set of the prompt build is the same. A skill loaded later by an item appended to the conversation (append-only
+     * loading) is not marked until the prompt is built again: the appended item announces it, and the header names that
+     * announcement. A block that marks no line (no names, or none of them in the catalog) carries
+     * {@see CATALOG_HEADER_WITHOUT_LOADED_MARKS} and otherwise the same lines.
+     *
+     * @param string[] $skillNamesOfTheLoadedSkillsBlock
      */
     public static function renderCatalogBlock(
         AISkills $catalog,
         bool $listSubSkillTools = false,
         ?AgentFeatureFlagsInterface $featureFlags = null,
         ?AgentAccountRightsInterface $accountRights = null,
-        bool $topLevelOnly = false
+        bool $topLevelOnly = false,
+        array $skillNamesOfTheLoadedSkillsBlock = []
     ): string {
         $lines = [];
+        $marksALoadedSkill = false;
         foreach ($catalog->getElements() as $skill) {
-            if ($topLevelOnly) {
+            if ($topLevelOnly && $skill->isSubSkill) {
                 // the hierarchy: one line per top-level skill, which speaks for its whole sub-tree; a sub-skill is
-                // listed by its loaded parent, so this block is the same for the whole conversation
-                if (!$skill->isSubSkill) {
-                    $lines[] = self::renderCatalogLine($skill, [], false);
-                }
+                // listed by its loaded parent
                 continue;
             }
-            $lines[] = self::renderCatalogLine(
-                $skill,
-                $listSubSkillTools && $skill->isSubSkill ? $skill->getToolSummaries(AIConversationEntitlement::forAxes($featureFlags, $accountRights)) : []
-            );
+            $toolSummaries = !$topLevelOnly && $listSubSkillTools && $skill->isSubSkill
+                ? $skill->getToolSummaries(AIConversationEntitlement::forAxes($featureFlags, $accountRights))
+                : [];
+            $namesSubSkills = !$topLevelOnly;
+            if (in_array($skill->name, $skillNamesOfTheLoadedSkillsBlock, true)) {
+                $lines[] = self::renderCatalogLineOfLoadedSkill($skill, $toolSummaries, $namesSubSkills);
+                $marksALoadedSkill = true;
+                continue;
+            }
+            $lines[] = self::renderCatalogLine($skill, $toolSummaries, $namesSubSkills);
         }
-        return $lines === [] ? '' : self::CATALOG_HEADER . implode("\n", $lines);
+        if ($lines === []) {
+            return '';
+        }
+        return ($marksALoadedSkill ? self::CATALOG_HEADER : self::CATALOG_HEADER_WITHOUT_LOADED_MARKS) . implode("\n", $lines);
     }
 
     /** The skill catalog this tool offers (its names become the parameter enum; its descriptions the help text). */

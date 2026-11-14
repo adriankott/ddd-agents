@@ -31,6 +31,9 @@ class ToolResultRecordingEntry extends ValueObject
     /** @var string|null The executor gate's refusal kind, when the call was refused */
     public ?string $refusalKind = null;
 
+    /** @var bool Whether the executor refused the call finally; false also for a recording written before the flag existed */
+    public bool $refusalIsFinal = false;
+
     /** @var string|null The tool's platform note for the model; null also for a recording written before the note existed */
     public ?string $platformNoteForModel = null;
 
@@ -61,6 +64,7 @@ class ToolResultRecordingEntry extends ValueObject
         $toolResultRecordingEntry->content = $toolResult->content;
         $toolResultRecordingEntry->isError = $toolResult->isError;
         $toolResultRecordingEntry->refusalKind = $toolResult->refusalKind;
+        $toolResultRecordingEntry->refusalIsFinal = $toolResult->refusalIsFinal;
         $toolResultRecordingEntry->platformNoteForModel = $toolResult->platformNoteForModel;
         $toolResultRecordingEntry->dictatedWidgetType = $toolResult->dictatedWidgetType;
         $toolResultRecordingEntry->bindableResult = $toolResult->bindableResult;
@@ -81,6 +85,7 @@ class ToolResultRecordingEntry extends ValueObject
         $toolResultRecordingEntry->content = (string)($storedEntry['content'] ?? '');
         $toolResultRecordingEntry->isError = (bool)($storedEntry['isError'] ?? false);
         $toolResultRecordingEntry->refusalKind = $storedEntry['refusalKind'] ?? null;
+        $toolResultRecordingEntry->refusalIsFinal = (bool)($storedEntry['refusalIsFinal'] ?? false);
         $toolResultRecordingEntry->platformNoteForModel = $storedEntry['platformNoteForModel'] ?? null;
         $toolResultRecordingEntry->dictatedWidgetType = $storedEntry['dictatedWidgetType'] ?? null;
         $toolResultRecordingEntry->bindableResult = is_array($storedEntry['bindableResult'] ?? null) ? $storedEntry['bindableResult'] : null;
@@ -90,9 +95,10 @@ class ToolResultRecordingEntry extends ValueObject
     }
 
     /**
-     * The stored form inside a recording file (key order fixed; an entry without booked costs stores none).
+     * The stored form inside a recording file (key order fixed; an entry without booked costs stores none, an entry
+     * whose refusal is not final stores no `refusalIsFinal`).
      *
-     * @return array{toolName: string, arguments: string, content: string, isError: bool, refusalKind: string|null, platformNoteForModel: string|null, dictatedWidgetType: string|null, bindableResult: array|null, bookedCosts?: array|object}
+     * @return array{toolName: string, arguments: string, content: string, isError: bool, refusalKind: string|null, refusalIsFinal?: true, platformNoteForModel: string|null, dictatedWidgetType: string|null, bindableResult: array|null, bookedCosts?: array|object}
      */
     public function toStoredEntry(): array
     {
@@ -102,6 +108,11 @@ class ToolResultRecordingEntry extends ValueObject
             'content' => $this->content,
             'isError' => $this->isError,
             'refusalKind' => $this->refusalKind,
+        ];
+        if ($this->refusalIsFinal) {
+            $storedEntry['refusalIsFinal'] = true;
+        }
+        $storedEntry += [
             'platformNoteForModel' => $this->platformNoteForModel,
             'dictatedWidgetType' => $this->dictatedWidgetType,
             'bindableResult' => $this->bindableResult,
@@ -122,6 +133,7 @@ class ToolResultRecordingEntry extends ValueObject
     {
         $toolResult = new ToolResult($this->content, $this->isError);
         $toolResult->refusalKind = $this->refusalKind;
+        $toolResult->refusalIsFinal = $this->refusalIsFinal;
         $toolResult->platformNoteForModel = $this->platformNoteForModel;
         $toolResult->dictatedWidgetType = $this->dictatedWidgetType;
         $toolResult->bindableResult = $this->bindableResult;

@@ -48,7 +48,7 @@ loaded skills' resident schemas, `load_tool` last); the tools skill owns the sch
 | `EPISODIC_HISTORY` | the conversation stored one at creation; roots only | the conversation |
 | `DAY_CONTEXT`, `LOCAL_SITUATION` | the host composed them at creation; roots only | the conversation |
 | `PRODUCT_CAPABILITIES`, `AI_BUDGET_AWARENESS`, `RESTRICTED_CAPABILITIES` | the entitlement services render something | the account |
-| `SKILL_CATALOG` | an account exists: the skills the call may load (`LoadSkillsTool::renderCatalogBlock()`) | the conversation under the default `hierarchy` discovery mode (top level only, both strategies); the loaded set only in the sub-skill discovery measurement arms (`SubSkillToolDiscovery`) |
+| `SKILL_CATALOG` | an account exists: the skills the call may load (`LoadSkillsTool::renderCatalogBlock()`); the lines of the skills the `LOADED_SKILLS` segment renders are marked LOADED | the loaded set of the system content (top level only under the default `hierarchy` discovery mode, both strategies; the prefix epoch's base set under append-only) |
 | `LOADED_SKILLS` | a skill is loaded: header, "Currently loaded: …", the situation line when a skill is cut by variants, the instruction blocks filtered by entitlement | the loaded set (the prefix epoch under append-only) |
 | `QUERY_OPTIONS_SYNTAX`, `SHARED_PARAMS` | a loaded skill's package exposes them; emitted once instead of on every parameter | the loaded set |
 | `COMPACTION_SUMMARY` | a compaction cover exists: the preserved facts and identifiers, then the node gists | the cover |

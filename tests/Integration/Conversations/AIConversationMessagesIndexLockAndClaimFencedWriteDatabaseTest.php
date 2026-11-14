@@ -18,13 +18,15 @@ use DDD\Infrastructure\Services\DDDService;
 use DDD\Tests\Agents\Support\DatabaseTestCase;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
+use Doctrine\DBAL\Exception\LockWaitTimeoutException;
 use RuntimeException;
 
 /**
  * The message-index lock and the claim-fenced write of {@see AIConversationMessagesService} against the database, on
  * both engines, with a second session as the other worker: while a writer holds the lock no other session gets it, the
- * rows of an open write are invisible until its commit, and every way a write ends — commit, rollback, a lost claim, a
- * lock that was not free — leaves the lock free and no transaction open. Also the truncation that runs under the lock
+ * rows of an open write are invisible until its commit, every write — with a run claim or without — holds the
+ * conversation row locked until it ends, and every way a write ends — commit, rollback, a lost claim, a lock that was
+ * not free — leaves the lock free and no transaction open. Also the truncation that runs under the lock
  * and the reads by index.
  *
  * MariaDB holds the lock on the session; PostgreSQL holds it for the transaction the hold begins. The tests ask the
@@ -105,6 +107,31 @@ class AIConversationMessagesIndexLockAndClaimFencedWriteDatabaseTest extends Dat
         self::assertFalse($this->getDatabaseConnection()->isTransactionActive());
         self::assertSame(1, $this->countRowsAnotherWorkerSees());
         self::assertTrue($this->canAnotherWorkerTakeTheLock());
+    }
+
+    /**
+     * A write without a run claim (the inline drive of a console command, an external writer) locks the conversation
+     * row like a claimed one: another worker cannot change the row while the write is open — so the row cannot change
+     * after the write's snapshot, and the message INSERT never meets MariaDB's error 1020 under
+     * `innodb_snapshot_isolation` (which would roll back the whole write). The write then commits its row.
+     */
+    public function testAWriteWithoutARunClaimLocksTheConversationRowUntilItEnds(): void
+    {
+        $messagesService = $this->getMessagesService();
+        $conversation = $this->buildConversation(self::CONVERSATION_ID);
+
+        $writeScope = $messagesService->openClaimFencedWrite($conversation, null);
+        // the write reads first (its snapshot exists), as the free-index write does
+        self::assertNull($messagesService->findNewestMessageIndex($conversation));
+
+        self::assertFalse($this->canAnotherWorkerChangeTheConversationRow(), 'the open write holds the conversation row');
+
+        $messagesService->persistNewRowUnderRunClaim($conversation, $this->buildOwnerMessage('written without a run claim'));
+        $messagesService->commitClaimFencedWrite($writeScope);
+
+        self::assertSame(1, $this->countRowsAnotherWorkerSees());
+        self::assertFalse($this->getDatabaseConnection()->isTransactionActive());
+        self::assertTrue($this->canAnotherWorkerChangeTheConversationRow(), 'the row is free after the write');
     }
 
     public function testAWriteThatRollsBackStoresNothingAndGivesTheLockBack(): void
@@ -353,6 +380,26 @@ class AIConversationMessagesIndexLockAndClaimFencedWriteDatabaseTest extends Dat
             'SELECT COUNT(*) FROM `' . DBAIConversationMessageModel::getTableName() . '` WHERE `aiConversationId` = ?',
             [self::CONVERSATION_ID]
         );
+    }
+
+    /** Whether another session can change the test's conversation row within a second; the change is rolled back. */
+    protected function canAnotherWorkerChangeTheConversationRow(): bool
+    {
+        $connectionOfAnotherWorker = $this->getConnectionOfAnotherWorker();
+        $connectionOfAnotherWorker->beginTransaction();
+        try {
+            $this->getSqlDialect()->setTransactionTimeouts($connectionOfAnotherWorker, 1, null);
+            $connectionOfAnotherWorker->executeStatement(
+                'UPDATE `' . DBAIConversationModel::getTableName() . '` SET `runToken` = ? WHERE `id` = ?',
+                ['token-of-another-worker', self::CONVERSATION_ID]
+            );
+            return true;
+        } catch (LockWaitTimeoutException) {
+            return false;
+        } finally {
+            $connectionOfAnotherWorker->rollBack();
+            $this->getSqlDialect()->clearTransactionTimeouts($connectionOfAnotherWorker);
+        }
     }
 
     /** Whether the message-index lock of the test's conversation is free for another session; a lock it got is given back. */

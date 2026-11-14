@@ -18,7 +18,9 @@ use DDD\Domain\Base\Entities\ValueObject;
  * given. Every level the call lists is rebuilt from the STORED item objects in the order sent — so an item keeps
  * everything it holds: its 30 seeded declarations, its platform records, its status and note, by construction — a
  * new item is created and minted (pre-order: a new parent before its new children; a number is never reused), a dropped
- * item leaves with its subtree. Then the statuses the call sent apply under the field-presence rules: an omitted field
+ * item leaves with its subtree. A removal names its item by key at whatever level of the call it stands: a stored item
+ * removed outside the list of its level leaves from wherever it stands after the rebuild, and a removal inside a subtree
+ * the call drops anyway is named once, with that subtree. Then the statuses the call sent apply under the field-presence rules: an omitted field
  * changes nothing; the stored status sent again is no transition (a note refresh on a terminal item, flags on a blocked
  * one); a different status is a TRANSITION through the tick application of `set_task_status` — its
  * gates, its cascade cap and its feedback lines, one gate set for both plan tools; a status a gate refuses leaves the stored one, and no status ever rejects the call. A working
@@ -41,6 +43,12 @@ class TaskPlanUpdateApplication extends ValueObject
     /** @var array<int, true> the added items, by object id */
     protected array $addedItemObjectIds = [];
 
+    /** @var array<string, true> the keys the call removes, at any level */
+    protected array $removedKeys = [];
+
+    /** @var array<int, string> the plan's items before the call: object id → key */
+    protected array $keysByItemObjectId = [];
+
     /** @var TaskPlanUpdateItemStatusRequest[] the elements that sent a status, a note or a flag, in the order sent (pre-order) */
     protected array $statusRequests = [];
 
@@ -56,15 +64,70 @@ class TaskPlanUpdateApplication extends ValueObject
         $taskPlanUpdateApplication->taskPlanUpdateOutcome = new TaskPlanUpdateOutcome();
         foreach ($taskPlan->items?->buildItemAddresses()->getElements() ?? [] as $taskPlanItemAddress) {
             $taskPlanUpdateApplication->itemsByKey[$taskPlanItemAddress->key] = $taskPlanItemAddress->item;
+            $taskPlanUpdateApplication->keysByItemObjectId[spl_object_id($taskPlanItemAddress->item)] = $taskPlanItemAddress->key;
         }
         // the top-level counter as it persists, before anything is minted on it
         $taskPlan->highestItemKeyNumber = $taskPlan->getHighestItemKeyNumber();
         if ($updateTaskPlanArguments->items !== null) {
+            $taskPlanUpdateApplication->collectRemovedKeys($updateTaskPlanArguments->items);
             $taskPlan->items = $taskPlanUpdateApplication->buildLevel($updateTaskPlanArguments->items, null);
+            if ($taskPlanUpdateApplication->removedKeys !== []) {
+                $taskPlan->items = $taskPlanUpdateApplication->dropItemsRemovedOutsideTheirList($taskPlan->items);
+            }
         }
         $taskPlanUpdateApplication->applyStatusRequests();
         $taskPlanUpdateApplication->describeAddedItems();
         return $taskPlanUpdateApplication->taskPlanUpdateOutcome;
+    }
+
+    /** Every key the call removes, at any level. */
+    protected function collectRemovedKeys(UpdateTaskPlanArgumentsItems $argumentsItems): void
+    {
+        foreach ($argumentsItems->getElements() as $argumentsItem) {
+            if ($argumentsItem->isRemovalOfKey()) {
+                $this->removedKeys[(string)$argumentsItem->key] = true;
+            }
+            if ($argumentsItem->subtasks !== null) {
+                $this->collectRemovedKeys($argumentsItem->subtasks);
+            }
+        }
+    }
+
+    /** Whether the call also removes a stored ancestor of the item with `$key` ("2.1" → "2"). */
+    protected function isAncestorRemoved(string $key): bool
+    {
+        for ($lastDotPosition = strrpos($key, '.'); $lastDotPosition !== false; $lastDotPosition = strrpos($key, '.')) {
+            $key = substr($key, 0, $lastDotPosition);
+            if (isset($this->removedKeys[$key])) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The rebuilt tree without the stored items the call removed by an element outside the list of their level: such
+     * an item still stands in a stored subtree the call kept without listing it. A set that loses no item is returned as
+     * it is.
+     */
+    protected function dropItemsRemovedOutsideTheirList(TaskPlanItems $taskPlanItems): TaskPlanItems
+    {
+        $keptItems = TaskPlanItems::newInstance();
+        $dropsAnItem = false;
+        foreach ($taskPlanItems->getElements() as $taskPlanItem) {
+            $storedKey = $this->keysByItemObjectId[spl_object_id($taskPlanItem)] ?? null;
+            // named among the dropped items already, by the level that holds its removal element
+            if ($storedKey !== null && isset($this->removedKeys[$storedKey])) {
+                $dropsAnItem = true;
+                continue;
+            }
+            if (($taskPlanItem->subtasks?->count() ?? 0) > 0) {
+                $taskPlanItem->subtasks = $this->dropItemsRemovedOutsideTheirList($taskPlanItem->subtasks);
+            }
+            // ObjectSet::add() is BY-REFERENCE — pass the loop variable, never a method return
+            $keptItems->add($taskPlanItem);
+        }
+        return $dropsAnItem ? $keptItems : $taskPlanItems;
     }
 
     /** Rebuild one level the call lists below `$parentItem` (null = the top level), recursing into the levels it lists. */
@@ -73,8 +136,9 @@ class TaskPlanUpdateApplication extends ValueObject
         $taskPlanItems = TaskPlanItems::newInstance();
         foreach ($argumentsItems->getElements() as $argumentsItem) {
             if ($argumentsItem->isRemovalOfKey()) {
+                // a removal inside a subtree the call drops anyway is named once, with that subtree
                 $droppedItem = $this->itemsByKey[(string)$argumentsItem->key] ?? null;
-                if ($droppedItem !== null) {
+                if ($droppedItem !== null && !$this->isAncestorRemoved((string)$argumentsItem->key)) {
                     $this->taskPlanUpdateOutcome->droppedItemDescriptions[] = self::describeDroppedItem($droppedItem);
                 }
                 continue;

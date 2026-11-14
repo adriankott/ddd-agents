@@ -50,7 +50,9 @@ Structure only, keyed (`UpdateTaskPlanTool`, arguments `UpdateTaskPlanArguments`
 
 - an existing item: `{"key": "2.1"}` — its text is fixed; a different text rejects;
 - a new item: `{"text": "…"}` without a key — the server mints the key;
-- a drop: `{"key": "…", "remove": true}`; an existing item sent without `subtasks` keeps its subtree.
+- a drop: `{"key": "…", "remove": true}`; an existing item sent without `subtasks` keeps its subtree. A drop names
+  its item by key at any level of the call (no move rejection for it); a drop inside a subtree the call drops anyway
+  is redundant, and a kept item whose every subtask is dropped, wherever the drops stand, is still rejected.
 
 `TaskPlan::checkUpdate()` collects every violation in one pass (`TaskPlanUpdateRejections`): unknown or malformed key,
 a key sent as a number or another JSON type, an item of a listed level left out, a move, a changed text, the last item
@@ -129,7 +131,8 @@ model ticks leaves, never containers).
 ## 7. What the model reads
 
 Each call carries the plan as a tail entry (`TaskPlan::toTailHintText()`): a header with the one tick rule set
-(`TaskPlan::buildTickRules()` — also the tool description and the maintenance rules), then one compact line per item
+(`TaskPlan::buildTickRules()` — also the tool description and the maintenance rules; its last sentence puts a stop the
+owner ordered before the open items), then one compact line per item
 (key, status, title; the full text only for the `← next` item; finished subtrees collapsed). Because it is re-derived
 from the column, it survives tool-result clearing, compaction and a worker hand-over. Placement in the model input:
 `ddd-module-agents-context-specialist`.
@@ -162,7 +165,8 @@ turn (or a turn a work signal started), items still owed once the candidate text
 (`TaskPlanItems::hasOwedOpenItemsAfterCandidateTextEvidence()`), and a text that hands nothing to the owner → the text is
 discarded and bounced with `SIGNAL_SOURCE_TASK_PLAN_OPEN_BOUNCE`, at most `MAX_BOUNCES_PER_CHUNK` per chunk. The bounce
 is ONE text (`AgentCheckedStopPolicy::buildCheckedStopBounceText()`): the owed items by key, split into the ones the
-model ticks and the ones the record closes. A plan-less turn is never bounced, nor is the opener of a kickoff the owner
+model ticks and the ones the record closes; it names the owner's stop too (stop, wait or not now: no item is worked,
+the answer is repeated and names what stays open), as the tick rules do. A plan-less turn is never bounced, nor is the opener of a kickoff the owner
 has not answered yet (`AIConversationMessages::isKickoffBeforeTheOwnerSpoke()`). The site and its other bounces: [stall-and-final-text](stall-and-final-text.md).
 
 Plan tools are exempt from the repeat guard, so two brakes keep a re-tick loop finite:

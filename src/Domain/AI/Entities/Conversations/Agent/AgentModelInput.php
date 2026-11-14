@@ -807,30 +807,7 @@ class AgentModelInput extends ValueObject
                 "\n\n# Capabilities restricted for this user\n\n" . $this->restrictedCapabilities
             );
         }
-        // The skill CATALOG, right before the loaded skills; `load_skills` carries only the enum. Under the
-        // hierarchy it holds the TOP level only and is the same for the whole conversation: a sub-skill is listed by
-        // its loaded parent (below). The measurement arms list the sub-skills of the loaded roots here instead.
         $listsSubSkillsUnderLoadedParent = SubSkillToolDiscovery::listsSubSkillsUnderLoadedParent();
-        if ($this->offeredSkillCatalog !== null) {
-            $skillCatalogBlock = LoadSkillsTool::renderCatalogBlock(
-                $this->offeredSkillCatalog,
-                SubSkillToolDiscovery::listsToolsInCatalog(),
-                $this->featureFlags,
-                $this->accountRights,
-                $listsSubSkillsUnderLoadedParent
-            );
-            if ($skillCatalogBlock !== '') {
-                $skillCatalogSegment = AgentContextSegment::of(AgentContextSegmentType::SKILL_CATALOG, $skillCatalogBlock);
-                $skillCatalogSegment->skillNames = array_values(array_map(
-                    static fn ($skill): string => $skill->name,
-                    array_filter(
-                        $this->offeredSkillCatalog->getElements(),
-                        static fn ($skill): bool => !$listsSubSkillsUnderLoadedParent || !$skill->isSubSkill
-                    )
-                ));
-                $systemSegments[] = $skillCatalogSegment;
-            }
-        }
         // an append-only epoch's system content carries the epoch's BASE set; the skills loaded later
         // ride the history as appended items
         // (option b: the situation epoch's base set — every skill loaded when the situation changed)
@@ -855,7 +832,34 @@ class AgentModelInput extends ValueObject
         $this->renderedSkillSectionIds = $appendsSituationSections
             ? array_merge($directiveSectionIds, $this->loadedAISkills?->getRenderedSectionIds($this->variants) ?? [])
             : array_merge($directiveSectionIds, ($this->prefixEpoch !== null ? $this->loadedAISkills : $systemAISkills)?->getRenderedSectionIds($systemVariants) ?? []);
-        if ($skillInstructions !== '' && $systemLoadedCapabilities !== null) {
+        // the loaded-skills block below renders exactly when this holds; the catalog marks that block's skills
+        $rendersLoadedSkillsBlock = $skillInstructions !== '' && $systemLoadedCapabilities !== null;
+        // The skill CATALOG, right before the loaded skills; `load_skills` carries only the enum. Under the
+        // hierarchy it holds the TOP level only: a sub-skill is listed by its loaded parent (below). The measurement
+        // arms list the sub-skills of the loaded roots here instead. The lines of the skills the loaded-skills block
+        // below renders are marked LOADED, so the catalog stays the same as long as that block's set is the same.
+        if ($this->offeredSkillCatalog !== null) {
+            $skillCatalogBlock = LoadSkillsTool::renderCatalogBlock(
+                $this->offeredSkillCatalog,
+                SubSkillToolDiscovery::listsToolsInCatalog(),
+                $this->featureFlags,
+                $this->accountRights,
+                $listsSubSkillsUnderLoadedParent,
+                $rendersLoadedSkillsBlock ? $systemLoadedCapabilities->getLoadedSkillNames() : []
+            );
+            if ($skillCatalogBlock !== '') {
+                $skillCatalogSegment = AgentContextSegment::of(AgentContextSegmentType::SKILL_CATALOG, $skillCatalogBlock);
+                $skillCatalogSegment->skillNames = array_values(array_map(
+                    static fn ($skill): string => $skill->name,
+                    array_filter(
+                        $this->offeredSkillCatalog->getElements(),
+                        static fn ($skill): bool => !$listsSubSkillsUnderLoadedParent || !$skill->isSubSkill
+                    )
+                ));
+                $systemSegments[] = $skillCatalogSegment;
+            }
+        }
+        if ($rendersLoadedSkillsBlock) {
             // Name the already-loaded skills explicitly and state their tools are live — without this a weak model
             // re-calls load_skills every turn for a skill it already loaded (whose tools ARE offered each turn).
             $loadedSkillNames = $systemLoadedCapabilities->getLoadedSkillNames();

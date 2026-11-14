@@ -395,6 +395,39 @@ class UpdateTaskPlanKeyedCatalogueTest extends KeyedTaskPlanUpdateTestCase
         self::assertSame(['4' => '[open] Find three new keywords'], self::treeByKey($switchedPlan));
     }
 
+    /** The owner cancels the whole plan; the model removes every item, the subtasks of a removed parent included. */
+    public function testF26bRemovalsOfSubtasksBesideTheirRemovedParentAreRedundantAndAccepted(): void
+    {
+        $switchedPlan = $this->appliedPlan($switchOutcome = $this->update(self::s1(), [
+            ['key' => '1', 'remove' => true], ['key' => '2', 'remove' => true], ['key' => '2.1', 'remove' => true], ['key' => '2.2', 'remove' => true],
+            ['key' => '3', 'remove' => true], ['text' => 'Find three new keywords'],
+        ]));
+
+        self::assertSame(['4' => '[open] Find three new keywords'], self::treeByKey($switchedPlan));
+        self::assertSame(
+            "Task plan updated: 1 items (0 done, 1 open, 0 blocked). Added: 4 'Find three new keywords' (first at the top level)."
+                . " Dropped: 1 'Set the holiday hours (24–26 Dec closed)' — its state leaves with it, 2 'Answer the newest reviews' with its subtasks 2.1, 2.2 — its state leaves with it,"
+                . " 3 'Write the holiday post' with its subtasks 3.1, 3.2.",
+            $switchOutcome->renderAppliedSummary(),
+            'a subtask removed with its parent is named once, with the parent'
+        );
+    }
+
+    /** A subtask removal sent at the top level removes the stored subtask; its parent stays with the other subtask. */
+    public function testF26cASubtaskRemovalSentAtTheTopLevelRemovesTheStoredSubtask(): void
+    {
+        foreach ([
+            'parent sent without its list' => [['key' => '1'], ['key' => '2'], ['key' => '3'], ['key' => '2.1', 'remove' => true]],
+            'parent sent with the other subtask' => [['key' => '1'], ['key' => '2', 'subtasks' => [['key' => '2.2']]], ['key' => '3'], ['key' => '2.1', 'remove' => true]],
+        ] as $case => $items) {
+            $changedPlan = $this->appliedPlan($taskPlanUpdateOutcome = $this->update(self::s1(), $items));
+
+            self::assertSame(['1', '2', '2.2', '3', '3.1', '3.2'], array_map('strval', array_keys(self::treeByKey($changedPlan))), $case);
+            self::assertStringEndsWith("Dropped: 2.1 'Read the newest reviews' — its state leaves with it.", $taskPlanUpdateOutcome->renderAppliedSummary(), $case);
+            self::assertSame(2, self::countersOf($changedPlan)['2'], $case . ': a counter never decreases');
+        }
+    }
+
     public function testF27TheOldHabitOfResendingTextsWithoutKeysIsRejectedWithOneLinePerRepeatedTextAndTheOmissions(): void
     {
         $this->assertRejectedWithLines(self::s1(), [

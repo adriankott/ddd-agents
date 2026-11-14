@@ -7,6 +7,7 @@ namespace DDD\Tests\Agents\Domain\AI\Entities\MCPPackages\Probes;
 use DDD\Domain\AI\Entities\MCPPackages\MCPPackage;
 use DDD\Domain\AI\Entities\MCPPackages\MCPTool;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolReceivesCurrentConversationId;
+use DDD\Domain\AI\Entities\MCPPackages\MCPToolRequiresOwnerWordsAsEvidence;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolResultIsNeverStubbedByTheBudget;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolSendsMessageToOwner;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolShowsNoActivityLine;
@@ -43,6 +44,13 @@ class ToolDeclarationsProbeMCPPackage extends MCPPackage
     #[MCPTool]
     #[MCPToolSendsMessageToOwner('sends the owner an email')]
     public function probeEmailToOwner(): string
+    {
+        return '';
+    }
+
+    #[MCPTool]
+    #[MCPToolRequiresOwnerWordsAsEvidence('the grant is verified against the owner\'s statement')]
+    public function probeGrantFromOwnerWords(): string
     {
         return '';
     }

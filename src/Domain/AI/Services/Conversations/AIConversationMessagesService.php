@@ -733,6 +733,33 @@ class AIConversationMessagesService extends EntitiesService
     }
 
     /**
+     * Lock the row of the conversation that holds the `delegate` row `$delegateCallMessageId` (`SELECT … FOR UPDATE`)
+     * inside the caller's open transaction. A writer that locks the `delegate` row and afterwards inserts a row whose
+     * foreign key points at that conversation (the deadline row of a continuation run) takes this lock FIRST: the
+     * run-end notification locks in the same order (the conversation row, then the `delegate` row). Taken the other
+     * way round, the writer holds the `delegate` row and waits for the conversation row while the notification holds
+     * the conversation row and waits for the `delegate` row — the database ends one of the two as a deadlock. The
+     * `delegate` row is read without a lock for its conversation id; a row that is gone locks nothing.
+     *
+     * @throws \Doctrine\DBAL\Exception
+     */
+    public function lockConversationRowOfStoredDelegateCall(int $delegateCallMessageId): void
+    {
+        $connection = EntityManagerFactory::getInstance()->getConnection();
+        $conversationIdOfDelegateCallRow = $connection->fetchOne(
+            'SELECT `aiConversationId` FROM `' . DBAIConversationMessageModel::getTableName() . '` WHERE `id` = :id',
+            ['id' => $delegateCallMessageId]
+        );
+        if ($conversationIdOfDelegateCallRow === false || $conversationIdOfDelegateCallRow === null) {
+            return;
+        }
+        $connection->fetchOne(
+            'SELECT `id` FROM `' . DBAIConversationModel::getTableName() . '` WHERE `id` = :id FOR UPDATE',
+            ['id' => (int)$conversationIdOfDelegateCallRow]
+        );
+    }
+
+    /**
      * @throws \Doctrine\DBAL\Exception
      * @throws \JsonException
      */
@@ -2402,8 +2429,13 @@ class AIConversationMessagesService extends EntitiesService
      * claim the row holds any more. Every row and column the caller writes until the write ends — the capability-chain
      * re-encode of later rows included — commits together or not at all. A nested open (an admission persisting
      * capabilities, a signal acknowledgement persisting its replay row) joins the open lock and transaction. `$runToken`
-     * null (no claim held: the CLI/eval drive, an external writer) skips only the claim check. An unpersisted
-     * conversation gets an unfenced write: no lock, no transaction.
+     * null (no claim held: the CLI/eval drive, an external writer) skips only the claim check: the conversation row is
+     * locked all the same, as the first statement of the transaction. A write that read before it holds a snapshot;
+     * when another session changed the conversation row after that snapshot (a worker writing the previous turn's
+     * summary), the INSERT of a message row — its foreign key points at the conversation row — fails under MariaDB's
+     * `innodb_snapshot_isolation` with error 1020 ("Record has changed since last read") and the whole transaction is
+     * rolled back. Locked before anything is read, the row cannot change under the write. An unpersisted conversation
+     * gets an unfenced write: no lock, no transaction.
      *
      * The caller ends the write exactly once (the write scope replaces the former callback):
      *     $writeScope = $this->openClaimFencedWrite($conversation, $runToken);
@@ -2464,14 +2496,13 @@ class AIConversationMessagesService extends EntitiesService
                 $connection->rollBack();
                 $connection->beginTransaction();
             }
-            if ($runToken !== null) {
-                $heldRunToken = $connection->fetchOne(
-                    'SELECT `runToken` FROM `' . DBAIConversationModel::getTableName() . '` WHERE `id` = :id FOR UPDATE',
-                    ['id' => (int)$conversation->id]
-                );
-                if ($heldRunToken !== $runToken) {
-                    throw new AgentRunClaimLostException('Run-claim lost before a message write — another worker owns this conversation.');
-                }
+            // the conversation row is locked in every fenced write, the claim compared only when one is held
+            $heldRunToken = $connection->fetchOne(
+                'SELECT `runToken` FROM `' . DBAIConversationModel::getTableName() . '` WHERE `id` = :id FOR UPDATE',
+                ['id' => (int)$conversation->id]
+            );
+            if ($runToken !== null && $heldRunToken !== $runToken) {
+                throw new AgentRunClaimLostException('Run-claim lost before a message write — another worker owns this conversation.');
             }
         } catch (\Throwable $claimCheckError) {
             $this->rollBackClaimFencedWrite($writeScope, $claimCheckError);
@@ -3365,8 +3396,10 @@ class AIConversationMessagesService extends EntitiesService
      *
      * The row is written by a strict INSERT, so the database itself refuses an index another writer took meanwhile (the
      * named index lock is not exclusive behind ProxySQL + Galera): the row is written again one above the refused index,
-     * up to {@see self::NEW_ROW_INDEX_COLLISION_ATTEMPTS} attempts. MariaDB undoes only the refused statement, so the
-     * retry runs in the caller's open transaction; PostgreSQL ends the whole transaction with the refused statement and
+     * up to {@see self::NEW_ROW_INDEX_COLLISION_ATTEMPTS} attempts. For a duplicate key (error 1062) MariaDB undoes only
+     * the refused statement, so the retry runs in the caller's open transaction — unlike error 1020 under
+     * `innodb_snapshot_isolation`, which rolls back the whole transaction (the fenced write locks the conversation row
+     * first so that a message INSERT never meets that error, {@see openClaimFencedWrite()}); PostgreSQL ends the whole transaction with the refused statement and
      * gets no second attempt ({@see canWriteAgainAfterARefusedInsert()}). The retry reads nothing: the winner was committed after this
      * transaction's snapshot, a plain read does not see it, and a locking read of it fails with error 1020 under
      * `innodb_snapshot_isolation` — the INSERT itself is the probe.
@@ -3390,8 +3423,8 @@ class AIConversationMessagesService extends EntitiesService
     }
 
     /**
-     * Whether the open transaction can go on after the database refused an INSERT. MariaDB undoes only the refused
-     * statement. PostgreSQL ends the transaction with it — and has no use for a second attempt: its message-index lock
+     * Whether the open transaction can go on after the database refused an INSERT for a duplicate key. MariaDB undoes
+     * only the refused statement. PostgreSQL ends the transaction with it — and has no use for a second attempt: its message-index lock
      * is exclusive and its writers read the latest commits, so a writer under the lock does not meet an index another
      * writer took meanwhile; a refusal there fails the write.
      */

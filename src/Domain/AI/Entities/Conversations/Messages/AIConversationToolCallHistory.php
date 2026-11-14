@@ -544,6 +544,42 @@ class AIConversationToolCallHistory extends ValueObject
         return null;
     }
 
+    /**
+     * The newest earlier call of the same tool with the same NORMALIZED arguments ({@see ToolCall::getNormalizedIdentityKey()})
+     * that the executor refused FINALLY ({@see ToolCall::$wasRefusedAsFinal}) while nothing since can have changed what
+     * the refusal depends on; null otherwise. The backward scan from the newest row ends with null at:
+     * - a signal row of any source or a user-role row ({@see AIConversationMessage::isSignalOrUserRoleRow()}): a
+     *   message to a sub-agent, an owner's confirmation or widget click, a connected channel may bring what was missing;
+     * - a completed call that changes state and was not refused as a repeat ({@see ToolCall::changesState()}): a granted
+     *   mandate, a changed setting;
+     * - the newest identical call when it was not refused finally (it ran, or failed otherwise).
+     * An identical call the loop refused as a repeat ran nothing and is passed over, so a third identical call meets the
+     * executor's own refusal, never the loop's answer to the second. `$toolCall` itself is skipped.
+     */
+    public function getNewestEarlierIdenticalCallWhenRefusedAsFinal(ToolCall $toolCall): ?ToolCall
+    {
+        $toolName = (string)($toolCall->name ?? '');
+        $identityKey = $toolCall->getNormalizedIdentityKey();
+        for ($position = count($this->rows) - 1; $position >= 0; $position--) {
+            $row = $this->rows[$position];
+            if ($row->isSignalOrUserRoleRow()) {
+                return null;
+            }
+            $priorCall = isset($row->toolCall) ? $row->toolCall : null;
+            if ($priorCall === null || $priorCall === $toolCall || $priorCall->wasRefusedAsDuplicate) {
+                continue;
+            }
+            $isIdenticalCall = (string)($priorCall->name ?? '') === $toolName && $priorCall->getNormalizedIdentityKey() === $identityKey;
+            if ($isIdenticalCall) {
+                return $priorCall->isRefusedAsFinal() ? $priorCall : null;
+            }
+            if ($priorCall->status === AIConversationMessage::STATUS_COMPLETED && $priorCall->changesState()) {
+                return null;
+            }
+        }
+        return null;
+    }
+
     /** The rows' calls with `$toolCall`'s normalized arguments that the loop refused as repeats (`$toolCall` itself skipped). */
     public function countRefusedRepeatsWithNormalizedIdentityKey(ToolCall $toolCall): int
     {
@@ -589,9 +625,15 @@ class AIConversationToolCallHistory extends ValueObject
             $toolCall = isset($message->toolCall) ? $message->toolCall : null;
             // A GATE refusal (mandate / owner confirmation) is the sanctioned "call again when the gate opens" —
             // it never counts as a repeat, or the authorized third call is swallowed.
-            if ($toolCall !== null && !$toolCall->wasRefusedByGate && $toolCall->signature() === $signature) {
-                $count++;
+            if ($toolCall === null || $toolCall->wasRefusedByGate || $toolCall->signature() !== $signature) {
+                continue;
             }
+            // A repeat the loop answered with an earlier final refusal ran nothing: counted, it would refuse the
+            // identical call a later signal row lets run again.
+            if ($toolCall->wasRefusedAsDuplicate && $toolCall->isRefusedAsFinal()) {
+                continue;
+            }
+            $count++;
         }
         return $count;
     }

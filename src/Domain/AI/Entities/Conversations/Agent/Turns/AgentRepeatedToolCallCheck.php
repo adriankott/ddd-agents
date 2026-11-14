@@ -15,8 +15,10 @@ use DDD\Domain\Base\Entities\ValueObject;
  * Whether one tool call repeats earlier work of the conversation (formerly asked separately
  * by the dispatch and by the fork admission, each building the same history reads): the identical call past the
  * per-turn guard, a read that already failed twice, a read the current turn already answered, a write already
- * persisted. Two callers, two questions, each in today's order:
- * - the dispatch asks {@see verdictForRepeatGuard()} first and the three findings later in its branch chain;
+ * persisted, a write whose identical call the current turn already saw refused finally. Two callers, two questions, each
+ * in today's order:
+ * - the dispatch asks {@see findFinalRefusalOfTheSameWriteInTurn()} first, then {@see verdictForRepeatGuard()}, and the
+ *   three findings later in its branch chain;
  * - the fork admission asks {@see wouldInterceptBeforeAppend()} before the call's row exists.
  * Every answer is read from the history when asked, never cached: the dispatch's branch order decides which reads run.
  *
@@ -160,6 +162,64 @@ class AgentRepeatedToolCallCheck extends ValueObject
     }
 
     /**
+     * The most of a final refusal quoted in {@see buildRepeatAfterFinalRefusalCorrective()}: above the longest refusal
+     * the package writes (the executor's mandate refusal, about 600 characters with its names), so its closing
+     * instruction is quoted whole.
+     */
+    public const int MAX_QUOTED_FINAL_REFUSAL_CHARS = 1000;
+
+    /**
+     * The call of the current turn whose final refusal this WRITE repeats: the newest earlier call of the same tool with
+     * the same normalized arguments, refused finally by the executor, with no signal row and no completed write since
+     * ({@see \DDD\Domain\AI\Entities\Conversations\Messages\AIConversationToolCallHistory::getNewestEarlierIdenticalCallWhenRefusedAsFinal()}).
+     * Null for a call whose tool changes nothing, and otherwise.
+     */
+    public function findFinalRefusalOfTheSameWriteInTurn(): ?ToolCall
+    {
+        if (!isset($this->conversation->messages) || !$this->toolCall->changesState()) {
+            return null;
+        }
+        return $this->conversation->messages->buildCurrentTurn()->buildToolCallHistory()->getNewestEarlierIdenticalCallWhenRefusedAsFinal($this->toolCall);
+    }
+
+    /**
+     * The answer to the identical repeat of a write that was refused finally: not executed, nothing done, the refusal's own
+     * words, and the one move left — the answer, on a step without tools.
+     */
+    public function buildRepeatAfterFinalRefusalCorrective(ToolCall $finallyRefusedCall): string
+    {
+        $refusalText = self::cutAtSentenceEnd(trim($finallyRefusedCall->getResultTextHead(PHP_INT_MAX)), self::MAX_QUOTED_FINAL_REFUSAL_CHARS);
+        return sprintf(
+            'NOT executed: `%s` with these arguments was already refused in this turn, and that refusal is final — the same '
+            . 'call is refused again, and nothing was done. The refusal: «%s» Write your answer now from what it says; the '
+            . 'next step has no tools.',
+            $this->getToolName(),
+            $refusalText !== '' ? $refusalText : '(no refusal text)'
+        );
+    }
+
+    /**
+     * `$text` whole when it has at most `$maxChars` characters; otherwise cut after the last sentence end (`.`, `!` or
+     * `?` followed by white space) at or below the limit, else after the last whole word, else at the limit, and marked
+     * with " …".
+     */
+    public static function cutAtSentenceEnd(string $text, int $maxChars): string
+    {
+        if (mb_strlen($text) <= $maxChars) {
+            return $text;
+        }
+        // one character beyond the limit: a sentence or word that ends exactly at the limit is followed by white space
+        $window = mb_substr($text, 0, $maxChars + 1);
+        if (preg_match('/^(.*[.!?])\s/su', $window, $sentenceMatch) === 1) {
+            return $sentenceMatch[1] . ' …';
+        }
+        if (preg_match('/^(.*\S)\s/su', $window, $wordMatch) === 1) {
+            return $wordMatch[1] . ' …';
+        }
+        return mb_substr($text, 0, $maxChars) . ' …';
+    }
+
+    /**
      * An identical read that already failed twice in the conversation (and nothing changed since): its failure count
      * and last failure text. Null for a state-refreshing tool.
      *
@@ -206,7 +266,9 @@ class AgentRepeatedToolCallCheck extends ValueObject
     /**
      * Whether the dispatch would answer this call WITHOUT executing it — asked by the fork admission BEFORE the
      * call's row is appended (the repeat count therefore counts one more). Today's order: no name, the repeat cap,
-     * the identical write, a tool outside $loadedToolNames, the failed read, the reused read.
+     * the identical write (also one that saved nothing or was refused finally), a tool a delegated run is never offered
+     * ({@see AIConversation::findToolNamesLeftOutOfADelegatedRun()}), a tool outside $loadedToolNames, the failed read,
+     * the reused read.
      *
      * @param string[] $loadedToolNames the newest loaded capabilities' tool names
      */
@@ -219,10 +281,14 @@ class AgentRepeatedToolCallCheck extends ValueObject
         if ($this->countIdenticalCallsInTurn() + 1 >= self::MAX_REPEATED_TOOL_CALLS) {
             return true;
         }
-        if ($this->findEarlierIdenticalWriteIndex() !== null || $this->findEarlierUnsavedIdenticalCallInTurn() !== null) {
+        if ($this->findEarlierIdenticalWriteIndex() !== null || $this->findEarlierUnsavedIdenticalCallInTurn() !== null
+            || $this->findFinalRefusalOfTheSameWriteInTurn() !== null
+        ) {
             return true;
         }
-        if (!in_array($toolName, $loadedToolNames, true)) {
+        if (in_array($toolName, $this->conversation->findToolNamesLeftOutOfADelegatedRun(), true)
+            || !in_array($toolName, $loadedToolNames, true)
+        ) {
             return true;
         }
         return $this->findRepeatedFailedRead() !== null || $this->findReusablePriorRead() !== null;

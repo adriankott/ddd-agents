@@ -25,7 +25,6 @@ use DDD\Domain\AI\Services\Conversations\AIConversationRunClaimsService;
 use DDD\Domain\AI\Services\Conversations\AIConversationsService;
 use DDD\Domain\AI\Traits\Conversations\AITraceLogTrait;
 use DDD\Infrastructure\Services\DDDService;
-use DDD\Domain\Base\Repo\DB\Doctrine\EntityManagerFactory;
 use DDD\Infrastructure\Base\DateTime\DateTime;
 use DDD\Infrastructure\Services\Service;
 use Throwable;
@@ -46,8 +45,11 @@ class AIConversationDelegationNotificationsService extends Service
 
     /**
      * Write the one notification of run `$runNumber` of the sub-agent on `$delegateCallMessageId` into its parent:
-     * under the parent's message index lock (taken FIRST) and in one transaction — the
-     * `reportedToParentAt` compare-and-set, then the signal row rendered from the records. After the commit a
+     * in the fenced write of every message writer ({@see AIConversationMessagesService::openClaimFencedWrite()}, without a
+     * run token): the parent's message index lock (taken FIRST), then one transaction whose first statement locks the
+     * parent's conversation row, so a concurrent change of that row cannot fail the message INSERT with MariaDB's error
+     * 1020 under `innodb_snapshot_isolation` and roll back the stamp — the `reportedToParentAt` compare-and-set, then the
+     * signal row rendered from the records. After the commit a
      * notification that resumes the parent stamps the parent's inbound activity, ticks the realtime status and — when
      * the parent is not terminal and holds no live claim — dispatches ONE resume (a running parent takes the row at its
      * next model call; its release re-checks waiting rows). Returns whether THIS call wrote the notification.
@@ -63,23 +65,15 @@ class AIConversationDelegationNotificationsService extends Service
         }
         $parentConversation = $this->buildParentConversationForRowWrites((int)$delegateCallRow->aiConversationId);
         $messagesService = $this->messagesService();
-        $connection = EntityManagerFactory::getInstance()->getConnection();
-        $notification = null;
-        $messageIndexLock = $messagesService->lockMessageIndex($parentConversation);
+        // the fenced write of every message writer: the parent's index lock, then its conversation row locked as the
+        // first statement of the transaction — no claim is compared (this process does not drive the parent)
+        $writeScope = $messagesService->openClaimFencedWrite($parentConversation, null);
         try {
-            $connection->beginTransaction();
-            try {
-                $notification = $this->writeNotificationRowIfUnreported($parentConversation, $delegateCallMessageId, $runNumber);
-                $connection->commit();
-            } catch (Throwable $notificationError) {
-                if ($connection->isTransactionActive()) {
-                    $connection->rollBack();
-                }
-                throw $notificationError;
-            }
-        } finally {
-            $messagesService->unlockMessageIndex($messageIndexLock);
+            $notification = $this->writeNotificationRowIfUnreported($parentConversation, $delegateCallMessageId, $runNumber);
+        } catch (Throwable $notificationError) {
+            $messagesService->rollBackClaimFencedWrite($writeScope, $notificationError);
         }
+        $messagesService->commitClaimFencedWrite($writeScope);
         if ($notification === null) {
             return false;
         }
@@ -261,8 +255,8 @@ class AIConversationDelegationNotificationsService extends Service
     }
 
     /**
-     * The compare-and-set and the row, run by {@see notifyParentOfSubAgentRunEnd()} inside its transaction under the
-     * parent's index lock: null when the run had already been reported (or has not ended) — nothing written.
+     * The compare-and-set and the row, run by {@see notifyParentOfSubAgentRunEnd()} inside its fenced write on the
+     * parent: null when the run had already been reported (or has not ended) — nothing written.
      *
      * @throws Throwable
      */

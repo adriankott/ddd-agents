@@ -35,4 +35,24 @@ class DelegationSubAgentRefusal extends ValueObject
         $delegationSubAgentRefusal->corrective = $corrective;
         return $delegationSubAgentRefusal;
     }
+
+    /**
+     * The refusal of a tool run whose tool is judged on the owner's own words
+     * ({@see \DDD\Domain\AI\Entities\MCPPackages\MCPToolRequiresOwnerWordsAsEvidence}): a sub-agent sees only its task,
+     * never the conversation with the owner. The conversation with the owner makes that call itself before it
+     * delegates; a delegating conversation that is itself a delegated run (`$parentIsDelegatedRun`) cannot make it
+     * either, and is told that the main conversation with the owner makes it.
+     */
+    public static function forToolRequiringOwnerWords(string $toolName, bool $parentIsDelegatedRun): static
+    {
+        return static::forFailureReasonAndCorrective(
+            DelegationSubAgentRun::FAILURE_REASON_REFUSED,
+            'delegate REJECTED — `' . $toolName . '` needs the owner\'s own words as evidence, and a sub-agent sees only its '
+                . 'task, never ' . ($parentIsDelegatedRun ? 'the' : 'your') . ' conversation with the owner. '
+                . ($parentIsDelegatedRun
+                    ? 'You are a sub-agent too: the main conversation with the owner makes this call. '
+                    : 'Make this call yourself in this conversation before you delegate. ')
+                . 'Nothing was started.'
+        );
+    }
 }

@@ -52,6 +52,22 @@ class LoadableSubSkillTools extends ValueObject
         return array_map(static fn (LoadableSubSkillTool $loadableSubSkillTool): string => $loadableSubSkillTool->toolName, $this->tools);
     }
 
+    /**
+     * These tools without the ones named in `$toolNames` (the tools the conversation is never offered); the order of the
+     * rest is kept.
+     *
+     * @param string[] $toolNames
+     */
+    public function withoutToolNames(array $toolNames): static
+    {
+        $loadableSubSkillTools = new static();
+        $loadableSubSkillTools->tools = array_values(array_filter(
+            $this->tools,
+            static fn (LoadableSubSkillTool $loadableSubSkillTool): bool => !in_array($loadableSubSkillTool->toolName, $toolNames, true)
+        ));
+        return $loadableSubSkillTools;
+    }
+
     /** No sub-skill tool is listed. */
     public function isEmpty(): bool
     {

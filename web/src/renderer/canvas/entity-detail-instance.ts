@@ -11,6 +11,11 @@ export interface EntityDetailTarget {
   entityId: string;
 }
 
+/** The entity an `openEntity` action opens: its type, its id and the key of its agent space when the entity names one. */
+export interface OpenEntityActionTarget extends EntityDetailTarget {
+  agentSpaceKey?: number;
+}
+
 const ENTITY_TYPE_PATTERN = /^[a-zA-Z][a-zA-Z0-9]*$/;
 /** An entity id: letters, digits, `_`, `-`, `.` — a row id or an external id, never a path or markup. */
 const ENTITY_ID_PATTERN = /^[A-Za-z0-9_.-]{1,256}$/;
@@ -55,7 +60,7 @@ export const isRowBoundOpenEntityAction = (action: Record<string, unknown>): boo
  */
 const readEntityDetailTargetOfEntity = (
   entity: unknown,
-): (EntityDetailTarget & { agentSpaceKey?: number }) | undefined => {
+): OpenEntityActionTarget | undefined => {
   if (!isPlainRecord(entity)) return undefined;
   const { entityType, entityId } = entity;
   const agentSpaceKey = entity[getWidgetSelfHydrationKeyFieldName()];
@@ -81,7 +86,7 @@ const readEntityDetailTargetOfEntity = (
 export const readOpenEntityActionTarget = (
   action: Record<string, unknown>,
   currentRow?: unknown,
-): (EntityDetailTarget & { agentSpaceKey?: number }) | undefined => {
+): OpenEntityActionTarget | undefined => {
   if (isRowBoundOpenEntityAction(action)) {
     return isPlainRecord(currentRow) ? readEntityDetailTargetOfEntity(currentRow.entity) : undefined;
   }

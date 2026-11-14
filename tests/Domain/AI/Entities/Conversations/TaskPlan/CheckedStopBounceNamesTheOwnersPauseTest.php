@@ -11,12 +11,15 @@ use DDD\Tests\Agents\Support\UnitTestCase;
 
 /**
  * The checked-stop bounce names the way out for an owner who asked to stop after a part and check back: report that
- * part and end with the one question, the later items stay open. The sentence is in the text with and without the
- * sub-agent prefix.
+ * part and end with the one question, the later items stay open. It also names the stop the owner ordered outright
+ * (stop, wait, not now): no item is worked, the answer is repeated and names what stays open. Both sentences are in the
+ * text with and without the sub-agent prefix.
  */
 class CheckedStopBounceNamesTheOwnersPauseTest extends UnitTestCase
 {
     protected const string PAUSE_SENTENCE = 'When the owner asked you to stop after a part and check back with them: report that part and end with that ONE question — the items after it stay open.';
+
+    protected const string OWNER_ORDERED_STOP_SENTENCE = 'When the owner said stop, wait or not now: work no item — your final answer repeats what you said and names the items that stay open.';
 
     protected function buildTaskPlanWithOpenItems(): TaskPlan
     {
@@ -30,8 +33,8 @@ class CheckedStopBounceNamesTheOwnersPauseTest extends UnitTestCase
     {
         $bounceText = AgentCheckedStopPolicy::buildCheckedStopBounceText($this->buildTaskPlanWithOpenItems());
 
-        self::assertStringContainsString(self::PAUSE_SENTENCE, $bounceText);
-        self::assertStringEndsWith('Then give your final answer, reporting the result of every item — it is accepted as it is.', $bounceText);
+        self::assertStringContainsString(self::PAUSE_SENTENCE . ' ' . self::OWNER_ORDERED_STOP_SENTENCE, $bounceText);
+        self::assertStringEndsWith(self::OWNER_ORDERED_STOP_SENTENCE . ' Otherwise give your final answer, reporting the result of every item — it is accepted as it is.', $bounceText);
     }
 
     public function testTheBounceOfASubAgentFoldNamesTheOwnersPauseToo(): void
@@ -39,6 +42,6 @@ class CheckedStopBounceNamesTheOwnersPauseTest extends UnitTestCase
         $bounceText = AgentCheckedStopPolicy::buildCheckedStopBounceText($this->buildTaskPlanWithOpenItems(), true);
 
         self::assertStringStartsWith('Your sub-agents\' results are above', $bounceText);
-        self::assertStringContainsString(self::PAUSE_SENTENCE, $bounceText);
+        self::assertStringContainsString(self::PAUSE_SENTENCE . ' ' . self::OWNER_ORDERED_STOP_SENTENCE, $bounceText);
     }
 }

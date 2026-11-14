@@ -15,7 +15,10 @@ the block.
 
 - The catalog in the system prompt (`LoadSkillsTool::renderCatalogBlock()`, header `LoadSkillsTool::CATALOG_HEADER`)
   holds the TOP level only, one line per offered root: `- <name> — <description>`. The line speaks for the whole
-  sub-tree and names no sub-skill and no tool, so the catalog stays the same for the whole conversation.
+  sub-tree and names no sub-skill and no tool. A skill the same prompt build renders in its loaded-skills block reads
+  `- <name> — LOADED, its tools are in your tool list — <description>`, so the catalog stays the same as long as that
+  set is the same (under append-only loading: the epoch's base set; a skill appended later is not marked, the appended
+  item announces it as loaded and the header names that announcement).
 - A LOADED skill lists its offered direct sub-skills in its own block, under `AISkill::SUB_SKILLS_HEADER`, each with
   its `description` (`AISkill::getSubSkillLines()`).
 - Tools are visible of loaded skills only.

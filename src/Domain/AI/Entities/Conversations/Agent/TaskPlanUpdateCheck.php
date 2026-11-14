@@ -37,8 +37,11 @@ class TaskPlanUpdateCheck extends ValueObject
     /** @var array<string, int> every conforming key the call sends → how often, in first-occurrence order */
     protected array $sentKeyCounts = [];
 
-    /** @var array<string, true> every conforming key the call sends with `"remove": true` */
+    /** @var array<string, true> every conforming key the call sends with `"remove": true`, at any level */
     protected array $removedKeys = [];
+
+    /** @var array<string, true> the keys of the stored items whose subtasks the call lists */
+    protected array $storedParentKeysWithListedSubtasks = [];
 
     /** @var TaskPlanItemAddress[] the stored items of a level the call lists that the call never names */
     protected array $omittedItemAddresses = [];
@@ -79,6 +82,7 @@ class TaskPlanUpdateCheck extends ValueObject
         }
         $this->collectSentKeys($updateTaskPlanArguments->items);
         $topLevelItemCount = $this->checkLevel($updateTaskPlanArguments->items, null, null);
+        $this->checkContainersEmptiedByRemovalsOutsideTheirList();
         // no key sent twice
         foreach ($this->sentKeyCounts as $sentKey => $occurrences) {
             if ($occurrences > 1) {
@@ -139,6 +143,9 @@ class TaskPlanUpdateCheck extends ValueObject
         };
         // the parent the level's items belong to: "" = the top level, a stored key, null = a new item
         $levelParentKey = $isTopLevel ? '' : ($storedParentItem !== null ? $this->keyOfStoredItem($storedParentItem) : null);
+        if ($storedParentItem !== null) {
+            $this->storedParentKeysWithListedSubtasks[(string)$levelParentKey] = true;
+        }
         $storedLevelItems = $isTopLevel ? $this->standingTaskPlanItems : $storedParentItem?->subtasks;
         $resultingItemCount = 0;
         $newItemCount = 0;
@@ -177,8 +184,8 @@ class TaskPlanUpdateCheck extends ValueObject
             }
             $storedItem = $storedItemAddress->item;
             $storedParentKey = self::parentKeyOf($storedItemAddress->key);
-            // the item stays on its level
-            if ($levelParentKey !== $storedParentKey) {
+            // the item stays on its level; a removal names its item by key wherever it stands — a removal is no move
+            if ($levelParentKey !== $storedParentKey && !$argumentsItem->isRemovalOfKey()) {
                 $this->reject(TaskPlanUpdateRejection::itemMoved($sentKey, $parentLevel, TaskPlanUpdateRejection::describeStoredLevel($storedParentKey), $storedItem->seededByPurpose, $storedParentKey, $this->findSubtaskKeysOfStoredItemWithKey($storedParentKey)));
             } elseif ($storedItem->seededByPurpose && !$argumentsItem->isRemovalOfKey()) {
                 $keptSeededItems[] = TaskPlanKeptSeededItem::forKeyAndStoredPosition($sentKey, self::positionOf($storedItemAddress));
@@ -221,6 +228,47 @@ class TaskPlanUpdateCheck extends ValueObject
             }
         }
         return $resultingItemCount;
+    }
+
+    /**
+     * R18 for a stored item whose subtasks the call does not list ({@see checkLevel()} asks it of a listed level): the
+     * item stays, and every one of its stored subtasks is removed by an element at another level of the call. An item
+     * removed itself, or with an ancestor, takes its subtree along and is no container that stays.
+     */
+    protected function checkContainersEmptiedByRemovalsOutsideTheirList(): void
+    {
+        if ($this->removedKeys === []) {
+            return;
+        }
+        foreach ($this->standingItemAddresses?->getElements() ?? [] as $storedItemAddress) {
+            $storedItem = $storedItemAddress->item;
+            if (($storedItem->subtasks?->count() ?? 0) === 0
+                || isset($this->storedParentKeysWithListedSubtasks[$storedItemAddress->key])
+                || $this->isRemovedWithItsSubtree($storedItemAddress)
+            ) {
+                continue;
+            }
+            foreach ($storedItem->subtasks->getElements() as $storedSubtask) {
+                if (!isset($this->removedKeys[$this->keyOfStoredItem($storedSubtask)])) {
+                    continue 2;
+                }
+            }
+            $this->reject(TaskPlanUpdateRejection::containerLeftEmpty($storedItemAddress->key, $storedItem->text));
+        }
+    }
+
+    /** Whether the call removes this stored item, itself or with one of its ancestors. */
+    protected function isRemovedWithItsSubtree(TaskPlanItemAddress $storedItemAddress): bool
+    {
+        if (isset($this->removedKeys[$storedItemAddress->key])) {
+            return true;
+        }
+        foreach ($storedItemAddress->ancestors as $ancestorItem) {
+            if (isset($this->removedKeys[$this->keyOfStoredItem($ancestorItem)])) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** The shape checks (and the R4 variants) for one element — every violation named; false when any was found. */

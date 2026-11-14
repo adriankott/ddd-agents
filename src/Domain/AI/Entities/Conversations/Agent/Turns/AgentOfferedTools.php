@@ -114,12 +114,16 @@ class AgentOfferedTools extends ValueObject
         // simply drops back to "available".
         $loadedSkillToolDefinitions = $agentOfferedToolsInputs->loadedSkillToolDefinitions;
         $residentToolNames = $agentOfferedToolsInputs->residentToolNames;
-        // The purpose's `blockedToolNames` (the root's for a delegation child) leave the wire — resident schema and
-        // load_tool catalog alike. The executor refuses such a call anyway; a tool the model cannot see it does not
-        // call, and a refusal it never saw it cannot relay as "I could not do X". The loop holds no tool name here.
+        $loadableSubSkillTools = $agentOfferedToolsInputs->loadableSubSkillTools;
+        // The purpose's `blockedToolNames` (the root's for a delegation child) and, in a delegated run, the tools that
+        // need the owner's own words leave the wire — resident schema, load_tool catalog and the sub-skill tools
+        // alike. A call of such a tool by name is still refused (the executor for a purpose's blocked tool, the
+        // dispatch for a tool a delegated run is never offered); a tool the model cannot see it does not call, and a
+        // refusal it never saw it cannot relay as "I could not do X". The loop holds no tool name here.
         if ($agentOfferedToolsInputs->purposeBlockedToolNames !== []) {
             $loadedSkillToolDefinitions = $loadedSkillToolDefinitions->withoutNames($agentOfferedToolsInputs->purposeBlockedToolNames);
             $residentToolNames = array_values(array_diff($residentToolNames, $agentOfferedToolsInputs->purposeBlockedToolNames));
+            $loadableSubSkillTools = $loadableSubSkillTools->withoutToolNames($agentOfferedToolsInputs->purposeBlockedToolNames);
         }
         if ($agentOfferedToolsInputs->appendOnlyReachableToolDefinitions !== null) {
             // the epoch's whole reachable domain tool set (the purpose's blocked tools already removed)
@@ -139,7 +143,7 @@ class AgentOfferedTools extends ValueObject
         $loadTool = LoadToolTool::forAvailableTools(
             $loadedSkillToolDefinitions,
             $residentToolNames,
-            $agentOfferedToolsInputs->loadableSubSkillTools,
+            $loadableSubSkillTools,
             $agentOfferedToolsInputs->listsSubSkillToolsByNameOnly,
             $agentOfferedToolsInputs->ownerIsOnThePhoneLine
         );

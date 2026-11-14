@@ -40,7 +40,7 @@ export interface ChartSeriesDeclaration {
   hasExplicitLabel: boolean;
 }
 
-/** The theme colours the chart draws with, resolved from the `--sc-charts-*` and `--fn-*` tokens at render time. */
+/** The theme colours the chart draws with, resolved from the `--agents-*` tokens at render time. */
 export interface ChartPalette {
   seriesColors: string[];
   axisTextColor: string;
@@ -112,7 +112,7 @@ export interface ChartBarRow {
   valueText: string;
   /** The filled part of the track, 0 to 1. */
   fraction: number;
-  /** The colour token of the bar (`--sc-charts-0N`). */
+  /** The colour token of the bar (`--agents-chart-0N`). */
   colorToken: string;
   /** The signed change ("+2", "-3", "0"); undefined when the row has no number in the delta field. */
   deltaText?: string;

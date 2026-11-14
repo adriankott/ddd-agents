@@ -145,6 +145,17 @@ step is left (`armForcedOwnerReportCallIfOwed()`; `ddd-module-agents-autonomy-sp
   (`AgentRepeatedToolCallCheck::hasRepeatGuardAnsweredASkillLoadInAnEarlierStepOfTheTurn()`) gets the generic
   corrective and the tool-less step. The calls of one model step are answered alike; a step begins at the row with
   the usage stamp.
+- The identical write after its FINAL refusal in this turn (`MCPToolResponse::finalRefusal()`, carried as
+  `ToolCall::$wasRefusedAsFinal`, stored only when true; `AgentRepeatedToolCallCheck::findFinalRefusalOfTheSameWriteInTurn()`)
+  does not run: it is answered with the refusal the first call met — the executor's, or for a tool a delegated run is
+  never offered the dispatch's own (`AgentToolCallDispatchService::buildRefusalOfToolLeftOutOfADelegatedRun()`) —
+  quoted by `buildRepeatAfterFinalRefusalCorrective()` (never the loop's earlier answer; cut at a sentence end above
+  the longest refusal the package writes), and the next step runs without tools. The dispatch decides it before the
+  repeat guard, so the second, third and every later identical call get this answer, stored FAILED with
+  `wasRefusedAsDuplicate` and `wasRefusedAsFinal`. A signal row of any source or a completed write between
+  the refusal and the repeat lets the repeat run (a granted mandate, a message from the parent, an owner click). A final
+  refusal may carry a gate kind (the mandate a sub-agent or a scheduled run cannot obtain); a gate refusal that is not
+  final stays the sanctioned retry.
 
 ## 8. The loop's memory between steps
 

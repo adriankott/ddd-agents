@@ -20,6 +20,7 @@ use DDD\Domain\AI\Services\Conversations\AIConversationMessagesService;
 use DDD\Domain\AI\Services\Conversations\AIConversationRealtimeSignalService;
 use DDD\Domain\AI\Services\Conversations\AIConversationRunClaimsService;
 use DDD\Infrastructure\Services\DDDService;
+use Doctrine\DBAL\DriverManager;
 use RuntimeException;
 
 /**
@@ -28,8 +29,9 @@ use RuntimeException;
  * child, the record and the deadline row), the continuation run
  * ({@see AIConversationDelegationSpawnService::openSubAgentContinuationRun()} — a transaction of its own, or a level
  * of the caller's) and the parent's notification
- * ({@see AIConversationDelegationNotificationsService::notifyParentOfSubAgentRunEnd()} — a transaction inside the hold
- * of the parent's message index lock, which on PostgreSQL is itself a transaction).
+ * ({@see AIConversationDelegationNotificationsService::notifyParentOfSubAgentRunEnd()} — the fenced write of every
+ * message writer on the parent: its message index lock, which on PostgreSQL is itself a transaction, and the parent's
+ * conversation row locked first in that transaction).
  */
 class AIConversationSubAgentRunEndContinuationAndNotificationDatabaseTest extends DelegationTreeDatabaseTestCase
 {
@@ -196,6 +198,37 @@ class AIConversationSubAgentRunEndContinuationAndNotificationDatabaseTest extend
         self::assertSame(2, $this->findStoredSubAgentRecord()['currentRunNumber']);
     }
 
+    /**
+     * The continuation writes a deadline row whose foreign key points at the parent's conversation row, and the
+     * run-end notification locks that row before it stamps the `delegate` row. A continuation that locked the
+     * `delegate` row first would wait for the parent's row while the notification waits for the `delegate` row: a
+     * deadlock. So the continuation holds the parent's row when it takes the `delegate` row.
+     */
+    public function testAContinuationHoldsTheParentsConversationRowWhenItLocksTheDelegateRow(): void
+    {
+        $this->insertEndedSubAgent(AIConversationRunState::COMPLETED, true);
+        $childConversation = $this->buildChildAsItsWorkerLoadedIt([]);
+        $connection = $this->getDatabaseConnection();
+        $connectionOfAnotherWorker = DriverManager::getConnection($connection->getParams(), $connection->getConfiguration());
+        $messagesService = new MessagesServiceThatProbesTheConversationRowAtTheDelegateRowLock();
+        $messagesService->connectionOfAnotherWorker = $connectionOfAnotherWorker;
+        $messagesService->sqlDialect = $this->getSqlDialect();
+        $messagesService->probedConversationId = self::PARENT_CONVERSATION_ID;
+        $this->spawnService->messagesServiceInsteadOfTheContainers = $messagesService;
+        try {
+            self::assertTrue($this->spawnService->openSubAgentContinuationRun($childConversation, 'Please shorten the draft.', DelegationSubAgentRun::CONTINUED_BY_ADMIN));
+        } finally {
+            $connectionOfAnotherWorker->close();
+        }
+
+        self::assertFalse(
+            $messagesService->anotherWorkerCouldChangeTheConversationRowAtTheDelegateRowLock,
+            'the parent\'s conversation row is locked before the delegate row'
+        );
+        self::assertSame(2, $this->findStoredSubAgentRecord()['currentRunNumber']);
+        self::assertFalse($connection->isTransactionActive());
+    }
+
     public function testAContinuationThatCannotQueueTheChildAgainLeavesNoDeadlineRowBehind(): void
     {
         // the record says the run ended while a worker still drives the child
@@ -251,6 +284,31 @@ class AIConversationSubAgentRunEndContinuationAndNotificationDatabaseTest extend
         self::assertCount(1, $this->findStoredSignalRowsOfTheParent());
         self::assertSame([self::PARENT_CONVERSATION_ID], $this->notificationsService->resumedParentConversationIds);
         self::assertFalse($this->getDatabaseConnection()->isTransactionActive());
+    }
+
+    /**
+     * The notification is a fenced write on the parent: its conversation row is locked from the first statement of the
+     * transaction on, so another worker that changes that row (the parent's summary) waits for the write instead of
+     * changing it after the write's snapshot — which fails the message INSERT on MariaDB with error 1020 under
+     * `innodb_snapshot_isolation` and rolls back the `reportedToParentAt` stamp with it.
+     */
+    public function testTheNotificationLocksTheParentsConversationRowWhileItWrites(): void
+    {
+        $this->insertEndedSubAgent(AIConversationRunState::COMPLETED, false);
+        $connection = $this->getDatabaseConnection();
+        $connectionOfAnotherWorker = DriverManager::getConnection($connection->getParams(), $connection->getConfiguration());
+        $this->notificationsService->connectionOfAnotherWorker = $connectionOfAnotherWorker;
+        $this->notificationsService->sqlDialect = $this->getSqlDialect();
+        try {
+            self::assertTrue($this->notificationsService->notifyParentOfSubAgentRunEnd(self::DELEGATE_ROW_ID, 1));
+        } finally {
+            $connectionOfAnotherWorker->close();
+        }
+
+        self::assertFalse($this->notificationsService->anotherWorkerCouldChangeTheParentRowDuringTheWrite, 'the open write holds the parent\'s row');
+        self::assertCount(1, $this->findStoredSignalRowsOfTheParent());
+        self::assertNotEmpty($this->findStoredRunOfDelegateRow(self::DELEGATE_ROW_ID, 1)['reportedToParentAt']);
+        self::assertFalse($connection->isTransactionActive());
     }
 
     public function testAParentThatHasEndedAndASubAgentThatReportsWithoutAResumeGetTheirRowAndNoResume(): void

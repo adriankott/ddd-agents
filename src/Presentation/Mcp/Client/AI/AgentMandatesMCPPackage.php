@@ -9,6 +9,7 @@ use DDD\Domain\AI\Entities\MCPPackages\MCPTool;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolEffect;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolExecutionTimeout;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolParallelSafe;
+use DDD\Domain\AI\Entities\MCPPackages\MCPToolRequiresOwnerWordsAsEvidence;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolSummary;
 use DDD\Domain\AI\Services\AgentSpaces\AgentSpacesService;
 use DDD\Domain\AI\Services\Mandates\AgentMandatesService;
@@ -47,6 +48,7 @@ class AgentMandatesMCPPackage extends AgentMandateToolCallsMCPPackage
     #[MCPTool]
     #[MCPToolEffect(MCPToolEffect::WRITE, identicalRepeatDoesNewWork: true, isOutwardAction: true)]
     #[MCPToolExecutionTimeout(100, 'The consent check is a model call of up to 45 s and runs a second time when it gave no verdict.')]
+    #[MCPToolRequiresOwnerWordsAsEvidence('the grant is verified against the owner\'s own statement in the conversation')]
     #[MCPToolSummary('Grant a standing mandate from the customer\'s own statement in this conversation — server-verified against the real dialogue; rejected with a reason when consent is missing or quantity-based.')]
     public function grantMandate(
         MandateGrantRequestDto $requestDto,

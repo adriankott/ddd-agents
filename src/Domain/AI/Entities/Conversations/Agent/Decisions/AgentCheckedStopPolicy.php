@@ -65,7 +65,9 @@ class AgentCheckedStopPolicy extends ValueObject
      * The ONE checked-stop bounce text: the open items by key and plan-line title, split the way the
      * plan line splits them — the items the model ticks (finish and tick `done` with a `statusNote`, or mark them
      * `blocked` / `not_applicable` with a concrete `statusNote`) and the items the record closes (do their work; never
-     * tick them done) — or end on the one question an item needs. The next answer is accepted as it is
+     * tick them done) — or end on the one question an item needs; when the owner ordered a stop (stop, wait, not now),
+     * no item is worked and the final answer repeats what was said and names the items that stay open; otherwise the final
+     * answer reports the result of every item. The next answer is accepted as it is
      * ({@see MAX_BOUNCES_PER_CHUNK}). A turn that reads the sub-agents' results is told to tick from them, never to re-run a
      * child's tool (the results arrive as notifications; a delegation stored before the sub-agent records existed
      * carries them in its `delegate` tool result).
@@ -95,7 +97,8 @@ class AgentCheckedStopPolicy extends ValueObject
         }
         return $bounceText . ' An item only the owner\'s reply can resolve: resolve every other item first, then end with the ONE question that unblocks it. '
             . 'When the owner asked you to stop after a part and check back with them: report that part and end with that ONE question — the items after it stay open. '
-    . 'Then give your final answer, reporting the result of every item — it is accepted as it is.';
+            . 'When the owner said stop, wait or not now: work no item — your final answer repeats what you said and names the items that stay open. '
+            . 'Otherwise give your final answer, reporting the result of every item — it is accepted as it is.';
     }
 
     /**

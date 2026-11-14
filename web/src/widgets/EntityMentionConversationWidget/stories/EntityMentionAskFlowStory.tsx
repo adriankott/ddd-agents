@@ -23,7 +23,7 @@ export const EntityMentionAskFlowStory = (props: { maxWidth?: number }) => (
             {entity.label}
           </Text>
           <Text role="help" color="var(--agents-fg-light)" translate={false}>
-            {"detail panel body (domain lane)"}
+            {"detail panel body"}
           </Text>
           <div className={styles.footer}>
             <EntityMentionAskButton {...entity} testId={`entity-mention-ask-${entity.entityId}`} />

@@ -64,6 +64,7 @@ class MCPToolExecutorTargetAgentSpaceTest extends UnitTestCase
 
         self::assertTrue($response->isError);
         self::assertNull($response->refusalKind, 'no gate that opens later: the same call is refused again');
+        self::assertTrue($response->isFinalRefusal(), 'the same arguments are refused again');
         self::assertSame(
             [
                 [

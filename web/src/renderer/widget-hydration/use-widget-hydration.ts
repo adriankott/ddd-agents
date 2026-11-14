@@ -43,6 +43,17 @@ const getRuntime = (key: string): RuntimeEntry => {
   return entry;
 };
 
+/**
+ * Aborts the in-flight read of each key and forgets the key, so the next mount reads anew instead of joining a read
+ * that no store waits for any more. Test support: the hydration stand-ins call it when they are restored.
+ */
+export const abandonWidgetHydrationReads = (keys: Iterable<string>): void => {
+  for (const key of keys) {
+    runtime.get(key)?.controller?.abort();
+    runtime.delete(key);
+  }
+};
+
 export interface UseWidgetHydrationResult<TData> {
   data: TData | null;
   status: WidgetHydrationStatus;

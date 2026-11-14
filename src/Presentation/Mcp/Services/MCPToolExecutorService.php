@@ -232,6 +232,7 @@ class MCPToolExecutorService extends Service
         $toolResult->bindableResult = $response->isError ? null : $response->getBindableResultRecord()?->toStoredArray();
         $toolResult->images = $toolResultImages;
         $toolResult->refusalKind = $response->refusalKind;
+        $toolResult->refusalIsFinal = $response->isFinalRefusal();
         $toolResult->platformNoteForModel = $response->getPlatformNoteForModel();
         $toolResult->dictatedWidgetType = $response->isError ? null : $response->getDictatedWidgetType();
         if ($toolResult->isError) {
@@ -708,7 +709,7 @@ class MCPToolExecutorService extends Service
                 try {
                     $targetAgentSpace = $this->findAgentSpaceOfToolCall($arguments, $serverProvidedInput);
                 } catch (ForbiddenException) {
-                    return MCPToolResponse::error($this->buildAgentSpaceNotUsableRefusalText($toolName));
+                    return MCPToolResponse::finalRefusal($this->buildAgentSpaceNotUsableRefusalText($toolName));
                 }
 
                 // THE HARD ENTITLEMENT GATE. The offer side filters a gated tool out of the turn
@@ -1066,7 +1067,7 @@ class MCPToolExecutorService extends Service
             ]);
             return null;
         }
-        return MCPToolResponse::gateRefusal($this->buildIneligibleScopeRefusalText($toolName), MCPToolResponse::REFUSAL_SCOPE_NOT_ELIGIBLE);
+        return MCPToolResponse::finalRefusal($this->buildIneligibleScopeRefusalText($toolName), MCPToolResponse::REFUSAL_SCOPE_NOT_ELIGIBLE);
     }
 
     /**
@@ -1192,7 +1193,7 @@ class MCPToolExecutorService extends Service
         $actionClassDescription = AgentMandate::getActionClassDescription($actionClass);
         $authAccountId = AuthService::instance()->getAccount()?->id;
         if ($authAccountId === null) {
-            return MCPToolResponse::error(
+            return MCPToolResponse::finalRefusal(
                 "Tool '{$toolName}' requires a mandate ({$actionClass}) and no account could be resolved to check "
                 . 'it against. Do not retry.'
             );
@@ -1238,7 +1239,7 @@ class MCPToolExecutorService extends Service
                 if (($serverProvidedInput->scheduleId ?? null) !== null) {
                     // Scheduled run: no customer is present, so "grant fresh and retry" is impossible — a
                     // deferred/scheduled order needs a TIME_WINDOW mandate covering its run time.
-                    return MCPToolResponse::error(
+                    return MCPToolResponse::finalRefusal(
                         "Tool '{$toolName}' was NOT executed: this scheduled run has no active mandate for "
                         . "{$actionClass}. A one-instruction mandate never covers a later scheduled run — a deferred "
                         . 'order needs a TIME_WINDOW mandate covering the planned run time, granted while the '
@@ -1331,7 +1332,7 @@ class MCPToolExecutorService extends Service
             );
         } catch (ForbiddenException) {
             // the account the mandate would be granted for may not use the target space: no mandate, no call
-            return MCPToolResponse::error($this->buildAgentSpaceNotUsableRefusalText($toolName));
+            return MCPToolResponse::finalRefusal($this->buildAgentSpaceNotUsableRefusalText($toolName));
         } catch (BadRequestException $noConsent) {
             return MCPToolResponse::gateRefusal(
                 "Tool '{$toolName}' was NOT executed: the customer has not asked for or agreed to this action "
@@ -1356,7 +1357,7 @@ class MCPToolExecutorService extends Service
     /** The refusal where the platform cannot check consent itself (a scheduled run, a delegation child, no dialogue). */
     protected function buildMandateRequiredRefusal(string $toolName, string $actionClass, string $actionClassDescription): MCPToolResponse
     {
-        return MCPToolResponse::gateRefusal(
+        return MCPToolResponse::finalRefusal(
             $this->buildMandateRequiredRefusalText($toolName, $actionClass, $actionClassDescription),
             MCPToolResponse::REFUSAL_MANDATE_REQUIRED
         );
@@ -1707,13 +1708,13 @@ class MCPToolExecutorService extends Service
         if ($targetAgentSpace !== null) {
             $featureFlags = $aIConversationEntitlementsService->findFeatureFlagsOfAgentSpace($targetAgentSpace);
             if ($featureFlags === null) {
-                return MCPToolResponse::error($this->buildFeatureFlagsNotCheckableForAgentSpaceRefusalText($toolName, $gatingFeatureFlagRequirement));
+                return MCPToolResponse::finalRefusal($this->buildFeatureFlagsNotCheckableForAgentSpaceRefusalText($toolName, $gatingFeatureFlagRequirement));
             }
         } else {
             $account = $this->findAccountOfToolCallWithoutAgentSpace($serverProvidedInput);
             $featureFlags = $account !== null ? $aIConversationEntitlementsService->findFeatureFlagsOfAccount($account) : null;
             if ($featureFlags === null) {
-                return MCPToolResponse::error($this->buildFeatureFlagsNotCheckableWithoutAgentSpaceRefusalText($toolName, $gatingFeatureFlagRequirement));
+                return MCPToolResponse::finalRefusal($this->buildFeatureFlagsNotCheckableWithoutAgentSpaceRefusalText($toolName, $gatingFeatureFlagRequirement));
             }
         }
 
@@ -1721,7 +1722,7 @@ class MCPToolExecutorService extends Service
             return null;
         }
 
-        return MCPToolResponse::error($this->buildFeatureFlagsMissingRefusalText($toolName, $gatingFeatureFlagRequirement));
+        return MCPToolResponse::finalRefusal($this->buildFeatureFlagsMissingRefusalText($toolName, $gatingFeatureFlagRequirement));
     }
 
     /**
@@ -1788,7 +1789,7 @@ class MCPToolExecutorService extends Service
         $aIConversationEntitlementsService = DDDService::instance()->getService(AIConversationEntitlementsService::class);
         $accountRightsSetting = $aIConversationEntitlementsService->findAccountRightsOfCurrentAccount();
         if ($accountRightsSetting === null) {
-            return MCPToolResponse::error(
+            return MCPToolResponse::finalRefusal(
                 "Tool '{$toolName}' requires the account rights {$requiredAccountRightNames}, and no account rights "
                 . 'could be resolved for the current user to check them against. Do not retry.'
             );
@@ -1798,7 +1799,7 @@ class MCPToolExecutorService extends Service
             return null;
         }
 
-        return MCPToolResponse::error(
+        return MCPToolResponse::finalRefusal(
             "Tool '{$toolName}' is not permitted for this user account — it requires the account rights "
             . "{$requiredAccountRightNames}. Do not retry. Tell the customer their account administrator has to grant "
             . 'that permission; this is NOT a plan upgrade and NOT a technical failure.'

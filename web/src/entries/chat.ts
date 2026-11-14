@@ -30,9 +30,20 @@ export { ConversationErrorCard, type ConversationErrorCardProps } from "../chat/
 export { ConversationMessageInputAttachmentsErrorBox } from "../chat/ConversationMessageInput/ConversationMessageInputAttachments/ConversationMessageInputAttachmentsErrorBox";
 export { ConversationMessageInputAttachmentsPreviewStrip } from "../chat/ConversationMessageInput/ConversationMessageInputAttachments/ConversationMessageInputAttachmentsPreviewStrip";
 export { normalizeServerMessageToMarkdown } from "../chat/normalize-server-message-to-markdown";
-// The widget provider bound to the chat store (the chat-free callbacks are in `./renderer`) and the canvas restore.
+// The SIGNAL sources an app's own message rows read: the phone call's started / ended markers and every source that
+// owes no work (never makes a failed run retryable).
+export {
+  PHONE_CALL_LIFECYCLE_SIGNAL_SOURCES,
+  SIGNAL_SOURCES_THAT_OWE_NO_WORK,
+} from "../chat/last-wire-message-is-unanswered-user-message";
+// The widget provider bound to the chat store (the chat-free callbacks are in `./renderer`), the canvas restore and the
+// mount of a widget a page opens (`?agentWidget=`) with its feature gate and error boundary.
 export { ConversationWidgetProvider, type ConversationWidgetProviderProps } from "../renderer/ConversationWidgetContext";
 export { CanvasRestoreOnMount, type CanvasRestoreOnMountProps } from "../renderer/canvas/CanvasRestoreOnMount";
+export {
+  ConversationDeepLinkedWidget,
+  type ConversationDeepLinkedWidgetProps,
+} from "../renderer/ConversationDeepLinkedWidget";
 // The building blocks a host composes its own chat surface from: the canvas pane, the message list, the message rows,
 // the input with its attachment shapes, and the activity ticker an app's own activity face paces itself by.
 export { CanvasPane } from "../chat/CanvasPane/CanvasPane";

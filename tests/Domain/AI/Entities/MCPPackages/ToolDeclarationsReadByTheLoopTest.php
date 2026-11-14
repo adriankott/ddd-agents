@@ -4,19 +4,30 @@ declare(strict_types=1);
 
 namespace DDD\Tests\Agents\Domain\AI\Entities\MCPPackages;
 
+use DDD\Domain\AI\Entities\Conversations\Agent\Delegation\AgentDelegationToolRunTask;
+use DDD\Domain\AI\Entities\Conversations\Agent\AgentRun;
+use DDD\Domain\AI\Entities\Conversations\Agent\Delegation\AgentSubAgentRequest;
+use DDD\Domain\AI\Entities\Conversations\Agent\Tools\DelegateTool;
+use DDD\Domain\AI\Entities\Conversations\Agent\Tools\DelegateToolArguments;
+use DDD\Tests\Agents\Domain\AI\Services\Conversations\Agent\Probes\TaskRefusalExposingDelegationSpawnService;
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Entities\Conversations\AIConversationSummary;
 use DDD\Domain\AI\Entities\Conversations\AIConversations;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessages;
 use DDD\Domain\AI\Entities\Conversations\Messages\ContextRetentionSettings;
+use DDD\Domain\AI\Entities\Conversations\Messages\LoadedCapabilities;
+use DDD\Domain\AI\Entities\Conversations\Messages\LoadedCapability;
 use DDD\Domain\AI\Entities\Conversations\Messages\ToolCall;
+use DDD\Domain\AI\Entities\Conversations\Messages\Delegation\DelegationSubAgentRefusal;
+use DDD\Domain\AI\Entities\Conversations\Messages\Delegation\DelegationSubAgentRun;
 use DDD\Domain\AI\Entities\Conversations\Purposes\AIConversationPurpose;
 use DDD\Domain\AI\Entities\Conversations\Purposes\ScheduleRunPurpose;
 use DDD\Domain\AI\Entities\Conversations\Widgets\ConversationSearchResultsConversationWidget;
 use DDD\Domain\AI\Entities\MCPPackages\MCPTool;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolAttributeCatalog;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolEffectCatalog;
+use DDD\Domain\AI\Entities\MCPPackages\MCPToolRequiresOwnerWordsAsEvidence;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolSendsMessageToOwner;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolWritesAgentMemoryOnly;
 use DDD\Domain\AI\Services\Conversations\AgentActivityLinesService;
@@ -26,6 +37,7 @@ use DDD\Domain\Base\Entities\LazyLoad\LazyLoadRepo;
 use DDD\Infrastructure\Base\DateTime\DateTime;
 use DDD\Infrastructure\Libs\Config;
 use DDD\Infrastructure\Services\DDDService;
+use DDD\Presentation\Mcp\Client\AI\AgentMandatesMCPPackage;
 use DDD\Tests\Agents\Domain\AI\Entities\MCPPackages\Probes\ToolDeclarationsProbeMCPPackage;
 use DDD\Tests\Agents\Support\UnitTestCase;
 use ReflectionClass;
@@ -35,7 +47,8 @@ use ReflectionProperty;
 /**
  * What the loop reads from a tool's declaration instead of a list of tool names: the id of the calling conversation
  * as an argument, a writer of agent memory rows beside forked calls and in the key of the standing directives, a result
- * the budget never stubs, a call without an activity line, and the tools a run of a task schedule blocks. The tools of
+ * the budget never stubs, a call without an activity line, the tools a run of a task schedule blocks, and the tools a
+ * delegated run is never offered and a `delegate` tool run refuses (the owner's own words as evidence). The tools of
  * {@see ToolDeclarationsProbeMCPPackage} are added to the catalog for the test; the application binds none of them.
  * Also: the two texts the model reads that are built in code name no tool of a skill the module does not bind.
  */
@@ -281,6 +294,113 @@ class ToolDeclarationsReadByTheLoopTest extends UnitTestCase
         self::assertNotNull($scheduleRunPurpose);
         self::assertSame([], $scheduleRunPurpose->blockedToolNames);
         self::assertStringNotContainsString('Tools not available in this conversation', $scheduleRunPurpose->getDirectiveBlock());
+    }
+
+    public function testADelegatedRunIsNeverOfferedAToolThatNeedsTheOwnersWords(): void
+    {
+        // the module's own grant tool (the mandates skill) and the probe's
+        self::assertSame(['grantMandate', 'probeGrantFromOwnerWords'], MCPToolAttributeCatalog::getToolNamesDeclaringAttribute(MCPToolRequiresOwnerWordsAsEvidence::class));
+
+        $delegatedConversation = (new ReflectionClass(AIConversation::class))->newInstanceWithoutConstructor();
+        $delegatedConversation->delegatedFromMessageId = 88;
+        self::assertSame(['grantMandate', 'probeGrantFromOwnerWords'], $delegatedConversation->findToolNamesLeftOutOfADelegatedRun());
+        self::assertSame(['grantMandate', 'probeGrantFromOwnerWords'], $delegatedConversation->findBlockedToolNamesOfConversationTree(), 'off the wire and never named as callable');
+
+        $rootConversation = (new ReflectionClass(AIConversation::class))->newInstanceWithoutConstructor();
+        self::assertSame([], $rootConversation->findToolNamesLeftOutOfADelegatedRun(), 'the conversation with the owner keeps the tool');
+        self::assertSame([], $rootConversation->findBlockedToolNamesOfConversationTree());
+    }
+
+    public function testTheOfferOfADelegatedRunLeavesOutTheGrantToolOfTheLoadedMandatesSkill(): void
+    {
+        foreach ([ContextRetentionSettings::SKILL_LOADING_STRATEGY_SYSTEM_PROMPT_SWAP, ContextRetentionSettings::SKILL_LOADING_STRATEGY_CONVERSATION_APPEND] as $skillLoadingStrategy) {
+            self::assertContains('grantMandate', $this->conversationWithTheMandatesSkillLoaded(null, $skillLoadingStrategy)->buildOfferedTools(false)->getToolNames(), $skillLoadingStrategy);
+
+            $offeredToolNamesOfTheDelegatedRun = $this->conversationWithTheMandatesSkillLoaded(88, $skillLoadingStrategy)->buildOfferedTools(false)->getToolNames();
+            self::assertNotContains('grantMandate', $offeredToolNamesOfTheDelegatedRun, $skillLoadingStrategy);
+            self::assertContains('listMandates', $offeredToolNamesOfTheDelegatedRun, $skillLoadingStrategy . ': the other tools of the skill stay');
+        }
+    }
+
+    /**
+     * A conversation whose one row carries the module's mandates skill with its grant and list tools resident, loading
+     * skills by `$skillLoadingStrategy`; `$delegatedFromMessageId` set = a delegated run.
+     */
+    protected function conversationWithTheMandatesSkillLoaded(?int $delegatedFromMessageId, string $skillLoadingStrategy): AIConversation
+    {
+        $ownerRow = $this->textMessage(0, AIConversationMessage::ROLE_USER, AIConversationMessage::AUTHOR_USER, 'allow the weekly post');
+        $ownerRow->loadedCapabilities = LoadedCapabilities::fromCanonicalEntries([
+            'Assistant.Mandates' => ['name' => 'Assistant.Mandates', 'type' => LoadedCapability::TYPE_SKILL],
+            'grantMandate' => ['name' => 'grantMandate', 'type' => LoadedCapability::TYPE_TOOL, 'parentSkillNames' => ['Assistant.Mandates']],
+            'listMandates' => ['name' => 'listMandates', 'type' => LoadedCapability::TYPE_TOOL, 'parentSkillNames' => ['Assistant.Mandates']],
+        ]);
+        $messages = new AIConversationMessages();
+        $messages->add($ownerRow);
+        $conversation = (new ReflectionClass(AIConversation::class))->newInstanceWithoutConstructor();
+        $conversation->messages = $messages;
+        $conversation->delegatedFromMessageId = $delegatedFromMessageId;
+        $contextRetentionSettings = new ContextRetentionSettings();
+        $contextRetentionSettings->skillLoadingStrategy = $skillLoadingStrategy;
+        $conversation->contextRetentionSettings = $contextRetentionSettings;
+        return $conversation;
+    }
+
+    public function testADelegateToolRunOfAToolThatNeedsTheOwnersWordsIsRefused(): void
+    {
+        self::assertTrue(AgentDelegationToolRunTask::forToolCall('probeGrantFromOwnerWords', [])->callsToolRequiringOwnerWords());
+        self::assertFalse(AgentDelegationToolRunTask::forToolCall('probeRecordChange', [])->callsToolRequiringOwnerWords());
+        self::assertFalse(AgentDelegationToolRunTask::forToolCall('aToolNoPackageDeclares', [])->callsToolRequiringOwnerWords());
+
+        $delegationSubAgentRefusal = DelegationSubAgentRefusal::forToolRequiringOwnerWords('probeGrantFromOwnerWords', false);
+        self::assertSame(DelegationSubAgentRun::FAILURE_REASON_REFUSED, $delegationSubAgentRefusal->failureReason);
+        self::assertSame(
+            'delegate REJECTED — `probeGrantFromOwnerWords` needs the owner\'s own words as evidence, and a sub-agent sees only its task, '
+                . 'never your conversation with the owner. Make this call yourself in this conversation before you delegate. Nothing was started.',
+            $delegationSubAgentRefusal->corrective
+        );
+        self::assertSame(
+            'delegate REJECTED — `probeGrantFromOwnerWords` needs the owner\'s own words as evidence, and a sub-agent sees only its task, '
+                . 'never the conversation with the owner. You are a sub-agent too: the main conversation with the owner makes this call. '
+                . 'Nothing was started.',
+            DelegationSubAgentRefusal::forToolRequiringOwnerWords('probeGrantFromOwnerWords', true)->corrective,
+            'a delegated run that delegates cannot make the call either'
+        );
+
+        // the spawn asks it before it asks anything else of the parent: no offer is built, no child is seeded
+        $agentSubAgentRequest = AgentSubAgentRequest::forModelCall(DelegateToolArguments::fromToolCallArguments(['toolName' => 'grantMandate', 'toolArguments' => '{}']));
+        self::assertNotNull($agentSubAgentRequest);
+        $spawnRefusal = (new ReflectionClass(TaskRefusalExposingDelegationSpawnService::class))->newInstanceWithoutConstructor()->callFindRefusalOfModelRequestedTask(
+            AgentRun::forTurnEntry(),
+            (new ReflectionClass(AIConversation::class))->newInstanceWithoutConstructor(),
+            $agentSubAgentRequest,
+            $this->toolCall(DelegateTool::NAME),
+            true
+        );
+        self::assertEquals(DelegationSubAgentRefusal::forToolRequiringOwnerWords('grantMandate', false), $spawnRefusal);
+
+        // a delegated run that delegates the grant is told that the main conversation makes the call
+        $delegatedParentConversation = (new ReflectionClass(AIConversation::class))->newInstanceWithoutConstructor();
+        $delegatedParentConversation->delegatedFromMessageId = 88;
+        $spawnRefusalOfADelegatedRun = (new ReflectionClass(TaskRefusalExposingDelegationSpawnService::class))->newInstanceWithoutConstructor()->callFindRefusalOfModelRequestedTask(
+            AgentRun::forTurnEntry(),
+            $delegatedParentConversation,
+            $agentSubAgentRequest,
+            $this->toolCall(DelegateTool::NAME),
+            true
+        );
+        self::assertEquals(DelegationSubAgentRefusal::forToolRequiringOwnerWords('grantMandate', true), $spawnRefusalOfADelegatedRun);
+        self::assertStringContainsString('You are a sub-agent too: the main conversation with the owner makes this call.', (string)$spawnRefusalOfADelegatedRun?->corrective);
+    }
+
+    public function testTheGrantToolOfTheMandatesPackageNeedsTheOwnersWords(): void
+    {
+        $toolNamesNeedingOwnerWords = [];
+        foreach ((new ReflectionClass(AgentMandatesMCPPackage::class))->getMethods(ReflectionMethod::IS_PUBLIC) as $reflectionMethod) {
+            if ($reflectionMethod->getAttributes(MCPTool::class) !== [] && $reflectionMethod->getAttributes(MCPToolRequiresOwnerWordsAsEvidence::class) !== []) {
+                $toolNamesNeedingOwnerWords[] = $reflectionMethod->getName();
+            }
+        }
+        self::assertSame(['grantMandate'], $toolNamesNeedingOwnerWords, 'a list or a revoke needs no statement of the owner');
     }
 
     public function testTheEarlierSessionsTextEndsWithASentenceAnApplicationCanReplace(): void

@@ -63,7 +63,13 @@ class AgentOfferedToolsInputs extends ValueObject
     /** @var string[] The tools resident on the anchor message (their full schema is offered). */
     public array $residentToolNames = [];
 
-    /** @var string[] The tree purpose's `blockedToolNames` — off the wire, resident schema and `load_tool` alike. */
+    /**
+     * @var string[] Every tool this conversation is never offered
+     *      ({@see \DDD\Domain\AI\Entities\Conversations\AIConversation::findBlockedToolNamesOfConversationTree()}): the
+     *      tree purpose's `blockedToolNames` and, in a delegated run, the tools that need the owner's own words. Despite
+     *      its name it holds both lists; the name stays because applications set the property. Off the wire: resident
+     *      schema, `load_tool` catalog and sub-skill tools alike.
+     */
     public array $purposeBlockedToolNames = [];
 
     /**

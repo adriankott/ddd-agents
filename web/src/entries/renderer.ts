@@ -28,7 +28,12 @@ export { unregisterWidgetHydrator } from "../renderer/widget-hydration/widget-hy
 export * from "../renderer/canvas/canvas-behaviours";
 export * from "../renderer/canvas/canvas-state";
 export { canvasBodies, canvasFeatureFlagOf, type CanvasBodyProps } from "../renderer/canvas/canvasBodies";
-export { readComposedViewTree } from "../renderer/widget-tree/composed-view-tree";
+// The entity an `openEntity` action opens, for a host's own `onOpenEntity` of the composed-view renderer.
+export {
+  readOpenEntityActionTarget,
+  type OpenEntityActionTarget,
+} from "../renderer/canvas/entity-detail-instance";
+export { composedViewTreeToWire, readComposedViewTree } from "../renderer/widget-tree/composed-view-tree";
 export {
   addComposedNodeSchemaApplicationPart,
   composedNodeSchema,
@@ -82,3 +87,5 @@ export {
   type WidgetRenderBlockReport,
 } from "../renderer/render-report/widget-render-report-collector";
 export { deepLinkableWidgetNameForCanvas, resolveDeepLinkableWidget } from "../renderer/resolve-deep-linkable-widget";
+// The widget click sources (the package's own and the app's further ones), to tell an answered widget from an open one.
+export { getWidgetClickSignalSources, isWidgetClickSignalSource } from "../renderer/widget-click-signal-sources";
