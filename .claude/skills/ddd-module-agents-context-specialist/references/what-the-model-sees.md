@@ -94,7 +94,9 @@ user-role wire entry after the whole history, never stored. Order:
 3. the plan directive of the decision layer;
 4. the decided direct widget (`[SIGNAL:widget]`);
 5. `[SIGNAL:skills]` on the turn's first call while skills are loaded;
-6. `[SIGNAL:answer-content]` once the turn completed a write or a picture read;
+6. `[SIGNAL:answer-content]` once the turn completed a write or a picture read. The entry is absent once a tool
+   of the turn made the platform write a widget of a type that ends the conversation's purpose — that widget reports the
+   turn, and the tool's result asks for one closing line;
 7. the image fallback entry (only for a provider that refuses pictures in tool results);
 8. `[SIGNAL:situation]` (`everyCall` only);
 9. the host's local-situation hint (`AgentModelInput::getLocalSituationTailHint()`, null by default);

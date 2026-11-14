@@ -144,6 +144,13 @@ class AgentModelInput extends ValueObject
     public ?string $purposeInheritsFromName = null;
 
     /**
+     * @var string[] The widget types that end the conversation's purpose, as the purpose names them (canonical wire
+     * names); empty for a conversation without a purpose, a purpose that no widget ends and a delegation child. The
+     * conversation writes them when it builds the model input; {@see completedWritesAnswerContractHint()} reads them.
+     */
+    public array $widgetTypesThatEndThePurpose = [];
+
+    /**
      * The scheduled-run role directive ({@see \DDD\Domain\AI\Entities\Conversations\Schedules\AIConversationSchedule::RUN_DIRECTIVE}),
      * set by the loop when the conversation carries a {@see \DDD\Domain\AI\Entities\Conversations\AIConversation::$scheduleId}
      * Tells the model every round that it EXECUTES one firing of the schedule and never administers schedules.
@@ -1225,6 +1232,32 @@ class AgentModelInput extends ValueObject
     }
 
     /**
+     * Whether a row the platform wrote during a tool call (a tool message authored by the tool) after
+     * `$messagePosition` holds a widget of one of {@see $widgetTypesThatEndThePurpose}: that widget shows the owner
+     * what the turn's calls did and the result of the tool that wrote it asks for one closing line, so the answer
+     * contract beside it would ask the same step to report every completed call again. A block in the agent's own
+     * text is not such a row. Pure.
+     */
+    protected function hasPlatformWrittenWidgetThatEndsThePurposeAfterPosition(int $messagePosition): bool
+    {
+        if ($this->widgetTypesThatEndThePurpose === []) {
+            return false;
+        }
+        for ($position = $messagePosition + 1; $position < count($this->messages); $position++) {
+            $message = $this->messages[$position];
+            if (($message->messageType ?? null) !== AIConversationMessage::MESSAGE_TOOL_MESSAGE
+                || ($message->authorType ?? null) !== AIConversationMessage::AUTHOR_TOOL
+            ) {
+                continue;
+            }
+            if ($message->buildWidgetBlocks()->findFirstBlockOfTypes(...$this->widgetTypesThatEndThePurpose) !== null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * The ANSWER CONTRACT for a turn that already completed WRITE tools or PICTURE-bearing reads (the language-reflex
      * class: the reply-language cue is itself a `role:user` wire entry, and on the final step a model sometimes
      * ANSWERS that cue — "Verstanden. Ich antworte Ihnen weiterhin auf Deutsch." — instead of reporting the
@@ -1239,6 +1272,8 @@ class AgentModelInput extends ValueObject
      * The entry names what the final answer CONTAINS, never that it is due: it rides every call after the turn's
      * first write, and read as "answer now" it ended a turn whose further writes the owner had asked for.
      * Volatile wire-tail contract like the other hints: never persisted, cache-neutral.
+     * Null as well once a tool of the turn made the platform write the widget that ends the purpose
+     * ({@see hasPlatformWrittenWidgetThatEndsThePurposeAfterPosition()}).
      */
     public function completedWritesAnswerContractHint(): ?string
     {
@@ -1252,6 +1287,9 @@ class AgentModelInput extends ValueObject
                 $newestOwnerMessagePosition = $i;
                 break;
             }
+        }
+        if ($this->hasPlatformWrittenWidgetThatEndsThePurposeAfterPosition($newestOwnerMessagePosition)) {
+            return null;
         }
         $completedWriteToolNames = [];
         $pictureReadToolNames = [];

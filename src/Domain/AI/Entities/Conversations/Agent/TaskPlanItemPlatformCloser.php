@@ -166,6 +166,27 @@ class TaskPlanItemPlatformCloser extends ValueObject
     }
 
     /**
+     * The completed-call half for a leaf that asks for a tool call AND a rendered widget: when the completed call of
+     * `$toolName` is the leaf's done-evidence and the widget the leaf asks for is in the transcript already (the tool
+     * made the platform write it while the call ran), the turn-end conditions hold and the leaf is closed now
+     * ({@see applyTurnEndEvidenceClosing()}). A widget the owner answers and a leaf that waits for an answer text to
+     * the owner are never closed here. The locked gate tools are not read: the call that just completed meets the tool
+     * gate ({@see TaskPlanEvidence::withoutEntitlementLocks()}). Returns the status written, or null.
+     */
+    public function closeWhenCompletedCallAndWrittenWidgetProveDone(string $toolName, TaskPlanEvidence $taskPlanEvidence): ?string
+    {
+        if (!$this->taskPlanItem->isOpenOrBlockedByTheModel()
+            || ($this->taskPlanItem->doneRequiresWidget ?? null) === null
+            || $this->taskPlanItem->doneRequiresWidgetAnswered
+            || $this->taskPlanItem->doneRequiresOwnerVisibleAnswerInSameTurn
+            || !in_array($toolName, $this->taskPlanItem->getDoneRequiresToolCallAlternatives(), true)
+        ) {
+            return null;
+        }
+        return $this->applyTurnEndEvidenceClosing($taskPlanEvidence->withoutEntitlementLocks());
+    }
+
+    /**
      * The TURN-END half for this leaf ({@see TaskPlanItems::closeLeavesWhoseWidgetOrDeliveryEvidenceLandedAtTurnEnd()}):
      * a widget leaf whose widget (the model's or a platform-written one, or the candidate answer's) is rendered and
      * whose tool gate, if declared, is satisfied or entitlement-waived; a widget the OWNER answers closes on the

@@ -133,6 +133,18 @@ class TaskPlanEvidence extends ValueObject
     }
 
     /**
+     * A copy that reports no tool locked and never reads the locked gate tools: for a closing whose tool gate is met by
+     * the call that just completed (a tool that completed is not locked, and its call is the evidence, no waiver).
+     */
+    public function withoutEntitlementLocks(): static
+    {
+        $taskPlanEvidence = clone $this;
+        $taskPlanEvidence->entitlementLocksConversation = null;
+        $taskPlanEvidence->entitlementLockedToolNames = [];
+        return $taskPlanEvidence;
+    }
+
+    /**
      * The plan's done-gate tools this account cannot run: the given value, else asked of the conversation now.
      *
      * @return string[]

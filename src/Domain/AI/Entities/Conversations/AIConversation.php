@@ -2693,6 +2693,7 @@ class AIConversation extends Entity
             $agentContext->purposeDirective = $aIConversationPurpose?->getDirectiveBlock();
             $agentContext->purposeName = $aIConversationPurpose?->name;
             $agentContext->purposeInheritsFromName = $aIConversationPurpose?->inheritsFromPurposeName;
+            $agentContext->widgetTypesThatEndThePurpose = $aIConversationPurpose?->getWidgetTypesThatEndThisPurpose() ?? [];
         }
         // Scheduled-run role directive for a run conversation WITHOUT a purpose — the runs spawned before the
         // `Schedule.Run` purpose carried the role statement (execute the mission, never administer schedules) as this

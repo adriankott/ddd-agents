@@ -374,14 +374,18 @@ class TaskPlanItems extends ObjectSet
      * leaf whose {@see TaskPlanItem::$notApplicableRequiresToolCall} record landed and no contradiction gate forbids
      * it. A call that qualifies for BOTH the blocked and the not_applicable verdict of one leaf is left to the model
      * (the platform never guesses between two verdicts). Each closed leaf carries the platform's statusNote naming
-     * the tool and the call's message index. Returns the closings (item key → the status written).
+     * the tool and the call's message index. A leaf that asks for a widget on top is closed here too when that widget
+     * is in the transcript already — the tool made the platform write it while the call ran
+     * ({@see TaskPlanItemPlatformCloser::closeWhenCompletedCallAndWrittenWidgetProveDone()}). Returns the closings
+     * (item key → the status written).
      */
     public function closeLeavesProvenByCompletedCall(string $toolName, int $toolCallMessageIndex, TaskPlanEvidence $taskPlanEvidence): TaskPlanLeafClosings
     {
         $taskPlanLeafClosings = new TaskPlanLeafClosings();
         foreach ($this->buildItemAddresses()->getLeaves() as $taskPlanItemAddress) {
-            $closingStatus = TaskPlanItemPlatformCloser::forItem($taskPlanItemAddress->item)
-                ->closeWhenCompletedCallProvesStatus($toolName, $toolCallMessageIndex, $taskPlanEvidence);
+            $taskPlanItemPlatformCloser = TaskPlanItemPlatformCloser::forItem($taskPlanItemAddress->item);
+            $closingStatus = $taskPlanItemPlatformCloser->closeWhenCompletedCallProvesStatus($toolName, $toolCallMessageIndex, $taskPlanEvidence)
+                ?? $taskPlanItemPlatformCloser->closeWhenCompletedCallAndWrittenWidgetProveDone($toolName, $taskPlanEvidence);
             if ($closingStatus !== null) {
                 $taskPlanLeafClosings->addClosing($taskPlanItemAddress->key, $closingStatus);
             }

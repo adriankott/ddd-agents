@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.1.0-alpha.25
+
+- Task plan: a leaf that asks for a tool call AND a rendered widget closes in the completed-call pass when the tool
+  made the platform write that widget while the call ran
+  (`TaskPlanItemPlatformCloser::closeWhenCompletedCallAndWrittenWidgetProveDone()`, read by
+  `TaskPlanItems::closeLeavesProvenByCompletedCall()`), under the turn-end conditions; the plan note on the tool result
+  names it. A leaf whose widget the model writes itself, a widget the owner answers and a leaf that waits for an answer
+  text to the owner stay open until the turn end as before. The completed-call closings still never read the locked
+  gate tools (`TaskPlanEvidence::withoutEntitlementLocks()`): the call that just completed meets the tool gate.
+- Answer contract: `AgentModelInput::completedWritesAnswerContractHint()` is null once a row the platform wrote during a
+  tool call after the owner's newest input holds a widget of a type that ends the conversation's purpose
+  (`hasPlatformWrittenWidgetThatEndsThePurposeAfterPosition()`, `AgentModelInput::$widgetTypesThatEndThePurpose`, set by
+  `AIConversation::putDirectivesIntoContext()` from `AIConversationPurpose::getWidgetTypesThatEndThisPurpose()`; empty
+  for a delegation child). A turn without that widget, a widget of another type and a widget block in the agent's own
+  text keep the contract.
+
 ## 0.1.0-alpha.24
 
 - Final refusals: `MCPToolResponse::finalRefusal()` marks a refusal the same arguments meet again (missing feature
