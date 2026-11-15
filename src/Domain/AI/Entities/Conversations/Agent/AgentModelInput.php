@@ -1172,8 +1172,19 @@ class AgentModelInput extends ValueObject
         }
         $repeatedSkillNames = $this->findSkillNamesOfNewestStepThatOnlyRepeatedSkillLoads();
         if ($repeatedSkillNames !== []) {
+            $repeatedSkillToolNames = [];
+            foreach ($this->loadedAISkills?->getElements() ?? [] as $loadedAISkill) {
+                if (in_array((string)$loadedAISkill->name, $repeatedSkillNames, true)) {
+                    foreach ($loadedAISkill->getToolNames() as $skillToolName) {
+                        $repeatedSkillToolNames[$skillToolName] = $skillToolName;
+                    }
+                }
+            }
+            $repeatedSkillToolNames = array_slice(array_values($repeatedSkillToolNames), 0, 12);
             return '[SIGNAL:skills] ' . implode(', ', $repeatedSkillNames) . (count($repeatedSkillNames) === 1 ? ' is' : ' are')
-                . ' loaded — its tools are in your tool list now: call the tool.';
+                . ' loaded — its tools are in your tool list now'
+                . ($repeatedSkillToolNames !== [] ? ' (' . implode(', ', $repeatedSkillToolNames) . ')' : '')
+                . ': call the one you need.';
         }
         for ($i = count($this->messages) - 1; $i >= 0; $i--) {
             $candidate = $this->messages[$i];
@@ -1705,9 +1716,10 @@ class AgentModelInput extends ValueObject
                     . 'it. Write what the owner has not seen yet: first what the question\'s own tool result asks to stand in this '
                     . 'text (a draft the question approves: every line of it), then what the reads of this turn ask the answer to '
                     . 'carry (the points they list, a ready widget block), then the result of every plan item you closed in this '
-                    . 'turn, in the order of the plan, then the text of every open plan item whose line says "text in your answer" '
-                    . '(a draft) — the platform closes each of them from this text; with none of these, ONE short sentence that '
-                    . 'leads to the question. ',
+                    . 'turn, in the order of the plan, then the text of every open plan item whose line says "write it in the '
+                    . 'answer of this turn" (a draft) — the platform closes each of them from this text; an item whose line says '
+                    . '"after the items before it" is not written here; with none of these, ONE short sentence that leads to the '
+                    . 'question. ',
                 default => ': the RESULT the owed plan item promises, or its ONE question. A report of what is done or what happens next is not an answer — never end on it. ',
             }
             . 'Nothing is unavailable and you never lack access — NEVER tell the user so. Write it in the '

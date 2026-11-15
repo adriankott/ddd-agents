@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.0-alpha.47
+
+- The model's takeover load of a preloaded skill names the skills and their tools ("Skills loaded: <names>. Their
+  tools are in your tool list — <tools>. Call the one you need next."); after it nothing new arrives on the wire, and a
+  bare "loaded" made the model load again. The `[SIGNAL:skills]` line after a repeated load names the tools too.
+- An open `inAnswer` leaf behind a leaf that is still open says so on its plan line
+  (`TaskPlanItem::ANSWER_TEXT_AFTER_OPEN_ITEMS_MARK`: written by the answer of the turn that finished the items before
+  it); the answer step after an owner question names only the items whose line says "write it in the answer of this
+  turn"; the tick rules say a question to the owner is never such an item and that its answer comes after the items
+  before it. A draft of part 3 was written while part 2 still waited for the owner.
+
 ## 0.1.0-alpha.46
 
 - One evaluated run of one eval case moves into the package: `AgentEvalRunnerService` (single and follow-up turns,

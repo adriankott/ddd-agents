@@ -115,6 +115,25 @@ class AnswerTextItemsAndBlockedContainersTest extends UnitTestCase
         self::assertFalse(TaskPlanItemPlatformCloser::turnEndsOnAnOwnerQuestion($questionTurn->conversationMessages, 12), 'a later turn without a question');
     }
 
+    public function testAnAnswerTextItemBehindAnOpenItemSaysItWaitsForThem(): void
+    {
+        $readItem = new TaskPlanItem();
+        $readItem->text = 'Read the rankings';
+        $draftItem = new TaskPlanItem();
+        $draftItem->text = 'Post draft';
+        $draftItem->markResultIsTextInTheAnswer();
+        $taskPlanItems = new TaskPlanItems();
+        $taskPlanItems->add($readItem);
+        $taskPlanItems->add($draftItem);
+
+        $lines = $taskPlanItems->buildCompactTailHintLines();
+        self::assertStringEndsWith(TaskPlanItem::ANSWER_TEXT_AFTER_OPEN_ITEMS_MARK, end($lines));
+
+        $readItem->status = TaskPlanItem::STATUS_DONE;
+        $lines = $taskPlanItems->buildCompactTailHintLines();
+        self::assertStringEndsWith(TaskPlanItem::ANSWER_TEXT_MARK . ' ← next', end($lines), 'nothing open before it: write it now');
+    }
+
     public function testASeededItemOrAContainerIsNotMarked(): void
     {
         $seededItem = new TaskPlanItem();

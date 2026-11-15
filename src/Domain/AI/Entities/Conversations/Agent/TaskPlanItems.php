@@ -1032,8 +1032,17 @@ class TaskPlanItems extends ObjectSet
         $doneKeys = [];
         $terminalKeysUnderDoneItems = [];
         $renderLines = [];
+        // an answer-text leaf behind an open leaf is written only by the answer that finished the leaves before it
+        // (the turn-end closer holds it otherwise, {@see closeLeavesWhoseWidgetOrDeliveryEvidenceLandedAtTurnEnd()})
+        $anEarlierLeafIsOpen = false;
         foreach ($this->buildItemAddresses()->getElements() as $taskPlanItemAddress) {
             $taskPlanItem = $taskPlanItemAddress->item;
+            $hasOpenLeafBefore = $anEarlierLeafIsOpen;
+            if (($taskPlanItem->subtasks === null || $taskPlanItem->subtasks->count() === 0)
+                && $taskPlanItem->isOpen() && !$taskPlanItemAddress->hasBlockedAncestor
+            ) {
+                $anEarlierLeafIsOpen = true;
+            }
             if ($taskPlanItem->rendersAsDoneOnPlanLine()) {
                 if (!$taskPlanItemAddress->hasClosedAncestor) {
                     $doneKeys[] = $taskPlanItemAddress->key;
@@ -1049,7 +1058,7 @@ class TaskPlanItems extends ObjectSet
                 continue;
             }
             $renderLines[] = str_repeat('  ', $taskPlanItemAddress->depth)
-                . $taskPlanItem->toCompactTailHintLine($taskPlanItemAddress->key, $nextMarkedItem !== null && $taskPlanItem === $nextMarkedItem);
+                . $taskPlanItem->toCompactTailHintLine($taskPlanItemAddress->key, $nextMarkedItem !== null && $taskPlanItem === $nextMarkedItem, $hasOpenLeafBefore);
         }
         if ($doneKeys === []) {
             return $renderLines;

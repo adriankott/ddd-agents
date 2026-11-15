@@ -1597,7 +1597,11 @@ class AIConversationMessage extends Entity
                 foreach ($preloadedSkillCapabilities as $preloadedSkillCapability) {
                     $preloadedSkillCapability->source = LoadedCapability::SOURCE_MODEL;
                 }
-                return 'Skills loaded; their tools are now available.';
+                // the tools are named: after the model's own load it is handed their definitions; after this takeover
+                // nothing new arrives, and a bare "loaded" made it load again
+                $takenOverToolNames = array_slice(array_values(array_unique($residentCallableToolNames)), 0, 12);
+                return 'Skills loaded: ' . implode(', ', $alreadyLoadedRequestedNames) . '. Their tools are in your tool list'
+                    . ($takenOverToolNames !== [] ? ' — ' . implode(', ', $takenOverToolNames) : '') . '. Call the one you need next.';
             }
             // Truly fully resident. Answering "Skills loaded" here bred an obedience loop: an agent steered to
             // "load X" kept re-loading on that confirmation until the byte-exact repeat guard aborted the whole

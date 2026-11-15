@@ -60,8 +60,10 @@ Structure only, keyed (`UpdateTaskPlanTool`, arguments `UpdateTaskPlanArguments`
   answer — no call proves it — but never from the answer of a turn that ends on the model's question to the owner
   (`TaskPlanItemPlatformCloser::turnEndsOnAnOwnerQuestion()`), and only when no leaf before it in plan order is still open
   (`closeLeavesWhoseWidgetOrDeliveryEvidenceLandedAtTurnEnd()`; the checked stop's read does not hold it back). Its
-  open plan line carries `TaskPlanItem::ANSWER_TEXT_MARK`, and the answer step after a recorded question asks for its
-  text.
+  open plan line carries `TaskPlanItem::ANSWER_TEXT_MARK` — `ANSWER_TEXT_AFTER_OPEN_ITEMS_MARK` while a leaf before it
+  is open, `ANSWER_TEXT_MAYBE_GIVEN_MARK` once an answer held it open (`answerTextHeldOpenAtMessageIndex`; then the
+  model's done tick is accepted) — and the answer step after a recorded question asks for the text of the items whose
+  line says "write it in the answer of this turn".
 
 `TaskPlan::checkUpdate()` collects every violation in one pass (`TaskPlanUpdateRejections`): unknown or malformed key,
 a key sent as a number or another JSON type, an item of a listed level left out, a move, a changed text, the last item

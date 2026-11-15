@@ -51,7 +51,7 @@ class RepeatedSkillLoadStepsLeaveTheWireTest extends UnitTestCase
             $this->callRow(LoadSkillsTool::NAME, ['skill_names' => ['Reviews']], 120, true),
         ];
 
-        self::assertSame('[SIGNAL:skills] Reviews is loaded — its tools are in your tool list now: call the tool.', $agentModelInput->loadedSkillsTailHint());
+        self::assertSame('[SIGNAL:skills] Reviews is loaded — its tools are in your tool list now: call the one you need.', $agentModelInput->loadedSkillsTailHint(), 'no loaded skill object here: no tool names');
     }
 
     protected function textRow(string $role, string $text, int $inputTokens): AIConversationMessage

@@ -20,7 +20,7 @@ class AFirstOwnLoadOfAPreloadedSkillIsALoadTest extends UnitTestCase
     {
         $callMessage = $this->messageWithLoadedSkill(LoadedCapability::SOURCE_DECISION_MODEL);
 
-        self::assertSame('Skills loaded; their tools are now available.', $callMessage->loadSkillsFromToolArguments(['skill_names' => ['Media.Images']]));
+        self::assertSame('Skills loaded: Media.Images. Their tools are in your tool list. Call the one you need next.', $callMessage->loadSkillsFromToolArguments(['skill_names' => ['Media.Images']]));
         self::assertSame(LoadedCapability::SOURCE_MODEL, $callMessage->getLoadedCapabilities()->getByName('Media.Images')->source);
         self::assertStringStartsWith('Already loaded: Media.Images', $callMessage->loadSkillsFromToolArguments(['skill_names' => ['Media.Images']]));
     }

@@ -1152,6 +1152,9 @@ class TaskPlanItem extends ValueObject
     /** The plan-line suffix of an open item whose result is text in the answer ({@see isResultTextInTheAnswer()}). */
     public const string ANSWER_TEXT_MARK = ' — text in your answer: write it in the answer of this turn; the platform closes it from that answer';
 
+    /** The plan-line suffix of such an item behind a leaf that is still open (the turn-end closer holds it until then). */
+    public const string ANSWER_TEXT_AFTER_OPEN_ITEMS_MARK = ' — text in your answer, after the items before it: write it in the answer of the turn that finished them; an answer that ends earlier (your question to the owner, a stop the owner ordered) does not carry it';
+
     /**
      * The plan-line suffix of such an item an earlier answer may already have carried
      * ({@see $answerTextHeldOpenAtMessageIndex}).
@@ -1166,16 +1169,21 @@ class TaskPlanItem extends ValueObject
      * unless its text already says it — a `← next` item awaiting its proof never invites a tick. An offer widget
      * on the owner's screen keeps its one-line instruction.
      */
-    public function toCompactTailHintLine(string $key, bool $carriesNextMarker): string
+    public function toCompactTailHintLine(string $key, bool $carriesNextMarker, bool $hasOpenLeafBefore = false): string
     {
         $statusNote = trim((string)($this->statusNote ?? ''));
         $closesItself = $this->isOpenAndClosedByTheRecord() && mb_stripos($this->text, 'closes itself') === false;
         $obstaclePrefix = $statusNote !== '' && $this->status === self::STATUS_OPEN
             ? '(obstacle noted, retry: ' . self::clipForPlanLine($statusNote, self::COMPACT_LINE_NOTE_CHARS) . ') '
             : '';
-        $answerTextMark = $this->isResultTextInTheAnswer() && $this->isOpen()
-            ? ($this->answerTextHeldOpenAtMessageIndex !== null ? self::ANSWER_TEXT_MAYBE_GIVEN_MARK : self::ANSWER_TEXT_MARK)
-            : '';
+        $answerTextMark = '';
+        if ($this->isResultTextInTheAnswer() && $this->isOpen()) {
+            $answerTextMark = match (true) {
+                $hasOpenLeafBefore => self::ANSWER_TEXT_AFTER_OPEN_ITEMS_MARK,
+                $this->answerTextHeldOpenAtMessageIndex !== null => self::ANSWER_TEXT_MAYBE_GIVEN_MARK,
+                default => self::ANSWER_TEXT_MARK,
+            };
+        }
         if ($carriesNextMarker) {
             return '[ ] ' . $obstaclePrefix . $key . ' ' . $this->text . ($closesItself ? self::SELF_CLOSING_NEXT_MARK : '') . $answerTextMark . ' ← next';
         }
