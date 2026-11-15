@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.0-alpha.41
+
+- `update_task_plan` items take `inAnswer` (boolean): an item whose result is text in the answer (a draft, a summary)
+  gets the delivery gate — the model's tick is not applied before the answer, and the platform closes the leaf from the
+  turn's owner-visible answer (`TaskPlanItem::markResultIsTextInTheAnswer()`; model-made leaves only, never seeded
+  items or containers). The tick rules and the plan directive say so.
+- A container whose subtasks are all closed and none of them done takes its blocker's state: it renders `[✗ blocked: …]`
+  and counts blocked, never ✓ (`TaskPlanItem::findBlockerOfClosedContainer()`); a part whose only subtask was blocked
+  showed as done while nothing was produced.
+- The plan directive (`AgentPlanDynamicsDecision`, and the base prompt's plan rule): one item per part the owner named;
+  a subtask only for a separate result inside that part, never for loading a skill or any other preparatory call.
+- `[SIGNAL:answer-step]` after an owner question recorded in this turn also names what the reads of the turn ask the
+  answer to carry (the points they list, a ready widget block).
+
 ## 0.1.0-alpha.40
 
 - `[SIGNAL:answer-step]` after an owner question recorded in this turn: first what the question's own tool result asks

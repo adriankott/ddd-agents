@@ -1063,10 +1063,68 @@ class TaskPlanItem extends ValueObject
         return $this->isOpen() && $this->isClosedByThePlatformFromTheRecord();
     }
 
-    /** Whether the plan line shows this item done (`[✓]`): closed and neither blocked nor not applicable. */
+    /**
+     * The model's `inAnswer` item: its result is text in the answer (a draft, a summary) — no call proves it. A leaf the
+     * model made (never a seeded item, never a container) gets the delivery gate
+     * ({@see $doneRequiresOwnerVisibleAnswerInSameTurn}): the model's tick is not applied before the answer, and the
+     * platform closes the leaf from the owner-visible answer of the turn ({@see TaskPlanItemPlatformCloser}).
+     * Returns whether the mark was applied.
+     */
+    public function markResultIsTextInTheAnswer(): bool
+    {
+        if ($this->seededByPurpose || ($this->subtasks !== null && $this->subtasks->count() > 0) || $this->carriesRecordEvidenceGate()) {
+            return false;
+        }
+        $this->doneRequiresOwnerVisibleAnswerInSameTurn = true;
+        return true;
+    }
+
+    /** Whether the model marked this leaf as one whose result is text in the answer ({@see markResultIsTextInTheAnswer()}). */
+    public function isResultTextInTheAnswer(): bool
+    {
+        return !$this->seededByPurpose && $this->doneRequiresOwnerVisibleAnswerInSameTurn && $this->doneRequiresToolCall === null;
+    }
+
+    /**
+     * Whether the plan line shows this item done (`[✓]`): closed and neither blocked nor not applicable — nor a
+     * container that takes its blocker's state ({@see findBlockerOfClosedContainer()}).
+     */
     public function rendersAsDoneOnPlanLine(): bool
     {
-        return !$this->isOpen() && $this->status !== self::STATUS_BLOCKED && $this->status !== self::STATUS_NOT_APPLICABLE;
+        return !$this->isOpen() && $this->status !== self::STATUS_BLOCKED && $this->status !== self::STATUS_NOT_APPLICABLE
+            && $this->findBlockerOfClosedContainer() === null;
+    }
+
+    /** Whether the plan line shows this item blocked and the counts count it blocked: its own status, or its blocker's. */
+    public function rendersAsBlockedOnPlanLine(): bool
+    {
+        return $this->status === self::STATUS_BLOCKED || $this->findBlockerOfClosedContainer() !== null;
+    }
+
+    /**
+     * A container whose subtasks are all closed and none of them done takes its blocker's state: it renders and counts
+     * blocked, never ✓ (a part whose only subtask — "load the skill" — was blocked showed as done while nothing was
+     * produced). Returns the first subtask that renders blocked; null for a leaf, an open container, a container with a
+     * done subtask, one whose subtasks are all not applicable, and a container of status blocked or not applicable
+     * (its own status says it).
+     */
+    public function findBlockerOfClosedContainer(): ?TaskPlanItem
+    {
+        if ($this->subtasks === null || $this->subtasks->count() === 0
+            || $this->status === self::STATUS_BLOCKED || $this->status === self::STATUS_NOT_APPLICABLE || $this->isOpen()
+        ) {
+            return null;
+        }
+        $blockingSubtask = null;
+        foreach ($this->subtasks->getElements() as $subtask) {
+            if ($subtask->rendersAsDoneOnPlanLine()) {
+                return null;
+            }
+            if ($blockingSubtask === null && $subtask->rendersAsBlockedOnPlanLine()) {
+                $blockingSubtask = $subtask;
+            }
+        }
+        return $blockingSubtask;
     }
 
     /** `$text` cut to `$maxChars` with an ellipsis, never leaving a backtick span open. */
@@ -1102,8 +1160,13 @@ class TaskPlanItem extends ValueObject
         }
         $labelledTitle = $key . ' ' . $this->buildPlanLineTitle();
         $reason = $statusNote !== '' ? self::clipForPlanLine($statusNote, self::COMPACT_LINE_NOTE_CHARS) : 'no reason given';
+        $blockerOfClosedContainer = $this->findBlockerOfClosedContainer();
+        if ($blockerOfClosedContainer !== null && $statusNote === '') {
+            $blockerNote = trim((string)($blockerOfClosedContainer->statusNote ?? ''));
+            $reason = $blockerNote !== '' ? self::clipForPlanLine($blockerNote, self::COMPACT_LINE_NOTE_CHARS) : 'a subtask is blocked';
+        }
         return match (true) {
-            $this->status === self::STATUS_BLOCKED => '[✗ blocked: ' . $reason . '] ' . $labelledTitle,
+            $this->rendersAsBlockedOnPlanLine() => '[✗ blocked: ' . $reason . '] ' . $labelledTitle,
             $this->status === self::STATUS_NOT_APPLICABLE => '[– n/a: ' . $reason . '] ' . $labelledTitle,
             !$this->isOpen() => '[✓] ' . $labelledTitle,
             $this->isAwaitingOwnerOffer() => '[⏳ awaiting the owner\'s answer on the widget — END YOUR TURN; nothing to do here] ' . $labelledTitle,

@@ -160,6 +160,9 @@ class TaskPlanUpdateApplication extends ValueObject
             if ($argumentsItem->subtasks !== null) {
                 $taskPlanItem->subtasks = $this->buildLevel($argumentsItem->subtasks, $taskPlanItem);
             }
+            if ($argumentsItem->inAnswer === true) {
+                $taskPlanItem->markResultIsTextInTheAnswer();
+            }
             // ObjectSet::add() is BY-REFERENCE — pass the loop variable, never a method return
             $taskPlanItems->add($taskPlanItem);
         }

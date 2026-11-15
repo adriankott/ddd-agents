@@ -259,7 +259,11 @@ class TaskPlanItemPlatformCloser extends ValueObject
             // (Else a leaf closes on a text written before its result existed.) Without the leaf's own
             // evidence call in THIS turn the platform cannot know that an answer delivered THIS result — such a
             // leaf closes on the previous turn's delivery where the seed declares it, otherwise it stays open.
-            if ($evidenceCallIndex === null || $evidenceCallIndex <= $currentTurnInitiatorMessageIndex) {
+            if ($this->taskPlanItem->isResultTextInTheAnswer()) {
+                // the model's `inAnswer` leaf: no call proves it — the turn's owner-visible answer carries the result
+                $deliveredThisTurn = self::isOwnerVisibleCandidateAnswerText($candidateAnswerText)
+                    || $conversationMessages->hasOwnerVisibleAssistantAnswerAfterIndex($currentTurnInitiatorMessageIndex);
+            } elseif ($evidenceCallIndex === null || $evidenceCallIndex <= $currentTurnInitiatorMessageIndex) {
                 $deliveredThisTurn = false;
             } else {
                 $deliveredThisTurn = self::isOwnerVisibleCandidateAnswerText($candidateAnswerText) || $conversationMessages->hasOwnerVisibleAssistantAnswerAfterIndex($evidenceCallIndex);

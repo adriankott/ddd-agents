@@ -53,6 +53,11 @@ Structure only, keyed (`UpdateTaskPlanTool`, arguments `UpdateTaskPlanArguments`
 - a drop: `{"key": "…", "remove": true}`; an existing item sent without `subtasks` keeps its subtree. A drop names
   its item by key at any level of the call (no move rejection for it); a drop inside a subtree the call drops anyway
   is redundant, and a kept item whose every subtask is dropped, wherever the drops stand, is still rejected.
+- `"inAnswer": true` on an item (`UpdateTaskPlanArgumentsItem::IN_ANSWER_FIELD_NAME`): its result is text in the
+  answer (a draft, a summary). A leaf the model made gets the delivery gate (`doneRequiresOwnerVisibleAnswerInSameTurn`
+  via `TaskPlanItem::markResultIsTextInTheAnswer()`; never a seeded item or a container): a tick before the answer is
+  not applied, and the turn-end closer (`TaskPlanItemPlatformCloser`) closes the leaf from the turn's owner-visible
+  answer — no call proves it.
 
 `TaskPlan::checkUpdate()` collects every violation in one pass (`TaskPlanUpdateRejections`): unknown or malformed key,
 a key sent as a number or another JSON type, an item of a listed level left out, a move, a changed text, the last item
@@ -127,6 +132,9 @@ produced, the obstacle or the reason (capped at `STATUS_NOTE_MAX_LENGTH`). A blo
 `TaskPlanItem::isOpen()` is tree-aware and the ONE predicate every reader uses: blocked and not_applicable prune their
 subtree; a done item with open subtasks stays open; an open container whose subtasks are all terminal is closed (the
 model ticks leaves, never containers).
+A container whose subtasks are all closed and none of them done takes its blocker's state
+(`TaskPlanItem::findBlockerOfClosedContainer()`): `rendersAsBlockedOnPlanLine()` true, the plan line `[✗ blocked: …]` with
+the blocker's note, and `countItemsByStatus()` counts it blocked — never ✓. It stays closed for the checked stop.
 
 ## 7. What the model reads
 

@@ -842,7 +842,8 @@ class TaskPlanItems extends ObjectSet
             if ($taskPlanItemAddress->hasBlockedAncestor) {
                 continue;
             }
-            if ($taskPlanItemAddress->item->status === TaskPlanItem::STATUS_BLOCKED) {
+            // a container whose subtasks are all closed and none done counts as its blocker
+            if ($taskPlanItemAddress->item->rendersAsBlockedOnPlanLine()) {
                 $taskPlanItemStatusCounts->blocked++;
             } elseif ($taskPlanItemAddress->itemIsOpen) {
                 $taskPlanItemStatusCounts->open++;

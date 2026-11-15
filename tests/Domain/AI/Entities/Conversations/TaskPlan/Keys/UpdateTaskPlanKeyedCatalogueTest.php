@@ -41,6 +41,16 @@ class UpdateTaskPlanKeyedCatalogueTest extends KeyedTaskPlanUpdateTestCase
         self::assertSame(0, $createdPlan->updatedAtTurnInitiatorMessageIndex);
     }
 
+    public function testANewItemSentWithInAnswerCarriesTheDeliveryGate(): void
+    {
+        $changedPlan = $this->appliedPlan($this->update(self::s1(), [...self::S1_KEPT_TOP_LEVEL, ['text' => 'Draft the holiday post', 'inAnswer' => true]]));
+
+        $draftItem = $changedPlan->items->getItemByKey('4');
+        self::assertNotNull($draftItem);
+        self::assertTrue($draftItem->isResultTextInTheAnswer(), 'the platform closes it from the answer');
+        self::assertFalse($changedPlan->items->getItemByKey('1')->isResultTextInTheAnswer());
+    }
+
     public function testF2ATopLevelItemIsAddedAtTheEndAndEveryStandingItemKeepsItsState(): void
     {
         $changedPlan = $this->appliedPlan($taskPlanUpdateOutcome = $this->update(self::s1(), [...self::S1_KEPT_TOP_LEVEL, ['text' => 'Mail the owner a short summary']]));

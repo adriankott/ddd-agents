@@ -1472,7 +1472,8 @@ class ArgusAIAgentConversation extends ArgusAIConversation
         if (!$decisionModelGuidesThePlan) {
             return '- For a MULTI-PART task, maintain a task plan. The trigger is the REQUEST ITSELF: whenever it asks for more than'
                 . "\n  one thing (several actions, a list, \"and\" chains) — CREATE the plan BEFORE any other tool call, whether or not"
-                . "\n  the user mentions a plan: `update_task_plan` as your FIRST call (one item per part, sub-steps as subtasks). The"
+                . "\n  the user mentions a plan: `update_task_plan` as your FIRST call (one item per part the owner named; a subtask only for a separate result"
+                . "\n  inside that part, never for loading a skill or any other preparatory call). The"
                 . "\n  plan tools teach you the maintenance rules when you use them; your current plan is shown to you each step, and"
                 . "\n  before your final answer no item may remain open.";
         }

@@ -117,6 +117,7 @@ class UpdateTaskPlanTool extends ValueObject implements AgentSeededPlanRefusingM
             'requiresUserAction' => ['type' => 'boolean', 'description' => 'Blocked and only the user can unblock it'],
             'retryable' => ['type' => 'boolean', 'description' => 'Blocked by a transient external failure'],
             'remove' => ['type' => 'boolean', 'description' => 'true drops this existing item and its subtasks; send it with the key only'],
+            UpdateTaskPlanArgumentsItem::IN_ANSWER_FIELD_NAME => ['type' => 'boolean', 'description' => 'true for an item whose result is text you write in your answer (a draft, a summary): the platform closes it when your answer carries that text; never tick it.'],
         ];
         return [
             'type' => 'function',

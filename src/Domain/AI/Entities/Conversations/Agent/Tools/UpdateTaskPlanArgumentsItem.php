@@ -98,6 +98,12 @@ class UpdateTaskPlanArgumentsItem extends ValueObject
     /** The sent `retryable`; null when not sent. */
     public ?bool $retryable = null;
 
+    /** The field of an item whose result is text in the model's answer (a draft): the platform closes it from the answer. */
+    public const string IN_ANSWER_FIELD_NAME = 'inAnswer';
+
+    /** The sent `inAnswer`; null when not sent. */
+    public ?bool $inAnswer = null;
+
     /** A `remove` field was sent. */
     public bool $hasRemoveField = false;
 
@@ -166,6 +172,9 @@ class UpdateTaskPlanArgumentsItem extends ValueObject
         if (array_key_exists('retryable', $rawElement)) {
             $argumentsItem->retryable = (bool)$rawElement['retryable'];
         }
+        if (array_key_exists(self::IN_ANSWER_FIELD_NAME, $rawElement)) {
+            $argumentsItem->inAnswer = $rawElement[self::IN_ANSWER_FIELD_NAME] === true;
+        }
         if (array_key_exists('remove', $rawElement)) {
             $argumentsItem->hasRemoveField = true;
             $argumentsItem->removeIsTrue = $rawElement['remove'] === true;
@@ -180,7 +189,7 @@ class UpdateTaskPlanArgumentsItem extends ValueObject
                 $argumentsItem->subtasks = UpdateTaskPlanArgumentsItems::fromRawList($rawSubtasks, $argumentsItem->requestPath);
             }
         }
-        $sentFieldNames = array_merge(self::TEXT_FIELD_NAMES, self::STATUS_FIELD_NAMES, self::STATUS_NOTE_FIELD_NAMES, self::REQUIRES_USER_ACTION_FIELD_NAMES, ['retryable'], self::SUBTASKS_FIELD_NAMES);
+        $sentFieldNames = array_merge(self::TEXT_FIELD_NAMES, self::STATUS_FIELD_NAMES, self::STATUS_NOTE_FIELD_NAMES, self::REQUIRES_USER_ACTION_FIELD_NAMES, ['retryable', self::IN_ANSWER_FIELD_NAME], self::SUBTASKS_FIELD_NAMES);
         foreach ($sentFieldNames as $sentFieldName) {
             if (array_key_exists($sentFieldName, $rawElement)) {
                 $argumentsItem->fieldNamesBesidesKeyAndRemove[] = $sentFieldName;
