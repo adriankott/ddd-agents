@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.0-alpha.40
+
+- `[SIGNAL:answer-step]` after an owner question recorded in this turn: first what the question's own tool result asks
+  to stand in the text (a draft the question approves: every line of it), then the results of the closed plan items.
+  The model wrote only the results, and the owner approved a draft that was never shown.
+- Reply language of a FIRST owner message: inconclusive (the configured language applies) unless it holds two words
+  written in lower case — names, brands and places with a preposition ("<Brand>, in Berlin.") were read as English
+  with full confidence. A text without cased letters counts its tokens as before.
+
 ## 0.1.0-alpha.39
 
 - A write the owner-consent check held (`OwnerConsentsService::reserveOwnerConsentForStep()` NOT_RESERVED) is marked on

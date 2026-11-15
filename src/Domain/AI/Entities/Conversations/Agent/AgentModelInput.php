@@ -1660,8 +1660,9 @@ class AgentModelInput extends ValueObject
                 $followsPlatformWrittenWidgetThatEndsThePurpose => ': here the text the last tool result asks for — every part it lists, in its order. Beyond those '
                     . 'parts: no recap of what the widget shows and no list of completed steps. ',
                 $followsOwnerQuestionRecordedInThisTurn => ': your question is recorded and shows as a widget under your text — do not repeat '
-                    . 'it. Write what the owner has not seen yet: the result of every plan item you closed in this turn, in the '
-                    . 'order of the plan; with no such result, ONE short sentence that leads to the question. ',
+                    . 'it. Write what the owner has not seen yet: first what the question\'s own tool result asks to stand in this '
+                    . 'text (a draft the question approves: every line of it), then the result of every plan item you closed in '
+                    . 'this turn, in the order of the plan; with neither, ONE short sentence that leads to the question. ',
                 default => ': the RESULT the owed plan item promises, or its ONE question. A report of what is done or what happens next is not an answer — never end on it. ',
             }
             . 'Nothing is unavailable and you never lack access — NEVER tell the user so. Write it in the '

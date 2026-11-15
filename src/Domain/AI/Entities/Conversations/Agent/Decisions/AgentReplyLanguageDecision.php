@@ -177,19 +177,27 @@ class AgentReplyLanguageDecision extends AgentDecision
     }
 
     /**
-     * A FIRST owner message of one bare token ("slots", "Hola", a name) carries no language evidence the chain may act
-     * on: the decision model reads an English product term as English with full confidence,
-     * and there is no anchor to hold against it. Deterministic, before the model's answer is weighed: the written
-     * answer counts as an abstention and the configured language applies. Once an anchor exists the model's context
-     * question decides (a bare term after a German offer is `undecidable` by its own criteria).
+     * A FIRST owner message without two words of running text carries no language evidence the chain may act on: one
+     * bare token ("slots", "Hola", a name), or names and places with a preposition ("<Brand>, in Berlin.", "Café
+     * Sonnenhof Leipzig") — the decision model reads an English product term or an English-looking preposition as
+     * English with full confidence, and there is no anchor to hold against it. Counted are words written in lower
+     * case: names, brands and places are capitalised in every cased language ("wir sind eine Bäckerei" and "we are a
+     * bakery in berlin" still decide). A text without cased letters (a script without case) counts its tokens.
+     * Deterministic, before the model's answer is weighed: the written answer counts as an abstention and the
+     * configured language applies. Once an anchor exists the model's context question decides (a bare term after a
+     * German offer is `undecidable` by its own criteria).
      */
     public static function writtenEvidenceIsInconclusiveForFirstMessage(?string $anchorLanguageCode, string $ownerWordsThisTurn): bool
     {
         if ($anchorLanguageCode !== null) {
             return false;
         }
-        $tokens = preg_split('/\s+/u', trim($ownerWordsThisTurn)) ?: [];
-        return count(array_filter($tokens, static fn (string $token): bool => $token !== '')) < 2;
+        $tokens = array_values(array_filter(preg_split('/\s+/u', trim($ownerWordsThisTurn)) ?: [], static fn (string $token): bool => $token !== ''));
+        if (!preg_match('/[\p{Lu}\p{Ll}]/u', $ownerWordsThisTurn)) {
+            return count($tokens) < 2;
+        }
+        $lowerCaseWords = array_filter($tokens, static fn (string $token): bool => (bool)preg_match('/^[^\p{L}]*\p{Ll}/u', $token));
+        return count($lowerCaseWords) < 2;
     }
 
     /** A real language code from the closed set, at or above the confidence floor — not an abstention token. */

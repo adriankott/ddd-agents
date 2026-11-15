@@ -170,6 +170,18 @@ class AgentReplyLanguageDecisionResolveTest extends UnitTestCase
         self::assertFalse(AgentReplyLanguageDecision::writtenEvidenceIsInconclusiveForFirstMessage('de', 'rankings'), 'with an anchor the context question decides');
     }
 
+    public function testAFirstMessageOfNamesAndPlacesIsInconclusiveAndRunningTextDecides(): void
+    {
+        foreach (['Sonnenhof, in Berlin.', 'Café Sonnenhof Leipzig', 'Guten Tag', 'HELLO THERE'] as $namesAndPlaces) {
+            self::assertTrue(AgentReplyLanguageDecision::writtenEvidenceIsInconclusiveForFirstMessage(null, $namesAndPlaces), $namesAndPlaces);
+        }
+        foreach (['wir sind eine Bäckerei', 'we are a bakery in berlin', 'Wir sind ein Café in Leipzig', '(we) "are" here'] as $runningText) {
+            self::assertFalse(AgentReplyLanguageDecision::writtenEvidenceIsInconclusiveForFirstMessage(null, $runningText), $runningText);
+        }
+        self::assertFalse(AgentReplyLanguageDecision::writtenEvidenceIsInconclusiveForFirstMessage(null, '我们 是 面包店'), 'a script without case counts its tokens');
+        self::assertTrue(AgentReplyLanguageDecision::writtenEvidenceIsInconclusiveForFirstMessage(null, '面包店'));
+    }
+
     public function testRepositoryRoundTripKeepsEveryField(): void
     {
         $decision = new AgentReplyLanguageDecision();
