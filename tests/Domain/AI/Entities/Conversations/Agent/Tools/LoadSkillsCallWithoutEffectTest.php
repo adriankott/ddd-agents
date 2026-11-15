@@ -181,6 +181,19 @@ class LoadSkillsCallWithoutEffectTest extends UnitTestCase
         self::assertFalse($this->messages($owner)->buildCurrentTurn()->hasNewestModelStepOnlyRepeatedSkillLoads());
     }
 
+    public function testALoadCallTheStepHeldBackIsNoLoadOfTheTurn(): void
+    {
+        $owner = $this->text(AIConversationMessage::ROLE_USER, AIConversationMessage::AUTHOR_USER, 'how are my rankings?', 0);
+        $repeatedLoad = $this->firstRowOfAModelStep($this->loadWithoutEffect(1));
+        $heldBack = $this->firstRowOfAModelStep($this->call(LoadSkillsTool::NAME, AIConversationMessage::STATUS_FAILED, 2));
+        $heldBack->toolCall->wasWithheldOnStep = true;
+        self::assertFalse(
+            $this->messages($owner, $repeatedLoad, $heldBack, $this->firstRowOfAModelStep($this->loadWithoutEffect(3)))->buildCurrentTurn()->hasSkillOrToolLoadCall(),
+            'a call that never ran loaded nothing: the prose after it is a reply'
+        );
+        self::assertTrue($this->messages($owner, $heldBack, $this->firstRowOfAModelStep($this->skillLoadCall(3)))->buildCurrentTurn()->hasSkillOrToolLoadCall());
+    }
+
     protected function loadWithoutEffect(int $index): AIConversationMessage
     {
         $message = $this->skillLoadCall($index);

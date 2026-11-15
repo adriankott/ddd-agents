@@ -512,6 +512,7 @@ class AIConversationTurnMessages extends ValueObject
      * either: the answer after it — on the tool-less step the guard forces, or on the one step that keeps its tools
      * ({@see hasSkillLoadCallAnsweredByTheRepeatGuardBeforeTheNewestModelStep()}) — is a reply; counted as a load it was
      * nudged as a stall, the model loaded again, was answered by the guard again, and the turn ran to its step budget.
+     * A call the step held back on the wire ({@see ToolCall::$wasWithheldOnStep}) never ran, so it is no load either.
      */
     public function hasSkillOrToolLoadCall(): bool
     {
@@ -520,7 +521,7 @@ class AIConversationTurnMessages extends ValueObject
             if (($toolCall?->name) === LoadSkillsTool::NAME && $toolCall->loadSkillsCallLoadedNothing) {
                 continue;
             }
-            if ($toolCall !== null && $toolCall->wasRefusedAsDuplicate) {
+            if ($toolCall !== null && ($toolCall->wasRefusedAsDuplicate || $toolCall->wasWithheldOnStep)) {
                 continue;
             }
             // a `load_tool` call is the same signal: it may bring a sub-skill with the tool; so is a `findWidgets` call

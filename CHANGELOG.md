@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.0-alpha.54
+
+- A `load_skills` call the step held back (append-only loading: refused with the held-back text, never run) is no
+  skill load of the turn: the prose answer after it is a reply, no longer nudged as a stall
+  (`AIConversationTurnMessages::hasSkillOrToolLoadCall()`).
+
 ## 0.1.0-alpha.53
 
 - "Card" names of conversation elements become "widget" names; the old exports stay as deprecated aliases for one
