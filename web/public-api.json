@@ -244,7 +244,8 @@
       "useWidgetHydration",
       "useWidgetMemory",
       "useWidgetRenderReporter",
-      "withConversationWidgetVariant"
+      "withConversationWidgetVariant",
+      "LEGACY_CARD_CLICK_ORIGIN"
     ],
     "types": [
       "AgentsWidgetHydrationState",
@@ -335,9 +336,9 @@
     "values": [
       "CANVAS_VIABLE_MIN_WIDTH",
       "CUSTOM_VISUALIZATION_SANDBOX_CONFIG",
-      "CanvasWidgetCard",
+      "CanvasLauncherWidget",
       "CanvasWidgetSwitch",
-      "CardFooter",
+      "WidgetFooter",
       "ClockConversationWidget",
       "ConceptExplainerConversationWidget",
       "ConversationSearchResultsConversationWidget",
@@ -377,11 +378,13 @@
       "readConceptExplainerValue",
       "resolveCustomVisualizationFrameUrl",
       "useCanvasViable",
-      "useElementVisible"
+      "useElementVisible",
+      "CanvasWidgetCard",
+      "CardFooter"
     ],
     "types": [
-      "CanvasWidgetCardCanvas",
-      "CanvasWidgetCardProps",
+      "CanvasLauncherWidgetCanvas",
+      "CanvasLauncherWidgetProps",
       "ConceptExplainerStep",
       "ConceptExplainerStepsInput",
       "ConceptExplainerText",
@@ -396,7 +399,9 @@
       "WidgetStatusTone",
       "WidgetSurfaceLevel",
       "WidgetSurfaceProps",
-      "WidgetSurfaceSkeletonProps"
+      "WidgetSurfaceSkeletonProps",
+      "CanvasWidgetCardProps",
+      "CanvasWidgetCardCanvas"
     ]
   },
   "./contract": {
@@ -504,7 +509,7 @@
       "CanvasRestoreOnMount",
       "ConversationClosedBar",
       "ConversationDeepLinkedWidget",
-      "ConversationErrorCard",
+      "ConversationErrorWidget",
       "ConversationErrorType",
       "ConversationMessageInput",
       "ConversationMessageInputAttachmentsErrorBox",
@@ -535,7 +540,8 @@
       "useAgentsConversationRunStatus",
       "useConversationMessageSearch",
       "useConversationsSearch",
-      "useOptionalAgentsChatStore"
+      "useOptionalAgentsChatStore",
+      "ConversationErrorCard"
     ],
     "types": [
       "ActivityTicker",
@@ -560,7 +566,7 @@
       "ChatScrollTarget",
       "ConversationClosedBarProps",
       "ConversationDeepLinkedWidgetProps",
-      "ConversationErrorCardProps",
+      "ConversationErrorWidgetProps",
       "ConversationMessageInputAttachmentPreview",
       "ConversationMessageInputAttachmentUploadStatus",
       "ConversationMessageInputHandle",
@@ -574,7 +580,8 @@
       "ConversationWidgetProviderProps",
       "ConversationsSearchState",
       "SendMessageHandler",
-      "SendMessageOptions"
+      "SendMessageOptions",
+      "ConversationErrorCardProps"
     ]
   },
   "./preview": {

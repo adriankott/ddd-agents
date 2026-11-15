@@ -2,7 +2,7 @@ import { Button, SplitView } from "../provider/components";
 import type { ChatAssistantCategory, ChatAssistantIdentity, ChatAssistantOpening } from "./chat-assistant-identity";
 import { classNames } from "../provider/class-names";
 import React, { CSSProperties, useRef, useState } from "react";
-import { useCanvasViable } from "../widgets/CanvasWidgetCard/use-canvas-viable";
+import { useCanvasViable } from "../widgets/CanvasLauncherWidget/use-canvas-viable";
 import {
   CANVAS_BOXED_INSET_PX,
   CANVAS_MIN_WIDTH_PX,

@@ -44,7 +44,7 @@ const canvasFor = (instanceId: string): CanvasState => ({
   canvasId: "entityDetail",
   instanceId,
   anchor: { kind: "message", messageId: 9 },
-  origin: "cardClick",
+  origin: "widgetClick",
   mountGeneration: 1,
 });
 

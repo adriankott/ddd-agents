@@ -11,20 +11,20 @@ import {
   sameCanvasIdentity,
 } from "../../renderer/canvas/canvas-state";
 import { useCanvasViable } from "./use-canvas-viable";
-import styles from "./CanvasWidgetCard.module.scss";
+import styles from "./CanvasLauncherWidget.module.scss";
 
 /**
  * The canvas a card opens: which canvas, which instance, anchored on which message. The body comes from
  * `canvasBodies` and re-reads its payload from the anchor message — the card carries no rendered node. Layout
  * (width, narrow-viewport rule, full bleed) is the canvas's behaviour (`canvas-behaviours.ts`), not a card prop.
  */
-export interface CanvasWidgetCardCanvas {
+export interface CanvasLauncherWidgetCanvas {
   canvasId: CanvasId;
   instanceId: string;
   anchor: CanvasAnchor;
 }
 
-export interface CanvasWidgetCardProps {
+export interface CanvasLauncherWidgetProps {
   /**
    * Headline shown on the inline card (e.g. "Search results for 'X'"). Rendered through the component library's `Text`, so
    * it auto-translates: keep dynamic values out of the string and pass them via `titleReplacements` (`%token%`).
@@ -54,7 +54,7 @@ export interface CanvasWidgetCardProps {
    * The canvas this card opens (`canvasForMessageWidget`). Undefined while the widget does not know its message (the
    * reply is still streaming, a composer echo): the card renders but opens nothing.
    */
-  canvas?: CanvasWidgetCardCanvas;
+  canvas?: CanvasLauncherWidgetCanvas;
   /**
    * The other agent space the canvas shows, when it is not the active one. The named card shows that agent space's chip on
    * a row above it: floating over the card's corner, the chip would cover the open affordance, and inside the card
@@ -92,7 +92,7 @@ const DEFAULT_ICON = "maximize";
  *  - without a `preview` (the canvas is the widget's only surface, behaviour `narrowViewport: "overlay"`): the same
  *    named card as on the wide viewport, so closing the canvas leaves a card to re-open.
  */
-export const CanvasWidgetCard = ({
+export const CanvasLauncherWidget = ({
   title,
   titleReplacements,
   translateTitle = true,
@@ -106,7 +106,7 @@ export const CanvasWidgetCard = ({
   anotherAgentSpaceKey,
   preview,
   testId,
-}: CanvasWidgetCardProps) => {
+}: CanvasLauncherWidgetProps) => {
   const { openCanvas, canvas: openCanvasState } = useConversationWidgetContext();
   const canvasViable = useCanvasViable();
   const openedRef = useRef(false);
@@ -122,7 +122,7 @@ export const CanvasWidgetCard = ({
   }, [justDelivered, canvas?.instanceId]);
 
   const open = () => {
-    if (canvas) openCanvas({ ...canvas, origin: "cardClick", justDelivered: false });
+    if (canvas) openCanvas({ ...canvas, origin: "widgetClick", justDelivered: false });
   };
 
   // The inline preview is suppressed while THIS card's canvas is open.

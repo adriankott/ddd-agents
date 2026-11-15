@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import type { PayloadConversationWidgetProps } from "../../renderer/conversation-widget-props";
 import { useReportWidgetRenderStatus } from "../../renderer/render-report/widget-render-report";
-import { EntityMentionCard } from "./EntityMentionCard/EntityMentionCard";
+import { EntityMentionWidgetBody } from "./EntityMentionWidgetBody/EntityMentionWidgetBody";
 import { parseEntityMentionPayload } from "./shared/entity-mention";
 import styles from "./EntityMentionConversationWidget.module.scss";
 
@@ -23,7 +23,7 @@ export const EntityMentionConversationWidget = (props: PayloadConversationWidget
   if (mention === null) return null;
   return (
     <div className={styles.row} data-testid="entity-mention-message">
-      <EntityMentionCard mention={mention} />
+      <EntityMentionWidgetBody mention={mention} />
     </div>
   );
 };

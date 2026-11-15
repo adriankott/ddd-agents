@@ -1,6 +1,6 @@
 import { Button, Icon, Text } from "../../provider/components";
 import React, { useCallback, useMemo, useState } from "react";
-import styles from "./ConversationErrorCard.module.scss";
+import styles from "./ConversationErrorWidget.module.scss";
 import { ConversationErrorType } from "../store/conversation-error-type";
 import { useAgentsBudgetLimit } from "../../provider/AgentsProvider";
 
@@ -12,7 +12,7 @@ const formatFirstDayOfNextMonth = (now: Date): string => {
   return `${day}.${month}.${firstDayOfNextMonth.getFullYear()}`;
 };
 
-export interface ConversationErrorCardProps {
+export interface ConversationErrorWidgetProps {
   errorType: ConversationErrorType;
   /** Retry-After seconds of the 429 — only meaningful for RATE_LIMIT; picks the "try again in …" wording. */
   rateLimitRetryAfterSeconds?: number | null;
@@ -24,7 +24,7 @@ export interface ConversationErrorCardProps {
   onRetry?: () => Promise<void>;
 }
 
-export const ConversationErrorCard = (props: ConversationErrorCardProps) => {
+export const ConversationErrorWidget = (props: ConversationErrorWidgetProps) => {
   const { errorType, rateLimitRetryAfterSeconds, onRetry } = props;
   const [retrying, setRetrying] = useState(false);
   // The app's budget: whether an upgrade lifts the limit, and the fair-use wording (resellers that present the AI

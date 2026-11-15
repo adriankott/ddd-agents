@@ -1,17 +1,17 @@
 import { Icon, InteractiveSurface, Text } from "../../provider/components";
 import type { ChatAssistantOpening } from "../chat-assistant-identity";
 import React from "react";
-import styles from "./ConversationSuggestionCard.module.scss";
+import styles from "./ConversationSuggestionWidget.module.scss";
 import { classNames } from "../../provider/class-names";
 import { useAgentsEnvironment } from "../../provider/AgentsProvider";
 
-export interface ConversationSuggestionCardProps {
+export interface ConversationSuggestionWidgetProps {
   suggestion: ChatAssistantOpening;
   onClick?: () => void;
   testId?: string;
 }
 
-export const ConversationSuggestionCard = (props: ConversationSuggestionCardProps) => {
+export const ConversationSuggestionWidget = (props: ConversationSuggestionWidgetProps) => {
   const { suggestion, onClick, testId } = props;
   const { AssistantIconBadge } = useAgentsEnvironment();
 

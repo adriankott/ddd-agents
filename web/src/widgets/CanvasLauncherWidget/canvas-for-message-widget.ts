@@ -3,7 +3,7 @@ import {
   canvasInstanceIdForMessagePayload,
   messageAnchor,
 } from "../../renderer/canvas/canvas-state";
-import type { CanvasWidgetCardCanvas } from "./CanvasWidgetCard";
+import type { CanvasLauncherWidgetCanvas } from "./CanvasLauncherWidget";
 
 /**
  * The canvas a payload widget in a message opens: anchored on the host message, one instance per message + payload.
@@ -14,7 +14,7 @@ export const canvasForMessageWidget = (
   canvasId: CanvasId,
   messageId: string | number | undefined,
   payload: string,
-): CanvasWidgetCardCanvas | undefined => {
+): CanvasLauncherWidgetCanvas | undefined => {
   const numericMessageId = messageId === undefined ? Number.NaN : Number(messageId);
   if (!Number.isFinite(numericMessageId)) return undefined;
   return {

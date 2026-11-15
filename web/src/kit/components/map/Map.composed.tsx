@@ -114,7 +114,7 @@ const MapNode = (props: ComposedViewComponentProps) => {
       canvasId: "mapFullScreen",
       instanceId: fullScreenInstanceId,
       anchor: messageAnchor(numericMessageId),
-      origin: "cardClick",
+      origin: "widgetClick",
       justDelivered: false,
     });
   };

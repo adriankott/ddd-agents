@@ -18,13 +18,21 @@ export type CanvasAnchor =
 /**
  * How a canvas came to be open — the one question the opening rule asks (`decide-canvas-open.ts`):
  *  - `deliveredInMessage`  a canvas widget in a message delivered live (`justDelivered`); replay never opens one
- *  - `cardClick`           the customer clicked a card in the transcript, or the canvas toggle button on the divider
+ *  - `widgetClick`         the customer clicked a widget in the transcript, or the canvas toggle button on the divider
  *  - `openedByPage`        a page handed the tool over (`openAgentWithWidget` / `?agentWidget=`)
  *  - `restoredAfterReload` the pointer stored for this conversation, on the mount of the conversation
  * A restored or page-opened canvas never runs a body's creation side effects (a post editor with no created entity
  * renders its empty state instead of creating a draft).
  */
-export type CanvasOrigin = "deliveredInMessage" | "cardClick" | "openedByPage" | "restoredAfterReload";
+/** @deprecated The former name of the `widgetClick` origin; an app's call that still passes it opens like `widgetClick`. */
+export const LEGACY_CARD_CLICK_ORIGIN = "cardClick";
+
+export type CanvasOrigin =
+  | "deliveredInMessage"
+  | "widgetClick"
+  | "openedByPage"
+  | "restoredAfterReload"
+  | typeof LEGACY_CARD_CLICK_ORIGIN;
 
 /** The identity of a canvas: WHICH canvas, and which instance of it. Two canvases with the same identity are one. */
 export interface CanvasIdentity {

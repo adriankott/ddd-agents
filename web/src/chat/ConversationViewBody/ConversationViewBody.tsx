@@ -16,7 +16,7 @@ import type { ChatMessage } from "../chat-message";
 import { NoConversationLoading, ConversationLoading } from "../ConversationLoadingStates";
 import { ConversationMessageList } from "../ConversationMessageList/ConversationMessageList";
 import { WidgetWindowRootContext } from "../../renderer/widget-windowing";
-import { ConversationIntroCard } from "../ConversationIntroCard/ConversationIntroCard";
+import { ConversationIntroWidget } from "../ConversationIntroWidget/ConversationIntroWidget";
 import { useAgentsEnvironment } from "../../provider/AgentsProvider";
 import { ConversationMessageUserTheme } from "../ConversationMessage/ConversationMessageUser/ConversationMessageUser";
 import { ConversationScrollToLatestMessageButton } from "../ConversationScrollToLatestMessageButton/ConversationScrollToLatestMessageButton";
@@ -627,7 +627,7 @@ export const ConversationViewBody = (props: ConversationViewProps) => {
       ) : null}
 
       {isConversationIntroVisible ? (
-        <ConversationIntroCard
+        <ConversationIntroWidget
           aiPromptExtension={aiPromptExtension!}
           aiPromptExtensionIcon={aiPromptExtension!.iconClass as string}
           suggestions={suggestions}

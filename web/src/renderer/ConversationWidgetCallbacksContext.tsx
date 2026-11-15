@@ -100,7 +100,7 @@ export interface ConversationWidgetCallbacks {
   openCanvas: (request: CanvasOpenRequestFromOpener) => void;
   closeCanvas: (byCustomer: boolean) => void;
   /**
-   * Re-open `lastClosedCanvas` as a customer action (origin `cardClick`): the canvas toggle button on the divider, the
+   * Re-open `lastClosedCanvas` as a customer action (origin `widgetClick`): the canvas toggle button on the divider, the
    * narrow-viewport re-open control, the compact → expand path. No-op when nothing was closed.
    */
   reopenLastClosedCanvas: () => void;

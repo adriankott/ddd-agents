@@ -3,8 +3,8 @@ import styles from "./ConversationMessageInputAttachmentsPreviewStrip.module.scs
 import { classNames } from "../../../provider/class-names";
 import {
   ConversationMessageInputAttachmentPreview,
-  ConversationMessageInputAttachmentPreviewCard,
-} from "./ConversationMessageInputAttachmentPreviewCard";
+  ConversationMessageInputAttachmentPreviewWidget,
+} from "./ConversationMessageInputAttachmentPreviewWidget";
 
 export interface ConversationMessageInputAttachmentsPreviewStripProps {
   attachments: ConversationMessageInputAttachmentPreview[];
@@ -30,7 +30,7 @@ export const ConversationMessageInputAttachmentsPreviewStrip = (
       <div className={styles.stripRevealInner}>
         <div className={styles.strip}>
           {attachments.map((attachment) => (
-            <ConversationMessageInputAttachmentPreviewCard
+            <ConversationMessageInputAttachmentPreviewWidget
               key={attachment.attachmentId}
               attachment={attachment}
               onRemove={() => onRemoveAttachment(attachment.attachmentId)}

@@ -240,7 +240,7 @@ describe("decideCanvasOpen — the opening rule", () => {
   test("a card click, a page hand-over and a restore always open — the customer, the page or the pointer decided", () => {
     const lastClosed = { ...request(), mountGeneration: 1, closedByCustomer: true };
     const openWorkSurface = { ...workSurfaceRequest(), mountGeneration: 1 };
-    for (const origin of ["cardClick", "openedByPage", "restoredAfterReload"] as const) {
+    for (const origin of ["widgetClick", "openedByPage", "restoredAfterReload"] as const) {
       expect(
         decideCanvasOpen(listBehaviour, null, lastClosed, request({ origin, justDelivered: false })),
       ).toEqual({ kind: "accept" });
@@ -315,7 +315,7 @@ describe("canvas reducers — the lifetime state machine", () => {
   test("a card click on the SAME identity re-opens it with a new generation (a list with other filters remounts)", () => {
     const state = emptyState();
     applyOpenCanvas(state, request());
-    applyOpenCanvas(state, request({ origin: "cardClick", justDelivered: false }));
+    applyOpenCanvas(state, request({ origin: "widgetClick", justDelivered: false }));
     expect(state.canvas?.mountGeneration).toBe(2);
     expect(state.lastClosedCanvas).toBeNull();
   });
@@ -334,7 +334,7 @@ describe("canvas reducers — the lifetime state machine", () => {
     expect(applyOpenCanvas(state, request())).toEqual({ kind: "ignore", reason: "customerClosedIt" });
     expect(state.canvas).toBeNull();
 
-    expect(applyOpenCanvas(state, request({ origin: "cardClick" }))).toEqual({ kind: "accept" });
+    expect(applyOpenCanvas(state, request({ origin: "widgetClick" }))).toEqual({ kind: "accept" });
     expect(state.canvas?.mountGeneration).toBe(2);
     expect(state.lastClosedCanvas).toBeNull();
   });
@@ -344,7 +344,7 @@ describe("canvas reducers — the lifetime state machine", () => {
     applyOpenCanvas(state, request());
     applyCloseCanvas(state, false);
     expect(state.lastClosedCanvas?.closedByCustomer).toBe(false);
-    expect(applyOpenCanvas(state, request({ origin: "cardClick" }))).toEqual({ kind: "accept" });
+    expect(applyOpenCanvas(state, request({ origin: "widgetClick" }))).toEqual({ kind: "accept" });
   });
 
   test("closing nothing changes nothing", () => {
@@ -379,7 +379,7 @@ describe("canvas reducers — the lifetime state machine", () => {
     expectEmptySlots(state);
 
     // Closed before the send: dropped as well.
-    applyOpenCanvas(state, request({ origin: "cardClick" }));
+    applyOpenCanvas(state, request({ origin: "widgetClick" }));
     applyCloseCanvas(state, true);
     applyResetCanvasForNewTurn(state);
     expectEmptySlots(state);
@@ -463,7 +463,7 @@ describe("canvas reducers — the lifetime state machine", () => {
       request({
         canvasId: "exampleEditor",
         instanceId: canvasInstanceIdForMessage("exampleEditor", 10),
-        origin: "cardClick",
+        origin: "widgetClick",
       }),
     );
     expect(state.canvas?.createdEntityId).toBe(77);

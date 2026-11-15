@@ -1,6 +1,6 @@
 import { Button, ProgressBar, Text } from "../../../provider/components";
 import React from "react";
-import styles from "./ConversationMessageInputAttachmentPreviewCard.module.scss";
+import styles from "./ConversationMessageInputAttachmentPreviewWidget.module.scss";
 import { classNames } from "../../../provider/class-names";
 import { convertBytesToSizeString } from "./convert-bytes-to-size-string";
 
@@ -23,7 +23,7 @@ export type ConversationMessageInputAttachmentPreview = {
   uploadProgressPercent: number;
 };
 
-export interface ConversationMessageInputAttachmentPreviewCardProps {
+export interface ConversationMessageInputAttachmentPreviewWidgetProps {
   attachment: ConversationMessageInputAttachmentPreview;
   /** The card's ✕ — the host drops the attachment (and discards its in-flight upload result). */
   onRemove: () => void;
@@ -40,8 +40,8 @@ export interface ConversationMessageInputAttachmentPreviewCardProps {
  * (progress 100%) but the media-library call hasn't resolved — the bar goes indeterminate for that
  * stretch. Both disappear when the upload settles.
  */
-export const ConversationMessageInputAttachmentPreviewCard = (
-  props: ConversationMessageInputAttachmentPreviewCardProps,
+export const ConversationMessageInputAttachmentPreviewWidget = (
+  props: ConversationMessageInputAttachmentPreviewWidgetProps,
 ) => {
   const { attachment, onRemove, testId = "chat-input-attachment" } = props;
 

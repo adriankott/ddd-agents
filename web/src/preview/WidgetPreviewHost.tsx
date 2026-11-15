@@ -21,7 +21,7 @@ import type { CanvasState } from "../renderer/canvas/canvas-state";
 import { canvasBodies } from "../renderer/canvas/canvasBodies";
 import { canvasBehaviourOf } from "../renderer/canvas/canvas-behaviours";
 import { decideCanvasOpen } from "../renderer/canvas/decide-canvas-open";
-import { CANVAS_VIABLE_MIN_WIDTH } from "../widgets/CanvasWidgetCard/use-canvas-viable";
+import { CANVAS_VIABLE_MIN_WIDTH } from "../widgets/CanvasLauncherWidget/use-canvas-viable";
 import { WidgetImageRenderContext } from "../image-render/WidgetImageRenderContext";
 import { ComposedViewComponentsContext } from "../kit/composed-view-components";
 import { buildPreviewComposedViewComponents } from "./preview-stub-components";

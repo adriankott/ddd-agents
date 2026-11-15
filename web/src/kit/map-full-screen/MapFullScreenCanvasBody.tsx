@@ -51,7 +51,7 @@ export const MapFullScreenCanvasBody = (props: CanvasBodyProps) => {
         canvasId: "entityDetail",
         instanceId: canvasInstanceIdForEntityDetail(target),
         anchor,
-        origin: "cardClick",
+        origin: "widgetClick",
         justDelivered: false,
       });
     },

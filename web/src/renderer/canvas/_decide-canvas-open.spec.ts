@@ -7,6 +7,7 @@ import {
   canvasInstanceIdForMessage,
   canvasInstanceIdForMessagePayload,
   LastClosedCanvas,
+  LEGACY_CARD_CLICK_ORIGIN,
   messageAnchor,
 } from "./canvas-state";
 import { CanvasOpenDecision, CanvasOpenIgnoreReason, decideCanvasOpen } from "./decide-canvas-open";
@@ -18,7 +19,8 @@ import { CanvasOpenDecision, CanvasOpenIgnoreReason, decideCanvasOpen } from "./
  * not an id: `exampleEditor` stands for an app's canvas that declares the overlay.
  */
 
-const ORIGINS: readonly CanvasOrigin[] = ["deliveredInMessage", "cardClick", "openedByPage", "restoredAfterReload"];
+// the legacy `cardClick` an app may still pass opens like `widgetClick`
+const ORIGINS: readonly CanvasOrigin[] = ["deliveredInMessage", "widgetClick", "openedByPage", "restoredAfterReload", LEGACY_CARD_CLICK_ORIGIN];
 
 const request = (overrides: Partial<CanvasOpenRequest> = {}): CanvasOpenRequest => ({
   canvasId: "conversationSearchResults",

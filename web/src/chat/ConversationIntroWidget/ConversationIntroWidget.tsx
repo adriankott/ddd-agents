@@ -3,9 +3,9 @@ import type { ChatAssistantIdentity, ChatAssistantOpening } from "../chat-assist
 import React from "react";
 import { useAgentsEnvironment } from "../../provider/AgentsProvider";
 import styles from "../Conversation.module.scss";
-import { ConversationSuggestionCard } from "../ConversationSuggestionCard/ConversationSuggestionCard";
+import { ConversationSuggestionWidget } from "../ConversationSuggestionWidget/ConversationSuggestionWidget";
 
-interface ConversationIntroCardProps {
+interface ConversationIntroWidgetProps {
   aiPromptExtension: ChatAssistantIdentity;
   /** The icon class of the extension, an icon of the app's icon set. */
   aiPromptExtensionIcon: string;
@@ -13,12 +13,12 @@ interface ConversationIntroCardProps {
   onSuggestionClick: (text: string) => void;
 }
 
-export const ConversationIntroCard = ({
+export const ConversationIntroWidget = ({
   aiPromptExtension,
   aiPromptExtensionIcon,
   suggestions,
   onSuggestionClick,
-}: ConversationIntroCardProps) => {
+}: ConversationIntroWidgetProps) => {
   const { AssistantIconBadge } = useAgentsEnvironment();
   return (
     <div className={styles.extensionIntro}>
@@ -48,7 +48,7 @@ export const ConversationIntroCard = ({
       </Text>
       <div className={styles.suggestions}>
         {suggestions?.map((suggestion, index) => (
-          <ConversationSuggestionCard
+          <ConversationSuggestionWidget
             key={"suggestion_prop_" + index}
             suggestion={suggestion}
             onClick={() => onSuggestionClick(suggestion.openingText!)}

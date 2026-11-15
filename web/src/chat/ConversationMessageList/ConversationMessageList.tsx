@@ -15,7 +15,7 @@ import { ConversationMessageSystem } from "../ConversationMessage/ConversationMe
 import { ConversationCallMarkerChip } from "../ConversationMessage/ConversationCallMarkerChip/ConversationCallMarkerChip";
 import { ConversationTaskInstructionDisclosure } from "../ConversationMessage/ConversationTaskInstructionDisclosure/ConversationTaskInstructionDisclosure";
 import { ConversationMessageThinking } from "../ConversationMessage/ConversationMessageWidgets/ConversationMessageThinking/ConversationMessageThinking";
-import { ConversationErrorCard } from "../ConversationErrorCard/ConversationErrorCard";
+import { ConversationErrorWidget } from "../ConversationErrorWidget/ConversationErrorWidget";
 import { ConversationErrorType } from "../store/conversation-error-type";
 import type { ChatMessage } from "../chat-message";
 import { PHONE_CALL_LIFECYCLE_SIGNAL_SOURCES } from "../last-wire-message-is-unanswered-user-message";
@@ -185,7 +185,7 @@ export const ConversationMessageList = ({
     // never shown to the customer. Stored role=SYSTEM, so this guard precedes the role branches.
     if (message.messageType === "SIGNAL") return null;
     // ERROR messages carry the raw internal failure (e.g. a provider 400 with the full error body) — never shown to
-    // the customer. The user-facing "something went wrong" is the ConversationErrorCard below, rendered from runState=FAILED.
+    // the customer. The user-facing "something went wrong" is the ConversationErrorWidget below, rendered from runState=FAILED.
     if (message.messageType === "ERROR") return null;
 
     let messageNode: React.ReactNode = null;
@@ -276,7 +276,7 @@ export const ConversationMessageList = ({
       )}
 
       {error !== null ? (
-        <ConversationErrorCard
+        <ConversationErrorWidget
           errorType={error!}
           rateLimitRetryAfterSeconds={rateLimitRetryAfterSeconds}
           onRetry={

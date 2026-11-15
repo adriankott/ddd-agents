@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { PayloadConversationWidgetProps } from "../../renderer/conversation-widget-props";
-import { CanvasWidgetSwitch } from "../CanvasWidgetCard/CanvasWidgetSwitch";
-import { canvasForMessageWidget } from "../CanvasWidgetCard/canvas-for-message-widget";
+import { CanvasWidgetSwitch } from "../CanvasLauncherWidget/CanvasWidgetSwitch";
+import { canvasForMessageWidget } from "../CanvasLauncherWidget/canvas-for-message-widget";
 import { parseWebSearchResultsPayload } from "./shared/web-search-results-widget-payload";
 import { WebSearchAnswer } from "./WebSearchAnswer";
 import { WebSearchSourcesList } from "./WebSearchSourcesList";

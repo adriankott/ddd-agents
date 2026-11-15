@@ -6,7 +6,7 @@ import type { AgentsChatEvent } from "../chat/store/agents-chat-state";
 import type { AgentsChatStore } from "../chat/store/create-agents-chat-store";
 import { useAgentsChatSelector } from "../chat/store/use-agents-chat-store";
 import type { CanvasState, LastClosedCanvas } from "./canvas/canvas-state";
-import { CANVAS_VIABLE_MIN_WIDTH } from "../widgets/CanvasWidgetCard/use-canvas-viable";
+import { CANVAS_VIABLE_MIN_WIDTH } from "../widgets/CanvasLauncherWidget/use-canvas-viable";
 import { ConversationComposerWidget } from "./conversation-composer-widget";
 import type { CanvasCreatedEntity } from "./canvas/canvas-reducers";
 import { clearStoredCanvas, storeOpenCanvas } from "./canvas/canvasStorage";
@@ -291,7 +291,7 @@ const ConversationWidgetProviderBody = ({
         canvasId: last.canvasId,
         instanceId: last.instanceId,
         anchor: last.anchor,
-        origin: "cardClick",
+        origin: "widgetClick",
         justDelivered: false,
         viewportViable: window.innerWidth >= CANVAS_VIABLE_MIN_WIDTH,
         hostHasCanvasSurface: hostHasCanvasSurfaceRef.current,

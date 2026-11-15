@@ -133,7 +133,7 @@ describe("public entry exports", () => {
       canvasId: "entityDetail",
       instanceId: "entityDetail:invoice:7",
       anchor: rendererEntry.messageAnchor(10),
-      origin: "cardClick",
+      origin: "widgetClick",
       mountGeneration: 1,
     });
     expect(clientTestingEntry.readStoredCanvas(42)).toEqual({

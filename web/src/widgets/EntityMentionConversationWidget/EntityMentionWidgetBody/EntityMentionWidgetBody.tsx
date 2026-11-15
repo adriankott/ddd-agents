@@ -2,9 +2,9 @@ import { Icon, Text } from "../../../provider/components";
 import { ModelText } from "../../../kit/ModelText/ModelText";
 import type { EntityMentionFields } from "../shared/entity-mention";
 import { entityTypeFallbackLabel, entityTypeIcon } from "../shared/entity-mention-presentation";
-import styles from "./EntityMentionCard.module.scss";
+import styles from "./EntityMentionWidgetBody.module.scss";
 
-export interface EntityMentionCardProps {
+export interface EntityMentionWidgetBodyProps {
   mention: EntityMentionFields;
   testId?: string;
 }
@@ -14,7 +14,7 @@ export interface EntityMentionCardProps {
  * type's icon in a rounded tile, the caption "Asking about" and the entity's name below it. The name is business
  * content (`ModelText`: never translated, never parsed as markup); without one the line names the type ("This review").
  */
-export const EntityMentionCard = (props: EntityMentionCardProps) => {
+export const EntityMentionWidgetBody = (props: EntityMentionWidgetBodyProps) => {
   const { mention, testId = "entity-mention-chip" } = props;
   return (
     <div className={styles.card} data-testid={testId}>

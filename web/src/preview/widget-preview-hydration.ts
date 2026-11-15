@@ -40,7 +40,7 @@ const answerFromFixture = (
  * one that answers from the fixture's `hydration` (by derived key, else by type) and otherwise runs the real hydrator,
  * whose requests the request transport answers from `responses`. The widget therefore runs its live code path —
  * `useWidgetHydration` with the store's hydration slice, no frozen capture context — so a self-hydrating canvas widget
- * auto-opens its canvas like in the chat (`CanvasWidgetCard`). The `email` mode keeps the capture's frozen hydration.
+ * auto-opens its canvas like in the chat (`CanvasLauncherWidget`). The `email` mode keeps the capture's frozen hydration.
  * Returns the disposer that puts the real hydrators back.
  */
 export const installWidgetPreviewHydration = (

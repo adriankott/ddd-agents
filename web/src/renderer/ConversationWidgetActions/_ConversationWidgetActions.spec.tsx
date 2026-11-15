@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { ConversationWidgetRenderContext } from "../ConversationWidgetRenderContext";
 import { ConversationWidgetActions } from "./ConversationWidgetActions";
-import { CardFooter } from "../../widgets/_shared/CardFooter";
+import { WidgetFooter } from "../../widgets/_shared/WidgetFooter";
 
 describe("email widget actions", () => {
   it("preserves ordinary conversation actions without adding a DOM wrapper", () => {
@@ -25,12 +25,12 @@ describe("email widget actions", () => {
               <button>Reply</button>
             </footer>
           </ConversationWidgetActions>
-          <CardFooter>
+          <WidgetFooter>
             <button>Edit</button>
-          </CardFooter>
-          <CardFooter actionOnly={false}>
+          </WidgetFooter>
+          <WidgetFooter actionOnly={false}>
             <span>Published</span>
-          </CardFooter>
+          </WidgetFooter>
         </article>
       </ConversationWidgetRenderContext.Provider>,
     );

@@ -1,8 +1,14 @@
 // `@mgamadeus/ddd-agents/widgets` — the generic widgets the package registers itself, the canvas card and the modern
 // look primitives an app's own widgets build on.
-export { CanvasWidgetCard, type CanvasWidgetCardProps } from "../widgets/CanvasWidgetCard/CanvasWidgetCard";
-export { CanvasWidgetSwitch } from "../widgets/CanvasWidgetCard/CanvasWidgetSwitch";
-export { canvasForMessageWidget } from "../widgets/CanvasWidgetCard/canvas-for-message-widget";
+export { CanvasLauncherWidget, type CanvasLauncherWidgetProps } from "../widgets/CanvasLauncherWidget/CanvasLauncherWidget";
+/** @deprecated Renamed to `CanvasLauncherWidget` (and `CanvasLauncherWidgetProps`, `CanvasLauncherWidgetCanvas`). */
+export {
+  CanvasLauncherWidget as CanvasWidgetCard,
+  type CanvasLauncherWidgetProps as CanvasWidgetCardProps,
+  type CanvasLauncherWidgetCanvas as CanvasWidgetCardCanvas,
+} from "../widgets/CanvasLauncherWidget/CanvasLauncherWidget";
+export { CanvasWidgetSwitch } from "../widgets/CanvasLauncherWidget/CanvasWidgetSwitch";
+export { canvasForMessageWidget } from "../widgets/CanvasLauncherWidget/canvas-for-message-widget";
 export { ClockConversationWidget } from "../widgets/ClockConversationWidget/ClockConversationWidget";
 export { ConceptExplainerConversationWidget } from "../widgets/ConceptExplainerConversationWidget/ConceptExplainerConversationWidget";
 export { ConversationSearchResultsConversationWidget } from "../widgets/ConversationSearchResultsConversationWidget/ConversationSearchResultsConversationWidget";
@@ -24,10 +30,12 @@ export { WritingDraftConversationWidget } from "../widgets/WritingDraftConversat
 export * from "../widgets/_shared/modern";
 // The primitives an app's own widgets build on beside the modern look: the label, the footer, the done pill, the
 // skeleton shapes, payload validation, the canvas-body update channel, visibility, and the canvas viability.
-export type { CanvasWidgetCardCanvas } from "../widgets/CanvasWidgetCard/CanvasWidgetCard";
-export { CANVAS_VIABLE_MIN_WIDTH, useCanvasViable } from "../widgets/CanvasWidgetCard/use-canvas-viable";
+export type { CanvasLauncherWidgetCanvas } from "../widgets/CanvasLauncherWidget/CanvasLauncherWidget";
+export { CANVAS_VIABLE_MIN_WIDTH, useCanvasViable } from "../widgets/CanvasLauncherWidget/use-canvas-viable";
 export { WidgetLabel } from "../widgets/_shared/WidgetLabel";
-export { CardFooter } from "../widgets/_shared/CardFooter";
+export { WidgetFooter } from "../widgets/_shared/WidgetFooter";
+/** @deprecated Renamed to `WidgetFooter`. */
+export { WidgetFooter as CardFooter } from "../widgets/_shared/WidgetFooter";
 export { DonePill } from "../widgets/_shared/DonePill";
 export { SkeletonCircle, SkeletonLine, SkeletonPill, SkeletonWidgetLabel } from "../widgets/_shared/skeleton-primitives";
 export {

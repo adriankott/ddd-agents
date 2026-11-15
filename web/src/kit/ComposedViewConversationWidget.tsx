@@ -48,7 +48,7 @@ export const ComposedViewConversationWidget = (props: PayloadConversationWidgetP
         canvasId: "entityDetail",
         instanceId: canvasInstanceIdForEntityDetail(target),
         anchor: messageAnchor(numericMessageId),
-        origin: "cardClick",
+        origin: "widgetClick",
         justDelivered: false,
       });
     },

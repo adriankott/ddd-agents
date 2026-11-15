@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.0-alpha.53
+
+- "Card" names of conversation elements become "widget" names; the old exports stay as deprecated aliases for one
+  release: `CanvasWidgetCard` → `CanvasLauncherWidget` (`CanvasWidgetCardProps` / `CanvasWidgetCardCanvas` →
+  `CanvasLauncherWidgetProps` / `CanvasLauncherWidgetCanvas`), `ConversationErrorCard` → `ConversationErrorWidget`
+  (`…Props`), `CardFooter` → `WidgetFooter`; internal: `ConversationSuggestionCard`, `ConversationIntroCard`,
+  `ConversationMessageInputAttachmentPreviewCard` → `…Widget`, `EntityMentionCard` → `EntityMentionWidgetBody`.
+- The canvas origin `cardClick` is `widgetClick`; `cardClick` (`LEGACY_CARD_CLICK_ORIGIN`) still opens like it.
+- Test id `writing-draft-widget-card` → `writing-draft-widget`. `VideoCard`, `MapPointCard` (tiles inside a widget)
+  and their test ids stay.
+- The npm package of 0.1.0-alpha.52 was not published (its tag carried the renamed files without the import
+  updates); this release carries 0.1.0-alpha.52's change too.
+
 ## 0.1.0-alpha.52
 
 - The driver's and the judge's model calls of a judged run (`AgentEvalJudgedRunService::callModel()`) send the

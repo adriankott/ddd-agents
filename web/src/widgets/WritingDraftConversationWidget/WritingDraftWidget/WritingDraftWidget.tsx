@@ -135,7 +135,7 @@ export const WritingDraftWidget = (props: WritingDraftWidgetProps) => {
         ) : null}
       </div>
 
-      <WidgetSurface className={styles.card} testId="writing-draft-widget-card">
+      <WidgetSurface className={styles.card} testId="writing-draft-widget">
         {isEditing ? (
           <div className={styles.editFields}>
             {showsRecipientRow ? (

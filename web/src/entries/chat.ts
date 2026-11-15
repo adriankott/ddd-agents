@@ -26,7 +26,12 @@ export type { ChatMessage } from "../chat/chat-message";
 export type { ChatAssistantCategory, ChatAssistantIdentity, ChatAssistantOpening } from "../chat/chat-assistant-identity";
 export type { SendMessageHandler, SendMessageOptions } from "../chat/conversation-send-message";
 export { ConversationView, type ConversationViewProps } from "../chat/ConversationView";
-export { ConversationErrorCard, type ConversationErrorCardProps } from "../chat/ConversationErrorCard/ConversationErrorCard";
+export { ConversationErrorWidget, type ConversationErrorWidgetProps } from "../chat/ConversationErrorWidget/ConversationErrorWidget";
+/** @deprecated Renamed to `ConversationErrorWidget` (and `ConversationErrorWidgetProps`). */
+export {
+  ConversationErrorWidget as ConversationErrorCard,
+  type ConversationErrorWidgetProps as ConversationErrorCardProps,
+} from "../chat/ConversationErrorWidget/ConversationErrorWidget";
 export { ConversationMessageInputAttachmentsErrorBox } from "../chat/ConversationMessageInput/ConversationMessageInputAttachments/ConversationMessageInputAttachmentsErrorBox";
 export { ConversationMessageInputAttachmentsPreviewStrip } from "../chat/ConversationMessageInput/ConversationMessageInputAttachments/ConversationMessageInputAttachmentsPreviewStrip";
 export { normalizeServerMessageToMarkdown } from "../chat/normalize-server-message-to-markdown";
@@ -70,7 +75,7 @@ export {
 export type {
   ConversationMessageInputAttachmentPreview,
   ConversationMessageInputAttachmentUploadStatus,
-} from "../chat/ConversationMessageInput/ConversationMessageInputAttachments/ConversationMessageInputAttachmentPreviewCard";
+} from "../chat/ConversationMessageInput/ConversationMessageInputAttachments/ConversationMessageInputAttachmentPreviewWidget";
 export type { AssistantServerMessagePayload } from "../chat/normalize-server-message-to-markdown";
 export { useActivityTicker, SUCCESS_BEAT_MS } from "../chat/controller/use-activity-ticker";
 export { formatElapsedClock, isStepStillRunning, type ActivityTickerLine } from "../chat/controller/activity-ticker";

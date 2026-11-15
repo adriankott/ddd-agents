@@ -36,7 +36,7 @@ const ignore = (reason: CanvasOpenIgnoreReason): CanvasOpenDecision => ({ kind: 
  * is a fresh Accept (remount), and the refresh contract of a pinned work surface is a value the body derives from the
  * message list, not a reducer merge.
  *
- * A `cardClick`, an `openedByPage` and a `restoredAfterReload` request always open (the customer, the page or the
+ * A `widgetClick`, an `openedByPage` and a `restoredAfterReload` request always open (the customer, the page or the
  * stored pointer decided); only `deliveredInMessage` is judged.
  */
 export const decideCanvasOpen = (
