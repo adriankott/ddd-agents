@@ -267,6 +267,29 @@ class LoadedCapabilities extends ObjectSet
         return $skillNames;
     }
 
+    /**
+     * A copy without the skills `$source` loaded and the tools that belong only to them (a tool another kept skill
+     * carries stays). The set itself is unchanged.
+     */
+    public function withoutSkillsLoadedBySource(string $source): static
+    {
+        $copy = $this->deepCopy();
+        $leavingSkillNames = $copy->getSkillNamesLoadedBySource($source);
+        if ($leavingSkillNames === []) {
+            return $copy;
+        }
+        $leavingNames = $leavingSkillNames;
+        foreach ($copy->getElements() as $capability) {
+            if ($capability->type === LoadedCapability::TYPE_TOOL && $capability->parentSkillNames !== []
+                && array_diff($capability->parentSkillNames, $leavingSkillNames) === []
+            ) {
+                $leavingNames[] = $capability->name;
+            }
+        }
+        $copy->removeByNames(...$leavingNames);
+        return $copy;
+    }
+
     /** @return string[] the loaded TOOL names, in order. */
     public function getLoadedToolNames(): array
     {

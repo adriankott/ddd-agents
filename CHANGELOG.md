@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.0-alpha.56
+
+- Append-only loading: the decision model's preload on a conversation's first row is no part of the first epoch's
+  base set (`LoadedCapabilities::withoutSkillsLoadedBySource()`): the turn's first model call appends it behind the
+  `load_skills` call and its result of 0.1.0-alpha.55, with its `additional_tools` item and its instructions — the
+  shape of the model's own load. The base prefix (prompt and base tools) is the same for every new conversation,
+  whatever the preload picked. A structural or plan-item load on row 0 stays in the base set. A conversation already
+  running appends such a skill once on its next call (one cache miss).
+
 ## 0.1.0-alpha.55
 
 - Append-only loading: skills the platform loaded before the turn's first model call (a preload: decision model, plan

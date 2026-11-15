@@ -99,6 +99,10 @@ Under `conversationAppend` (`AIConversation::buildPrefixEpoch()` → `AgentPrefi
   `load_skills` call and its result (`call_preload_<row index>`, `AIConversationMessage::LOAD_SKILLS_RESULT_LOADED`),
   recorded in `RequestSnapshot::$appendedPreloadLoadCallSkillNames` and re-rendered at the same position. Shown only as
   instructions, the preloaded skill was loaded again by the model as its first call; its own load it never repeats.
+  The decision model's preload on row 0 is no part of the first epoch's base set
+  (`LoadedCapabilities::withoutSkillsLoadedBySource()`): call 0 appends it in that shape too, and the base prefix (prompt
+  + base tools) is the same for every new conversation, whatever the preload picked. A structural or plan-item load on
+  row 0 stays in the base set (the same per purpose, cached across conversations).
 - **Conditional meta tools** (`AgentAppendOnlyCall::CONDITIONAL_META_TOOL_NAMES`) join once where their condition
   first holds and stay; a cold epoch carries them top-level (`AgentPrefixEpoch::$carriedConditionalMetaToolNames`).
 - **Reachable tool set top-level.** When the estimated schemas of every tool the purpose may reach fit

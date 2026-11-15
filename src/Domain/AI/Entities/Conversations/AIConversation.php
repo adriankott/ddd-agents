@@ -63,6 +63,7 @@ use DDD\Domain\AI\Entities\Conversations\Messages\ContextRetentionSettings;
 use DDD\Domain\AI\Entities\Conversations\Messages\Delegation\DelegationResultSlice;
 use DDD\Domain\AI\Entities\Conversations\Messages\ToolResultRetention;
 use DDD\Domain\AI\Entities\Conversations\Messages\LoadedCapabilities;
+use DDD\Domain\AI\Entities\Conversations\Messages\LoadedCapability;
 use DDD\Domain\AI\Entities\Conversations\Messages\LoadedCapabilityOrigin;
 use DDD\Domain\AI\Entities\Conversations\Messages\LoadedSkillToolDefinitions;
 use DDD\Domain\AI\Entities\Conversations\Messages\RequestSnapshot;
@@ -2454,6 +2455,12 @@ class AIConversation extends Entity
         }
         $agentPrefixEpoch->coverFingerprint = AgentPrefixEpoch::buildCoverFingerprint($compactionCover->getCoverNodes());
         $agentPrefixEpoch->baseCapabilities = $this->findLoadedCapabilitiesAtPrefixEpochStart($agentPrefixEpoch->startIndex, $agentRun);
+        // the decision model's preload on the first row is no part of the base set: the first call appends it behind a
+        // `load_skills` call and its result (the shape of the model's own load, which it does not repeat), and the base
+        // prefix stays the same for every new conversation, whatever the preload picked
+        if ($agentPrefixEpoch->startIndex === 0 && $agentPrefixEpoch->baseCapabilities !== null) {
+            $agentPrefixEpoch->baseCapabilities = $agentPrefixEpoch->baseCapabilities->withoutSkillsLoadedBySource(LoadedCapability::SOURCE_DECISION_MODEL);
+        }
         $agentPrefixEpoch->appendOnlyToolSet = $this->buildAppendOnlyToolSet($agentRun);
         if ($agentPrefixEpoch->baseCapabilities !== null) {
             /** @var AISkillsService $aiSkillsService */
