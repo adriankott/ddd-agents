@@ -120,7 +120,7 @@ with one wire name, the one that extends the other wins (`ComposedViewFolderClas
 | `ComposedView` | `ComposedViewConversationWidget` | the composable kit; answerable through its `Form` nodes |
 | `CustomVisualization` | `CustomVisualizationConversationWidget` | the model's own sandboxed HTML, CSS and script; last resort |
 | `WebSearchResults` | `WebSearchResultsConversationWidget` | the pages a web answer used; data-complete |
-| `ConversationSearchResults` | `ConversationSearchResultsConversationWidget` | grouped cross-conversation recall hits; data-complete |
+| `ConversationSearchResults` | `ConversationSearchResultsConversationWidget` | grouped cross-conversation recall hits; data-complete — `groups` in the block, or `groupsFromToolCallId` and the platform fills them from the stored search result |
 | `EntityMention` | `EntityMentionConversationWidget` | written by the owner's composer, never by the agent |
 | `ToolTrace` | `ToolTraceConversationWidget` | one tool step the chat shows |
 | `SuggestedActions` | `SuggestedActionsConversationWidget` | suggested next owner messages; read as a leaf attribute, a fence of it renders nothing |

@@ -13,6 +13,7 @@ use DDD\Domain\AI\Entities\Conversations\Widgets\Composed\Bindings\ComposedViewT
 use DDD\Domain\AI\Entities\Conversations\Widgets\Composed\ComposedViewConversationWidget;
 use DDD\Domain\AI\Entities\Conversations\Widgets\Composed\EntityReferences\EntityReferenceResolverClasses;
 use DDD\Domain\AI\Entities\Conversations\Widgets\Composed\EntityReferences\EntityReferenceRow;
+use DDD\Domain\AI\Entities\Conversations\Widgets\ConversationSearchResultsConversationWidget;
 use DDD\Domain\AI\Entities\Conversations\Widgets\WidgetBlock;
 use DDD\Domain\AI\Entities\Conversations\Widgets\WidgetBlocks;
 use DDD\Domain\AI\Services\AgentSpaces\AgentSpacesService;
@@ -26,6 +27,9 @@ use WeakMap;
  * model's own rows, re-writes, transient eval conversations) and the widget-row writer (tool and platform rows,
  * `appendWidget()` → `persistNewRowUnderRunClaim()`) — right BEFORE the row is written and therefore before its
  * realtime publication.
+ *
+ * It also fills the `groups` of a `ConversationSearchResults` block that names its search call
+ * ({@see fillConversationSearchResultsGroupsOfRow()}), in the same place and from the same lookup.
  *
  * Two entry points:
  * - {@see resolveBindingsOfRowBeforePersist()} — the row's own blocks: every `$from` binding and `openEntity`
@@ -57,6 +61,7 @@ class ComposedViewBindingResolutionService extends Service
      */
     public function resolveBindingsOfRowBeforePersist(AIConversationMessage $message): void
     {
+        $this->fillConversationSearchResultsGroupsOfRow($message);
         if (!self::isResolvableRow($message)) {
             return;
         }
@@ -150,6 +155,66 @@ class ComposedViewBindingResolutionService extends Service
             }
         }
         return $resolvedRows;
+    }
+
+    /**
+     * Fills the `groups` of every `ConversationSearchResults` block of an ASSISTANT row that names its search call in
+     * `groupsFromToolCallId` and carries no groups yet: the groups (and an empty `query`) are taken from that call's
+     * stored structured result (top-level `groups`, `query`), looked up like a `$from` binding — the loaded call rows of
+     * the conversation, then the stored rows. A call that has not ended, failed, or holds no `groups` list leaves the
+     * block as it is. A row without such a field costs one substring check. Idempotent: a filled block is skipped.
+     */
+    public function fillConversationSearchResultsGroupsOfRow(AIConversationMessage $message): void
+    {
+        $messageText = $message->message ?? null;
+        if (($message->role ?? null) !== AIConversationMessage::ROLE_ASSISTANT || !is_string($messageText)
+            || !str_contains($messageText, ConversationSearchResultsConversationWidget::FIELD_GROUPS_FROM_TOOL_CALL_ID)
+        ) {
+            return;
+        }
+        $conversation = isset($message->aiConversation) ? $message->aiConversation : null;
+        $widgetBlocks = WidgetBlocks::fromMarkdown($messageText);
+        $replacementWidgetJsonsByOrdinal = [];
+        foreach ($widgetBlocks->getElements() as $widgetBlock) {
+            $filledWidgetJson = $this->buildConversationSearchResultsWidgetJsonWithGroups($widgetBlock, $conversation);
+            if ($filledWidgetJson !== null) {
+                $replacementWidgetJsonsByOrdinal[$widgetBlock->ordinal] = $filledWidgetJson;
+            }
+        }
+        if ($replacementWidgetJsonsByOrdinal !== []) {
+            $message->message = $widgetBlocks->buildMarkdownWithWidgetJsonsReplaced($replacementWidgetJsonsByOrdinal);
+        }
+    }
+
+    /** The block's JSON with `groups` filled from the named search call, or null when it is no such block or nothing is filled. */
+    protected function buildConversationSearchResultsWidgetJsonWithGroups(WidgetBlock $widgetBlock, ?AIConversation $conversation): ?string
+    {
+        if ($widgetBlock->outcome !== WidgetBlock::OUTCOME_VALID || !$widgetBlock->isOfType(ConversationSearchResultsConversationWidget::WIDGET_TYPE)) {
+            return null;
+        }
+        try {
+            $widgetFields = json_decode($widgetBlock->widgetJson, true, 64, JSON_THROW_ON_ERROR);
+        } catch (Throwable) {
+            return null;
+        }
+        $toolCallId = is_array($widgetFields) ? ($widgetFields[ConversationSearchResultsConversationWidget::FIELD_GROUPS_FROM_TOOL_CALL_ID] ?? null) : null;
+        if (!is_string($toolCallId) || trim($toolCallId) === '' || (is_array($widgetFields['groups'] ?? null) && $widgetFields['groups'] !== [])) {
+            return null;
+        }
+        $searchCallResult = $this->findToolCallResults($conversation, [$toolCallId])->findToolCallResult($toolCallId);
+        if ($searchCallResult === null || !$searchCallResult->hasEnded() || $searchCallResult->resultIsUnusable || !$searchCallResult->hasBindableData) {
+            return null;
+        }
+        $searchResultData = $searchCallResult->bindableData;
+        if (!is_array($searchResultData) || !is_array($searchResultData['groups'] ?? null)) {
+            return null;
+        }
+        $widgetFields['groups'] = array_values($searchResultData['groups']);
+        if (trim((string)($widgetFields['query'] ?? '')) === '' && is_string($searchResultData['query'] ?? null)) {
+            $widgetFields['query'] = $searchResultData['query'];
+        }
+        $filledWidgetJson = json_encode($widgetFields, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_LINE_TERMINATORS);
+        return is_string($filledWidgetJson) ? $filledWidgetJson : null;
     }
 
     /** Whether the row's text holds a `ComposedView` block at all — the one check every stored row pays. */

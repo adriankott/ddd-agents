@@ -57,6 +57,17 @@ No filters, no recursion, no slices; at most `ComposedViewToolResultPath::MAX_PA
 Calls are looked up by conversation and tool call id: first in the loaded rows, then in the stored rows (a call
 compacted out of the window still resolves).
 
+## `groupsFromToolCallId` — the search results widget filled from its call
+
+A `ConversationSearchResults` block may name the search's tool call instead of carrying `groups`:
+`{"type":"ConversationSearchResults","query":"…","groupsFromToolCallId":"<call id>"}`. When the row is stored,
+`ComposedViewBindingResolutionService::fillConversationSearchResultsGroupsOfRow()` writes the top-level `groups` (and
+`query` when the block's is empty) of that call's stored structured result into the block — the same hook and lookup
+as `$from` (loaded call rows, then stored rows). The search tool must return a structured result with a top-level
+`groups` list (within the bindable size, 64 KB). Left as is: a block that already carries groups, a call that has not
+ended (a call of the same step), an error result, a result without `groups`. The tool's text tells the model to name
+its call id; the model then copies no JSON.
+
 ## Making a result bindable
 
 The executor stores a result's structured shape next to the markdown the model reads

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.0-alpha.30
+
+- `ConversationSearchResults`: a block may name the search's tool call in `groupsFromToolCallId` instead of carrying
+  `groups`; when the row is stored the platform writes the `groups` (and an empty `query`) of that call's stored
+  structured result into the block (`ComposedViewBindingResolutionService::fillConversationSearchResultsGroupsOfRow()`,
+  the hook and lookup of `$from`). The model no longer copies kilobytes of JSON (a copied block lost a bracket and was
+  invalid). The search tool must return a structured result with a top-level `groups` list.
+
 ## 0.1.0-alpha.29
 
 - `[SIGNAL:clock]` also names yesterday, tomorrow, this week and last week as dates of the space's zone (weeks from
