@@ -8,6 +8,7 @@ use DDD\Domain\AI\Entities\Conversations\Compaction\AIConversationCompactionNode
 use DDD\Domain\AI\Entities\Texts\Embeddings\TextEmbedding;
 use DDD\Domain\AI\Repo\DB\Conversations\Compaction\DBAIConversationCompactionNodeModel;
 use DDD\Domain\AI\Repo\DB\Conversations\Compaction\DBConversationCompactionNodes;
+use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Repo\DB\Conversations\DBAIConversationModel;
 use DDD\Domain\Base\Repo\DB\Doctrine\EntityManagerFactory;
 use DDD\Domain\Common\Entities\Accounts\Account;
@@ -40,6 +41,10 @@ class ConversationCompactionNodesVectorSearchDatabaseTest extends DatabaseTestCa
     protected const int ZERO_VECTOR_NODE_ID = 203;
     protected const int SECOND_CONVERSATION_NODE_ID = 211;
     protected const int OTHER_ACCOUNT_NODE_ID = 221;
+    protected const int SCHEDULED_CONVERSATION_ID = 4;
+    protected const int EVAL_RUN_CONVERSATION_ID = 5;
+    protected const int SCHEDULED_CONVERSATION_NODE_ID = 231;
+    protected const int EVAL_RUN_CONVERSATION_NODE_ID = 241;
 
     protected function setUp(): void
     {
@@ -50,6 +55,9 @@ class ConversationCompactionNodesVectorSearchDatabaseTest extends DatabaseTestCa
         $this->insertRow(DBAIConversationModel::getTableName(), ['id' => self::FIRST_CONVERSATION_ID, 'accountId' => self::SEARCHING_ACCOUNT_ID]);
         $this->insertRow(DBAIConversationModel::getTableName(), ['id' => self::SECOND_CONVERSATION_ID, 'accountId' => self::SEARCHING_ACCOUNT_ID]);
         $this->insertRow(DBAIConversationModel::getTableName(), ['id' => self::CONVERSATION_OF_OTHER_ACCOUNT_ID, 'accountId' => self::OTHER_ACCOUNT_ID]);
+        // runs without the owner: the search across conversations never answers from them
+        $this->insertRow(DBAIConversationModel::getTableName(), ['id' => self::SCHEDULED_CONVERSATION_ID, 'accountId' => self::SEARCHING_ACCOUNT_ID, 'initiatorType' => AIConversation::INITIATOR_TYPE_SCHEDULE]);
+        $this->insertRow(DBAIConversationModel::getTableName(), ['id' => self::EVAL_RUN_CONVERSATION_ID, 'accountId' => self::SEARCHING_ACCOUNT_ID, 'runSettings' => '{"evalRun": true}']);
 
         $this->insertNode(self::FARTHEST_NODE_ID, self::FIRST_CONVERSATION_ID, 0, [0.0, 1.0]);
         $this->insertNode(self::NEAREST_NODE_ID, self::FIRST_CONVERSATION_ID, 10, [1.0, 0.0]);
@@ -57,6 +65,8 @@ class ConversationCompactionNodesVectorSearchDatabaseTest extends DatabaseTestCa
         $this->insertNode(self::ZERO_VECTOR_NODE_ID, self::FIRST_CONVERSATION_ID, 20, null);
         $this->insertNode(self::SECOND_CONVERSATION_NODE_ID, self::SECOND_CONVERSATION_ID, 0, [1.0, 1.0]);
         $this->insertNode(self::OTHER_ACCOUNT_NODE_ID, self::CONVERSATION_OF_OTHER_ACCOUNT_ID, 0, [1.0, 0.0]);
+        $this->insertNode(self::SCHEDULED_CONVERSATION_NODE_ID, self::SCHEDULED_CONVERSATION_ID, 0, [1.0, 0.0]);
+        $this->insertNode(self::EVAL_RUN_CONVERSATION_NODE_ID, self::EVAL_RUN_CONVERSATION_ID, 0, [1.0, 0.0]);
     }
 
     protected function onTearDown(): void
@@ -97,7 +107,8 @@ class ConversationCompactionNodesVectorSearchDatabaseTest extends DatabaseTestCa
         self::assertSame(
             [self::NEAREST_NODE_ID, self::SECOND_CONVERSATION_NODE_ID, self::FARTHEST_NODE_ID],
             $this->getNodeIdsInOrder($foundNodes),
-            'both conversations of the account in one order of distance, never the conversation of the other account'
+            'both conversations of the account in one order of distance, never the conversation of the other account,'
+            . ' never a scheduled run or an eval run of the account'
         );
     }
 

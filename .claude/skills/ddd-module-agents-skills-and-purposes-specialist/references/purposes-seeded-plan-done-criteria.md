@@ -230,8 +230,11 @@ texts never reach the customer.
 whose conversations are the platform's own work: never in a customer's history, search or recall, fully visible to
 an admin. A conversation is hidden when its own or its root's purpose is listed. A host redeclares the list on its
 registry class. A host's customer read path calls `AIConversationsService::findVisibleToCustomer()` and a list applies
-`DBAIConversations::restrictToCustomerVisibleConversations()`; the read rights stay untouched. Two more host lists:
-`PURPOSE_NAMES_CLOSED_WITHOUT_AN_OWNER_TURN` and `PURPOSE_NAMES_HELD_AS_A_PHONE_CALL`.
+`DBAIConversations::restrictToCustomerVisibleConversations()`; the read rights stay untouched. Three more host lists:
+`PURPOSE_NAMES_CLOSED_WITHOUT_AN_OWNER_TURN`, `PURPOSE_NAMES_HELD_AS_A_PHONE_CALL` and
+`PURPOSE_NAMES_LEFT_OUT_OF_THE_SEARCH_ACROSS_CONVERSATIONS` — purposes visible to the owner whose conversations the
+search across conversations still never answers from (the package lists `Schedule.Run`; the hidden purposes are left
+out anyway; scheduled runs by initiator type: `AIConversation::INITIATOR_TYPES_LEFT_OUT_OF_THE_SEARCH_ACROSS_CONVERSATIONS`).
 
 **Purposes closed without an owner turn.** A purpose is closed at the settled release point of a turn. When the turn
 that reaches the goal is the owner's last one and the close was deferred (a failed `completePurposeGoalAndConfirmItIsDurable()`,

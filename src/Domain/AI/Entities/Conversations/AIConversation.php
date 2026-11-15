@@ -458,6 +458,16 @@ class AIConversation extends Entity
     ];
 
     /**
+     * @var string[] The initiator types whose conversations the search across an account's conversations never answers
+     * from: a run the platform started on a schedule is no dialogue with the owner. A conversation is left out when its
+     * own initiator type OR its root's is listed. An application redeclares the list with the types of its own such
+     * runs; read through {@see getInitiatorTypesLeftOutOfTheSearchAcrossConversations()}.
+     */
+    protected const array INITIATOR_TYPES_LEFT_OUT_OF_THE_SEARCH_ACROSS_CONVERSATIONS = [
+        self::INITIATOR_TYPE_SCHEDULE,
+    ];
+
+    /**
      * @var string[] The initiator types of the runs the platform runs for itself: it reads what they write, no person
      * does ({@see AIConversationOrigin::isPlatformOwnRun()}). The module starts no such run by an initiator type (its
      * own are known by their purpose); an application redeclares the list with the types of its own; read through
@@ -1615,6 +1625,12 @@ class AIConversation extends Entity
     public static function getOwnerAbsentInitiatorTypes(): array
     {
         return (self::getConversationClassOfTheApplication())::OWNER_ABSENT_INITIATOR_TYPES;
+    }
+
+    /** @return string[] {@see INITIATOR_TYPES_LEFT_OUT_OF_THE_SEARCH_ACROSS_CONVERSATIONS} of the running application. */
+    public static function getInitiatorTypesLeftOutOfTheSearchAcrossConversations(): array
+    {
+        return (self::getConversationClassOfTheApplication())::INITIATOR_TYPES_LEFT_OUT_OF_THE_SEARCH_ACROSS_CONVERSATIONS;
     }
 
     /** @return string[] {@see PLATFORM_OWN_RUN_INITIATOR_TYPES} of the running application. */

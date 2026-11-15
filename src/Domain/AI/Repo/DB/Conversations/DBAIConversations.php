@@ -6,6 +6,7 @@ namespace DDD\Domain\AI\Repo\DB\Conversations;
 
 use DDD\Domain\AI\Entities\AgentSpaces\AgentSpace;
 use DDD\Domain\AI\Entities\AgentSpaces\AgentSpaceSqlCondition;
+use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Entities\Conversations\AIConversations;
 use DDD\Domain\AI\Entities\Conversations\Purposes\AIConversationPurpose;
 use DDD\Domain\AI\Services\AgentSpaces\AgentSpacesService;
@@ -75,6 +76,51 @@ class DBAIConversations extends DBEntitySet
                 . ' AND hiddenRootConversation.purposeName IN (:customerHiddenPurposeNames))'
             )
             ->setParameter('customerHiddenPurposeNames', AIConversationPurpose::getCustomerHiddenPurposeNames());
+    }
+
+    /**
+     * Restrict a query that joins the conversation row as `$conversationAlias` to the conversations the search across
+     * an account's conversations answers from — the owner's dialogue. Left out, inside the query (so their rows are
+     * neither read for a distance nor ranked):
+     * - an eval run (`runSettings.evalRun` true) unless it holds the history an eval seeded (`runSettings.evalSeededHistory`);
+     * - a conversation whose own purpose or whose root's purpose is in
+     *   {@see AIConversationPurpose::getPurposeNamesLeftOutOfTheSearchAcrossConversations()} (the customer-hidden purposes
+     *   and the schedule run);
+     * - a conversation whose own initiator type or whose root's is in
+     *   {@see AIConversation::getInitiatorTypesLeftOutOfTheSearchAcrossConversations()} (a scheduled run).
+     * Both lists are the application's, redeclared on its purpose and conversation class.
+     */
+    public static function restrictToConversationsTheSearchAcrossConversationsAnswersFrom(
+        DoctrineQueryBuilder $queryBuilder,
+        string $conversationAlias
+    ): void {
+        $evalRunMark = "JSON_FIELD_TEXT($conversationAlias.runSettings, 'evalRun')";
+        $evalSeededHistoryMark = "JSON_FIELD_TEXT($conversationAlias.runSettings, 'evalSeededHistory')";
+        $queryBuilder->andWhere("($evalRunMark IS NULL OR $evalRunMark <> 'true' OR $evalSeededHistoryMark = 'true')");
+
+        $rootConditions = [];
+        $leftOutPurposeNames = AIConversationPurpose::getPurposeNamesLeftOutOfTheSearchAcrossConversations();
+        if ($leftOutPurposeNames !== []) {
+            $queryBuilder
+                ->andWhere("($conversationAlias.purposeName IS NULL OR $conversationAlias.purposeName NOT IN (:searchLeftOutPurposeNames))")
+                ->setParameter('searchLeftOutPurposeNames', $leftOutPurposeNames);
+            $rootConditions[] = 'searchLeftOutRootConversation.purposeName IN (:searchLeftOutPurposeNames)';
+        }
+        $leftOutInitiatorTypes = AIConversation::getInitiatorTypesLeftOutOfTheSearchAcrossConversations();
+        if ($leftOutInitiatorTypes !== []) {
+            $queryBuilder
+                ->andWhere("($conversationAlias.initiatorType IS NULL OR $conversationAlias.initiatorType NOT IN (:searchLeftOutInitiatorTypes))")
+                ->setParameter('searchLeftOutInitiatorTypes', $leftOutInitiatorTypes);
+            $rootConditions[] = 'searchLeftOutRootConversation.initiatorType IN (:searchLeftOutInitiatorTypes)';
+        }
+        if ($rootConditions !== []) {
+            $modelClass = DBAIConversation::BASE_ORM_MODEL;
+            $queryBuilder->andWhere(
+                "NOT EXISTS (SELECT searchLeftOutRootConversation.id FROM {$modelClass} searchLeftOutRootConversation"
+                . " WHERE searchLeftOutRootConversation.id = $conversationAlias.rootConversationId"
+                . ' AND (' . implode(' OR ', $rootConditions) . '))'
+            );
+        }
     }
 
     /**

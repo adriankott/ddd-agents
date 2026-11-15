@@ -87,6 +87,17 @@ class AIConversationPurpose extends Entity
     ];
 
     /**
+     * @var string[] The purposes whose conversations the search across an account's conversations never answers from,
+     * in addition to {@see CUSTOMER_HIDDEN_PURPOSE_NAMES}: runs the platform drives without the owner, whose text is
+     * no dialogue with the owner. A conversation is left out when its own purpose OR its root's purpose is listed. An
+     * application redeclares the list with its own such purposes added; read through
+     * {@see getPurposeNamesLeftOutOfTheSearchAcrossConversations()}.
+     */
+    protected const array PURPOSE_NAMES_LEFT_OUT_OF_THE_SEARCH_ACROSS_CONVERSATIONS = [
+        self::SCHEDULE_RUN,
+    ];
+
+    /**
      * @var string[] The purposes whose reached goal is completed and closed without waiting for an owner turn: the
      * recovery reads their idle conversations after a quiet period and runs the close of a reached goal again
      * ({@see shouldCloseConversationAfterSettledTurn()}, {@see completePurposeGoalAndConfirmItIsDurable()}). The
@@ -1033,6 +1044,18 @@ class AIConversationPurpose extends Entity
     public static function getCustomerHiddenPurposeNames(): array
     {
         return (self::getPurposeClassOfTheApplication())::CUSTOMER_HIDDEN_PURPOSE_NAMES;
+    }
+
+    /**
+     * @return string[] The purposes the search across an account's conversations never answers from: the
+     * application's {@see PURPOSE_NAMES_LEFT_OUT_OF_THE_SEARCH_ACROSS_CONVERSATIONS} and every customer-hidden purpose.
+     */
+    public static function getPurposeNamesLeftOutOfTheSearchAcrossConversations(): array
+    {
+        return array_values(array_unique(array_merge(
+            (self::getPurposeClassOfTheApplication())::PURPOSE_NAMES_LEFT_OUT_OF_THE_SEARCH_ACROSS_CONVERSATIONS,
+            self::getCustomerHiddenPurposeNames()
+        )));
     }
 
     /** @return string[] The purposes whose reached goal the recovery closes without waiting for an owner turn. */

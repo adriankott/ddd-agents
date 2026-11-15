@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.0-alpha.28
+
+- The search across an account's conversations answers from the owner's dialogue only, and decides it INSIDE its
+  three queries (message vectors, compaction nodes, keyword) instead of after them: an eval run without seeded history,
+  a conversation whose own or root purpose is customer-hidden or `Schedule.Run`, and a conversation whose own or root
+  initiator type is `SCHEDULE` are neither read for a distance nor ranked nor given an over-fetch place
+  (`DBAIConversations::restrictToConversationsTheSearchAcrossConversationsAnswersFrom()`). New host lists:
+  `AIConversationPurpose::PURPOSE_NAMES_LEFT_OUT_OF_THE_SEARCH_ACROSS_CONVERSATIONS` and
+  `AIConversation::INITIATOR_TYPES_LEFT_OUT_OF_THE_SEARCH_ACROSS_CONVERSATIONS`. Before, scheduled runs were searched
+  and the excluded rows took the over-fetch places of the owner's messages. Requires `mgamadeus/ddd` ^3.33.0
+  (`JSON_FIELD_TEXT` in DQL on MariaDB).
+
 ## 0.1.0-alpha.27
 
 - npm: `AgentsStateAction` carries the index signature of redux 5's `UnknownAction`, so a redux 5 / react-redux 9 host

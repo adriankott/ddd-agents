@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DDD\Domain\AI\Repo\DB\Conversations\Compaction;
 
+use DDD\Domain\AI\Repo\DB\Conversations\DBAIConversations;
 use DDD\Domain\AI\Entities\Conversations\Compaction\AIConversationCompactionNodes;
 use DDD\Domain\AI\Entities\Texts\Embeddings\TextEmbedding;
 use DDD\Domain\Common\Entities\Accounts\Account;
@@ -71,7 +72,8 @@ class DBConversationCompactionNodes extends DBEntitySet
 
     /**
      * The query of {@see findSimilarAcrossConversationsByEmbedding()}: the vector search of this repo, restricted to
-     * the conversations whose `accountId` is the account's. The restriction is a filter of the search, not a right
+     * the conversations whose `accountId` is the account's and that the search answers from
+     * ({@see DBAIConversations::restrictToConversationsTheSearchAcrossConversationsAnswersFrom()}). The restriction is a filter of the search, not a right
      * (see {@see \DDD\Domain\AI\Repo\DB\Conversations\Messages\DBAIConversationMessages::restrictToConversationsOfAccount()}).
      */
     public function buildVectorSearchQueryBuilderForConversationsOfAccount(Account $account, TextEmbedding $queryEmbedding, int $limit): DoctrineQueryBuilder
@@ -83,6 +85,7 @@ class DBConversationCompactionNodes extends DBEntitySet
             ->innerJoin("$alias.aiConversation", $conversationAlias)
             ->andWhere("$conversationAlias.accountId = :conversationAccountId")
             ->setParameter('conversationAccountId', (int)$account->id);
+        DBAIConversations::restrictToConversationsTheSearchAcrossConversationsAnswersFrom($queryBuilder, $conversationAlias);
         return $queryBuilder;
     }
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DDD\Domain\AI\Repo\DB\Conversations\Messages;
 
+use DDD\Domain\AI\Repo\DB\Conversations\DBAIConversations;
 use DDD\Domain\AI\Entities\Conversations\SignalSources\ConversationSignalSources;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessages;
@@ -292,8 +293,9 @@ class DBAIConversationMessages extends DBEntitySet
     }
 
     /**
-     * Restrict a message query to the conversations whose `accountId` is the account's. This is a filter of the
-     * search, not a right: it also holds where the read rights are wider — an account with the admin role (no
+     * Restrict a message query to the conversations whose `accountId` is the account's and that the search answers
+     * from ({@see DBAIConversations::restrictToConversationsTheSearchAcrossConversationsAnswersFrom()}: no eval run, no
+     * left-out purpose, no scheduled run). This is a filter of the search, not a right: it also holds where the read rights are wider — an account with the admin role (no
      * condition at all), or an account the application lets read the conversations of other accounts (the accounts
      * below it, the accounts it provisioned).
      */
@@ -304,6 +306,7 @@ class DBAIConversationMessages extends DBEntitySet
             ->innerJoin(self::getBaseModelAlias() . '.aiConversation', $conversationAlias)
             ->andWhere("$conversationAlias.accountId = :conversationAccountId")
             ->setParameter('conversationAccountId', (int)$account->id);
+        DBAIConversations::restrictToConversationsTheSearchAcrossConversationsAnswersFrom($queryBuilder, $conversationAlias);
     }
 
     /**
