@@ -66,6 +66,7 @@ use DDD\Domain\AI\Entities\Conversations\Agent\AgentReply;
 use DDD\Domain\AI\Entities\Conversations\Agent\AgentTurnOutcome;
 use DDD\Domain\AI\Entities\Conversations\Agent\ModelResponse;
 use DDD\Domain\AI\Entities\Conversations\Agent\Tools\DelegateTool;
+use DDD\Domain\AI\Entities\Conversations\Agent\Tools\LoadSkillsTool;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
 use DDD\Domain\AI\Entities\Conversations\Messages\OwnerDevice;
 use DDD\Domain\AI\Entities\Conversations\Purposes\AgentPurposedConversationStart;
@@ -2085,6 +2086,19 @@ class AIConversationAgentService extends Service implements AgentModelCallRunner
                     $firstStepTools = $workOnlyTools;
                     $planToolsHeldBackAfterRejectedTicks = true;
                     $this->aiTrace('turn.step.planToolsSuppressed', ['conversationId' => $conversation->id ?? null, 'step' => $agentRun->invocationStep + 1, 'rejectedStreak' => $rejectedPlanTickStreak]);
+                }
+            }
+            // REPEATED SKILL LOAD HOLD: the newest step only loaded skills that were loaded already — the model read its
+            // own call and wrote it again. `load_skills` is held back for this ONE model call (the tool choice stays the
+            // step's): the system-prompt swap sends the set without it, append-only loading keeps it on the wire and the
+            // dispatch refuses its call. The call after it offers `load_skills` again.
+            if ($firstStepTools->offersTool(LoadSkillsTool::NAME)
+                && $conversation->messages->buildCurrentTurn()->hasNewestModelStepOnlyRepeatedSkillLoads()
+            ) {
+                $toolsWithoutSkillLoads = $firstStepTools->withoutTools([LoadSkillsTool::NAME]);
+                if (!$toolsWithoutSkillLoads->isEmpty()) {
+                    $firstStepTools = $toolsWithoutSkillLoads;
+                    $this->aiTrace('turn.step.skillLoadsHeldBack', ['conversationId' => $conversation->id ?? null, 'step' => $agentRun->invocationStep + 1]);
                 }
             }
             // BUDGET CLOSING STEP: the turn's step budget is one model call from spent and

@@ -605,6 +605,38 @@ class AIConversationTurnMessages extends ValueObject
     }
 
     /**
+     * Whether the turn's newest model step wrote nothing but `load_skills` calls that each loaded nothing new
+     * ({@see ToolCall::onlyRepeatedASkillLoad()}): the loop holds `load_skills` back on the next model call. A model step
+     * begins at the row that carries its usage stamp (a status line that heads it counts with it); signal rows after the step do not end
+     * it, an assistant text does.
+     */
+    public function hasNewestModelStepOnlyRepeatedSkillLoads(): bool
+    {
+        $hasRepeatedSkillLoad = false;
+        foreach (array_reverse($this->rows) as $message) {
+            $toolCall = isset($message->toolCall) ? $message->toolCall : null;
+            if ($toolCall === null) {
+                if ($hasRepeatedSkillLoad) {
+                    // a status line that heads the step holds the step's calls; any other row ends it
+                    return $message->isAssistantText() && ($message->inputTokens ?? 0) > 0;
+                }
+                if ($message->isAssistantText()) {
+                    return false;
+                }
+                continue;
+            }
+            if (!$toolCall->onlyRepeatedASkillLoad()) {
+                return false;
+            }
+            $hasRepeatedSkillLoad = true;
+            if (($message->inputTokens ?? 0) > 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Whether the repeat guard answered a `load_skills` call of this turn instead of running it
      * ({@see ToolCall::$wasRefusedAsDuplicate}) in a model step BEFORE the turn's newest one. A model step begins at
      * the row that carries its usage stamp ({@see AIConversationMessage::applyUsageAsStepHead()}); the calls of the

@@ -144,6 +144,51 @@ class LoadSkillsCallWithoutEffectTest extends UnitTestCase
         );
     }
 
+    public function testANewestModelStepOfRepeatedSkillLoadsOnlyIsFound(): void
+    {
+        $owner = $this->text(AIConversationMessage::ROLE_USER, AIConversationMessage::AUTHOR_USER, 'which image model is best?', 0);
+        $repeatedLoad = $this->firstRowOfAModelStep($this->loadWithoutEffect(1));
+        $secondRepeatedLoad = $this->loadWithoutEffect(2);
+        self::assertTrue($this->messages($owner, $repeatedLoad)->buildCurrentTurn()->hasNewestModelStepOnlyRepeatedSkillLoads());
+        self::assertTrue($this->messages($owner, $repeatedLoad, $secondRepeatedLoad)->buildCurrentTurn()->hasNewestModelStepOnlyRepeatedSkillLoads());
+
+        $statusLine = $this->firstRowOfAModelStep($this->text(AIConversationMessage::ROLE_ASSISTANT, AIConversationMessage::AUTHOR_ASSISTANT, 'Loading the skill.', 1));
+        self::assertTrue(
+            $this->messages($owner, $statusLine, $this->loadWithoutEffect(2))->buildCurrentTurn()->hasNewestModelStepOnlyRepeatedSkillLoads(),
+            'a status line that heads the step counts with it'
+        );
+    }
+
+    public function testAStepWithAnotherCallALoadThatLoadedOrAnEarlierStepIsNoRepeatedLoadStep(): void
+    {
+        $owner = $this->text(AIConversationMessage::ROLE_USER, AIConversationMessage::AUTHOR_USER, 'which image model is best?', 0);
+        $repeatedLoad = $this->firstRowOfAModelStep($this->loadWithoutEffect(1));
+        $workCall = $this->call('listImageModels', AIConversationMessage::STATUS_COMPLETED, 2);
+        self::assertFalse($this->messages($owner, $repeatedLoad, $workCall)->buildCurrentTurn()->hasNewestModelStepOnlyRepeatedSkillLoads(), 'the step also called a work tool');
+
+        $loadThatLoaded = $this->firstRowOfAModelStep($this->skillLoadCall(1));
+        self::assertFalse($this->messages($owner, $loadThatLoaded)->buildCurrentTurn()->hasNewestModelStepOnlyRepeatedSkillLoads());
+
+        $namedNoSkill = $this->firstRowOfAModelStep($this->loadWithoutEffect(1));
+        $namedNoSkill->toolCall->loadSkillsCallNamedNoSkill = true;
+        self::assertFalse($this->messages($owner, $namedNoSkill)->buildCurrentTurn()->hasNewestModelStepOnlyRepeatedSkillLoads(), 'a name that is no skill is no repeat');
+
+        $workStep = $this->firstRowOfAModelStep($this->call('listImageModels', AIConversationMessage::STATUS_COMPLETED, 2));
+        self::assertFalse($this->messages($owner, $repeatedLoad, $workStep)->buildCurrentTurn()->hasNewestModelStepOnlyRepeatedSkillLoads(), 'only the newest step counts');
+
+        $answer = $this->firstRowOfAModelStep($this->text(AIConversationMessage::ROLE_ASSISTANT, AIConversationMessage::AUTHOR_ASSISTANT, 'Image 2 is the best.', 2));
+        self::assertFalse($this->messages($owner, $repeatedLoad, $answer)->buildCurrentTurn()->hasNewestModelStepOnlyRepeatedSkillLoads());
+        self::assertFalse($this->messages($owner)->buildCurrentTurn()->hasNewestModelStepOnlyRepeatedSkillLoads());
+    }
+
+    protected function loadWithoutEffect(int $index): AIConversationMessage
+    {
+        $message = $this->skillLoadCall($index);
+        $message->toolCall->arguments = ['skill_names' => ['Media.Images']];
+        $message->toolCall->loadSkillsCallLoadedNothing = true;
+        return $message;
+    }
+
     /** Marks the row as the one that carries the usage of its model call, as the loop does for the first row of a step. */
     protected function firstRowOfAModelStep(AIConversationMessage $message): AIConversationMessage
     {

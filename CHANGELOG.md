@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.0-alpha.51
+
+- After a model step that only repeated `load_skills` (every call loaded nothing new), `load_skills` is held back for
+  the ONE next model call; the tool choice stays the step's. Under the system-prompt swap that call sends the tools
+  without `load_skills`; under append-only loading the tools stay on the wire byte for byte and a `load_skills` call is
+  refused with the held-back text. The call after it offers `load_skills` again
+  (`AIConversationTurnMessages::hasNewestModelStepOnlyRepeatedSkillLoads()`, trace `turn.step.skillLoadsHeldBack`).
+- The widget-image renderer reads the capture read path through `fetch` like through axios: a GET without body, with
+  the capture token, without the page's credentials, `debug` and `noCache`; anything else on that path fails the
+  capture (`WIDGET_HYDRATION_FAILED`). A widget whose client uses `fetch` renders live.
+
 ## 0.1.0-alpha.50
 
 - A model step that only repeated `load_skills` leaves the wire only when a newer such step exists: the NEWEST one
