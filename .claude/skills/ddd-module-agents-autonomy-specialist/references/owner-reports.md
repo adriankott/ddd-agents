@@ -41,6 +41,11 @@ model the contract per report channel; the purpose file belongs to the skills-an
 - **What is bound.** `SendOwnerReportTool::bindReportSourceToCalls()` binds the text at once only on the forced closing
   step (its call follows the final text it was forced after); every other call binds the text written after it, and the
   call's answer says that text beside the call is not sent.
+- **Open plan items.** A `REPORT` declared before the report is refused while the plan holds open items the model ticks
+  (`SendOwnerReportTool::buildRefusalWhilePlanItemsAreOpen()`; same gate as the checked stop: a plan this turn touched or
+  a work-signal turn). The step after an accepted `REPORT` has no tools, so an item could not be ticked there and the
+  checked stop discarded the report written in it (the report reached the chat twice). The refusal names the items; once
+  per turn, then the call is accepted. `NOTHING_TO_REPORT` and the forced closing step are never refused.
 - **The subject.** A report without a subject gets the schedule's label and the run day
   (`AIConversationSchedule::composeReportEmailSubjectForRun()`).
 - **One delivery path.** The send tools a purpose blocks are dropped from the offer, named in the purpose's directive,

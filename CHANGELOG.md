@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.0-alpha.34
+
+- `send_owner_report`: a `REPORT` declared before the report is refused while the task plan holds open items the model
+  ticks (a plan this turn touched or a work-signal turn; once per turn), naming them. The step after an accepted
+  `REPORT` has no tools, so the checked stop discarded the report written there and the report reached the chat twice.
+
 ## 0.1.0-alpha.33
 
 - Tool-result budget: a result of a tool declaring `MCPToolResultIsNeverStubbedByTheBudget` no longer counts against the

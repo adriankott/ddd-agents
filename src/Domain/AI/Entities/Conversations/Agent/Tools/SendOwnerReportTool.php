@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DDD\Domain\AI\Entities\Conversations\Agent\Tools;
 
+use DDD\Domain\AI\Entities\Conversations\Agent\TaskPlan;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
 use DDD\Domain\AI\Entities\Conversations\Messages\ToolCall;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolEffect;
@@ -58,11 +59,16 @@ class SendOwnerReportTool extends ValueObject implements AgentMetaTool
      *
      * @param array<string, mixed> $arguments the call's arguments as dispatched
      */
-    public static function answerCall(ToolCall $toolCall, array $arguments): AgentMetaToolCallAnswer
+    public static function answerCall(ToolCall $toolCall, array $arguments, ?string $refusalWhilePlanItemsAreOpen = null): AgentMetaToolCallAnswer
     {
         $sendOwnerReportOutcomeArguments = self::validateOutcomeArguments($arguments);
         if (!$sendOwnerReportOutcomeArguments->isAccepted()) {
             return AgentMetaToolCallAnswer::failed('Not accepted: ' . implode(' ', $sendOwnerReportOutcomeArguments->feedback));
+        }
+        if ($refusalWhilePlanItemsAreOpen !== null && $sendOwnerReportOutcomeArguments->isReport() && $toolCall->ownerReportMessageId === null) {
+            // The step after an accepted REPORT is tool-less: an item still open then cannot be ticked, and the
+            // checked stop discarded the report written in that step (the report reached the chat twice).
+            return AgentMetaToolCallAnswer::failed($refusalWhilePlanItemsAreOpen);
         }
         $toolCall->arguments['outcome'] = $sendOwnerReportOutcomeArguments->outcome;
         // overwritten by the loop-level send with the definitive result
@@ -79,6 +85,42 @@ class SendOwnerReportTool extends ValueObject implements AgentMetaTool
             unset($toolCall->arguments['subject']);
         }
         return $metaToolCallAnswer;
+    }
+
+    /** The start of the refusal of a REPORT while plan items the model ticks are open ({@see buildRefusalWhilePlanItemsAreOpen()}). */
+    public const string REFUSAL_WHILE_PLAN_ITEMS_ARE_OPEN_START = 'Not sent yet: your task plan still has OPEN items';
+
+    /**
+     * The refusal of a REPORT declared before the report while the plan holds open items the model ticks, or null when
+     * the call may proceed. The same plan the checked stop reads ({@see \DDD\Domain\AI\Entities\Conversations\Agent\Decisions\AgentCheckedStopPolicy::shouldBounceCheckedStop()}):
+     * a plan this turn touched or a turn a work signal started. Once per turn: a second REPORT call of the turn is accepted
+     * (`$refusedBeforeInTurn`), as the checked stop rejects one answer per chunk. Items the record closes are not named:
+     * a tick cannot close them. Pure.
+     */
+    public static function buildRefusalWhilePlanItemsAreOpen(
+        ?TaskPlan $taskPlan,
+        int $currentTurnInitiatorMessageIndex,
+        bool $turnInitiatedByWorkSignal,
+        bool $refusedBeforeInTurn
+    ): ?string {
+        if ($refusedBeforeInTurn || $taskPlan === null || !isset($taskPlan->items)) {
+            return null;
+        }
+        $planTouchedThisTurn = $taskPlan->wasUpdatedInTurn($currentTurnInitiatorMessageIndex)
+            || $taskPlan->wasResolvedInTurn($currentTurnInitiatorMessageIndex);
+        if (!$planTouchedThisTurn && !$turnInitiatedByWorkSignal) {
+            return null;
+        }
+        $modelTickedItemLines = $taskPlan->items->getOwedOpenItemTitleLines(false);
+        if ($modelTickedItemLines === []) {
+            return null;
+        }
+        return self::REFUSAL_WHILE_PLAN_ITEMS_ARE_OPEN_START . ': ' . implode('; ', $modelTickedItemLines) . '. '
+            . 'The report ends the run, so the plan is closed first. An item whose work is done: tick it with set_task_status — '
+            . 'done, with a statusNote of what you produced or found. An item not worked yet: do its work now, then tick it. '
+            . 'An item that cannot be done or does not apply: blocked or not_applicable, with the concrete reason. Then call '
+            . 'send_owner_report again — the ticks and that call can go in the same response — and write the report as your '
+            . 'next message.';
     }
 
     /**

@@ -280,7 +280,12 @@ class AgentToolCallDispatchService extends Service
                 $metaToolCallAnswer = $this->answerFindWidgetsCall($agentRun, $toolCall, $conversation, $callMessage);
                 $resultContent = $this->takeMetaToolCallAnswer($toolCall, $metaToolCallAnswer);
             } elseif ($toolName === SendOwnerReportTool::NAME) {
-                $metaToolCallAnswer = SendOwnerReportTool::answerCall($toolCall, $arguments);
+                $metaToolCallAnswer = SendOwnerReportTool::answerCall($toolCall, $arguments, SendOwnerReportTool::buildRefusalWhilePlanItemsAreOpen(
+                    $conversation->getTaskPlan(),
+                    $conversation->messages->getNewestInitiatorMessageIndex() ?? -1,
+                    $conversation->messages->hasWorkSignalAsNewestInboundMessage(),
+                    $this->isOwnerReportRefusedWhilePlanItemsAreOpenInCurrentTurn($conversation, $toolCall)
+                ));
                 $resultContent = $this->takeMetaToolCallAnswer($toolCall, $metaToolCallAnswer);
             } elseif (($repeatedFailure = $repeatedCallCheck->findRepeatedFailedRead()) !== null) {
                 // An identical READ that already FAILED twice in this conversation (and
@@ -1226,5 +1231,18 @@ class AgentToolCallDispatchService extends Service
         /** @var AIConversationTaskPlanRecordService $aIConversationTaskPlanRecordService */
         $aIConversationTaskPlanRecordService = DDDService::instance()->getService(AIConversationTaskPlanRecordService::class);
         return $aIConversationTaskPlanRecordService;
+    }
+
+    /** Whether a `send_owner_report` call of the current turn, other than `$toolCall`, was refused for open plan items. */
+    protected function isOwnerReportRefusedWhilePlanItemsAreOpenInCurrentTurn(AIConversation $conversation, ToolCall $toolCall): bool
+    {
+        foreach ($conversation->messages->buildCurrentTurn()->getRows() as $turnMessage) {
+            $turnToolCall = isset($turnMessage->toolCall) ? $turnMessage->toolCall : null;
+            if ($turnToolCall !== null && $turnToolCall !== $toolCall && $turnToolCall->name === SendOwnerReportTool::NAME
+                && str_starts_with((string)$turnToolCall->result, SendOwnerReportTool::REFUSAL_WHILE_PLAN_ITEMS_ARE_OPEN_START)) {
+                return true;
+            }
+        }
+        return false;
     }
 }
