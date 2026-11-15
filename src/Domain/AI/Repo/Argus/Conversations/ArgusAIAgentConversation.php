@@ -18,6 +18,8 @@ use DDD\Domain\AI\Entities\Conversations\Agent\Wire\AgentWireConfiguration;
 use DDD\Domain\AI\Entities\Conversations\Agent\Wire\AgentResponsesServerStateChain;
 use DDD\Domain\AI\Entities\Conversations\Messages\RequestSnapshot;
 use DDD\Domain\AI\Entities\Conversations\Agent\Tools\SendOwnerReportTool;
+use DDD\Domain\AI\Entities\Conversations\Agent\Tools\LoadSkillsTool;
+use DDD\Domain\AI\Entities\Conversations\Messages\RunSettings;
 use DDD\Domain\AI\Entities\Conversations\Agent\Tools\UpdateTaskPlanTool;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessages;
@@ -1138,6 +1140,54 @@ class ArgusAIAgentConversation extends ArgusAIConversation
     }
 
     /**
+     * The rows without the tool calls of a model step that only repeated `load_skills` for skills already loaded
+     * ({@see \DDD\Domain\AI\Entities\Conversations\Messages\ToolCall::$loadSkillsCallLoadedNothing}): a step is its
+     * stamped row (the one carrying the step's usage) and the unstamped call rows after it. Its call rows leave the
+     * wire only when EVERY call of the step loaded nothing — removing one call of a mixed step would let the next
+     * call row join the step before it. A prose head of such a step stays. The stored rows are untouched; the
+     * `[SIGNAL:skills]` tail line of the next step says the skills are loaded ({@see AgentModelInput::loadedSkillsTailHint()}).
+     *
+     * @param AIConversationMessage[] $messages
+     * @return AIConversationMessage[]
+     */
+    public static function withoutStepsThatOnlyRepeatedSkillLoads(array $messages): array
+    {
+        $droppedPositions = [];
+        $count = count($messages);
+        for ($i = 0; $i < $count; $i++) {
+            if (($messages[$i]->inputTokens ?? 0) <= 0) {
+                continue;
+            }
+            // the step of the stamped row at $i: it and the unstamped call rows after it (bookkeeping rows skipped)
+            $stepCallPositions = $messages[$i]->messageType === AIConversationMessage::MESSAGE_TOOL_CALL ? [$i] : [];
+            for ($j = $i + 1; $j < $count; $j++) {
+                $next = $messages[$j];
+                if ($next->messageType === AIConversationMessage::MESSAGE_TOOL_CALL && ($next->inputTokens ?? 0) <= 0) {
+                    $stepCallPositions[] = $j;
+                } elseif (!in_array($next->messageType, self::NON_WIRE_MESSAGE_TYPES, true)) {
+                    break;
+                }
+            }
+            if ($stepCallPositions === []) {
+                continue;
+            }
+            foreach ($stepCallPositions as $stepCallPosition) {
+                $stepToolCall = isset($messages[$stepCallPosition]->toolCall) ? $messages[$stepCallPosition]->toolCall : null;
+                if ($stepToolCall === null || ($stepToolCall->name ?? null) !== LoadSkillsTool::NAME || !$stepToolCall->loadSkillsCallLoadedNothing) {
+                    continue 2;
+                }
+            }
+            foreach ($stepCallPositions as $stepCallPosition) {
+                $droppedPositions[$stepCallPosition] = true;
+            }
+        }
+        if ($droppedPositions === []) {
+            return $messages;
+        }
+        return array_values(array_filter($messages, static fn (int $position): bool => !isset($droppedPositions[$position]), ARRAY_FILTER_USE_KEY));
+    }
+
+    /**
      * The conversation's messages as the OpenAI Chat-Completions `messages` ARRAY (WITHOUT the system entry, which
      * {@see buildModelContext()} prepends): user / assistant+tool_calls / tool results. **Each message renders ITSELF**
      * ({@see AIConversationMessage::toOpenAiChatMessageArray()} / `toOpenAiToolCallEntryArray()` /
@@ -1165,6 +1215,12 @@ class ArgusAIAgentConversation extends ArgusAIConversation
         // ONE conversation = ONE context window: the egress folds exactly the messages it was given — no
         // partition filtering (a sub-agent delegation is its own conversation). Default = this conversation's own.
         $messages ??= $this->messages->getElements();
+        // a step that only repeated load_skills for skills already loaded is not replayed: the model repeated its own
+        // freshest pattern (call + "already loaded") instead of calling the loaded tool. Kept under server state:
+        // there the provider holds the call and the next request must answer it.
+        if ($this->agentWireConfiguration?->wireApi !== RunSettings::AGENT_WIRE_API_RESPONSES_SERVER_STATE) {
+            $messages = self::withoutStepsThatOnlyRepeatedSkillLoads(array_values($messages));
+        }
         $count = count($messages);
         $entries = [];
 

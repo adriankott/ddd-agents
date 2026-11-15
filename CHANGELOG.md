@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.0-alpha.45
+
+- A model step that only repeated `load_skills` for skills already loaded is not replayed to the model: its call and
+  result rows leave the wire (`ArgusAIAgentConversation::withoutStepsThatOnlyRepeatedSkillLoads()`; the stored rows
+  stay; a prose head stays; a step with any other call stays; kept under the server-state wire), and the next step's
+  tail says `[SIGNAL:skills] <skill> is loaded — its tools are in your tool list now: call the tool.` The model
+  repeated its own freshest pattern instead of calling the loaded tool (21 of 1,237 runs loaded ≥ 3 times). The
+  tools and the system content are unchanged.
+
 ## 0.1.0-alpha.44
 
 - An `inAnswer` plan item is not closed by the answer of a turn that ends on the model's question to the owner (a

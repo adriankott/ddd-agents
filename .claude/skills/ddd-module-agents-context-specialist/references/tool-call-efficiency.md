@@ -16,6 +16,12 @@ dispatch) first; prose hints are the second line. What a tool declares to take p
   told instead: the LOADED_SKILLS header lists "Currently loaded" and their tools, and on a turn's first call the tail
   entry `[SIGNAL:skills] Loaded right now: …` names them (`AgentModelInput::loadedSkillsTailHint()`). Asking for a
   sub-skill without its root loads the root with it.
+- **A step that only repeated `load_skills`** for skills already loaded (every call of it `loadSkillsCallLoadedNothing`)
+  is not replayed: its call and result rows leave the wire
+  (`ArgusAIAgentConversation::withoutStepsThatOnlyRepeatedSkillLoads()`; a prose head stays, a mixed step stays, kept
+  under the server-state wire, whose provider holds the call), and the next step's tail says
+  `[SIGNAL:skills] <skill> is loaded — its tools are in your tool list now: call the tool.` The model repeated its own
+  freshest pattern (the call and its "already loaded" result) instead of calling the loaded tool.
 
 ## 2. Repeating a read
 

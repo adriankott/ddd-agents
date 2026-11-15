@@ -93,7 +93,7 @@ user-role wire entry after the whole history, never stored. Order:
 2. the compact task plan with the "Owner turns so far" counter;
 3. the plan directive of the decision layer;
 4. the decided direct widget (`[SIGNAL:widget]`);
-5. `[SIGNAL:skills]` on the turn's first call while skills are loaded;
+5. `[SIGNAL:skills]` on the turn's first call while skills are loaded, and after a step that only repeated `load_skills`;
 6. `[SIGNAL:answer-content]` once the turn completed a write or a picture read. The entry is absent once a tool
    of the turn made the platform write a widget of a type that ends the conversation's purpose — that widget reports the
    turn, and the tool's result asks for one closing line;

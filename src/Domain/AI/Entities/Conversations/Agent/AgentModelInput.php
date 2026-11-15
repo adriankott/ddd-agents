@@ -1170,6 +1170,11 @@ class AgentModelInput extends ValueObject
         if ($loadedSkillNames === []) {
             return null;
         }
+        $repeatedSkillNames = $this->findSkillNamesOfNewestStepThatOnlyRepeatedSkillLoads();
+        if ($repeatedSkillNames !== []) {
+            return '[SIGNAL:skills] ' . implode(', ', $repeatedSkillNames) . (count($repeatedSkillNames) === 1 ? ' is' : ' are')
+                . ' loaded — its tools are in your tool list now: call the tool.';
+        }
         for ($i = count($this->messages) - 1; $i >= 0; $i--) {
             $candidate = $this->messages[$i];
             if (isset($candidate->toolCall) && $candidate->toolCall !== null) {
@@ -1184,6 +1189,38 @@ class AgentModelInput extends ValueObject
         }
         return '[SIGNAL:skills] Loaded right now: ' . implode(', ', $loadedSkillNames) . ' — their tools are in your tool'
             . ' list. load_skills is only for a skill that is not named here.';
+    }
+
+    /**
+     * The skills the newest model step asked for when that step only repeated `load_skills` for skills already loaded
+     * (every call of the step loaded nothing) — such a step is left off the wire
+     * ({@see \DDD\Domain\AI\Repo\Argus\Conversations\ArgusAIAgentConversation::withoutStepsThatOnlyRepeatedSkillLoads()}), and
+     * the tail says once that the skills are loaded. Empty otherwise.
+     *
+     * @return string[]
+     */
+    public function findSkillNamesOfNewestStepThatOnlyRepeatedSkillLoads(): array
+    {
+        $skillNames = [];
+        for ($i = count($this->messages) - 1; $i >= 0; $i--) {
+            $candidate = $this->messages[$i];
+            $toolCall = isset($candidate->toolCall) ? $candidate->toolCall : null;
+            if (($candidate->messageType ?? null) !== AIConversationMessage::MESSAGE_TOOL_CALL || $toolCall === null) {
+                return [];
+            }
+            if (($toolCall->name ?? null) !== LoadSkillsTool::NAME || !$toolCall->loadSkillsCallLoadedNothing) {
+                return [];
+            }
+            foreach ((array)($toolCall->arguments['skill_names'] ?? []) as $skillName) {
+                if (is_string($skillName) && $skillName !== '') {
+                    $skillNames[$skillName] = $skillName;
+                }
+            }
+            if (($candidate->inputTokens ?? 0) > 0) {
+                return array_values($skillNames);
+            }
+        }
+        return [];
     }
 
     public function taskPlanTailHint(): ?string
