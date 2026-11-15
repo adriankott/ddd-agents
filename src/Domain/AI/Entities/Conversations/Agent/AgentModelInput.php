@@ -1398,7 +1398,7 @@ class AgentModelInput extends ValueObject
      */
     /**
      * The clock signal: the captured "now" of THIS model call in the space's zone with its offset and weekday,
-     * yesterday, tomorrow, this week and last week as dates of that zone (weeks start on
+     * yesterday, tomorrow, this week, last week, this month and last month as dates of that zone (weeks start on
      * {@see FIRST_WEEKDAY_OF_THE_WEEK}) — the model computed "tomorrow" or "last week" itself and got it wrong
      * repeatably. A user-role wire entry at the volatile tail (after the image fallback, before the reply-language
      * cue), so the cacheable prefix stays byte-stable. Pure: never reads the wall clock; null without a zone or a
@@ -1422,7 +1422,12 @@ class AgentModelInput extends ValueObject
             . ' · this week (' . $thisWeekStart->format('D') . '–' . $thisWeekStart->modify('+6 days')->format('D') . ') = '
             . $thisWeekStart->format('Y-m-d') . ' … ' . $thisWeekStart->modify('+6 days')->format('Y-m-d')
             . ' · last week = ' . $thisWeekStart->modify('-7 days')->format('Y-m-d') . ' … '
-            . $thisWeekStart->modify('-1 day')->format('Y-m-d');
+            . $thisWeekStart->modify('-1 day')->format('Y-m-d')
+            . ' · this month = ' . $localToday->format('F Y') . ' (' . $localToday->modify('first day of this month')->format('Y-m-d')
+            . ' … ' . $localToday->modify('last day of this month')->format('Y-m-d') . ')'
+            . ' · last month = ' . $localToday->modify('first day of last month')->format('F Y')
+            . ' (' . $localToday->modify('first day of last month')->format('Y-m-d') . ' … '
+            . $localToday->modify('last day of last month')->format('Y-m-d') . ')';
     }
 
     /** Whether the loaded-skills block carries the SITUATION line: a loaded skill is cut by the resolved variants. */

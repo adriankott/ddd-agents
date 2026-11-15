@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.0-alpha.44
+
+- An `inAnswer` plan item is not closed by the answer of a turn that ends on the model's question to the owner (a
+  completed `askOwner` with no later call but plan bookkeeping): it stays open and a later answer closes it. The
+  answer that asked "go on with the drafts?" closed drafts never written. The tick rules say so.
+- A plan the platform's turn-end close finishes retires like one the model's ticks finished: the owner's next message
+  reopens it (keep the finished items by their keys) instead of being told to drop its items.
+- The plan directive asks again for variants and sub-steps with their own result as subtasks of a part (and never
+  an item or a subtask for loading a skill or another preparatory call).
+- `[SIGNAL:clock]` also names this month and last month with their first and last day; the recorded-run comparison
+  normalizes their month names.
+
 ## 0.1.0-alpha.43
 
 - `inAnswer` plan items: the open line says the text belongs in this turn's answer (`TaskPlanItem::ANSWER_TEXT_MARK`);

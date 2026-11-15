@@ -91,7 +91,8 @@ class AgentModelInputTimeRuleAndClockTest extends UnitTestCase
         $agentContext->clockInstant = DateTime::fromTimestamp((new \DateTimeImmutable('2026-07-01 12:00:00', new \DateTimeZone('UTC')))->getTimestamp());
         self::assertSame(
             '[SIGNAL:clock] now = 2026-07-01 08:00:00-04:00 (Wednesday) · yesterday = 2026-06-30 (Tuesday) · tomorrow = 2026-07-02'
-                . ' (Thursday) · this week (Mon–Sun) = 2026-06-29 … 2026-07-05 · last week = 2026-06-22 … 2026-06-28',
+                . ' (Thursday) · this week (Mon–Sun) = 2026-06-29 … 2026-07-05 · last week = 2026-06-22 … 2026-06-28'
+                . ' · this month = July 2026 (2026-07-01 … 2026-07-31) · last month = June 2026 (2026-06-01 … 2026-06-30)',
             $agentContext->clockTailHint()
         );
 
@@ -108,7 +109,8 @@ class AgentModelInputTimeRuleAndClockTest extends UnitTestCase
 
         self::assertSame(
             '[SIGNAL:clock] now = 2026-11-15 01:29:25+01:00 (Sunday) · yesterday = 2026-11-14 (Saturday) · tomorrow = 2026-11-16'
-                . ' (Monday) · this week (Mon–Sun) = 2026-11-09 … 2026-11-15 · last week = 2026-11-02 … 2026-11-08',
+                . ' (Monday) · this week (Mon–Sun) = 2026-11-09 … 2026-11-15 · last week = 2026-11-02 … 2026-11-08'
+                . ' · this month = November 2026 (2026-11-01 … 2026-11-30) · last month = October 2026 (2026-10-01 … 2026-10-31)',
             $agentContext->clockTailHint()
         );
     }

@@ -2390,6 +2390,11 @@ class AIConversationAgentService extends Service implements AgentModelCallRunner
                     // With the final text persisted, the platform closes the plan leaves
                     // whose evidence is now in the transcript.
                     $aIConversationTaskPlanRecordService->closePlanLeavesAtTurnEnd($conversation, $transientMessageIds, $consoleStream, $emitRealtimeSignal);
+                    // a plan the platform's close just finished retires like one the model's ticks finished, so the
+                    // owner's next message reopens it instead of asking to drop its items
+                    if (!$stallClassification->isStall && !$stallClassification->turnRecordedOwnerQuestion) {
+                        $aIConversationTaskPlanRecordService->retireFinishedTaskPlanIfDue($conversation, $runToken, $purposeWorksAutonomously);
+                    }
                 }
                 break;
             }

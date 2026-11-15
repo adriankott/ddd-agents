@@ -250,6 +250,8 @@ class AgentRecordedRunIdNormalization
         );
         // the weekday the clock signal names beside its timestamp moves with the replay day like the timestamp itself
         $normalized = (string)preg_replace('/(<timestamp>|<date>) \((Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\)/', '$1 (<weekday>)', $normalized);
+        // so do the month names of its this-month / last-month entries
+        $normalized = (string)preg_replace('/\b(this month|last month) = (January|February|March|April|May|June|July|August|September|October|November|December) \d{4}\b/', '$1 = <month>', $normalized);
         $normalized = self::normalizeRunDurations($normalized);
         $normalized = (string)preg_replace_callback(
             '/\b\d{' . self::MIN_TEXT_WIDE_ID_DIGITS . ',}\b/',

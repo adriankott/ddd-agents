@@ -260,9 +260,11 @@ class TaskPlanItemPlatformCloser extends ValueObject
             // evidence call in THIS turn the platform cannot know that an answer delivered THIS result — such a
             // leaf closes on the previous turn's delivery where the seed declares it, otherwise it stays open.
             if ($this->taskPlanItem->isResultTextInTheAnswer()) {
-                // the model's `inAnswer` leaf: no call proves it — the turn's owner-visible answer carries the result
-                $deliveredThisTurn = self::isOwnerVisibleCandidateAnswerText($candidateAnswerText)
-                    || $conversationMessages->hasOwnerVisibleAssistantAnswerAfterIndex($currentTurnInitiatorMessageIndex);
+                // the model's `inAnswer` leaf: no call proves it — the turn's owner-visible answer carries the result,
+                // unless the turn ends on the model's question to the owner (the answer asked whether to go on)
+                $deliveredThisTurn = !self::turnEndsOnAnOwnerQuestion($conversationMessages, $currentTurnInitiatorMessageIndex)
+                    && (self::isOwnerVisibleCandidateAnswerText($candidateAnswerText)
+                        || $conversationMessages->hasOwnerVisibleAssistantAnswerAfterIndex($currentTurnInitiatorMessageIndex));
             } elseif ($evidenceCallIndex === null || $evidenceCallIndex <= $currentTurnInitiatorMessageIndex) {
                 $deliveredThisTurn = false;
             } else {
@@ -282,6 +284,27 @@ class TaskPlanItemPlatformCloser extends ValueObject
         }
         $this->taskPlanItem->closeOnTurnEndEvidence($evidenceDescription, $conversationMessages->getNewestMessageIndex() ?? 0, $conversationMessages->getNewestMessageIndex());
         return TaskPlanItem::STATUS_DONE;
+    }
+
+    /**
+     * Whether the turn after `$turnInitiatorMessageIndex` ends on the model's question to the owner: a completed
+     * `askOwner` call with no later tool call other than plan bookkeeping. Such a turn's answer carries no answer text
+     * of an `inAnswer` leaf ({@see TaskPlanItem::isResultTextInTheAnswer()}); the next turn's answer closes it.
+     */
+    public static function turnEndsOnAnOwnerQuestion(AIConversationMessages $conversationMessages, int $turnInitiatorMessageIndex): bool
+    {
+        $endsOnOwnerQuestion = false;
+        foreach ($conversationMessages->getElements() as $message) {
+            if (($message->indexInConversation ?? -1) <= $turnInitiatorMessageIndex || !isset($message->toolCall)) {
+                continue;
+            }
+            $toolName = (string)($message->toolCall->name ?? '');
+            if (in_array($toolName, TaskPlan::PLAN_TOOL_NAMES, true)) {
+                continue;
+            }
+            $endsOnOwnerQuestion = $toolName === AskOwnerTool::NAME && $message->toolCall->status === AIConversationMessage::STATUS_COMPLETED;
+        }
+        return $endsOnOwnerQuestion;
     }
 
     /** Whether this leaf closes on an asked owner question ({@see TaskPlanItem::$doneRequiresOwnerQuestionKey}). */

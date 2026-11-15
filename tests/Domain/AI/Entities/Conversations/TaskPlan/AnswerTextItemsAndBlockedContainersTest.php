@@ -86,6 +86,29 @@ class AnswerTextItemsAndBlockedContainersTest extends UnitTestCase
         self::assertFalse($draftItem->isOpen());
     }
 
+    public function testAnAnswerThatEndsOnTheOwnersQuestionClosesNoAnswerTextItem(): void
+    {
+        $draftItem = new TaskPlanItem();
+        $draftItem->text = 'Two post drafts';
+        $draftItem->markResultIsTextInTheAnswer();
+        $askOwnerMessage = $this->message(12, AIConversationMessage::ROLE_ASSISTANT, '');
+        $askOwnerMessage->messageType = AIConversationMessage::MESSAGE_TOOL_CALL;
+        $askOwnerToolCall = self::instantiateWithoutConstructor(\DDD\Domain\AI\Entities\Conversations\Messages\ToolCall::class);
+        $askOwnerToolCall->name = \DDD\Domain\AI\Entities\Conversations\Agent\Tools\AskOwnerTool::NAME;
+        $askOwnerToolCall->arguments = [];
+        $askOwnerToolCall->status = AIConversationMessage::STATUS_COMPLETED;
+        $askOwnerMessage->toolCall = $askOwnerToolCall;
+        $questionTurn = TaskPlanEvidence::forTurn(
+            $this->messageSet([$this->message(10, AIConversationMessage::ROLE_USER, 'do part 1 and 2, then ask me'), $askOwnerMessage]),
+            10,
+            'Parts 1 and 2 are done. Shall I go on with the two drafts?'
+        );
+
+        self::assertTrue(TaskPlanItemPlatformCloser::turnEndsOnAnOwnerQuestion($questionTurn->conversationMessages, 10));
+        self::assertNull(TaskPlanItemPlatformCloser::forItem($draftItem)->applyTurnEndEvidenceClosing($questionTurn), 'the question closes no draft');
+        self::assertFalse(TaskPlanItemPlatformCloser::turnEndsOnAnOwnerQuestion($questionTurn->conversationMessages, 12), 'a later turn without a question');
+    }
+
     public function testASeededItemOrAContainerIsNotMarked(): void
     {
         $seededItem = new TaskPlanItem();

@@ -57,7 +57,8 @@ Structure only, keyed (`UpdateTaskPlanTool`, arguments `UpdateTaskPlanArguments`
   answer (a draft, a summary). A leaf the model made gets the delivery gate (`doneRequiresOwnerVisibleAnswerInSameTurn`
   via `TaskPlanItem::markResultIsTextInTheAnswer()`; never a seeded item or a container): a tick before the answer is
   not applied, and the turn-end closer (`TaskPlanItemPlatformCloser`) closes the leaf from the turn's owner-visible
-  answer — no call proves it — but only when no leaf before it in plan order is still open
+  answer — no call proves it — but never from the answer of a turn that ends on the model's question to the owner
+  (`TaskPlanItemPlatformCloser::turnEndsOnAnOwnerQuestion()`), and only when no leaf before it in plan order is still open
   (`closeLeavesWhoseWidgetOrDeliveryEvidenceLandedAtTurnEnd()`; the checked stop's read does not hold it back). Its
   open plan line carries `TaskPlanItem::ANSWER_TEXT_MARK`, and the answer step after a recorded question asks for its
   text.
@@ -192,7 +193,9 @@ so it never re-arms the brake.
 
 An accepted final answer on a finished plan (`TaskPlan::isFinished()`) retires it into the finished set
 (`AIConversationTaskPlanRecordService::retireFinishedTaskPlanIfDue()` → `AgentWorkingState::retireFinishedTaskPlan()`,
-`TaskPlan::retire()` stamps title, time and `outcomeSummary`), and the next owner turn starts plan-less. This happens only
+`TaskPlan::retire()` stamps title, time and `outcomeSummary`), and the next owner turn starts plan-less. A plan the turn-end close finishes (the
+platform closed its last leaf from the persisted answer) is retired right after that close, like one the model's ticks
+finished. This happens only
 for a model-created plan of a root conversation whose purpose neither works autonomously nor seeds its plan, and only
 while the plan-dynamics decision site (`AgentDecisionModelSettings::SITE_PLAN_DYNAMICS`) is on; in shadow mode the
 retirement is only recorded (`wouldRetireFinishedPlan`) and the plan stays active. `get_task_plans` (`GetTaskPlansTool`) reads the finished plans. A finished plan reopens for
