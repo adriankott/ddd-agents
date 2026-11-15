@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.0-alpha.48
+
+- Tick rules: the sentence that a question to the owner is never an answer-text item stands on its own after the
+  `inAnswer` passage; inserted before "mark it", it read as an order to mark the question item.
+
 ## 0.1.0-alpha.47
 
 - The model's takeover load of a preloaded skill names the skills and their tools ("Skills loaded: <names>. Their
