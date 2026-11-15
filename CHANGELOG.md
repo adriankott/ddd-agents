@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.0-alpha.33
+
+- Tool-result budget: a result of a tool declaring `MCPToolResultIsNeverStubbedByTheBudget` no longer counts against the
+  budget (`AIConversation::resolveToolResultRetention()`). Two page reads and a web search filled a 16k budget and the
+  2k summary of the same round was stubbed; the stub asked to re-call the tool, and the model did.
+
 ## 0.1.0-alpha.32
 
 - A structured tool result (a response DTO without markdown rendering, a bare domain object) now hands the model its

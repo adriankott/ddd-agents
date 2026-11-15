@@ -234,6 +234,29 @@ class ToolDeclarationsReadByTheLoopTest extends UnitTestCase
         self::assertSame([], $toolResultRetentionWithoutTheDeclaration->stubbedIndexes);
     }
 
+    public function testTheResultsOfADeclaringToolTakeNoRoomFromTheOthers(): void
+    {
+        $conversation = (new ReflectionClass(AIConversation::class))->newInstanceWithoutConstructor();
+        $contextRetentionSettings = new ContextRetentionSettings();
+        $contextRetentionSettings->enabled = true;
+        $contextRetentionSettings->keepToolResultsRecentTurns = 1;
+        $contextRetentionSettings->toolResultTokenBudget = 1500;
+        $conversation->contextRetentionSettings = $contextRetentionSettings;
+        $pageOf8000Characters = str_repeat('p', 8000);
+        $tailMessages = [
+            $this->textMessage(0, AIConversationMessage::ROLE_USER, AIConversationMessage::AUTHOR_USER, 'draft the profile'),
+            $this->toolCallMessage(1, 'probeRecordChange', str_repeat('s', 2000)),
+            $this->toolCallMessage(2, 'probePageRead', $pageOf8000Characters),
+            $this->toolCallMessage(3, 'probePageRead', $pageOf8000Characters),
+            $this->textMessage(4, AIConversationMessage::ROLE_ASSISTANT, AIConversationMessage::AUTHOR_ASSISTANT, 'Both pages are read.'),
+        ];
+
+        $toolResultRetention = $conversation->resolveToolResultRetention($tailMessages);
+
+        self::assertSame([], $toolResultRetention->stubbedIndexes, 'the small result of the same round still fits beside two declared page reads');
+        self::assertLessThanOrEqual(1, $toolResultRetention->fromIndex);
+    }
+
     public function testACallOfADeclaringToolHasNoActivityLine(): void
     {
         $agentActivityLinesService = new class extends AgentActivityLinesService {

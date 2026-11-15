@@ -3082,7 +3082,8 @@ class AIConversation extends Entity
      * fit, and the model re-read it). Unseen results are never in the stubbed set.
      *
      * The budget-by-fit rule never stubs, inside the kept turns, the result of a tool that declares
-     * {@see MCPToolResultIsNeverStubbedByTheBudget}: the reads a later draft or answer is composed from.
+     * {@see MCPToolResultIsNeverStubbedByTheBudget}: the reads a later draft or answer is composed from. Such a result
+     * does not count against the budget either: the other reads that draft is composed from keep their room.
      *
      * @param AIConversationMessage[] $tailMessages index-sorted ascending (the AgentModelInput's messages)
      */
@@ -3150,7 +3151,12 @@ class AIConversation extends Entity
                         // may still fit, so the walk goes on. The newest result is always kept.
                         $stubbedByBudget[$messageIndex] = true;
                     } else {
-                        $accumulatedChars += $resultChars;
+                        // An exempt result is kept outside the budget: it never takes the room of the other results
+                        // (two page reads and a web search evicted a 2k summary of the same round, and the model
+                        // read it again).
+                        if (!$budgetExempt) {
+                            $accumulatedChars += $resultChars;
+                        }
                         $budgetBoundary = $messageIndex; // the oldest result the budget holds so far
                     }
                 }
