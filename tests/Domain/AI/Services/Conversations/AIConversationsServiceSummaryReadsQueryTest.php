@@ -13,7 +13,8 @@ use DDD\Infrastructure\Exceptions\InternalErrorException;
 use DDD\Tests\Agents\Support\UnitTestCase;
 
 /**
- * The query the two summary reads share (DQL only — no database): it selects the root conversations with a summary
+ * The query the two summary reads share (DQL only — no database): it selects the root conversations of the owner's
+ * dialogue (no eval run, schedule run or scheduled conversation, as the search across conversations) with a summary
  * that were active since a moment and carries NO condition on the account or the space. Each read adds the one it is
  * named after: the read of one space (or of the account level) the account and the partition, the read across the
  * spaces of an account the account alone.
@@ -31,6 +32,18 @@ class AIConversationsServiceSummaryReadsQueryTest extends UnitTestCase
         self::assertStringContainsString("$baseModelAlias.lastInboundMessageAt >= :sessionsSince", $dql);
         self::assertStringNotContainsString("$baseModelAlias.accountId", $dql, 'the caller adds the account');
         self::assertStringNotContainsString("$baseModelAlias.agentSpaceId", $dql, 'the caller adds the space, or none for a read across spaces');
+    }
+
+    public function testTheListLeavesOutWhatTheSearchAcrossConversationsLeavesOut(): void
+    {
+        $baseModelAlias = DBAIConversations::getBaseModelAlias();
+
+        $dql = $this->buildSharedQueryBuilder(12, null, [])->getDQL();
+
+        self::assertStringContainsString("JSON_FIELD_TEXT($baseModelAlias.runSettings, 'evalRun')", $dql, 'an eval run is not the owner\'s dialogue');
+        self::assertStringContainsString("JSON_FIELD_TEXT($baseModelAlias.runSettings, 'evalSeededHistory')", $dql, 'the history an eval seeded stays');
+        self::assertStringContainsString(':searchLeftOutPurposeNames', $dql, 'the schedule run and the customer-hidden purposes');
+        self::assertStringContainsString(':searchLeftOutInitiatorTypes', $dql, 'a conversation a schedule started');
     }
 
     public function testTheLimitStaysBetweenOneAndTwentyFive(): void

@@ -53,12 +53,16 @@ trait ContextRetentionSettingsOptionsTrait
         'minResidencyTurns' => 'evict-min-residency',
     ];
 
-    /** @var string[] The choice options: option name by field name of {@see ContextRetentionSettingsOverride} */
+    /**
+     * @var string[] The choice options: option name by field name of {@see ContextRetentionSettingsOverride}. The
+     *      values are the OPTION_* constants written out: a trait constant that reads `self::` fails when the trait
+     *      itself is reflected ("Cannot access trait constant … directly", a debug-mode container build does that)
+     */
     public const array CONTEXT_RETENTION_CHOICE_OPTION_NAMES_BY_FIELD = [
-        'unloadGranularity' => self::OPTION_UNLOAD_GRANULARITY,
-        'skillLoadingStrategy' => self::OPTION_SKILL_LOADING_STRATEGY,
-        'rebuildEpochOnSituationChange' => self::OPTION_REBUILD_EPOCH_ON_SITUATION_CHANGE,
-        'stateChangeDelivery' => self::OPTION_STATE_CHANGE_DELIVERY,
+        'unloadGranularity' => 'unload-granularity',
+        'skillLoadingStrategy' => 'skill-loading-strategy',
+        'rebuildEpochOnSituationChange' => 'rebuild-epoch-on-situation-change',
+        'stateChangeDelivery' => 'state-change-delivery',
     ];
 
     /** @var string The prefix of the compaction options of a command whose own options are about something else */

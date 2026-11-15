@@ -24,7 +24,8 @@ use DDD\Tests\Agents\Support\DatabaseTestCase;
  * The search across an account's conversations answers from the owner's dialogue only: the vector and the keyword
  * query leave out, inside the query, an eval run (unless it holds seeded history), a conversation of a left-out
  * purpose (a customer-hidden purpose, the schedule run) and a scheduled run — each also when only the root
- * conversation is such a run. On both engines.
+ * conversation is such a run — and every sub-agent's conversation, also one of the owner's dialogue (a child of an eval
+ * run carries no eval mark of its own). On both engines.
  */
 class SearchAcrossConversationsLeavesOutRunsWithoutTheOwnerDatabaseTest extends DatabaseTestCase
 {
@@ -44,7 +45,6 @@ class SearchAcrossConversationsLeavesOutRunsWithoutTheOwnerDatabaseTest extends 
     protected const array SEARCHED_CONVERSATION_IDS = [
         self::OWNER_DIALOGUE_CONVERSATION_ID,
         self::EVAL_SEEDED_HISTORY_CONVERSATION_ID,
-        self::CHILD_OF_OWNER_DIALOGUE_CONVERSATION_ID,
         self::ADMIN_TASK_CONVERSATION_ID,
     ];
 
@@ -65,6 +65,14 @@ class SearchAcrossConversationsLeavesOutRunsWithoutTheOwnerDatabaseTest extends 
         foreach ([1, 2, 3, 4, 5, 6, 7, 8, 9] as $conversationId) {
             $this->insertMessageWithVector($conversationId * 100, $conversationId);
         }
+        // the sub-agents' conversations hang on a `delegate` row of their parent (a message, so after the messages)
+        EntityManagerFactory::getInstance()->createQuery(
+            'UPDATE ' . DBAIConversationModel::class . ' conversationRow SET conversationRow.delegatedFromMessageId = :delegateRowId'
+            . ' WHERE conversationRow.id IN (:childIds)'
+        )->setParameters([
+            'delegateRowId' => self::OWNER_DIALOGUE_CONVERSATION_ID * 100,
+            'childIds' => [self::CHILD_OF_SCHEDULED_CONVERSATION_ID, self::CHILD_OF_OWNER_DIALOGUE_CONVERSATION_ID],
+        ])->execute();
     }
 
     protected function onTearDown(): void

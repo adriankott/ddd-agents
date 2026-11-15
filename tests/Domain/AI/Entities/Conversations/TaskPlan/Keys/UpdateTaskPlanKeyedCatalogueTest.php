@@ -105,7 +105,7 @@ class UpdateTaskPlanKeyedCatalogueTest extends KeyedTaskPlanUpdateTestCase
     {
         $changedPlan = $this->appliedPlan($taskPlanUpdateOutcome = $this->update(self::s1(), [['key' => '1'], ['key' => '2'], ['key' => '3', 'remove' => true]]));
 
-        self::assertSame("Task plan updated: 4 items (2 done, 2 open, 0 blocked). Dropped: 3 'Write the holiday post' with its subtasks 3.1, 3.2.", $taskPlanUpdateOutcome->renderAppliedSummary());
+        self::assertSame("Task plan updated: 4 items (2 done, 2 open, 0 blocked). Dropped: 3 'Write the holiday post' with its subtasks 3.1, 3.2. A dropped item is gone from the plan and its work is not delivered: if the owner's message did not cancel one of these, add it back now and work it.", $taskPlanUpdateOutcome->renderAppliedSummary());
         self::assertSame(3, $changedPlan->getHighestItemKeyNumber(), 'a counter never decreases');
         $laterOutcome = $this->update($changedPlan, [['key' => '1'], ['key' => '2'], ['text' => 'Mail the owner a summary']]);
         self::assertSame("Task plan updated: 5 items (2 done, 3 open, 0 blocked). Added: 4 'Mail the owner a summary' (at the end).", $laterOutcome->renderAppliedSummary());
@@ -257,7 +257,7 @@ class UpdateTaskPlanKeyedCatalogueTest extends KeyedTaskPlanUpdateTestCase
 
         $replacementOutcome = $this->update(self::s1(), [['key' => '1'], ['key' => '2'], ['key' => '3', 'remove' => true], ['text' => 'Write two holiday posts']]);
         self::assertSame(
-            "Task plan updated: 5 items (2 done, 3 open, 0 blocked). Added: 4 'Write two holiday posts' (at the end). Dropped: 3 'Write the holiday post' with its subtasks 3.1, 3.2.",
+            "Task plan updated: 5 items (2 done, 3 open, 0 blocked). Added: 4 'Write two holiday posts' (at the end). Dropped: 3 'Write the holiday post' with its subtasks 3.1, 3.2. A dropped item is gone from the plan and its work is not delivered: if the owner's message did not cancel one of these, add it back now and work it.",
             $replacementOutcome->renderAppliedSummary()
         );
     }
@@ -389,7 +389,7 @@ class UpdateTaskPlanKeyedCatalogueTest extends KeyedTaskPlanUpdateTestCase
         self::assertSame(
             "Task plan updated: 1 items (0 done, 1 open, 0 blocked). Added: 4 'Find three new keywords' (first at the top level)."
                 . " Dropped: 1 'Set the holiday hours (24–26 Dec closed)' — its state leaves with it, 2 'Answer the newest reviews' with its subtasks 2.1, 2.2 — its state leaves with it,"
-                . " 3 'Write the holiday post' with its subtasks 3.1, 3.2.",
+                . " 3 'Write the holiday post' with its subtasks 3.1, 3.2. A dropped item is gone from the plan and its work is not delivered: if the owner's message did not cancel one of these, add it back now and work it.",
             $switchOutcome->renderAppliedSummary()
         );
         self::assertSame(['4' => '[open] Find three new keywords'], self::treeByKey($switchedPlan));
@@ -407,7 +407,7 @@ class UpdateTaskPlanKeyedCatalogueTest extends KeyedTaskPlanUpdateTestCase
         self::assertSame(
             "Task plan updated: 1 items (0 done, 1 open, 0 blocked). Added: 4 'Find three new keywords' (first at the top level)."
                 . " Dropped: 1 'Set the holiday hours (24–26 Dec closed)' — its state leaves with it, 2 'Answer the newest reviews' with its subtasks 2.1, 2.2 — its state leaves with it,"
-                . " 3 'Write the holiday post' with its subtasks 3.1, 3.2.",
+                . " 3 'Write the holiday post' with its subtasks 3.1, 3.2. A dropped item is gone from the plan and its work is not delivered: if the owner's message did not cancel one of these, add it back now and work it.",
             $switchOutcome->renderAppliedSummary(),
             'a subtask removed with its parent is named once, with the parent'
         );
@@ -423,7 +423,7 @@ class UpdateTaskPlanKeyedCatalogueTest extends KeyedTaskPlanUpdateTestCase
             $changedPlan = $this->appliedPlan($taskPlanUpdateOutcome = $this->update(self::s1(), $items));
 
             self::assertSame(['1', '2', '2.2', '3', '3.1', '3.2'], array_map('strval', array_keys(self::treeByKey($changedPlan))), $case);
-            self::assertStringEndsWith("Dropped: 2.1 'Read the newest reviews' — its state leaves with it.", $taskPlanUpdateOutcome->renderAppliedSummary(), $case);
+            self::assertStringEndsWith("Dropped: 2.1 'Read the newest reviews' — its state leaves with it. A dropped item is gone from the plan and its work is not delivered: if the owner's message did not cancel one of these, add it back now and work it.", $taskPlanUpdateOutcome->renderAppliedSummary(), $case);
             self::assertSame(2, self::countersOf($changedPlan)['2'], $case . ': a counter never decreases');
         }
     }
@@ -478,7 +478,7 @@ class UpdateTaskPlanKeyedCatalogueTest extends KeyedTaskPlanUpdateTestCase
         ]));
 
         self::assertSame(
-            "Task plan updated: 7 items (2 done, 5 open, 0 blocked). Added: 2.3 'Draft and post the replies' (after 2.1). Dropped: 2.2 'Draft and post the replies' — its state leaves with it.",
+            "Task plan updated: 7 items (2 done, 5 open, 0 blocked). Added: 2.3 'Draft and post the replies' (after 2.1). Dropped: 2.2 'Draft and post the replies' — its state leaves with it. A dropped item is gone from the plan and its work is not delivered: if the owner's message did not cancel one of these, add it back now and work it.",
             $taskPlanUpdateOutcome->renderAppliedSummary()
         );
         $newIdentity = $changedPlan->items->getItemByKey('2.3');

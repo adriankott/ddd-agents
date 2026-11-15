@@ -1154,10 +1154,14 @@ class ToolCall extends ValueObject
     public function buildExecutionArguments(AIConversation $conversation): array
     {
         $arguments = $this->arguments;
-        if (!isset($arguments[MCPToolReceivesCurrentConversationId::ARGUMENT_NAME])
-            && MCPToolAttributeCatalog::hasAttributeOnToolName((string)($this->name ?? ''), MCPToolReceivesCurrentConversationId::class)
-        ) {
-            $arguments[MCPToolReceivesCurrentConversationId::ARGUMENT_NAME] = $conversation->id ?? null;
+        if (MCPToolAttributeCatalog::hasAttributeOnToolName((string)($this->name ?? ''), MCPToolReceivesCurrentConversationId::class)) {
+            // the conversation's own id always wins: the model is not offered the argument, and a value it still wrote
+            // (`0`) made the tool read no conversation; a conversation without an id keeps what the call carries
+            if (isset($conversation->id)) {
+                $arguments[MCPToolReceivesCurrentConversationId::ARGUMENT_NAME] = $conversation->id;
+            } elseif (!isset($arguments[MCPToolReceivesCurrentConversationId::ARGUMENT_NAME])) {
+                $arguments[MCPToolReceivesCurrentConversationId::ARGUMENT_NAME] = null;
+            }
         }
         return $arguments;
     }

@@ -36,6 +36,8 @@ The unit of a hit is always a MESSAGE (`SemanticSearchHit`); a compaction summar
 4. Across conversations, the search answers from the owner's dialogue only. The three queries of step 2 leave out,
    inside the query (`DBAIConversations::restrictToConversationsTheSearchAcrossConversationsAnswersFrom()`), so those
    rows are never read for a distance, ranked or given an over-fetch place:
+   - every sub-agent's conversation (`delegatedFromMessageId` set) — a child of an eval run carries no eval mark of its
+     own; what a sub-agent found reached its parent as a notification;
    - eval runs without seeded history (`runSettings.evalRun` / `evalSeededHistory`);
    - conversations whose own or root purpose is in `AIConversationPurpose::getPurposeNamesLeftOutOfTheSearchAcrossConversations()`
      (the customer-hidden purposes and `Schedule.Run`; the application extends
@@ -43,6 +45,8 @@ The unit of a hit is always a MESSAGE (`SemanticSearchHit`); a compaction summar
    - conversations whose own or root initiator type is in `AIConversation::getInitiatorTypesLeftOutOfTheSearchAcrossConversations()`
      (`SCHEDULE`; the application extends `INITIATOR_TYPES_LEFT_OUT_OF_THE_SEARCH_ACROSS_CONVERSATIONS` on its
      conversation class) — a scheduled run's report to the owner is not searchable.
+   The conversation list (`AIConversationsService::buildConversationsWithSummariesSinceQueryBuilder()`, the summary
+   reads behind the session list) applies the same restriction.
    After the fusion the eval-run and customer-hidden checks run once more over the candidates (fail-closed for hidden).
 5. Rerank (`ArgusSearchRerank`, a cheap fast model, prompt `AgentAIPromptNames::APP_AI_SEARCH_RERANK`): at most
    `MAX_RERANK_CANDIDATES` (40) candidates, each cut to `RERANK_CANDIDATE_CHARS` (400) around the query. A parseable

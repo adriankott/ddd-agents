@@ -185,6 +185,20 @@ class ToolDefinition extends ValueObject
                 }
             }
         }
+        // THE CALLING CONVERSATION'S ID: a tool that reads the conversation it is called from gets the id from the loop,
+        // always ({@see MCPToolReceivesCurrentConversationId}) — the model is not offered the argument at all
+        if (is_array($parameters) && is_array($parameters['properties'] ?? null)
+            && isset($parameters['properties'][MCPToolReceivesCurrentConversationId::ARGUMENT_NAME])
+            && MCPToolAttributeCatalog::hasAttributeOnToolName((string)$this->name, MCPToolReceivesCurrentConversationId::class)
+        ) {
+            unset($parameters['properties'][MCPToolReceivesCurrentConversationId::ARGUMENT_NAME]);
+            if ($parameters['properties'] === []) {
+                $parameters['properties'] = new \stdClass();
+            }
+            if (is_array($parameters['required'] ?? null)) {
+                $parameters['required'] = array_values(array_diff($parameters['required'], [MCPToolReceivesCurrentConversationId::ARGUMENT_NAME]));
+            }
+        }
         return [
             'type' => 'function',
             'function' => [

@@ -103,7 +103,8 @@ class TaskPlanUpdateOutcome extends ValueObject
                 $sentences[] = 'Added: ' . implode(', ', $this->addedItemDescriptions) . '.';
             }
             if ($this->droppedItemDescriptions !== []) {
-                $sentences[] = 'Dropped: ' . implode(', ', $this->droppedItemDescriptions) . '.';
+                $sentences[] = 'Dropped: ' . implode(', ', $this->droppedItemDescriptions) . '. A dropped item is gone from the plan '
+                    . 'and its work is not delivered: if the owner\'s message did not cancel one of these, add it back now and work it.';
             }
             if ($this->addedKeyStandsOutOfOrder) {
                 $sentences[] = self::KEYS_NEVER_CHANGE_SENTENCE;

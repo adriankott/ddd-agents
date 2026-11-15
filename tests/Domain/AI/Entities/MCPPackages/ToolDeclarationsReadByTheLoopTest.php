@@ -38,6 +38,9 @@ use DDD\Infrastructure\Base\DateTime\DateTime;
 use DDD\Infrastructure\Libs\Config;
 use DDD\Infrastructure\Services\DDDService;
 use DDD\Presentation\Mcp\Client\AI\AgentMandatesMCPPackage;
+use DDD\Domain\AI\Entities\MCPPackages\MCPToolReceivesCurrentConversationId;
+use DDD\Domain\AI\Entities\MCPPackages\ToolDefinition;
+use DDD\Tests\Agents\Domain\AI\Entities\MCPPackages\Probes\FixedOutputMCPSchema;
 use DDD\Tests\Agents\Domain\AI\Entities\MCPPackages\Probes\ToolDeclarationsProbeMCPPackage;
 use DDD\Tests\Agents\Support\UnitTestCase;
 use ReflectionClass;
@@ -138,12 +141,48 @@ class ToolDeclarationsReadByTheLoopTest extends UnitTestCase
             $this->toolCall('probeSearchOfThisConversation', ['query' => 'opening hours'])->buildExecutionArguments($conversation)
         );
         self::assertSame(
+            ['conversationId' => 4711],
+            $this->toolCall('probeSearchOfThisConversation', ['conversationId' => 0])->buildExecutionArguments($conversation),
+            'the calling conversation\'s id always wins over a value the model wrote'
+        );
+        $conversationWithoutId = (new ReflectionClass(AIConversation::class))->newInstanceWithoutConstructor();
+        self::assertSame(
             ['conversationId' => 12],
-            $this->toolCall('probeSearchOfThisConversation', ['conversationId' => 12])->buildExecutionArguments($conversation),
-            'an id the model passes is kept'
+            $this->toolCall('probeSearchOfThisConversation', ['conversationId' => 12])->buildExecutionArguments($conversationWithoutId),
+            'a conversation without an id keeps the value the call carries'
         );
         self::assertSame(['query' => 'opening hours'], $this->toolCall('probeRecordChange', ['query' => 'opening hours'])->buildExecutionArguments($conversation));
         self::assertSame([], $this->toolCall('aToolNoPackageDeclares')->buildExecutionArguments($conversation));
+    }
+
+    public function testTheDeclaringToolIsOfferedWithoutTheConversationIdAndOtherToolsKeepIt(): void
+    {
+        $declaringParameters = $this->buildConversationIdProbeToolDefinition('probeSearchOfThisConversation')->toOpenAiToolSchema()['function']['parameters'];
+        self::assertSame(['query'], array_keys($declaringParameters['properties']), 'the loop always fills the id: the model is not offered it');
+        self::assertSame(['query'], $declaringParameters['required']);
+
+        $otherParameters = $this->buildConversationIdProbeToolDefinition('probeRecordChange')->toOpenAiToolSchema()['function']['parameters'];
+        self::assertSame(['query', MCPToolReceivesCurrentConversationId::ARGUMENT_NAME], array_keys($otherParameters['properties']));
+        self::assertSame(['query', MCPToolReceivesCurrentConversationId::ARGUMENT_NAME], $otherParameters['required']);
+    }
+
+    /** A tool definition whose schema has `query` and the conversation id, both required. */
+    protected function buildConversationIdProbeToolDefinition(string $toolName): ToolDefinition
+    {
+        $inputSchema = new FixedOutputMCPSchema();
+        $inputSchema->serializedSchema = [
+            'type' => 'object',
+            'properties' => [
+                'query' => ['type' => 'string'],
+                MCPToolReceivesCurrentConversationId::ARGUMENT_NAME => ['type' => 'integer', 'description' => 'The conversation'],
+            ],
+            'required' => ['query', MCPToolReceivesCurrentConversationId::ARGUMENT_NAME],
+        ];
+        $toolDefinition = new ToolDefinition();
+        $toolDefinition->name = $toolName;
+        $toolDefinition->description = 'A probe.';
+        $toolDefinition->inputSchema = $inputSchema;
+        return $toolDefinition;
     }
 
     public function testAWriterOfAgentMemoryOnlyBesideForkedCallsDoesNotMakeThemWait(): void

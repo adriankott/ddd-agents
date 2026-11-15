@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.1.0-alpha.38
+
+- The search across conversations leaves out every sub-agent's conversation (`delegatedFromMessageId` set): a child
+  of an eval run carries no eval mark of its own and answered as the owner's chat; what a sub-agent found reached its
+  parent as a notification.
+- The conversation list (the summary reads behind the session list) leaves out what the search leaves out: eval runs
+  (unless they hold seeded history), schedule runs and conversations a schedule started.
+- A tool with `MCPToolReceivesCurrentConversationId` always gets the calling conversation's id — a value the model wrote
+  (`0`) no longer wins — and the agent loop's schema no longer offers the argument. A conversation without an id keeps
+  the call's value.
+- Checked-stop bounce: the discarded answer's content is to be written again in full, not a line saying it exists
+  (`AgentCheckedStopPolicy::buildCheckedStopBounceText()`).
+- Task plan update: after `Dropped: …` the result says that a dropped item's work is not delivered and that an item the
+  owner did not cancel is added back and worked.
+- `ContextRetentionSettingsOptionsTrait` can be reflected (a debug-mode container build failed with "Cannot access
+  trait constant self::OPTION_UNLOAD_GRANULARITY directly").
+
 ## 0.1.0-alpha.37
 
 - A sub-agent's result reaches the parent whole up to 8,000 characters (`DelegationRunEndNotification::VERDICT_MAX_LENGTH`,

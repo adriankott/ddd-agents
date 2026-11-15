@@ -1491,8 +1491,9 @@ class AIConversationsService extends EntitiesService
     }
 
     /**
-     * The query both summary reads share: the customer-visible root conversations with a persisted summary that were
-     * active since $since, newest activity first, at most `$limit` (1 to 25). It carries NO condition on the account
+     * The query both summary reads share: the customer-visible root conversations of the owner's dialogue
+     * ({@see DBAIConversations::restrictToConversationsTheSearchAcrossConversationsAnswersFrom()}) with a persisted
+     * summary that were active since $since, newest activity first, at most `$limit` (1 to 25). It carries NO condition on the account
      * or the space; the caller adds the one its read is named after.
      *
      * @param \DateTimeInterface $since
@@ -1528,6 +1529,9 @@ class AIConversationsService extends EntitiesService
                 ->setParameter('sessionsExcludeId', $excludeConversationId);
         }
         $entitySetRepo::restrictToCustomerVisibleConversations($queryBuilder);
+        // the owner's dialogue only, as the search across conversations: no eval run (unless it holds seeded history),
+        // no schedule run, no conversation a schedule started
+        DBAIConversations::restrictToConversationsTheSearchAcrossConversationsAnswersFrom($queryBuilder, $alias);
         return $queryBuilder;
     }
 

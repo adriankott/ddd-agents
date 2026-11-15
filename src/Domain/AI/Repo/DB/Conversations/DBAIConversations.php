@@ -82,6 +82,8 @@ class DBAIConversations extends DBEntitySet
      * Restrict a query that joins the conversation row as `$conversationAlias` to the conversations the search across
      * an account's conversations answers from — the owner's dialogue. Left out, inside the query (so their rows are
      * neither read for a distance nor ranked):
+     * - a sub-agent's conversation (`delegatedFromMessageId` set): never something the owner talked about, and a child
+     *   of an eval run carries no eval mark of its own; what a sub-agent found reached its parent as a notification;
      * - an eval run (`runSettings.evalRun` true) unless it holds the history an eval seeded (`runSettings.evalSeededHistory`);
      * - a conversation whose own purpose or whose root's purpose is in
      *   {@see AIConversationPurpose::getPurposeNamesLeftOutOfTheSearchAcrossConversations()} (the customer-hidden purposes
@@ -94,6 +96,7 @@ class DBAIConversations extends DBEntitySet
         DoctrineQueryBuilder $queryBuilder,
         string $conversationAlias
     ): void {
+        $queryBuilder->andWhere("$conversationAlias.delegatedFromMessageId IS NULL");
         $evalRunMark = "JSON_FIELD_TEXT($conversationAlias.runSettings, 'evalRun')";
         $evalSeededHistoryMark = "JSON_FIELD_TEXT($conversationAlias.runSettings, 'evalSeededHistory')";
         $queryBuilder->andWhere("($evalRunMark IS NULL OR $evalRunMark <> 'true' OR $evalSeededHistoryMark = 'true')");

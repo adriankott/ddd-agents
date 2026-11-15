@@ -34,7 +34,9 @@ class CheckedStopBounceNamesTheOwnersPauseTest extends UnitTestCase
         $bounceText = AgentCheckedStopPolicy::buildCheckedStopBounceText($this->buildTaskPlanWithOpenItems());
 
         self::assertStringContainsString(self::PAUSE_SENTENCE . ' ' . self::OWNER_ORDERED_STOP_SENTENCE, $bounceText);
-        self::assertStringEndsWith(self::OWNER_ORDERED_STOP_SENTENCE . ' Otherwise give your final answer, reporting the result of every item — it is accepted as it is.', $bounceText);
+        self::assertStringEndsWith(self::OWNER_ORDERED_STOP_SENTENCE . ' Otherwise give your final answer. The owner never saw the discarded answer: write its content again in full — '
+            . 'the results themselves (the list, the figures, the drafts), not a line saying that they exist — and report the '
+            . 'result of every item; this answer is accepted as it is.', $bounceText);
     }
 
     public function testTheBounceOfASubAgentFoldNamesTheOwnersPauseToo(): void

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DDD\Tests\Agents\Symfony\Commands\Agents;
 
 use DDD\Domain\AI\Entities\Conversations\Messages\ContextRetentionSettings;
+use DDD\Symfony\Commands\Agents\ContextRetentionSettingsOptionsTrait;
 use DDD\Tests\Agents\Support\UnitTestCase;
 use Symfony\Component\Console\Exception\InvalidOptionException;
 
@@ -161,5 +162,20 @@ class ContextRetentionSettingsOptionsTraitTest extends UnitTestCase
         $this->expectException(InvalidOptionException::class);
         $this->expectExceptionMessage("--fan-in must be a whole number of at least 2, got '1'");
         (new ContextRetentionSettingsOptionsProbeCommand(''))->buildCompactionOverride(['--fan-in' => '1']);
+    }
+
+    public function testTheTraitCanBeReflectedAndItsChoiceOptionsAreItsOptionConstants(): void
+    {
+        $constants = (new \ReflectionClass(ContextRetentionSettingsOptionsTrait::class))->getConstants();
+
+        self::assertSame(
+            [
+                'unloadGranularity' => ContextRetentionSettingsOptionsProbeCommand::OPTION_UNLOAD_GRANULARITY,
+                'skillLoadingStrategy' => ContextRetentionSettingsOptionsProbeCommand::OPTION_SKILL_LOADING_STRATEGY,
+                'rebuildEpochOnSituationChange' => ContextRetentionSettingsOptionsProbeCommand::OPTION_REBUILD_EPOCH_ON_SITUATION_CHANGE,
+                'stateChangeDelivery' => ContextRetentionSettingsOptionsProbeCommand::OPTION_STATE_CHANGE_DELIVERY,
+            ],
+            $constants['CONTEXT_RETENTION_CHOICE_OPTION_NAMES_BY_FIELD']
+        );
     }
 }
