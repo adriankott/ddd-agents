@@ -95,6 +95,7 @@ class AgentToolCallExecutionService extends Service
             }
         }
         $toolCall->applyExecutionOutcome($toolResult);
+        $toolCall->wasHeldForOwnerConsent = $provenance->isWriteHeldForOwnerConsent;
         return $toolResult;
     }
 

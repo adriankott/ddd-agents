@@ -111,4 +111,31 @@ class AgentModelInputAnswerContractTurnBoundaryTest extends UnitTestCase
         self::assertStringContainsString('not when it is due', $answerContractHint);
         self::assertStringContainsString('still open comes first: a question is answered by the read that answers it, an order by the call that carries it out — a question is never an order to write. Answer once nothing is open.', $answerContractHint);
     }
+
+    public function testAWriteHeldForTheOwnersConfirmationIsAskedForNotReportedAsDone(): void
+    {
+        $heldWriteMessage = $this->buildCompletedToolCallMessage('updateAddress');
+        $heldWriteMessage->toolCall->wasHeldForOwnerConsent = true;
+        $agentModelInput = new AgentModelInput();
+        $agentModelInput->messages = [
+            $this->buildOwnerTextMessage('Set the hours and the new address.'),
+            $this->buildCompletedToolCallMessage('updateOpeningHours'),
+            $heldWriteMessage,
+        ];
+        $answerContractHint = (string)$agentModelInput->completedWritesAnswerContractHint();
+
+        self::assertStringStartsWith(
+            '[SIGNAL:answer-content] Completed so far in this turn: updateOpeningHours. Your final answer MUST report the outcomes of these actions to the owner.'
+                . " Held for the owner's confirmation in this turn (nothing was changed): updateAddress. Your final answer MUST ask the owner"
+                . " for that confirmation, as a question of its own, in the owner's language. This names what the final answer contains",
+            $answerContractHint
+        );
+
+        $agentModelInput->messages = [$this->buildOwnerTextMessage('Set the new address.'), $heldWriteMessage];
+        self::assertStringStartsWith(
+            "[SIGNAL:answer-content] Held for the owner's confirmation in this turn (nothing was changed): updateAddress.",
+            (string)$agentModelInput->completedWritesAnswerContractHint(),
+            'a held write alone owes the question'
+        );
+    }
 }

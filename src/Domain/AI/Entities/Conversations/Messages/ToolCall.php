@@ -450,6 +450,14 @@ class ToolCall extends ValueObject
     public bool $wasRefusedByGate = false;
 
     /**
+     * @var bool True when the owner-consent check held a write of this call (NOT_RESERVED): the tool answered —
+     *           possibly COMPLETED — without changing anything. Such a call is no completed write for the answer
+     *           contract; the final answer asks the owner for the confirmation instead
+     *           ({@see \DDD\Domain\AI\Entities\Conversations\Agent\AgentModelInput::completedWritesAnswerContractHint()}).
+     */
+    public bool $wasHeldForOwnerConsent = false;
+
+    /**
      * @var bool|null True when this call was refused FINALLY — the same arguments are refused again: the executor said
      *                so ({@see ToolResult::$refusalIsFinal}), the dispatch refused a tool a delegated run is never
      *                offered, or the loop answered the identical repeat of such a refusal. The dispatch answers the

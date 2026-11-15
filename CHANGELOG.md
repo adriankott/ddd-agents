@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.0-alpha.39
+
+- A write the owner-consent check held (`OwnerConsentsService::reserveOwnerConsentForStep()` NOT_RESERVED) is marked on
+  the call (`AgentToolCallProvenance::$isWriteHeldForOwnerConsent` → `ToolCall::$wasHeldForOwnerConsent`). The answer
+  contract no longer lists it under "Completed so far in this turn" (its "nothing was changed" result came back
+  COMPLETED); it names it under its own obligation: "Held for the owner's confirmation in this turn (nothing was
+  changed): <tools>. Your final answer MUST ask the owner for that confirmation, as a question of its own".
+
 ## 0.1.0-alpha.38
 
 - The search across conversations leaves out every sub-agent's conversation (`delegatedFromMessageId` set): a child

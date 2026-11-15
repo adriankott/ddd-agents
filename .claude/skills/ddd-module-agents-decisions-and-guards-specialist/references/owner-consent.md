@@ -122,6 +122,11 @@ A tool package that must rebuild requests for historical calls (for a replay com
 | `OUTCOME_NOT_RESERVED` | no consent this call may use; write nothing | false |
 
 Any exception inside is `NOT_RESERVED` (fail closed); only `AgentRunClaimLostException` crosses it.
+
+A `NOT_RESERVED` outcome marks the call (`AgentToolCallProvenance::$isWriteHeldForOwnerConsent`, copied onto
+`ToolCall::$wasHeldForOwnerConsent` after the tool ran). The tool's "nothing was changed" answer may come back
+COMPLETED; the answer contract (`AgentModelInput::completedWritesAnswerContractHint()`) still never lists such a call as
+a completed write — it names it as held for the owner's confirmation, and the final answer asks for it.
 `requireOwnerConsentForStep()` returns the same reservation when the write is allowed and throws otherwise.
 
 What it stores, on a checked call (not ungated): one turn event of site `ownerConsent` with the verdict, both

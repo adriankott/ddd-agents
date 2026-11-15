@@ -77,6 +77,21 @@ class OwnerConsentsService extends Service
      */
     public function reserveOwnerConsentForStep(?AgentToolCallProvenance $callProvenance, OwnerConsentRequest $request): OwnerConsentReservation
     {
+        $reservation = $this->findOwnerConsentReservationForStep($callProvenance, $request);
+        if (!$reservation->isWriteAllowed() && $callProvenance !== null) {
+            // the call's write was held: the answer contract asks for the confirmation, never reports it as done
+            $callProvenance->isWriteHeldForOwnerConsent = true;
+        }
+        return $reservation;
+    }
+
+    /**
+     * The decision and reservation of {@see reserveOwnerConsentForStep()}, without marking the call.
+     *
+     * @throws AgentRunClaimLostException
+     */
+    protected function findOwnerConsentReservationForStep(?AgentToolCallProvenance $callProvenance, OwnerConsentRequest $request): OwnerConsentReservation
+    {
         $verdict = OwnerConsentVerdict::failed(OwnerConsentVerdict::FAILURE_ERROR);
         try {
             $conversation = $callProvenance?->conversation;

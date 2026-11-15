@@ -1314,7 +1314,9 @@ class AgentModelInput extends ValueObject
      * first write, and read as "answer now" it ended a turn whose further writes the owner had asked for.
      * Volatile wire-tail contract like the other hints: never persisted, cache-neutral.
      * Null as well once a tool of the turn made the platform write the widget that ends the purpose
-     * ({@see hasPlatformWrittenWidgetThatEndsThePurposeAfterPosition()}).
+     * ({@see hasPlatformWrittenWidgetThatEndsThePurposeAfterPosition()}). A write the owner-consent check held
+     * ({@see \DDD\Domain\AI\Entities\Conversations\Messages\ToolCall::$wasHeldForOwnerConsent}) is no completed write: it
+     * is named under its own obligation — the final answer asks the owner for the confirmation.
      */
     public function completedWritesAnswerContractHint(): ?string
     {
@@ -1323,6 +1325,7 @@ class AgentModelInput extends ValueObject
             return null;
         }
         $completedWriteToolNames = [];
+        $heldWriteToolNames = [];
         $pictureReadToolNames = [];
         for ($i = $newestOwnerMessagePosition + 1; $i < count($this->messages); $i++) {
             $toolCall = isset($this->messages[$i]->toolCall) ? $this->messages[$i]->toolCall : null;
@@ -1352,15 +1355,24 @@ class AgentModelInput extends ValueObject
             ) {
                 continue;
             }
+            // a write the owner-consent check held changed nothing: the answer asks for the confirmation
+            if ($toolCall->wasHeldForOwnerConsent) {
+                $heldWriteToolNames[$toolName] = $toolName;
+                continue;
+            }
             $completedWriteToolNames[$toolName] = $toolName;
         }
-        if ($completedWriteToolNames === [] && $pictureReadToolNames === []) {
+        if ($completedWriteToolNames === [] && $pictureReadToolNames === [] && $heldWriteToolNames === []) {
             return null;
         }
         $obligations = [];
         if ($completedWriteToolNames !== []) {
             $obligations[] = 'Completed so far in this turn: ' . implode(', ', $completedWriteToolNames)
                 . '. Your final answer MUST report the outcomes of these actions to the owner';
+        }
+        if ($heldWriteToolNames !== []) {
+            $obligations[] = 'Held for the owner\'s confirmation in this turn (nothing was changed): ' . implode(', ', $heldWriteToolNames)
+                . '. Your final answer MUST ask the owner for that confirmation, as a question of its own';
         }
         if ($pictureReadToolNames !== []) {
             $obligations[] = 'Pictures received in this turn from: ' . implode(', ', $pictureReadToolNames)

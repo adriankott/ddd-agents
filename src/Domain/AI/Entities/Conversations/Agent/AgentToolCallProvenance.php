@@ -164,6 +164,14 @@ class AgentToolCallProvenance extends ValueObject implements MCPServerProvidedIn
      */
     public ?string $toolCallId = null;
 
+    /**
+     * Set by {@see \DDD\Domain\AI\Services\Conversations\Agent\OwnerConsentsService::reserveOwnerConsentForStep()} when
+     * a write of THIS call was held for the owner's confirmation (NOT_RESERVED): the tool answered without changing
+     * anything. The loop copies it onto the call ({@see \DDD\Domain\AI\Entities\Conversations\Messages\ToolCall::$wasHeldForOwnerConsent}).
+     */
+    #[HideProperty]
+    public bool $isWriteHeldForOwnerConsent = false;
+
     public function getSourceUserMessageId(): ?int
     {
         $id = $this->sourceUserMessage->id ?? null;
