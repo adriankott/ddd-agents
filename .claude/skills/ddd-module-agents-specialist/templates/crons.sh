@@ -1,9 +1,7 @@
 #!/usr/bin/env sh
 # The agent's cron list, registered as rows of the framework's cron table (DDD\Domain\Common\Entities\Crons\Cron).
-# Placeholders: {{CONSOLE}} sample: php bin/console
-#               {{COMMAND_PREFIX}} sample: agent
-# Commands named app:... are the package's own; their names are fixed. Commands named {{COMMAND_PREFIX}}:... are the
-# samples of the templates beside this file; use the names the host gave its commands.
+# Placeholder: {{CONSOLE}} sample: php bin/console
+# Every command is the package's own; its name is fixed (a host subclass keeps it, an old host name can stay an alias).
 # `app:crons:upsert` validates the expression and that the command exists, `--dryRun` writes nothing. The rows run
 # through the framework's ticker, which the host starts every minute from its system scheduler:
 #   * * * * * {{CONSOLE}} app:crons:execute
@@ -20,15 +18,15 @@ set -e
 
 {{CONSOLE}} app:crons:upsert --name=agent-schedules-state-sweep \
   --description="Close, pause or re-arm agent schedules whose space or account changed its state" \
-  --schedule="17 * * * *" --command="{{COMMAND_PREFIX}}:schedules:sweep-state"
+  --schedule="17 * * * *" --command="app:ai-schedule:close-for-inactive-agent-spaces"
 
 {{CONSOLE}} app:crons:upsert --name=agent-runs-recover-owed-work \
   --description="Deliver owed agent run reports and resume agent turns that are still owed" \
-  --schedule="*/5 * * * *" --command="{{COMMAND_PREFIX}}:runs:recover-owed-work"
+  --schedule="*/5 * * * *" --command="app:ai-conversation:deliver-owed-reports-and-resume-owed-turns"
 
 {{CONSOLE}} app:crons:upsert --name=agent-runs-reap \
   --description="Wake or expire agent runs whose worker died, time out stale delegation batches" \
-  --schedule="*/5 * * * *" --command="{{COMMAND_PREFIX}}:runs:reap"
+  --schedule="*/5 * * * *" --command="app:ai-agent:reap"
 
 {{CONSOLE}} app:crons:upsert --name=agent-conversations-mark-finalized \
   --description="Mark agent conversations idle past the window as finalized" \

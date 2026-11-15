@@ -145,9 +145,11 @@ values). Inputs change local state only; nothing is sent before the submit.
 `ComposedViewNodeSchema::build()` is the one schema: node types with props, slots, sourcing and state rules, budgets,
 categories, size classes, action types, binding kinds, finding codes, embeddable widgets, all widget types, data
 sources and entity types. `ComposedViewNodeSchema::buildJson()` renders the committed file the frontend types, the
-frontend reader and the parity tests read. **The package ships no command that writes it**: a host writes a console
-command of the host that writes `buildJson()` into its frontend tree and fails in a check mode when the committed file
-differs. `ComposedViewNodeSchema::SCHEMA_FILE_RELATIVE_PATH` names one application's path; do not rely on it.
+frontend reader and the parity tests read. The package command
+`app:ai:composed-view:export-node-schema` (`ComposedViewNodeSchemaExportCommand`) writes it — the module's own file
+`ComposedViewNodeSchemaFilePaths::MODULE_SCHEMA_FILE_RELATIVE_PATH` and, through the override point
+`getSchemaFilePaths()`, an application's part (`ComposedViewNodeSchemaParts` splits the two) — and fails in its check
+mode when a committed file differs.
 
 ## What the model is taught
 

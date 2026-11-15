@@ -45,9 +45,10 @@ Not here: the conversation tree, run claims and the release of a child's run (lo
 2. **One `delegate` row is one sub-agent, one level deep.** A call with `parallelTasks` starts one per item, each on
    its own row. Its answer is final at the spawn; the result arrives later as exactly one signal row per run end
    (`SIGNAL_SOURCE_SUB_AGENT_RUN_ENDED`). A child never delegates.
-3. **The package ships the fire command, not its cron line; the sweep is a host command.** Without the host's cron
-   line for `app:ai-conversation:fire-due-schedules` no schedule fires; without the host's sweep, reaper and owed-work
-   commands no deadline times out, no lost notification is re-sent and no owed report is delivered late.
+3. **The package ships the fire, sweep, reaper and owed-work commands, not their cron lines.** Without the host's cron
+   line for `app:ai-conversation:fire-due-schedules` no schedule fires; without the cron lines of the sweep, the
+   reaper and the owed-work command no deadline times out, no lost notification is re-sent and no owed report is
+   delivered late.
 4. **Eligibility is its own gate, never the budget.** Every default says "eligible"; a host with account states
    overrides `AgentAutomationEligibilityService`, including all three refusal methods.
 5. **A mandate gates only a tool that carries `MCPToolRequiresMandate`.** The package tags none of its tools, and it
@@ -74,7 +75,7 @@ Not here: the conversation tree, run claims and the release of a child's run (lo
 - **Schedule tools without the provenance guard.** The package ships no schedule tools; a host's create, change and
   delete tools must refuse a call whose `AgentToolCallProvenance` carries a `scheduleId`, or a mission text with "every
   day" re-creates its schedule on every run.
-- **No reaper.** A child whose worker died never ends; its parent waits until the owner writes again.
+- **No reaper cron line.** A child whose worker died never ends; its parent waits until the owner writes again.
 - **Reading the result from the `delegate` row's answer.** It says "started"; the result is a later signal row or
   `check_delegations`.
 - **A sub-agent refused for a missing mandate.** A child is never granted one; the parent makes the first gated call of
@@ -155,7 +156,7 @@ eligible. A support override (`activateSupportOverride()` and its siblings) is p
 |---|---|
 | Let the agent or a tool start sub-agents; a sub-agent's result never arrives; "queued" sub-agents | [delegation-and-sub-agents.md](references/delegation-and-sub-agents.md) |
 | Run background operations of the host after a tool | [delegation-and-sub-agents.md](references/delegation-and-sub-agents.md) |
-| Run the fire command, build the sweep command; a schedule does not fire, fires twice, or never stops | [schedules-and-unattended-runs.md](references/schedules-and-unattended-runs.md) |
+| Run the fire and sweep commands; a schedule does not fire, fires twice, or never stops | [schedules-and-unattended-runs.md](references/schedules-and-unattended-runs.md) |
 | Write tools that create or change schedules; cap the spend of scheduled runs | [schedules-and-unattended-runs.md](references/schedules-and-unattended-runs.md) |
 | Stop automation for suspended or deleted spaces and accounts | [automation-eligibility.md](references/automation-eligibility.md) |
 | Gate a tool behind a standing permission; "requires an active MANDATE" | [mandates.md](references/mandates.md) |

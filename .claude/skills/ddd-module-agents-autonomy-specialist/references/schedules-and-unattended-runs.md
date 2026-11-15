@@ -262,8 +262,8 @@ its send tools.
 
 Full class names of what a host extends or calls here: `DDD\Domain\AI\Services\Conversations\AIConversationSchedulesService`, `DDD\Domain\AI\Services\Conversations\Schedules\ScheduleBudgetPotsService`, `DDD\Domain\AI\Entities\Conversations\Schedules\AIConversationSchedule`.
 
-- The cron line of the package's fire command, and the state-sweep command — template, cron lines and cadence in the
-  entry skill's host duties.
+- The cron lines of the package's fire command and its state-sweep command
+  (`app:ai-schedule:close-for-inactive-agent-spaces`) — cadence in the entry skill's host duties.
 - The tools that create, list, change, pause, resume and delete schedules, with the provenance guard above.
 - Optionally: the budget pot (`ScheduleBudgetPotsService`), eligibility (`AgentAutomationEligibilityService`), the
   sweep filter, the report mail (owner reports reference).

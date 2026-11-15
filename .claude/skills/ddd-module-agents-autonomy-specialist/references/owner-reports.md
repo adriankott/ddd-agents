@@ -77,8 +77,9 @@ billed entity come from `agentApplicationWording.php`.
 
 ## Late delivery
 
-A run that died before it delivered still owes. A console command of the host (the host duty "deliver owed reports",
-template in the entry skill `ddd-module-agents-specialist`) runs every few minutes:
+A run that died before it delivered still owes. The package command
+`app:ai-conversation:deliver-owed-reports-and-resume-owed-turns` (host duty "deliver owed reports" in the entry skill
+`ddd-module-agents-specialist`; the host adds its cron line) runs every few minutes:
 
 1. `AIConversationsService::findConversationIdsOwingReports()` — owed, not delivered, in no live run state (not
    RUNNING, AWAITING_DELEGATES or QUEUED; IDLE, an empty state and the terminal states qualify), not part of an

@@ -20,6 +20,7 @@ src/Domain/AI/**/Evals/**	observability
 src/Domain/AI/**/RecordedRuns/**	observability
 src/Domain/AI/Services/Eval/**	observability
 src/Domain/AI/Services/Conversations/Quality/**	observability
+src/Domain/AI/Entities/Conversations/Quality/**	observability
 src/Domain/AI/Services/Conversations/AIConversationAuditRenderService.php	observability
 src/Domain/AI/Services/Conversations/AgentMessagePrinterInterface.php	observability
 src/Domain/AI/MessageHandlers/AIConversationScorecard*	observability

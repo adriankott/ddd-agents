@@ -23,9 +23,6 @@ class ComposedViewNodeSchema
 {
     public const int SCHEMA_VERSION = 1;
 
-    /** The committed file, relative to the repository root. */
-    public const string SCHEMA_FILE_RELATIVE_PATH = 'html/react/src/components/ai-conversations/conversation-markdown/widget-tree/composed-node-schema.json';
-
     /** @return array<string, mixed> the schema, keys in a fixed order */
     public static function build(): array
     {

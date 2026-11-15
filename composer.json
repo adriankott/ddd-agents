@@ -3,7 +3,7 @@
     "description": "The agentic loop for mgamadeus/ddd: conversations, messages, compaction, the task plan, skills and MCP metadata, purposes and criteria, widgets and signal sources, delegation, the supervisor and run claims",
     "minimum-stability": "stable",
     "license": "MIT",
-    "version": "0.1.0-alpha.41",
+    "version": "0.1.0-alpha.42",
     "authors": [
         {
             "name": "Marius-Eugen Gerdan",
@@ -40,6 +40,10 @@
     },
     "require-dev": {
         "phpunit/phpunit": "^11.5",
-        "phpstan/phpstan": "^2.3"
+        "phpstan/phpstan": "^2.3",
+        "php-tui/php-tui": "^0.2.1"
+    },
+    "suggest": {
+        "php-tui/php-tui": "Draws the full-screen agent chat (app:ai-agent:chat-tui); without it the command ends with a line naming the library"
     }
 }

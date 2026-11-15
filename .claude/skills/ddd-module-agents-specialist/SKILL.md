@@ -28,12 +28,12 @@ their DTOs, the naming, wording, persona and egress configs, and `examples/`. Th
 ## Rules that always hold
 
 1. **The package ships commands; the host runs them.** The commands that fire schedules, finalize conversations,
-   purge the event tables, maintain old rows and diagnose a conversation are the package's (section "Console commands
-   the package ships"); a scheduled one runs only from the cron line the host registers (`templates/crons.sh`).
-   Sweeping schedule state, delivering owed reports and resuming owed turns, and reaping dead workers and stale
-   sub-agent groups are host commands. Without the cron lines and these commands unattended work never runs, a
-   crashed turn never answers and the event tables grow without bound. Templates: `templates/`; contracts:
-   [references/host-duties.md](references/host-duties.md).
+   purge the event tables, sweep schedule state, deliver owed reports and resume owed turns, reap dead workers and
+   stale sub-agent groups, maintain old rows, chat and inspect a conversation are the package's (section "Console
+   commands the package ships"); a scheduled one runs only from the cron line the host registers
+   (`templates/crons.sh`). Without the cron lines unattended work never runs, a crashed turn never answers and the
+   event tables grow without bound. A host adapts a command by a subclass with the same name and its override points;
+   contracts: [references/host-duties.md](references/host-duties.md).
 2. **The host provides the envelope middleware.** Every agent message that makes model calls declares its usage scope
    with `WithAIEnvelope` (all but `AIConversationReportEmailSendMessage`);
    no package ships the Messenger middleware that opens it. Without it the worker's model calls run outside any
@@ -152,7 +152,7 @@ the recovery commands).
 | A worker's model calls are attributed to no envelope, or refused over budget although the handler lifts the budget | [transports-and-workers.md](references/transports-and-workers.md) |
 | Schedules never fire; owed reports never arrive; a turn whose worker died never answers; conversations never finalize; event tables grow without bound | [host-duties.md](references/host-duties.md) |
 | Which console commands the package ships and which need a cron line | section "Console commands the package ships" below |
-| Write the host commands the package does not ship; register the cron list | [host-duties.md](references/host-duties.md), `templates/` |
+| Adapt a package command by its override points; register the cron list | [host-duties.md](references/host-duties.md), `templates/crons.sh` |
 | Model "what the agent works for": spaces, account level, starting a conversation for a space, tools that name a space | [agent-space.md](references/agent-space.md) |
 | Missing agent tables, wrong table names, a table prefix, a renamed persisted class | [tables-and-persisted-names.md](references/tables-and-persisted-names.md) |
 | Build the first tool, skill, purpose and widget | [first-capability-end-to-end.md](references/first-capability-end-to-end.md) |
@@ -180,6 +180,17 @@ with the same name.
 | `app:ai-conversation:compact-finalized` | dispatches one finalize job per finalized conversation that owes its completion compaction (`--batch`, default 50); `--inline` runs the chain of one conversation in the console | every five minutes | yes (`--inline` makes model calls) |
 | `app:ai-agent:trace-events-purge` | deletes trace events older than `--days` (default 180) in batches | daily | yes |
 | `app:ai-agent:turn-events-purge` | deletes turn events older than `--days` (default 180), then the snapshots no event references | daily | yes |
+| `app:ai-schedule:close-for-inactive-agent-spaces` | the schedule state sweep: closes, pauses or re-arms schedules whose space or account changed its automation state | hourly | yes |
+| `app:ai-conversation:deliver-owed-reports-and-resume-owed-turns` | delivers owed reports late, resumes owed turns and inbound messages left idle; override points for the host's own passes | every five minutes | yes |
+| `app:ai-agent:reap` | wakes or expires runs whose worker died, times out sub-agent groups, wakes parents of settled groups, settles purposed conversations closed without an owner turn, re-sends lost run-end notifications | every five minutes | yes |
+| `app:ai-agent:chat` | the console chat with the agent (ephemeral or stored, `--conversationId` resumes, turns file, recorded run, slash commands) | no | yes (makes model calls) |
+| `app:ai-agent:chat-tui` | the full-screen chat (suggested `php-tui/php-tui`; without it one line names the library) | no | yes (makes model calls) |
+| `app:ai-agent:inspect` | prints one conversation: header, summary, transcript, request snapshots | no | no |
+| `app:ai-agent:jev-probe` | runs the decision probe over a fixture, one evaluation envelope per case | no | no (makes model calls) |
+| `app:ai-conversation:scorecards` | selects conversations and dispatches (or runs `--inline`) their quality scorecards; `--print` the metrics | no | yes |
+| `app:mcp:documentation` | prints the MCP documentation of a bundle or package; `--call` runs one tool for a space | no | only with `--call` |
+| `app:mcp:clear-cache` | clears the cached MCP documentation of the bundles and skill packages, then the container cache | no | no |
+| `app:ai:composed-view:export-node-schema` | writes or checks the composed-view node schema file (`--check`) | no | yes, unless checking |
 | `app:ai-agent:request-snapshot-debug-payloads-strip` | removes the full request and raw response from request snapshots older than `--olderThanDays` (default 2); resumes from a cursor | optional, nightly, `--maxSeconds` below 360 | yes |
 | `app:ai-agent:loaded-capabilities-compact` | rewrites loaded-capability rows that carry their complete set into checkpoints and change records; resumes from a cursor | optional, nightly, `--maxSeconds` below 360; only once every reader reads the chain format | yes |
 | `app:ai-conversation:repair-zero-embeddings` | re-embeds (or deletes) embeddings that hold the zero vector: messages, compaction nodes, the host's memory tables | optional; no interval in the code | dry run unless `--apply` |
@@ -196,9 +207,8 @@ with the same name.
 | `app:ai-agent:compact` | runs one compaction round of a conversation in the console and prints the tree and the cover; `--show-only` renders only | no | yes, unless `--show-only` (makes model calls) |
 | `app:ai-conversation:search-inspect` | runs the conversation search stage by stage, rights off and on, inside the search envelope | no | no (makes model calls; `--embed` writes embeddings) |
 
-The host still writes the commands that sweep schedule state, deliver owed reports and resume owed turns, and reap
-runs whose worker died ([references/host-duties.md](references/host-duties.md), `templates/`), and its own chat,
-replay and evaluation commands (`ddd-module-agents-observability-specialist`).
+The host still writes its own replay and evaluation commands (`ddd-module-agents-observability-specialist`); for the
+commands above it writes subclasses only where it needs an override point ([references/host-duties.md](references/host-duties.md)).
 
 ## Templates
 
@@ -206,9 +216,6 @@ The folder [templates/](templates/) holds the files a host copies:
 
 | File | For |
 |---|---|
-| `templates/AgentSchedulesStateSweepCommand.php` | sweep schedule state |
-| `templates/AgentOwedWorkRecoveryCommand.php` | deliver owed reports, resume owed turns and lost resumes |
-| `templates/AgentStuckRunsReapCommand.php` | reap runs whose worker died, time out delegation batches |
 | `templates/AgentUsageEnvelopeMiddleware.php`, `templates/AgentConversationOverheadCostsMiddleware.php` | the worker middlewares |
 | `templates/messenger.yaml` | the transport block |
 | `templates/crons.sh` | the cron list: the package's scheduled commands and the three host commands above |

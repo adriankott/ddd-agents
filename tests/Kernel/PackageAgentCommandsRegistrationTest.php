@@ -6,14 +6,21 @@ namespace DDD\Tests\Agents\Kernel;
 
 use DDD\Symfony\Commands\Agents\AgentActivityLinesCommand;
 use DDD\Symfony\Commands\Agents\AgentCacheDiffCommand;
+use DDD\Symfony\Commands\Agents\AgentChatCommand;
+use DDD\Symfony\Commands\Agents\AgentChatTuiCommand;
+use DDD\Symfony\Commands\Agents\AgentCloseSchedulesForInactiveAgentSpacesCommand;
 use DDD\Symfony\Commands\Agents\AgentCompactConversationCommand;
 use DDD\Symfony\Commands\Agents\AgentCompactFinalizedConversationsCommand;
+use DDD\Symfony\Commands\Agents\AgentDeliverOwedReportsAndResumeOwedTurnsCommand;
 use DDD\Symfony\Commands\Agents\AgentDiagnoseResumeCommand;
 use DDD\Symfony\Commands\Agents\AgentExecuteToolCallCommand;
 use DDD\Symfony\Commands\Agents\AgentFireDueSchedulesCommand;
+use DDD\Symfony\Commands\Agents\AgentInspectConversationCommand;
+use DDD\Symfony\Commands\Agents\AgentJevProbeCommand;
 use DDD\Symfony\Commands\Agents\AgentLoadedCapabilitiesCompactCommand;
 use DDD\Symfony\Commands\Agents\AgentMarkFinalizedConversationsCommand;
 use DDD\Symfony\Commands\Agents\AgentModelInputEvictionSimCommand;
+use DDD\Symfony\Commands\Agents\AgentReapStuckConversationsCommand;
 use DDD\Symfony\Commands\Agents\AgentRequestSnapshotDebugPayloadsStripCommand;
 use DDD\Symfony\Commands\Agents\AgentToolResponseStatsCommand;
 use DDD\Symfony\Commands\Agents\AgentTraceEventsPurgeCommand;
@@ -22,8 +29,12 @@ use DDD\Symfony\Commands\Agents\AgentValidateConversationCommand;
 use DDD\Symfony\Commands\Agents\AIConversationBackfillEmbeddingsCommand;
 use DDD\Symfony\Commands\Agents\AIConversationBackfillEnvironmentCommand;
 use DDD\Symfony\Commands\Agents\AIConversationEmbeddingsRepairCommand;
+use DDD\Symfony\Commands\Agents\AIConversationScorecardsCommand;
 use DDD\Symfony\Commands\Agents\AISearchInspectCommand;
 use DDD\Symfony\Commands\Agents\Chat\SlashCommandRegistry;
+use DDD\Symfony\Commands\Agents\ComposedViewNodeSchemaExportCommand;
+use DDD\Symfony\Commands\Agents\MCPClearCacheCommand;
+use DDD\Symfony\Commands\Agents\MCPDocumentationCommand;
 use DDD\Symfony\Commands\Agents\SkillTokenMapCommand;
 use DDD\Tests\Agents\Support\IntegrationTestCase;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
@@ -60,6 +71,17 @@ class PackageAgentCommandsRegistrationTest extends IntegrationTestCase
         'app:ai-agent:turn-events-purge' => AgentTurnEventsPurgeCommand::class,
         'app:ai-agent:validate-conversation' => AgentValidateConversationCommand::class,
         'app:ai-agent:skill-token-map' => SkillTokenMapCommand::class,
+        'app:ai-agent:chat' => AgentChatCommand::class,
+        'app:ai-agent:chat-tui' => AgentChatTuiCommand::class,
+        'app:ai-agent:inspect' => AgentInspectConversationCommand::class,
+        'app:ai-agent:reap' => AgentReapStuckConversationsCommand::class,
+        'app:ai-agent:jev-probe' => AgentJevProbeCommand::class,
+        'app:ai-conversation:deliver-owed-reports-and-resume-owed-turns' => AgentDeliverOwedReportsAndResumeOwedTurnsCommand::class,
+        'app:ai-conversation:scorecards' => AIConversationScorecardsCommand::class,
+        'app:ai-schedule:close-for-inactive-agent-spaces' => AgentCloseSchedulesForInactiveAgentSpacesCommand::class,
+        'app:mcp:documentation' => MCPDocumentationCommand::class,
+        'app:mcp:clear-cache' => MCPClearCacheCommand::class,
+        'app:ai:composed-view:export-node-schema' => ComposedViewNodeSchemaExportCommand::class,
     ];
 
     /** @var string The tool-call child: run by name, never listed */
@@ -103,12 +125,12 @@ class PackageAgentCommandsRegistrationTest extends IntegrationTestCase
 
         $visibleCommandNames = array_keys(self::COMMAND_CLASSES_BY_NAME);
         $visibleCommandNames = array_values(array_diff($visibleCommandNames, [self::HIDDEN_COMMAND_NAME]));
-        self::assertCount(19, $visibleCommandNames);
+        self::assertCount(30, $visibleCommandNames);
         self::assertSame([], array_values(array_diff($visibleCommandNames, $listedCommandNames)), 'every visible command is listed');
         self::assertNotContains(self::HIDDEN_COMMAND_NAME, $listedCommandNames);
         self::assertContains(self::HIDDEN_COMMAND_NAME, $hiddenCommandNames);
         $textListProcess = $this->runConsoleScript('list', '--raw');
-        self::assertSame(19, preg_match_all('/^app:ai-(agent|conversation):\S+/m', $textListProcess->getOutput()), 'the text listing names the 19 visible commands');
+        self::assertSame(30, preg_match_all('/^app:(ai-(agent|conversation|schedule)|mcp|ai:composed-view):\S+/m', $textListProcess->getOutput()), 'the text listing names the 30 visible commands');
 
         $helpProcess = $this->runConsoleScript('help', self::HIDDEN_COMMAND_NAME);
         self::assertSame(0, $helpProcess->getExitCode(), $helpProcess->getErrorOutput());

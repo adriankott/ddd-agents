@@ -22,19 +22,41 @@ class MCPPackage extends ValueObject
     /** @var string|null Description of the MCP Package */
     public static ?string $description = null;
 
-    public static function buildDocumentation(): MCPPackageDocumentation
+    /**
+     * Builds — and caches in Redis — the MCP documentation for this package. `$noCache` bypasses the cached entry,
+     * rebuilds from source and overwrites the cache (invalidation + refresh), as {@see MCPBundle::buildDocumentation()}
+     * does.
+     */
+    public static function buildDocumentation(bool $noCache = false): MCPPackageDocumentation
     {
         $cache = Cache::instance(Cache::CACHE_GROUP_REDIS);
-        $cacheKey = 'mcp.doc.package.' . str_replace('\\', '.', static::class);
+        $cacheKey = static::buildDocumentationCacheKey();
 
-        $cached = $cache->get($cacheKey);
-        if ($cached instanceof MCPPackageDocumentation) {
-            return $cached;
+        if (!$noCache) {
+            $cached = $cache->get($cacheKey);
+            if ($cached instanceof MCPPackageDocumentation) {
+                return $cached;
+            }
         }
 
         $documentation = MCPPackageDocumentation::createFromClassName(static::class);
         $cache->set($cacheKey, $documentation, Cache::CACHE_TTL_ONE_DAY);
 
         return $documentation;
+    }
+
+    /**
+     * Drops the cached documentation of this package. Call after changing a tool signature or a referenced DTO of the
+     * package: the cache key names the class only.
+     */
+    public static function clearDocumentationCache(): void
+    {
+        Cache::instance(Cache::CACHE_GROUP_REDIS)->delete(static::buildDocumentationCacheKey());
+    }
+
+    /** The cache key of this package's documentation: the class name only. */
+    protected static function buildDocumentationCacheKey(): string
+    {
+        return 'mcp.doc.package.' . str_replace('\\', '.', static::class);
     }
 }

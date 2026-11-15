@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.1.0-alpha.42
+
+- The module ships eleven more console commands as bases an application subclasses under the same name: the chat
+  (`app:ai-agent:chat`) and the full-screen chat (`app:ai-agent:chat-tui`, with the suggested `php-tui/php-tui`), the
+  conversation inspector (`app:ai-agent:inspect`), the reaper (`app:ai-agent:reap`), the owed-turn recovery
+  (`app:ai-conversation:deliver-owed-reports-and-resume-owed-turns`), the schedule state sweep
+  (`app:ai-schedule:close-for-inactive-agent-spaces`; an application keeps an old name as an alias with
+  `name: '<package name>|<old name>'`), the decision probe (`app:ai-agent:jev-probe`), the scorecards command
+  (`app:ai-conversation:scorecards`), the MCP documentation and cache commands (`app:mcp:documentation`,
+  `app:mcp:clear-cache`) and the node-schema export (`app:ai:composed-view:export-node-schema`).
+  `MCPPackage::buildDocumentation()` takes `$noCache` like the bundle, and `clearDocumentationCache()` clears one
+  package's documentation; the scorecards service selects conversations (`findConversationIdsForSelection()`).
+- The skill templates of the sweep, owed-work and reaper commands are gone (the package ships the commands); the cron
+  sample names the package commands.
+- Removed: `ComposedViewNodeSchema::SCHEMA_FILE_RELATIVE_PATH` (an application's frontend path; nothing read it). The
+  export command uses `ComposedViewNodeSchemaFilePaths::MODULE_SCHEMA_FILE_RELATIVE_PATH`.
+
 ## 0.1.0-alpha.41
 
 - `update_task_plan` items take `inAnswer` (boolean): an item whose result is text in the answer (a draft, a summary)

@@ -7,7 +7,7 @@ release · 6. Failed turns stay owed · 7. Retry · 8. Recovery: what the host's
 work · 10. Adding a release branch
 
 For the symptom table "a turn that never answers" see `ddd-module-agents-observability-specialist`; the recovery
-commands a host must write, with their templates, are in `ddd-module-agents-specialist` (host duties). This file is the
+commands the package ships and the cron lines a host adds are in `ddd-module-agents-specialist` (host duties). This file is the
 mechanism they call.
 
 ## 1. Run states
@@ -161,9 +161,9 @@ by `rearmRunForRetry()`.
 
 ## 8. Recovery: what the host's passes call
 
-The package ships the finders and the re-drive, and no code that runs them: the passes are console commands of the
-host (the duty and its templates: `ddd-module-agents-specialist`). What follows is a recipe for the host, built only from
-package calls. Each pass impersonates the conversation's account around a dispatch and skips a conversation without
+The package ships the finders, the re-drive and the commands that run them (`app:ai-agent:reap`,
+`app:ai-conversation:deliver-owed-reports-and-resume-owed-turns`; cron lines: `ddd-module-agents-specialist`). What
+follows is what those passes do, built only from package calls. Each pass impersonates the conversation's account around a dispatch and skips a conversation without
 one. Every finder is scoped to the current environment. The owed-report, owed-turn and lost-resume finders also skip
 evaluation runs; the two reaper finders (`findStuckConversationIds()`, `expireStuckConversationsPastMaxAge()`) do not,
 so they revive and expire evaluation runs too.
