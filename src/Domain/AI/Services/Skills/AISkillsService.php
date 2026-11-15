@@ -94,6 +94,64 @@ class AISkillsService extends Service
     }
 
     /**
+     * The catalog name of the skill `$givenSkillName` names: the name itself when it is a skill, else the ONE skill whose
+     * name equals it once the dots and the case of both are ignored (a model wrote a dot too many). Null when no skill or
+     * more than one matches.
+     */
+    public function resolveSkillNameIgnoringDotsAndCase(string $givenSkillName): ?string
+    {
+        $allSkillNames = $this->getAllSkillNames();
+        if (in_array($givenSkillName, $allSkillNames, true)) {
+            return $givenSkillName;
+        }
+        $comparableGivenSkillName = static::buildSkillNameComparableWithoutDotsAndCase($givenSkillName);
+        if ($comparableGivenSkillName === '') {
+            return null;
+        }
+        $matchingSkillNames = [];
+        foreach ($allSkillNames as $skillName) {
+            if (static::buildSkillNameComparableWithoutDotsAndCase((string)$skillName) === $comparableGivenSkillName) {
+                $matchingSkillNames[] = (string)$skillName;
+            }
+        }
+        return count($matchingSkillNames) === 1 ? $matchingSkillNames[0] : null;
+    }
+
+    /**
+     * The names of `$givenSkillNames` that name no skill, not even with their dots and their case ignored
+     * ({@see resolveSkillNameIgnoringDotsAndCase()}).
+     *
+     * @param array<int, mixed> $givenSkillNames
+     * @return string[]
+     */
+    public function findSkillNamesThatAreNoSkill(array $givenSkillNames): array
+    {
+        $skillNamesThatAreNoSkill = [];
+        foreach ($givenSkillNames as $givenSkillName) {
+            if (!is_string($givenSkillName) || $this->resolveSkillNameIgnoringDotsAndCase($givenSkillName) === null) {
+                $skillNamesThatAreNoSkill[] = is_scalar($givenSkillName) ? (string)$givenSkillName : '';
+            }
+        }
+        return $skillNamesThatAreNoSkill;
+    }
+
+    /**
+     * The dotted names of every registered skill ({@see AISkill::getAllSkillNames()}).
+     *
+     * @return string[]
+     */
+    public function getAllSkillNames(): array
+    {
+        return array_values(array_map('strval', AISkill::getAllSkillNames()));
+    }
+
+    /** `$skillName` without its dots and spaces at the ends, in lower case: the form two spellings of a name compare in. */
+    public static function buildSkillNameComparableWithoutDotsAndCase(string $skillName): string
+    {
+        return mb_strtolower(str_replace('.', '', trim($skillName)));
+    }
+
+    /**
      * The resolved skills of a loaded capability set's SKILL names, in load order, an unknown name skipped
      * (the set no longer resolves itself). Remembered on the set, so the carried set shared by several rows is
      * resolved once.

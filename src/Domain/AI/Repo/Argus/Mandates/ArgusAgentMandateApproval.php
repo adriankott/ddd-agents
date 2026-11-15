@@ -94,6 +94,13 @@ class ArgusAgentMandateApproval extends AgentMandateApproval
             'timezone' => $this->getDialogueTimezone()->getName(),
             'requestedActionClass' => $this->requestedActionClass,
             'requestedActionClassDescription' => $this->requestedActionClassDescription,
+        ];
+        // the call the check judges, only when the platform checks one call itself
+        if ($this->requestedToolName !== null) {
+            $approvalCheckPayload['requestedToolName'] = $this->requestedToolName;
+            $approvalCheckPayload['requestedToolSummary'] = $this->requestedToolSummary;
+        }
+        $approvalCheckPayload += [
             'requestedScopeType' => $this->requestedScopeType,
             'requestedValidUntil' => $this->requestedValidUntil !== null ? AgentClock::formatMoment($this->requestedValidUntil, $this->getDialogueTimezone()) : null,
             'requestedValidUntilWeekday' => $this->requestedValidUntil !== null ? AgentClock::formatWeekday($this->requestedValidUntil, $this->getDialogueTimezone()) : null,

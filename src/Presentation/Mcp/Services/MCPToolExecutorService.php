@@ -19,6 +19,7 @@ use DDD\Domain\AI\Entities\Conversations\Messages\RunSettings;
 use DDD\Domain\AI\Services\Conversations\Agent\OwnerConsentsService;
 use DDD\Domain\AI\Entities\MCPPackages\MCPServerProvidedInput;
 use DDD\Domain\AI\Entities\MCPPackages\MCPTool;
+use DDD\Domain\AI\Entities\MCPPackages\MCPToolSummary;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolEntitlement;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolRequiresMandate;
 use DDD\Domain\AI\Entities\MCPPackages\MCPExposedFilterProperties;
@@ -1210,6 +1211,9 @@ class MCPToolExecutorService extends Service
         // the name the ONE_INSTRUCTION binds to: the tool's own, or the key tools of one intent share
         $bindingKey = $mandateAttribute->bindingKeyForTool($toolName);
         $actionClassDescription = AgentMandate::getActionClassDescription($actionClass);
+        // the platform's check of a ONE_INSTRUCTION judges THIS call: the tool's summary says what it does
+        $toolSummaryAttributes = $reflectionMethod->getAttributes(MCPToolSummary::class);
+        $toolSummary = $toolSummaryAttributes !== [] ? $toolSummaryAttributes[0]->newInstance()->summary : null;
         $authAccountId = AuthService::instance()->getAccount()?->id;
         if ($authAccountId === null) {
             return MCPToolResponse::finalRefusal(
@@ -1235,7 +1239,8 @@ class MCPToolExecutorService extends Service
                 $actionClass,
                 (int)$authAccountId,
                 $targetAgentSpace,
-                $serverProvidedInput
+                $serverProvidedInput,
+                $toolSummary
             );
             if ($grantedOrRefused instanceof MCPToolResponse) {
                 return $grantedOrRefused;
@@ -1275,7 +1280,8 @@ class MCPToolExecutorService extends Service
                     $actionClass,
                     (int)$authAccountId,
                     $targetAgentSpace,
-                    $serverProvidedInput
+                    $serverProvidedInput,
+                    $toolSummary
                 );
                 if ($grantedOrRefused instanceof MCPToolResponse) {
                     return $grantedOrRefused;
@@ -1314,6 +1320,7 @@ class MCPToolExecutorService extends Service
      * @param int $accountId
      * @param AgentSpace|null $targetAgentSpace the space the call targets; null = the call works at account level
      * @param AgentToolCallProvenance $agentToolCallProvenance
+     * @param string|null $toolSummary the summary line of the tool (#[MCPToolSummary]); the check judges consent to its call
      * @return AgentMandate|MCPToolResponse
      */
     protected function grantOneInstructionMandateFromTheCurrentRequest(
@@ -1321,7 +1328,8 @@ class MCPToolExecutorService extends Service
         string $actionClass,
         int $accountId,
         ?AgentSpace $targetAgentSpace,
-        AgentToolCallProvenance $agentToolCallProvenance
+        AgentToolCallProvenance $agentToolCallProvenance,
+        ?string $toolSummary = null
     ): AgentMandate|MCPToolResponse {
         $actionClassDescription = AgentMandate::getActionClassDescription($actionClass);
         if (AgentMandate::isStandingGrantNeededForActionClass($actionClass)) {
@@ -1343,7 +1351,14 @@ class MCPToolExecutorService extends Service
             $agentMandateGrantOutcome = $agentMandatesService->grantMandateFromDialogue(
                 $accountId,
                 $targetAgentSpace,
-                AgentMandateGrantArguments::build($actionClass, AgentMandate::SCOPE_ONE_INSTRUCTION, null, null),
+                AgentMandateGrantArguments::build(
+                    $actionClass,
+                    AgentMandate::SCOPE_ONE_INSTRUCTION,
+                    null,
+                    null,
+                    $toolName,
+                    $toolSummary
+                ),
                 $agentToolCallProvenance->conversationMessages,
                 $agentToolCallProvenance->sourceUserMessage,
                 $agentToolCallProvenance->rootConversationId ?? $agentToolCallProvenance->conversationId,

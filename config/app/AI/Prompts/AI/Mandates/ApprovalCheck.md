@@ -6,6 +6,7 @@ You receive a JSON object with:
 - `currentDateTime`: the current date/time — resolve relative durations ("einen Monat", "2 Wochen") against THIS.
 - `timezone`: the time zone of the space the mandate is for. `currentDateTime` and `requestedValidUntil` are given on this clock, with its offset — the same clock the dialogue speaks in. Never convert them.
 - `requestedActionClass` + `requestedActionClassDescription`: WHAT the assistant asks to be mandated for.
+- When requestedToolName is set, judge consent to THAT call: the owner's words must ask for what this tool does (requestedToolSummary), not for the whole action class.
 - `requestedScopeType`: `ONE_INSTRUCTION` (the customer's one current request, however many calls it takes), `TIME_WINDOW` (until `requestedValidUntil`), or `UNLIMITED` (until revoked).
 - `requestedValidUntil`: the window end, only for TIME_WINDOW.
 - `currentWeekday` / `requestedValidUntilWeekday`: the weekday of `currentDateTime` and of `requestedValidUntil` on that clock. Use them for a period the customer names by a weekday or a week ("until Friday", "until the end of next week"); never work out a weekday from a date yourself.

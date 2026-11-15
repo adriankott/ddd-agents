@@ -16,12 +16,17 @@ dispatch) first; prose hints are the second line. What a tool declares to take p
   told instead: the LOADED_SKILLS header lists "Currently loaded" and their tools, and on a turn's first call the tail
   entry `[SIGNAL:skills] Loaded right now: …` names them (`AgentModelInput::loadedSkillsTailHint()`). Asking for a
   sub-skill without its root loads the root with it.
-- **A step that only repeated `load_skills`** for skills already loaded (every call of it `loadSkillsCallLoadedNothing`)
-  is not replayed: its call and result rows leave the wire
-  (`ArgusAIAgentConversation::withoutStepsThatOnlyRepeatedSkillLoads()`; a prose head stays, a mixed step stays, kept
-  under the server-state wire, whose provider holds the call), and the next step's tail says
-  `[SIGNAL:skills] <skill> is loaded — its tools are in your tool list now: call the tool.` The model repeated its own
-  freshest pattern (the call and its "already loaded" result) instead of calling the loaded tool.
+- **A step that only repeated `load_skills`** (every call of it `ToolCall::onlyRepeatedASkillLoad()`: it loaded
+  nothing and named no name that is no skill) is not replayed once a newer such step exists: the older steps' call and
+  result rows leave the wire (`ArgusAIAgentConversation::withoutStepsThatOnlyRepeatedSkillLoads()`; a prose head stays,
+  a mixed step stays, kept under the server-state wire, whose provider holds the call). The NEWEST such step stays: with
+  it gone the model saw nearly the same input again and made the same call. The next step's tail says
+  `[SIGNAL:skills] <skill> is loaded — its tools are in your tool list now: call the tool.`, naming only skills that
+  are loaded.
+- **A skill name that is no skill**: a name that equals ONE catalog name once the dots and the case are ignored loads
+  that skill, and the answer starts `Loaded <name> (you wrote "<given>").`
+  (`AISkillsService::resolveSkillNameIgnoringDotsAndCase()`). A call that still named a name that is no skill is
+  stamped `ToolCall::$loadSkillsCallNamedNoSkill`: its answer says so and stays on the wire.
 
 ## 2. Repeating a read
 

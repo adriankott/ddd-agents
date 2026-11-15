@@ -1140,19 +1140,22 @@ class ArgusAIAgentConversation extends ArgusAIConversation
     }
 
     /**
-     * The rows without the tool calls of a model step that only repeated `load_skills` for skills already loaded
-     * ({@see \DDD\Domain\AI\Entities\Conversations\Messages\ToolCall::$loadSkillsCallLoadedNothing}): a step is its
+     * The rows without the tool calls of the OLDER model steps that only repeated `load_skills`
+     * ({@see \DDD\Domain\AI\Entities\Conversations\Messages\ToolCall::onlyRepeatedASkillLoad()}): a step is its
      * stamped row (the one carrying the step's usage) and the unstamped call rows after it. Its call rows leave the
-     * wire only when EVERY call of the step loaded nothing — removing one call of a mixed step would let the next
-     * call row join the step before it. A prose head of such a step stays. The stored rows are untouched; the
-     * `[SIGNAL:skills]` tail line of the next step says the skills are loaded ({@see AgentModelInput::loadedSkillsTailHint()}).
+     * wire only when EVERY call of the step only repeated a load — removing one call of a mixed step would let the next
+     * call row join the step before it. The NEWEST such step stays: its answer ("Already loaded … call them") is what
+     * the next step must read — without it the model saw nearly the same input again and made the same call. A step
+     * that named a name that is no skill stays too: its answer says so. A prose head of a dropped step stays. The
+     * stored rows are untouched; the `[SIGNAL:skills]` tail line of the next step says the skills are loaded
+     * ({@see AgentModelInput::loadedSkillsTailHint()}).
      *
      * @param AIConversationMessage[] $messages
      * @return AIConversationMessage[]
      */
     public static function withoutStepsThatOnlyRepeatedSkillLoads(array $messages): array
     {
-        $droppedPositions = [];
+        $stepsOfOnlyRepeatedLoads = [];
         $count = count($messages);
         for ($i = 0; $i < $count; $i++) {
             if (($messages[$i]->inputTokens ?? 0) <= 0) {
@@ -1173,16 +1176,22 @@ class ArgusAIAgentConversation extends ArgusAIConversation
             }
             foreach ($stepCallPositions as $stepCallPosition) {
                 $stepToolCall = isset($messages[$stepCallPosition]->toolCall) ? $messages[$stepCallPosition]->toolCall : null;
-                if ($stepToolCall === null || ($stepToolCall->name ?? null) !== LoadSkillsTool::NAME || !$stepToolCall->loadSkillsCallLoadedNothing) {
+                if ($stepToolCall === null || !$stepToolCall->onlyRepeatedASkillLoad()) {
                     continue 2;
                 }
             }
+            $stepsOfOnlyRepeatedLoads[] = $stepCallPositions;
+        }
+        // the newest such step stays on the wire
+        array_pop($stepsOfOnlyRepeatedLoads);
+        if ($stepsOfOnlyRepeatedLoads === []) {
+            return $messages;
+        }
+        $droppedPositions = [];
+        foreach ($stepsOfOnlyRepeatedLoads as $stepCallPositions) {
             foreach ($stepCallPositions as $stepCallPosition) {
                 $droppedPositions[$stepCallPosition] = true;
             }
-        }
-        if ($droppedPositions === []) {
-            return $messages;
         }
         return array_values(array_filter($messages, static fn (int $position): bool => !isset($droppedPositions[$position]), ARRAY_FILTER_USE_KEY));
     }

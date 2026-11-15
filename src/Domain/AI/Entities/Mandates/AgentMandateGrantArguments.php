@@ -9,7 +9,8 @@ use DDD\Infrastructure\Base\DateTime\DateTime;
 
 /**
  * What a mandate grant asks for ({@see \DDD\Domain\AI\Services\Mandates\AgentMandatesService::grantMandateFromDialogue()}):
- * the action class, the scope, the end of a time window and the customer's constraint. The dialogue the grant is
+ * the action class, the scope, the end of a time window, the customer's constraint and, for the platform's own check of
+ * one call, the tool of that call. The dialogue the grant is
  * verified against is never part of it — the service reads it from the conversation itself.
  *
  * @phpstan-consistent-constructor
@@ -28,13 +29,27 @@ class AgentMandateGrantArguments extends ValueObject
     /** The customer's constraint as the model passed it; the stored one is the approval check's. */
     public ?string $constraintsNote = null;
 
-    public static function build(string $actionClass, string $scopeType, ?DateTime $validUntil, ?string $constraintsNote): static
-    {
+    /** The tool whose call the grant is checked for (a ONE_INSTRUCTION the platform checks itself); null = the class. */
+    public ?string $requestedToolName = null;
+
+    /** The summary line of {@see $requestedToolName} (its #[MCPToolSummary]); null when it has none. */
+    public ?string $requestedToolSummary = null;
+
+    public static function build(
+        string $actionClass,
+        string $scopeType,
+        ?DateTime $validUntil,
+        ?string $constraintsNote,
+        ?string $requestedToolName = null,
+        ?string $requestedToolSummary = null
+    ): static {
         $agentMandateGrantArguments = new static();
         $agentMandateGrantArguments->actionClass = $actionClass;
         $agentMandateGrantArguments->scopeType = $scopeType;
         $agentMandateGrantArguments->validUntil = $validUntil;
         $agentMandateGrantArguments->constraintsNote = $constraintsNote;
+        $agentMandateGrantArguments->requestedToolName = $requestedToolName;
+        $agentMandateGrantArguments->requestedToolSummary = $requestedToolSummary;
         return $agentMandateGrantArguments;
     }
 }

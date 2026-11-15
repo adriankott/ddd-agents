@@ -235,7 +235,14 @@ class AgentStallRecoveryService extends Service
             : '';
         $whatWentWrong = $emittedNoText
             ? 'But this turn you produced NO output at all — neither a tool call nor an answer.'
-            : 'But this turn you loaded ' . $skillsPhrase . ' and then answered in prose WITHOUT using any of its tools.';
+            : 'But this turn you loaded ' . $skillsPhrase . ' and then answered in prose without using any of its tools.';
+        // after a prose answer: a loaded skill may itself say the request takes no tool — then the prose was right
+        $nextMoveSentence = $emittedNoText
+            ? ' Call the tool you need to complete the task — or, ONLY if you already have enough information, give'
+                . ' your final answer now.'
+            : ' When the loaded skill itself says this request takes no tool (a preference it says is captured'
+                . ' automatically, a question its own text answers), answer in prose again — that was right. Otherwise'
+                . ' call the tool you need.';
 
         // Name what load_tool can really load right now — the unloaded tools of the loaded skills and the tools of
         // their not-yet-loaded sub-skills; nothing is said about load_tool while it has nothing to offer.
@@ -267,9 +274,8 @@ class AgentStallRecoveryService extends Service
         }
 
         return 'You have the skill(s) ' . $skillsPhrase . ' loaded. ' . $directToolsSentence
-            . $loadableToolsSentence . $whatWentWrong
-            . ' Call the tool you need to complete the task — or, ONLY if you already have enough information, give'
-            . ' your final answer now. EXCEPTION: an IRREVERSIBLE action the owner has not agreed to in their own'
+            . $loadableToolsSentence . $whatWentWrong . $nextMoveSentence
+            . ' EXCEPTION: an IRREVERSIBLE action the owner has not agreed to in their own'
             . ' words — there, asking the owner that question in plain words IS the required output; ask it and wait,'
             . ' and never let this reminder push you into a destructive call without the owner\'s agreement.' . $countTail;
     }

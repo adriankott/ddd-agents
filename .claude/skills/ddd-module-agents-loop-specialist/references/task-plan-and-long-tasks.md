@@ -179,7 +179,8 @@ turn (or a turn a work signal started), items still owed once the candidate text
 (`TaskPlanItems::hasOwedOpenItemsAfterCandidateTextEvidence()`), and a text that hands nothing to the owner → the text is
 discarded and bounced with `SIGNAL_SOURCE_TASK_PLAN_OPEN_BOUNCE`, at most `MAX_BOUNCES_PER_CHUNK` per chunk. The bounce
 is ONE text (`AgentCheckedStopPolicy::buildCheckedStopBounceText()`): the owed items by key, split into the ones the
-model ticks and the ones the record closes; it names the owner's stop too (stop, wait or not now: no item is worked,
+model ticks, the ones the record closes and the ones whose result is text in the answer (`inAnswer`: write that text
+now, never tick them — `TaskPlanItems::getOwedOpenAnswerTextItemTitleLines()`); it names the owner's stop too (stop, wait or not now: no item is worked,
 the answer is repeated and names what stays open), as the tick rules do. A plan-less turn is never bounced, nor is the opener of a kickoff the owner
 has not answered yet (`AIConversationMessages::isKickoffBeforeTheOwnerSpoke()`). The site and its other bounces: [stall-and-final-text](stall-and-final-text.md).
 

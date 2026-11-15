@@ -1170,7 +1170,8 @@ class AgentModelInput extends ValueObject
         if ($loadedSkillNames === []) {
             return null;
         }
-        $repeatedSkillNames = $this->findSkillNamesOfNewestStepThatOnlyRepeatedSkillLoads();
+        // only a skill that IS loaded is named loaded
+        $repeatedSkillNames = array_values(array_intersect($this->findSkillNamesOfNewestStepThatOnlyRepeatedSkillLoads(), $loadedSkillNames));
         if ($repeatedSkillNames !== []) {
             $repeatedSkillToolNames = [];
             foreach ($this->loadedAISkills?->getElements() ?? [] as $loadedAISkill) {
@@ -1203,10 +1204,11 @@ class AgentModelInput extends ValueObject
     }
 
     /**
-     * The skills the newest model step asked for when that step only repeated `load_skills` for skills already loaded
-     * (every call of the step loaded nothing) — such a step is left off the wire
+     * The skills the newest model step asked for when that step only repeated `load_skills`
+     * ({@see \DDD\Domain\AI\Entities\Conversations\Messages\ToolCall::onlyRepeatedASkillLoad()} for every call of the
+     * step) — the older such steps leave the wire
      * ({@see \DDD\Domain\AI\Repo\Argus\Conversations\ArgusAIAgentConversation::withoutStepsThatOnlyRepeatedSkillLoads()}), and
-     * the tail says once that the skills are loaded. Empty otherwise.
+     * the tail says once that the loaded ones of them are loaded. Empty otherwise.
      *
      * @return string[]
      */
@@ -1219,7 +1221,7 @@ class AgentModelInput extends ValueObject
             if (($candidate->messageType ?? null) !== AIConversationMessage::MESSAGE_TOOL_CALL || $toolCall === null) {
                 return [];
             }
-            if (($toolCall->name ?? null) !== LoadSkillsTool::NAME || !$toolCall->loadSkillsCallLoadedNothing) {
+            if (!$toolCall->onlyRepeatedASkillLoad()) {
                 return [];
             }
             foreach ((array)($toolCall->arguments['skill_names'] ?? []) as $skillName) {

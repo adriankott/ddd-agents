@@ -767,18 +767,21 @@ class TaskPlanItems extends ObjectSet
      * The OWED open leaves (the membership of {@see getOpenItemPathTexts()}: an awaiting offer is no remaining work) as
      * `<key> '<title>'` lines, the title as the plan line shows it ({@see TaskPlanItem::buildPlanLineTitle()}) — the
      * open-work lists of the checked-stop rejection: `$closedByTheRecord` false = the items the model ticks, true = the
-     * items the record closes (the model does their work). A key that names more than one item is left out: it addresses
+     * items the record closes (the model does their work). `$includesAnswerTextItems` false leaves out the items whose
+     * result is text in the answer ({@see TaskPlanItem::isResultTextInTheAnswer()}; listed by
+     * {@see getOwedOpenAnswerTextItemTitleLines()}). A key that names more than one item is left out: it addresses
      * nothing.
      *
      * @return string[]
      */
-    public function getOwedOpenItemTitleLines(bool $closedByTheRecord): array
+    public function getOwedOpenItemTitleLines(bool $closedByTheRecord, bool $includesAnswerTextItems = true): array
     {
         $taskPlanItemAddresses = $this->buildItemAddresses();
         $owedOpenItemTitleLines = [];
         foreach ($taskPlanItemAddresses->getLeaves() as $taskPlanItemAddress) {
             if (!$taskPlanItemAddress->item->isOwedOpen() || $taskPlanItemAddress->hasNotOwedAncestor
                 || $taskPlanItemAddress->item->isOpenAndClosedByTheRecord() !== $closedByTheRecord
+                || (!$includesAnswerTextItems && $taskPlanItemAddress->item->isResultTextInTheAnswer())
                 || count($taskPlanItemAddresses->getAllByKey($taskPlanItemAddress->key)) !== 1
             ) {
                 continue;
@@ -786,6 +789,29 @@ class TaskPlanItems extends ObjectSet
             $owedOpenItemTitleLines[] = $taskPlanItemAddress->key . " '" . $taskPlanItemAddress->item->buildPlanLineTitle() . "'";
         }
         return $owedOpenItemTitleLines;
+    }
+
+    /**
+     * The OWED open leaves whose result is text in the answer ({@see TaskPlanItem::isResultTextInTheAnswer()}) as
+     * `<key> '<title>'` lines — the platform closes them from the answer; the checked stop asks for that text, never for a
+     * tick. A key that names more than one item is left out: it addresses nothing.
+     *
+     * @return string[]
+     */
+    public function getOwedOpenAnswerTextItemTitleLines(): array
+    {
+        $taskPlanItemAddresses = $this->buildItemAddresses();
+        $owedOpenAnswerTextItemTitleLines = [];
+        foreach ($taskPlanItemAddresses->getLeaves() as $taskPlanItemAddress) {
+            if (!$taskPlanItemAddress->item->isOwedOpen() || $taskPlanItemAddress->hasNotOwedAncestor
+                || !$taskPlanItemAddress->item->isResultTextInTheAnswer()
+                || count($taskPlanItemAddresses->getAllByKey($taskPlanItemAddress->key)) !== 1
+            ) {
+                continue;
+            }
+            $owedOpenAnswerTextItemTitleLines[] = $taskPlanItemAddress->key . " '" . $taskPlanItemAddress->item->buildPlanLineTitle() . "'";
+        }
+        return $owedOpenAnswerTextItemTitleLines;
     }
 
     /**

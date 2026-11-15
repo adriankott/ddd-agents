@@ -133,6 +133,9 @@ loop must ask `findActiveMandateFor()` itself.
    The payload gives `currentDateTime` / `requestedValidUntil` on the space's clock plus their weekdays
    (`currentWeekday`, `requestedValidUntilWeekday`, `AgentClock::formatWeekday()`): a period named by a weekday or a
    week is judged from them, and a period with two honest readings is approved when the window matches one.
+   The platform's own ONE_INSTRUCTION check of a refused call (`MCPToolExecutorService::refuseActionLackingMandate()`)
+   adds `requestedToolName` and `requestedToolSummary` (the tool's `#[MCPToolSummary]`): the check judges consent to
+   THAT call, not to the whole action class. A grant the model asks for carries neither.
 4. Approved: the ACTIVE row with the excerpt, then `supersedeCoveredMandates()` (same class, covered space). An
    account-wide grant replaces the class's mandates of every space; a grant for one space never narrows an account-wide
    mandate to that space (`AgentMandate::isSupersededBy()`) — narrowing is left to an explicit revoke.

@@ -65,7 +65,8 @@ class AgentCheckedStopPolicy extends ValueObject
      * The ONE checked-stop bounce text: the open items by key and plan-line title, split the way the
      * plan line splits them — the items the model ticks (finish and tick `done` with a `statusNote`, or mark them
      * `blocked` / `not_applicable` with a concrete `statusNote`) and the items the record closes (do their work; never
-     * tick them done) — or end on the one question an item needs; when the owner ordered a stop (stop, wait, not now),
+     * tick them done), and the items whose result is text in the answer (write that text now; never tick them) — or end
+     * on the one question an item needs; when the owner ordered a stop (stop, wait, not now),
      * no item is worked and the final answer repeats what was said and names the items that stay open; otherwise the final
      * answer reports the result of every item. The next answer is accepted as it is
      * ({@see MAX_BOUNCES_PER_CHUNK}). A turn that reads the sub-agents' results is told to tick from them, never to re-run a
@@ -74,8 +75,10 @@ class AgentCheckedStopPolicy extends ValueObject
      */
     public static function buildCheckedStopBounceText(TaskPlan $taskPlan, bool $isFoldTurn = false): string
     {
-        $modelTickedItemLines = $taskPlan->items?->getOwedOpenItemTitleLines(false) ?? [];
-        $recordClosedItemLines = $taskPlan->items?->getOwedOpenItemTitleLines(true) ?? [];
+        // an answer-text item is never ticked: it is named in its own group
+        $modelTickedItemLines = $taskPlan->items?->getOwedOpenItemTitleLines(false, false) ?? [];
+        $recordClosedItemLines = $taskPlan->items?->getOwedOpenItemTitleLines(true, false) ?? [];
+        $answerTextItemLines = $taskPlan->items?->getOwedOpenAnswerTextItemTitleLines() ?? [];
         $foldPrefix = $isFoldTurn
             ? 'Your sub-agents\' results are above (their notifications, or the `delegate` tool result of an earlier delegation) — tick the item(s) they completed via set_task_status '
                 . 'with the verdict as the statusNote (do NOT re-run any tool a sub-agent already ran, do NOT call check_delegations), '
@@ -95,12 +98,19 @@ class AgentCheckedStopPolicy extends ValueObject
             $bounceText .= ' Items that close themselves from the record: ' . implode('; ', $recordClosedItemLines)
                 . ' — do their work now (the call, the widget or the answer the item names); never tick them done.';
         }
+        if ($answerTextItemLines !== []) {
+            $bounceText .= ' Items whose result is text in your answer: ' . implode('; ', $answerTextItemLines)
+                . '. Write that text in the answer you give now — the platform closes them from it; never tick them.';
+        }
         return $bounceText . ' An item only the owner\'s reply can resolve: resolve every other item first, then end with the ONE question that unblocks it. '
             . 'When the owner asked you to stop after a part and check back with them: report that part and end with that ONE question — the items after it stay open. '
             . 'When the owner said stop, wait or not now: work no item — your final answer repeats what you said and names the items that stay open. '
             . 'Otherwise give your final answer. The owner never saw the discarded answer: write its content again in full — '
             . 'the results themselves (the list, the figures, the drafts), not a line saying that they exist — and report the '
-            . 'result of every item; this answer is accepted as it is.';
+            . 'result of every item' . ($answerTextItemLines !== []
+                ? '. This answer is accepted as it is: an item whose result is text in your answer closes only when that'
+                    . ' text stands in it — when it is missing, the item stays open and the owner has not received it.'
+                : '; this answer is accepted as it is.');
     }
 
     /**

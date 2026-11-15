@@ -32,6 +32,7 @@ use DDD\Domain\AI\Entities\Conversations\Usage\AIUsageBookedCostsStoredForm;
 use DDD\Domain\Base\Entities\ValueObject;
 use DDD\Infrastructure\Traits\Serializer\Attributes\HideProperty;
 use DDD\Domain\AI\Entities\Conversations\Agent\Tools\AskOwnerTool;
+use DDD\Domain\AI\Entities\Conversations\Agent\Tools\LoadSkillsTool;
 
 /**
  * One tool invocation recorded on a {@see AIConversationMessage} (MESSAGE_TOOL_CALL): which tool was called with
@@ -499,6 +500,14 @@ class ToolCall extends ValueObject
      *           and for a row stored before the flag existed.
      */
     public bool $loadSkillsCallLoadedNothing = false;
+
+    /**
+     * @var bool True when a `load_skills` call named a name that is no skill, not even with its dots and its case
+     *           ignored ({@see \DDD\Domain\AI\Services\Skills\AISkillsService::findSkillNamesThatAreNoSkill()}): its
+     *           answer says so, and the step stays on the model's wire — it is no repeated load. False for every other
+     *           call and for a row stored before the flag existed.
+     */
+    public bool $loadSkillsCallNamedNoSkill = false;
 
     /**
      * @var ToolCallImageReference[] The PERSISTED, bytes-free pointers to the images this call's result carried.
@@ -1314,5 +1323,14 @@ class ToolCall extends ValueObject
         // a read changes the record only through a widget it wrote (a snapshot, a match to confirm) — measured on
         // the tool-emitted rows, not on the newest index: in a parallel step the sibling call rows are newer too
         return $callWroteARowIntoTheTranscript;
+    }
+
+    /**
+     * Whether this call is a `load_skills` call that only repeated a load: it loaded nothing
+     * ({@see $loadSkillsCallLoadedNothing}) and named no name that is no skill ({@see $loadSkillsCallNamedNoSkill}).
+     */
+    public function onlyRepeatedASkillLoad(): bool
+    {
+        return ($this->name ?? null) === LoadSkillsTool::NAME && $this->loadSkillsCallLoadedNothing && !$this->loadSkillsCallNamedNoSkill;
     }
 }

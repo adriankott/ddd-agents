@@ -272,6 +272,9 @@ class AgentToolCallDispatchService extends Service
                     // a `load_skills` call that changed no loaded capability is no skill load for the stall check
                     $toolCall->loadSkillsCallLoadedNothing = !$agentToolCallWorkRequest->loadsTools()
                         && $capabilityNamesBeforeTheLoad === $this->buildLoadedCapabilityNamesOfCallAndNewestMessage($conversation, $callMessage);
+                    // a call that named a name that is no skill is no repeated load: its answer says so and stays on the wire
+                    $toolCall->loadSkillsCallNamedNoSkill = !$agentToolCallWorkRequest->loadsTools()
+                        && $this->findSkillNamesOfCallThatAreNoSkill($agentToolCallWorkRequest->toolArguments) !== [];
                 }
             } elseif ($toolName === AskOwnerTool::NAME) {
                 $metaToolCallAnswer = AskOwnerTool::answerCall($arguments, $conversation);
@@ -649,6 +652,20 @@ class AgentToolCallDispatchService extends Service
     }
 
     /**
+     * The names a `load_skills` call's `skill_names` gave that are no skill, not even with their dots and their case
+     * ignored ({@see AISkillsService::findSkillNamesThatAreNoSkill()}).
+     *
+     * @param array<array-key, mixed> $toolArguments
+     * @return string[]
+     */
+    protected function findSkillNamesOfCallThatAreNoSkill(array $toolArguments): array
+    {
+        /** @var AISkillsService $aiSkillsService */
+        $aiSkillsService = DDDService::instance()->getService(AISkillsService::class);
+        return $aiSkillsService->findSkillNamesThatAreNoSkill(is_array($toolArguments['skill_names'] ?? null) ? array_values($toolArguments['skill_names']) : []);
+    }
+
+    /**
      * A `load_skills` request through every gate of the load path — entitlement, account rights, vision, purpose and
      * initiator binding, the purpose rail, the sub-skill gate ({@see AISkillLoadRefusals}) — then the load itself.
      * Answers the tool result (what was loaded and, for every refused name, why and what to do instead) and the names
@@ -662,6 +679,21 @@ class AgentToolCallDispatchService extends Service
         $aiSkillsService = DDDService::instance()->getService(AISkillsService::class);
         $requestedSkillNames = is_array($toolArguments['skill_names'] ?? null) ? $toolArguments['skill_names'] : [];
         $loadedSkillNames = $callMessage->getLoadedCapabilities()?->getLoadedSkillNames() ?? [];
+        // a name that differs from ONE skill only in its dots or its case loads that skill, and the answer says so
+        $givenSkillNamesByCorrectedSkillName = [];
+        foreach ($requestedSkillNames as $requestedSkillNamePosition => $requestedSkillName) {
+            if (!is_string($requestedSkillName)) {
+                continue;
+            }
+            $correctedSkillName = $aiSkillsService->resolveSkillNameIgnoringDotsAndCase($requestedSkillName);
+            if ($correctedSkillName !== null && $correctedSkillName !== $requestedSkillName) {
+                $requestedSkillNames[$requestedSkillNamePosition] = $correctedSkillName;
+                $givenSkillNamesByCorrectedSkillName[$correctedSkillName] = $requestedSkillName;
+            }
+        }
+        if ($givenSkillNamesByCorrectedSkillName !== []) {
+            $toolArguments['skill_names'] = $requestedSkillNames;
+        }
         // under append-only loading the enum offers every sub-skill — a sub-skill asked for without its root
         // loads the root with it in the same call (structural, no refusal)
         if ($conversation->usesConversationAppend()) {
@@ -680,8 +712,14 @@ class AgentToolCallDispatchService extends Service
         $aISkillLoadRefusals = AISkillLoadRefusals::buildFor($requestedAISkills, $conversation->buildAISkillOfferRestrictions($agentRun));
         $toolArguments['skill_names'] = $aISkillLoadRefusals->loadableSkillNames;
         $refusalSentences = $aISkillLoadRefusals->renderCorrectiveSentences();
+        $correctedSkillNameSentences = '';
+        foreach ($givenSkillNamesByCorrectedSkillName as $correctedSkillName => $givenSkillName) {
+            if (in_array($correctedSkillName, $aISkillLoadRefusals->loadableSkillNames, true) && !in_array($correctedSkillName, $loadedSkillNames, true)) {
+                $correctedSkillNameSentences .= 'Loaded ' . $correctedSkillName . ' (you wrote "' . $givenSkillName . '"). ';
+            }
+        }
         return AgentSkillLoadOutcome::afterTheGates(
-            $callMessage->loadSkillsFromToolArguments($toolArguments, $conversation->findBlockedToolNamesOfConversationTree($agentRun)) . $refusalSentences,
+            $correctedSkillNameSentences . $callMessage->loadSkillsFromToolArguments($toolArguments, $conversation->findBlockedToolNamesOfConversationTree($agentRun)) . $refusalSentences,
             $aISkillLoadRefusals->loadableSkillNames,
             $refusalSentences
         );

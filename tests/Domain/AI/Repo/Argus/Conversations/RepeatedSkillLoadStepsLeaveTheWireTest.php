@@ -14,31 +14,56 @@ use DDD\Domain\AI\Repo\Argus\Conversations\ArgusAIAgentConversation;
 use DDD\Tests\Agents\Support\UnitTestCase;
 
 /**
- * A model step that only repeated `load_skills` for skills already loaded is not replayed to the model — the model
- * repeated its own freshest pattern instead of calling the loaded tool. The step leaves the wire only when every call
- * of it loaded nothing; the next step's tail says once that the skills are loaded.
+ * An older model step that only repeated `load_skills` is not replayed to the model — the model repeated its own
+ * freshest pattern instead of calling the loaded tool. The step leaves the wire only when every call of it loaded
+ * nothing; the NEWEST such step stays (its answer is what the next step must read), and a step that named a name that is
+ * no skill stays too. The next step's tail says once that the skills are loaded — only the ones that are.
  */
 class RepeatedSkillLoadStepsLeaveTheWireTest extends UnitTestCase
 {
-    public function testAStepOfOnlyRepeatedSkillLoadsLeavesTheWireAndAMixedStepStays(): void
+    public function testAnOlderStepOfOnlyRepeatedSkillLoadsLeavesTheWireTheNewestAndAMixedStepStay(): void
     {
         $ownerMessage = $this->textRow(AIConversationMessage::ROLE_USER, 'show me my reviews', 0);
         $firstLoad = $this->callRow(LoadSkillsTool::NAME, ['skill_names' => ['Reviews']], 100, false);
-        $repeatedLoad = $this->callRow(LoadSkillsTool::NAME, ['skill_names' => ['Reviews']], 120, true);
+        $olderRepeatedLoad = $this->callRow(LoadSkillsTool::NAME, ['skill_names' => ['Reviews']], 120, true);
         $mixedStepLoad = $this->callRow(LoadSkillsTool::NAME, ['skill_names' => ['Reviews']], 130, true);
         $mixedStepRead = $this->callRow('getReviews', [], 0, false);
+        $newestRepeatedLoad = $this->callRow(LoadSkillsTool::NAME, ['skill_names' => ['Reviews']], 140, true);
 
-        $wireRows = ArgusAIAgentConversation::withoutStepsThatOnlyRepeatedSkillLoads([$ownerMessage, $firstLoad, $repeatedLoad, $mixedStepLoad, $mixedStepRead]);
+        $wireRows = ArgusAIAgentConversation::withoutStepsThatOnlyRepeatedSkillLoads([$ownerMessage, $firstLoad, $olderRepeatedLoad, $mixedStepLoad, $mixedStepRead, $newestRepeatedLoad]);
 
-        self::assertSame([$ownerMessage, $firstLoad, $mixedStepLoad, $mixedStepRead], $wireRows);
+        self::assertSame([$ownerMessage, $firstLoad, $mixedStepLoad, $mixedStepRead, $newestRepeatedLoad], $wireRows);
     }
 
-    public function testAProseHeadOfSuchAStepStays(): void
+    public function testTheOnlyStepOfRepeatedSkillLoadsStays(): void
+    {
+        $ownerMessage = $this->textRow(AIConversationMessage::ROLE_USER, 'show me my reviews', 0);
+        $repeatedLoad = $this->callRow(LoadSkillsTool::NAME, ['skill_names' => ['Reviews']], 120, true);
+
+        self::assertSame([$ownerMessage, $repeatedLoad], ArgusAIAgentConversation::withoutStepsThatOnlyRepeatedSkillLoads([$ownerMessage, $repeatedLoad]));
+    }
+
+    public function testAProseHeadOfADroppedStepStays(): void
     {
         $proseHead = $this->textRow(AIConversationMessage::ROLE_ASSISTANT, 'Loading the reviews skill.', 90);
-        $repeatedLoad = $this->callRow(LoadSkillsTool::NAME, ['skill_names' => ['Reviews']], 0, true);
+        $olderRepeatedLoad = $this->callRow(LoadSkillsTool::NAME, ['skill_names' => ['Reviews']], 0, true);
+        $newestRepeatedLoad = $this->callRow(LoadSkillsTool::NAME, ['skill_names' => ['Reviews']], 110, true);
 
-        self::assertSame([$proseHead], ArgusAIAgentConversation::withoutStepsThatOnlyRepeatedSkillLoads([$proseHead, $repeatedLoad]));
+        self::assertSame([$proseHead, $newestRepeatedLoad], ArgusAIAgentConversation::withoutStepsThatOnlyRepeatedSkillLoads([$proseHead, $olderRepeatedLoad, $newestRepeatedLoad]));
+    }
+
+    public function testAStepThatNamedANameThatIsNoSkillStays(): void
+    {
+        $unknownNameLoad = $this->callRow(LoadSkillsTool::NAME, ['skill_names' => ['Posts.Seri.es.Propose']], 100, true, true);
+        $olderRepeatedLoad = $this->callRow(LoadSkillsTool::NAME, ['skill_names' => ['Reviews']], 110, true);
+        $newestRepeatedLoad = $this->callRow(LoadSkillsTool::NAME, ['skill_names' => ['Reviews']], 120, true);
+
+        self::assertSame(
+            [$unknownNameLoad, $newestRepeatedLoad],
+            ArgusAIAgentConversation::withoutStepsThatOnlyRepeatedSkillLoads([$unknownNameLoad, $olderRepeatedLoad, $newestRepeatedLoad])
+        );
+        self::assertFalse($unknownNameLoad->toolCall->onlyRepeatedASkillLoad());
+        self::assertTrue($newestRepeatedLoad->toolCall->onlyRepeatedASkillLoad());
     }
 
     public function testTheNextStepsTailSaysTheSkillIsLoaded(): void
@@ -54,6 +79,32 @@ class RepeatedSkillLoadStepsLeaveTheWireTest extends UnitTestCase
         self::assertSame('[SIGNAL:skills] Reviews is loaded — its tools are in your tool list now: call the one you need.', $agentModelInput->loadedSkillsTailHint(), 'no loaded skill object here: no tool names');
     }
 
+    public function testTheTailNamesOnlyTheSkillsThatAreLoaded(): void
+    {
+        $agentModelInput = new AgentModelInput();
+        $agentModelInput->loadedCapabilities = LoadedCapabilities::fromCanonicalEntries(['Reviews' => ['name' => 'Reviews', 'type' => LoadedCapability::TYPE_SKILL]]);
+        $agentModelInput->messages = [
+            $this->textRow(AIConversationMessage::ROLE_USER, 'show me my reviews', 0),
+            $this->callRow('getReviews', [], 100, false),
+            $this->callRow(LoadSkillsTool::NAME, ['skill_names' => ['Reviews', 'Ratings']], 120, true),
+        ];
+
+        self::assertSame('[SIGNAL:skills] Reviews is loaded — its tools are in your tool list now: call the one you need.', $agentModelInput->loadedSkillsTailHint());
+    }
+
+    public function testNoTailLineNamesASkillThatIsNotLoaded(): void
+    {
+        $agentModelInput = new AgentModelInput();
+        $agentModelInput->loadedCapabilities = LoadedCapabilities::fromCanonicalEntries(['Reviews' => ['name' => 'Reviews', 'type' => LoadedCapability::TYPE_SKILL]]);
+        $agentModelInput->messages = [
+            $this->textRow(AIConversationMessage::ROLE_USER, 'show me my reviews', 0),
+            $this->callRow('getReviews', [], 100, false),
+            $this->callRow(LoadSkillsTool::NAME, ['skill_names' => ['Posts.Seri.es']], 120, true, true),
+        ];
+
+        self::assertNull($agentModelInput->loadedSkillsTailHint());
+    }
+
     protected function textRow(string $role, string $text, int $inputTokens): AIConversationMessage
     {
         /** @var AIConversationMessage $message */
@@ -67,7 +118,7 @@ class RepeatedSkillLoadStepsLeaveTheWireTest extends UnitTestCase
     }
 
     /** @param array<string, mixed> $arguments */
-    protected function callRow(string $toolName, array $arguments, int $inputTokens, bool $loadedNothing): AIConversationMessage
+    protected function callRow(string $toolName, array $arguments, int $inputTokens, bool $loadedNothing, bool $namedNoSkill = false): AIConversationMessage
     {
         /** @var AIConversationMessage $message */
         $message = self::instantiateWithoutConstructor(AIConversationMessage::class);
@@ -80,6 +131,7 @@ class RepeatedSkillLoadStepsLeaveTheWireTest extends UnitTestCase
         $toolCall->arguments = $arguments;
         $toolCall->status = AIConversationMessage::STATUS_COMPLETED;
         $toolCall->loadSkillsCallLoadedNothing = $loadedNothing;
+        $toolCall->loadSkillsCallNamedNoSkill = $namedNoSkill;
         $message->toolCall = $toolCall;
         return $message;
     }

@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.1.0-alpha.50
+
+- A model step that only repeated `load_skills` leaves the wire only when a newer such step exists: the NEWEST one
+  stays, so the next step reads its answer ("Already loaded … call them"); with it removed the model saw nearly the
+  same input and made the same call again.
+- A `load_skills` name that is no skill: when it equals ONE catalog name once its dots and its case are ignored, that
+  skill loads and the answer starts `Loaded <name> (you wrote "<given>").`; a call that still named a name that is no
+  skill (`ToolCall::$loadSkillsCallNamedNoSkill`) is no repeated load and stays on the wire, and the `[SIGNAL:skills]`
+  tail line names only skills that are loaded.
+- The stall text after a prose answer that followed a skill load: when the loaded skill itself says the request takes
+  no tool, the prose answer was right; otherwise call the tool. The text after an empty step is unchanged.
+- The checked-stop bounce names the items whose result is text in the answer in their own group ("Write that text in
+  the answer you give now — the platform closes them from it; never tick them.") and no longer under "Items you tick"
+  (`TaskPlanItems::getOwedOpenAnswerTextItemTitleLines()`, `getOwedOpenItemTitleLines(..., $includesAnswerTextItems)`); its closing
+  sentence then says the answer is accepted and such an item stays open when its text is missing.
+- The platform's ONE_INSTRUCTION consent check of a refused call names the call: `requestedToolName` and
+  `requestedToolSummary` in the payload, and the approval prompt judges consent to THAT call. An application with its
+  own copy of `AI/Mandates/ApprovalCheck.md` adds the line.
+
 ## 0.1.0-alpha.49
 
 - The judged run of an eval case moves into the package: `AgentEvalJudgedRunService` (extends

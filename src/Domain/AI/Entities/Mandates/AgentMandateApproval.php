@@ -47,6 +47,12 @@ class AgentMandateApproval extends ValueObject
     /** @var string|null Plain-language description of what the action class covers — so the check judges the right scope. */
     public ?string $requestedActionClassDescription = null;
 
+    /** @var string|null The tool whose call the check judges consent to (a ONE_INSTRUCTION the platform checks itself); null = the class. */
+    public ?string $requestedToolName = null;
+
+    /** @var string|null The summary line of {@see $requestedToolName}: what the tool does. */
+    public ?string $requestedToolSummary = null;
+
     /** @var string|null The requested SCOPE_* type (ONE_INSTRUCTION / TIME_WINDOW / UNLIMITED). */
     public ?string $requestedScopeType = null;
 

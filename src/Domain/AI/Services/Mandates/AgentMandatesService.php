@@ -302,6 +302,8 @@ class AgentMandatesService extends EntitiesService
         $argusAgentMandateApproval = new ArgusAgentMandateApproval();
         $argusAgentMandateApproval->requestedActionClass = $actionClass;
         $argusAgentMandateApproval->requestedActionClassDescription = AgentMandate::getActionClassDescription($actionClass);
+        $argusAgentMandateApproval->requestedToolName = $grantArguments->requestedToolName;
+        $argusAgentMandateApproval->requestedToolSummary = $grantArguments->requestedToolSummary;
         $argusAgentMandateApproval->requestedScopeType = $scopeType;
         $argusAgentMandateApproval->requestedValidUntil = $validUntil;
         $argusAgentMandateApproval->requestedConstraintsNote = $constraintsNote;
