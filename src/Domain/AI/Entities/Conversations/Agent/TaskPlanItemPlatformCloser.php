@@ -262,9 +262,12 @@ class TaskPlanItemPlatformCloser extends ValueObject
             if ($this->taskPlanItem->isResultTextInTheAnswer()) {
                 // the model's `inAnswer` leaf: no call proves it — the turn's owner-visible answer carries the result,
                 // unless the turn ends on the model's question to the owner (the answer asked whether to go on)
-                $deliveredThisTurn = !self::turnEndsOnAnOwnerQuestion($conversationMessages, $currentTurnInitiatorMessageIndex)
-                    && (self::isOwnerVisibleCandidateAnswerText($candidateAnswerText)
-                        || $conversationMessages->hasOwnerVisibleAssistantAnswerAfterIndex($currentTurnInitiatorMessageIndex));
+                $answeredThisTurn = self::isOwnerVisibleCandidateAnswerText($candidateAnswerText)
+                    || $conversationMessages->hasOwnerVisibleAssistantAnswerAfterIndex($currentTurnInitiatorMessageIndex);
+                $deliveredThisTurn = $answeredThisTurn && !self::turnEndsOnAnOwnerQuestion($conversationMessages, $currentTurnInitiatorMessageIndex);
+                if ($answeredThisTurn && !$deliveredThisTurn) {
+                    $this->taskPlanItem->answerTextHeldOpenAtMessageIndex = $conversationMessages->getNewestMessageIndex();
+                }
             } elseif ($evidenceCallIndex === null || $evidenceCallIndex <= $currentTurnInitiatorMessageIndex) {
                 $deliveredThisTurn = false;
             } else {

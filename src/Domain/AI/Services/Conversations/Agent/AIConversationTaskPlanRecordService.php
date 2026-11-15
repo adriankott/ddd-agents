@@ -576,7 +576,7 @@ class AIConversationTaskPlanRecordService extends Service
         if ($siteMode !== AgentDecisionModelSettings::MODE_ON) {
             $decision->wouldRetireFinishedPlan = true;
             $aIConversationsService->persistAgentWorkingStateSlice($conversation, 'planDynamicsDecision');
-            $this->turnEventsService()->recordEventOfConversation($conversation, AIConversationTurnEvent::KIND_DECISION, AgentDecisionModelSettings::SITE_PLAN_DYNAMICS, $initiatorMessageIndex, 'retirement', null, ['applied' => false, 'mode' => $siteMode, 'wouldRetireFinishedPlan' => true, 'itemCount' => $activePlan->items?->countAllItems() ?? 0], $runToken, null);
+            $this->turnEventsService()->recordEventOfConversation($conversation, AIConversationTurnEvent::KIND_DECISION, AgentDecisionModelSettings::SITE_PLAN_DYNAMICS, $initiatorMessageIndex, AIConversationTurnEvent::SUBJECT_PLAN_RETIREMENT, null, ['applied' => false, 'mode' => $siteMode, 'wouldRetireFinishedPlan' => true, 'itemCount' => $activePlan->items?->countAllItems() ?? 0], $runToken, null);
             return;
         }
         $ownerMessage = '';
@@ -592,7 +592,7 @@ class AIConversationTaskPlanRecordService extends Service
         $decision->retiredFinishedPlan = true;
         $aIConversationsService->persistTaskPlanRetirementSlice($conversation, $runToken);
         $aIConversationsService->persistAgentWorkingStateSlice($conversation, 'planDynamicsDecision');
-        $this->turnEventsService()->recordEventOfConversation($conversation, AIConversationTurnEvent::KIND_DECISION, AgentDecisionModelSettings::SITE_PLAN_DYNAMICS, $initiatorMessageIndex, 'retirement', null, ['applied' => true, 'mode' => $siteMode, 'retiredFinishedPlan' => true, 'itemCount' => $retiredPlan->items?->countAllItems() ?? 0, 'finishedPlanCount' => $agentWorkingState->countFinishedTaskPlans()], $runToken, null);
+        $this->turnEventsService()->recordEventOfConversation($conversation, AIConversationTurnEvent::KIND_DECISION, AgentDecisionModelSettings::SITE_PLAN_DYNAMICS, $initiatorMessageIndex, AIConversationTurnEvent::SUBJECT_PLAN_RETIREMENT, null, ['applied' => true, 'mode' => $siteMode, 'retiredFinishedPlan' => true, 'itemCount' => $retiredPlan->items?->countAllItems() ?? 0, 'finishedPlanCount' => $agentWorkingState->countFinishedTaskPlans()], $runToken, null);
         $this->aiTrace('turn.planDynamics.retired', ['conversationId' => $conversation->id ?? null, 'title' => $retiredPlan->title, 'finishedPlanCount' => $agentWorkingState->countFinishedTaskPlans()]);
     }
 

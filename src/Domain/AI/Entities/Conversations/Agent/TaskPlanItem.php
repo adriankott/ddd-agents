@@ -222,6 +222,15 @@ class TaskPlanItem extends ValueObject
     public bool $doneRequiresOwnerVisibleAnswerInSameTurn = false;
 
     /**
+     * @var int|null The newest message index of a turn whose answer did NOT close this `inAnswer` leaf although an
+     *      owner-visible answer existed — the turn ended on the model's question to the owner, or an earlier leaf was
+     *      still open ({@see isResultTextInTheAnswer()}). That answer may already have given the owner the text: the
+     *      plan line says so, and the model may tick the leaf done instead of writing it again. A RECORD of the
+     *      platform, persisted with the plan; null = never held open after an answer.
+     */
+    public ?int $answerTextHeldOpenAtMessageIndex = null;
+
+    /**
      * @var string|null The QUESTION a delivery leaf ({@see $doneRequiresOwnerVisibleAnswerInSameTurn}) closes on: the
      * `askOwner` catalogue key ({@see Tools\AskOwnerQuestionCatalogue}) the owner must have been asked after
      * the leaf's evidence call — the delivered answer alone (a message that names the result) does not close the leaf.
@@ -1144,6 +1153,12 @@ class TaskPlanItem extends ValueObject
     public const string ANSWER_TEXT_MARK = ' — text in your answer: write it in the answer of this turn; the platform closes it from that answer';
 
     /**
+     * The plan-line suffix of such an item an earlier answer may already have carried
+     * ({@see $answerTextHeldOpenAtMessageIndex}).
+     */
+    public const string ANSWER_TEXT_MAYBE_GIVEN_MARK = ' — text in your answer: write it in the answer of this turn and the platform closes it from that answer; an earlier answer of yours already gave the owner this text: tick it done instead (statusNote: what that answer gave) and do not write it again';
+
+    /**
      * The COMPACT plan line of this node: `[status] <key> <title>` ({@see buildPlanLineTitle()}); the
      * `← next` item alone carries its full text (its procedure). A blocked or not-applicable item keeps its reason and an
      * open item its noted obstacle, each clipped to {@see COMPACT_LINE_NOTE_CHARS}; no other note: the results stand in the
@@ -1158,7 +1173,9 @@ class TaskPlanItem extends ValueObject
         $obstaclePrefix = $statusNote !== '' && $this->status === self::STATUS_OPEN
             ? '(obstacle noted, retry: ' . self::clipForPlanLine($statusNote, self::COMPACT_LINE_NOTE_CHARS) . ') '
             : '';
-        $answerTextMark = $this->isResultTextInTheAnswer() && $this->isOpen() ? self::ANSWER_TEXT_MARK : '';
+        $answerTextMark = $this->isResultTextInTheAnswer() && $this->isOpen()
+            ? ($this->answerTextHeldOpenAtMessageIndex !== null ? self::ANSWER_TEXT_MAYBE_GIVEN_MARK : self::ANSWER_TEXT_MARK)
+            : '';
         if ($carriesNextMarker) {
             return '[ ] ' . $obstaclePrefix . $key . ' ' . $this->text . ($closesItself ? self::SELF_CLOSING_NEXT_MARK : '') . $answerTextMark . ' ← next';
         }
@@ -1285,7 +1302,10 @@ class TaskPlanItem extends ValueObject
             'customerProgressStepKey' => $this->customerProgressStepKey,
             'skillNames' => $this->skillNames,
             'subtasks' => $this->subtasks?->toRepositoryArray() ?? [],
-        ];
+        ] + ($this->answerTextHeldOpenAtMessageIndex !== null
+            // stored only when set: a plan without it keeps its bytes
+            ? ['answerTextHeldOpenAtMessageIndex' => $this->answerTextHeldOpenAtMessageIndex]
+            : []);
     }
 
     /**
@@ -1363,6 +1383,9 @@ class TaskPlanItem extends ValueObject
         // the platform records
         $taskPlanItem->platformResolvedAtMessageIndex = isset($itemFields['platformResolvedAtMessageIndex'])
             ? (int)$itemFields['platformResolvedAtMessageIndex']
+            : null;
+        $taskPlanItem->answerTextHeldOpenAtMessageIndex = isset($itemFields['answerTextHeldOpenAtMessageIndex']) && is_numeric($itemFields['answerTextHeldOpenAtMessageIndex'])
+            ? (int)$itemFields['answerTextHeldOpenAtMessageIndex']
             : null;
         $taskPlanItem->evidenceMessageIndex = isset($itemFields['evidenceMessageIndex'])
             ? (int)$itemFields['evidenceMessageIndex']

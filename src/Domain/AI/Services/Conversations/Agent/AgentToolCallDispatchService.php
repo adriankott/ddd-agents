@@ -32,6 +32,7 @@ use DDD\Domain\AI\Entities\Conversations\Agent\Tools\SendOwnerReportTool;
 use DDD\Domain\AI\Entities\Conversations\Agent\Tools\WaitForSubAgentsTool;
 use DDD\Domain\AI\Entities\Conversations\Agent\Turns\AgentTransientMessageIds;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
+use DDD\Domain\AI\Entities\Conversations\Messages\LoadedCapability;
 use DDD\Domain\AI\Entities\Conversations\Messages\Delegation\AgentSubAgentLiveActivities;
 use DDD\Domain\AI\Entities\Conversations\Messages\Delegation\DelegationStatusReport;
 use DDD\Domain\AI\Entities\Conversations\Messages\Delegation\DelegationSubAgentRecords;
@@ -604,6 +605,8 @@ class AgentToolCallDispatchService extends Service
         $callMessageCapabilities = $callMessage->getLoadedCapabilities();
         $newestCapabilities = $conversation->messages->getNewestLoadedCapabilities();
         return [
+            // a platform preload the model's own load took over counts as a load ({@see AIConversationMessage::loadSkillsFromToolArguments()})
+            'callMessageModelLoadedSkills' => $callMessageCapabilities?->getSkillNamesLoadedBySource(LoadedCapability::SOURCE_MODEL) ?? [],
             'callMessageSkills' => $callMessageCapabilities?->getLoadedSkillNames() ?? [],
             'callMessageTools' => $callMessageCapabilities?->getLoadedToolNames() ?? [],
             'newestMessageSkills' => $newestCapabilities?->getLoadedSkillNames() ?? [],

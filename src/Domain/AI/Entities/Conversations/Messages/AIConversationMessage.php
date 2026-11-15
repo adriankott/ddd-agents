@@ -1581,6 +1581,24 @@ class AIConversationMessage extends Entity
                     . implode(', ', $restoredToolNames)
                     . '. They are in your tool list from the next step; call them directly NOW.';
             }
+            // A skill only the PLATFORM loaded (a preload) and the model asks for the first time: answered like the load
+            // it would have been without the preload — the model takes it over. "Already loaded" to its first own load
+            // made it ask again and again (the model never read a load of its own). Repeats after that are answered below.
+            $preloadedSkillCapabilities = [];
+            foreach ($alreadyLoadedRequestedNames as $alreadyLoadedRequestedName) {
+                $loadedCapability = $this->getLoadedCapabilities()?->getByName($alreadyLoadedRequestedName);
+                if ($loadedCapability === null || $loadedCapability->source === null || $loadedCapability->source === LoadedCapability::SOURCE_MODEL) {
+                    $preloadedSkillCapabilities = [];
+                    break;
+                }
+                $preloadedSkillCapabilities[] = $loadedCapability;
+            }
+            if ($preloadedSkillCapabilities !== []) {
+                foreach ($preloadedSkillCapabilities as $preloadedSkillCapability) {
+                    $preloadedSkillCapability->source = LoadedCapability::SOURCE_MODEL;
+                }
+                return 'Skills loaded; their tools are now available.';
+            }
             // Truly fully resident. Answering "Skills loaded" here bred an obedience loop: an agent steered to
             // "load X" kept re-loading on that confirmation until the byte-exact repeat guard aborted the whole
             // turn. Name the RESIDENT tools (never catalog names that are not offered), so the model's only

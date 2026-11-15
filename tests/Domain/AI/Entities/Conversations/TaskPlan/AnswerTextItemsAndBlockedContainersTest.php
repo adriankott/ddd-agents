@@ -106,6 +106,12 @@ class AnswerTextItemsAndBlockedContainersTest extends UnitTestCase
 
         self::assertTrue(TaskPlanItemPlatformCloser::turnEndsOnAnOwnerQuestion($questionTurn->conversationMessages, 10));
         self::assertNull(TaskPlanItemPlatformCloser::forItem($draftItem)->applyTurnEndEvidenceClosing($questionTurn), 'the question closes no draft');
+        self::assertNotNull($draftItem->answerTextHeldOpenAtMessageIndex, 'the answer may already have carried it');
+        self::assertSame('[ ] 3 Two post drafts' . TaskPlanItem::ANSWER_TEXT_MAYBE_GIVEN_MARK, $draftItem->toCompactTailHintLine('3', false));
+        $storedItemFields = $draftItem->toRepositoryFields();
+        $readBackItem = new TaskPlanItem();
+        $readBackItem->readRepositoryFields($storedItemFields);
+        self::assertSame($draftItem->answerTextHeldOpenAtMessageIndex, $readBackItem->answerTextHeldOpenAtMessageIndex);
         self::assertFalse(TaskPlanItemPlatformCloser::turnEndsOnAnOwnerQuestion($questionTurn->conversationMessages, 12), 'a later turn without a question');
     }
 

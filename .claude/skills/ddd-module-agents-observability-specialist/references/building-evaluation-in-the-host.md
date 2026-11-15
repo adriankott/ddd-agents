@@ -4,17 +4,19 @@
 
 Contents: what ships, what does not · the parts of a runner · driving one case · reading the outcome · the judge · the suite · throwaway spaces and cleanup · checklist · full class names
 
-The package ships the safety layers, the recorded runs and the read models an evaluation needs — no runner, no
-judge, no suite, no case format. A host that evaluates its agent builds them as console commands of its own. This
-reference names what each part calls in the package.
+The package ships the safety layers, the recorded runs, the read models an evaluation needs and the run of ONE case
+(`AgentEvalRunnerService` with the application's `AgentEvalRunHooksService`) — no judge, no suite, no lanes. A host
+that evaluates its agent builds those as console commands of its own around the runner. This reference names what each
+part calls in the package.
 
 ## What ships, what does not
 
 | Ships | Does not ship |
 |---|---|
-| the eval marker and the eval switches on `RunSettings` | a case file format and a case loader |
-| the eval tool block and the outbound recipient guard ([eval-safety](eval-safety.md)) | a runner command, parallel lanes, retries |
-| `AgentEvalResult` (a verdict value object) | assertions over a run (expected tool, skill, status, arguments) |
+| the eval marker and the eval switches on `RunSettings` | a case file loader (the case object `AgentEvalCase` reads a decoded case) |
+| the eval tool block and the outbound recipient guard ([eval-safety](eval-safety.md)) | a suite command, parallel lanes, retries |
+| `AgentEvalResult` (a verdict value object) and the assertions over a run (`AgentEvalExpectation`: expected tool, skill, status, arguments, plan, state after the run) | |
+| the run of one case: `AgentEvalRunnerService::runCase()` / `run()` / `runWithRestore()` — the tool block applied and lifted, follow-up turns, purpose, reload, restore (`AgentEvalRestorePlan`, `AgentEvalHarnessToolCalls`), the state check, the teardown, applicability (`AgentEvalApplicabilityFacts`), the eviction trajectory, the recall seed, the figures (`AgentEvalRunFigures`) | the application's part of a run: the 13 hooks of `AgentEvalRunHooksService` (scope, ineligible scope, withheld skills, harness arguments, …), overridden in a same-path subclass |
 | `AIConversationAuditRenderService` (the deterministic audit blocks a judge reads) | a judge prompt and a judge model call |
 | request snapshots, turn events, metrics, the integrity report | a simulated owner for multi-turn cases |
 | record and replay with the comparison ([record-and-replay](record-and-replay.md)) | a results folder, a summary, a baseline comparison |

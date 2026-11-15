@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DDD\Domain\AI\Entities\Conversations\Agent;
 
+use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\Base\Entities\ValueObject;
 
 /**
@@ -13,6 +14,11 @@ use DDD\Domain\Base\Entities\ValueObject;
  * Fed the run's messages in index order ({@see recordMessage()}), then {@see finish()}: the plan IN FORCE is the newest
  * per-message plan snapshot before the row (the snapshot a row carries is the state AFTER that row's plan-tool call, so
  * the model call on the same row still read the plan before it). A run without a snapshot measures nothing.
+ * {@see fromMessagesOfConversation()} feeds the rows of one conversation.
+ *
+ * Model call here: a row of the conversation that carries a request snapshot.
+ *
+ * @phpstan-consistent-constructor
  */
 class TaskPlanSize extends ValueObject
 {
@@ -36,6 +42,27 @@ class TaskPlanSize extends ValueObject
 
     /** Whether any plan was in force at all. */
     protected bool $sawPlan = false;
+
+    /**
+     * The size of the plans one conversation carried: its rows in set order, each fed with whether it carries a request
+     * snapshot (one model call) and the plan snapshot it stamped. Delegated conversations are not read.
+     *
+     * @return static|null the measured size; null when the conversation has no messages or carried no plan
+     */
+    public static function fromMessagesOfConversation(AIConversation $conversation): ?static
+    {
+        if (!isset($conversation->messages)) {
+            return null;
+        }
+        $taskPlanSize = static::newInstance();
+        foreach ($conversation->messages->getElements() as $message) {
+            $taskPlanSize->recordMessage(
+                isset($message->requestSnapshot),
+                isset($message->taskPlanSnapshot) ? $message->taskPlanSnapshot : null
+            );
+        }
+        return $taskPlanSize->finish() ? $taskPlanSize : null;
+    }
 
     /**
      * Feed ONE message row of the run, in index order.

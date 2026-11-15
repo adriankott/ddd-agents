@@ -41,6 +41,12 @@ class AIConversationTurnEvent extends Entity
     use ChangeHistoryTrait, QueryOptionsTrait;
 
     public const string KIND_DECISION = 'decision';
+
+    /** The subject of the plan-dynamics decision event that records a finished plan's retirement. */
+    public const string SUBJECT_PLAN_RETIREMENT = 'retirement';
+
+    /** The subject of a skill-preload decision event that records the rerank of the candidates. */
+    public const string SUBJECT_SKILL_PRELOAD_RERANK = 'rerank';
     public const string KIND_PRELOAD_OUTCOME = 'preloadOutcome';
     public const string KIND_EVICTION = 'eviction';
     public const string KIND_FORCED_RE_DRIVE = 'forcedReDrive';

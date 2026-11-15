@@ -279,7 +279,9 @@ class TaskPlanItemTickGate extends ValueObject
                 $sameTurnAnswerFloorIndex = $evidenceCallIndex;
             }
         }
-        if ($taskPlanItem->doneRequiresOwnerVisibleAnswerInSameTurn
+        // an `inAnswer` leaf an earlier answer may already have carried: the model knows whether it did — its tick stands
+        $answerTextMayAlreadyBeGiven = $taskPlanItem->isResultTextInTheAnswer() && $taskPlanItem->answerTextHeldOpenAtMessageIndex !== null;
+        if ($taskPlanItem->doneRequiresOwnerVisibleAnswerInSameTurn && !$answerTextMayAlreadyBeGiven
             && !$conversationMessages->hasOwnerVisibleAssistantAnswerAfterIndex($sameTurnAnswerFloorIndex)
         ) {
             $this->previousTurnDeliveryEvidenceIndex = $taskPlanItem->previousTurnDeliveryEvidenceToolNames !== null

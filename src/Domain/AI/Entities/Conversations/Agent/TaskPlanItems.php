@@ -418,6 +418,11 @@ class TaskPlanItems extends ObjectSet
         foreach ($this->buildItemAddresses()->getLeaves() as $taskPlanItemAddress) {
             $taskPlanItem = $taskPlanItemAddress->item;
             if ($holdsAnswerTextItemsBehindOpenItems && $anEarlierLeafIsOpen && $taskPlanItem->isResultTextInTheAnswer()) {
+                if ($taskPlanItem->isOpen() && $taskPlanEvidence->hasTranscript
+                    && $taskPlanEvidence->conversationMessages->hasOwnerVisibleAssistantAnswerAfterIndex($taskPlanEvidence->currentTurnInitiatorMessageIndex)
+                ) {
+                    $taskPlanItem->answerTextHeldOpenAtMessageIndex = $taskPlanEvidence->conversationMessages->getNewestMessageIndex();
+                }
                 continue;
             }
             $closingStatus = TaskPlanItemPlatformCloser::forItem($taskPlanItem)->applyTurnEndEvidenceClosing($taskPlanEvidence);

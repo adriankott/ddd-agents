@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.1.0-alpha.46
+
+- One evaluated run of one eval case moves into the package: `AgentEvalRunnerService` (single and follow-up turns,
+  purpose, persistence, reload, restore, state check, teardown, applicability, eviction trajectory, recall seed, trace)
+  with `AgentEvalRunHooksService` (13 hooks, neutral defaults), the case, scope, options, outcome, expectation,
+  figures, restore plan, harness tool calls (`AgentEvalHarnessToolCalls`), extractions
+  (`AgentEvalToolResultExtractions`), applicability (`AgentEvalNotApplicableReasons`) and
+  `AgentEvalPreconditionNotEstablishedException`; `TaskPlanSize::fromMessagesOfConversation()`. The run applies the
+  case's tool block itself for every caller; the state check lifts it for its read and cleanup; a case file's message
+  trace no longer carries the conversation back-reference; the tool-message failure text says "widget".
+- Turn-event subjects as constants: `AIConversationTurnEvent::SUBJECT_PLAN_RETIREMENT`, `SUBJECT_SKILL_PRELOAD_RERANK`.
+- `load_skills` for a skill only the platform preloaded, asked by the model for the first time, answers "Skills
+  loaded; their tools are now available." and the model takes the skill over (`source` model); "Already loaded" to
+  that first own load made the model ask again and again. Repeats after that are answered as before.
+- An `inAnswer` leaf that a turn's answer did not close (the turn ended on the owner's question, or an earlier leaf
+  was open) records `answerTextHeldOpenAtMessageIndex`: its plan line says an earlier answer may already have given the
+  text, and the model's done tick is accepted instead of a second copy. The tick rules say so.
+
 ## 0.1.0-alpha.45
 
 - A model step that only repeated `load_skills` for skills already loaded is not replayed to the model: its call and
