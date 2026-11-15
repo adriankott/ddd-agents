@@ -109,6 +109,6 @@ class AgentModelInputAnswerContractTurnBoundaryTest extends UnitTestCase
 
         self::assertStringContainsString('Your final answer MUST report the outcomes of these actions', $answerContractHint);
         self::assertStringContainsString('not when it is due', $answerContractHint);
-        self::assertStringContainsString('still open comes first — make its call now', $answerContractHint);
+        self::assertStringContainsString('still open comes first: a question is answered by the read that answers it, an order by the call that carries it out — a question is never an order to write. Answer once nothing is open.', $answerContractHint);
     }
 }

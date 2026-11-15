@@ -85,6 +85,32 @@ class LoadSkillsTool extends ValueObject implements AgentMetaTool
     }
 
     /**
+     * What the identical `load_skills` call is answered with when the next step has NO tools: from the second repeat-guard
+     * answer of a repeated `load_skills` in a turn on ({@see buildResultOfRepeatedCall()} answered the first). The loaded
+     * skills and their tools are named; the answer is written from what the conversation holds, a part that needed one
+     * of those tools is said to be not done yet — never "no access". Null without a loaded skill or a callable tool — the
+     * repeat guard's own text applies then.
+     *
+     * @param string[] $loadedSkillNames the skills loaded before the call
+     * @param string[] $callableToolNames the loaded skills' tools the model could call
+     */
+    public static function buildResultOfRepeatedCallBeforeAStepWithoutTools(int $identicalCallCount, array $loadedSkillNames, array $callableToolNames): ?string
+    {
+        if ($loadedSkillNames === [] || $callableToolNames === []) {
+            return null;
+        }
+        return sprintf(
+            'NOT executed: you have called `%s` with these exact arguments %d times and it loads nothing more. %s Your next '
+                . 'step has no tools: write your answer now from what this conversation already holds. If the request '
+                . 'needed one of these tools and you did not call it, say plainly that this part is not done yet — never '
+                . 'that you lack access or that it is unavailable.',
+            self::NAME,
+            $identicalCallCount,
+            self::renderLoadedSkillsWithTheirTools($loadedSkillNames, $callableToolNames)
+        );
+    }
+
+    /**
      * "Loaded right now: A, B — their tools are ALREADY in your tool list (t1, t2 and 3 more)."
      *
      * @param string[] $loadedSkillNames
@@ -281,7 +307,8 @@ class LoadSkillsTool extends ValueObject implements AgentMetaTool
                 'name' => self::NAME,
                 'description' => 'Load one or more skills to gain their tools — pick from the "Available skills" list in '
                     . 'the system prompt or from the sub-skills a loaded skill lists. Call when the request needs '
-                    . 'capabilities not yet loaded; callable again at any step.',
+                    . 'capabilities not yet loaded. A skill already loaded is never loaded again — its tools are in your '
+                    . 'tool list: call them.',
                 'parameters' => [
                     'type' => 'object',
                     'required' => ['skill_names'],

@@ -53,6 +53,12 @@ class AgentModelInput extends ValueObject
      * The rule for the parameters a tool does not require, stated once beside the shared parameters: a model that
      * fills every parameter of a schema with a placeholder changes what the placeholder names.
      */
+    /**
+     * @var int The first day of a week in the clock signal, ISO-8601 numbering (1 = Monday … 7 = Sunday). An
+     * application whose owners count weeks from another day redeclares it in its own class of the same path.
+     */
+    public const int FIRST_WEEKDAY_OF_THE_WEEK = 1;
+
     public const string OPTIONAL_PARAMETERS_RULE = "\n\n## Optional tool parameters\n"
         . 'Pass ONLY the parameters the task needs and leave every other parameter out. A parameter you pass is applied '
         . 'as a value — `false` and `0` included: a flag you send as `false` is switched off, a number you send as `0` is '
@@ -1347,7 +1353,8 @@ class AgentModelInput extends ValueObject
         }
         return '[SIGNAL:answer-content] ' . implode('. ', $obligations) . ', in the owner\'s'
             . ' language. This names what the final answer contains, not when it is due: a part of the owner\'s request'
-            . ' that is still open comes first — make its call now, and answer once nothing is open.'
+            . ' that is still open comes first: a question is answered by the read that answers it, an order by the call'
+            . ' that carries it out — a question is never an order to write. Answer once nothing is open.'
             . ' Harness [SIGNAL:…] entries are constraints, never messages to answer — a reply that'
             . ' only acknowledges a signal (for example a language note) without these outcomes is a defect.';
     }
@@ -1362,8 +1369,10 @@ class AgentModelInput extends ValueObject
      * an instruction rather than a customer message.
      */
     /**
-     * The clock signal: the captured "now" of THIS model call in the space's zone with its offset and
-     * weekday — a user-role wire entry at the volatile tail (after the image fallback, before the reply-language
+     * The clock signal: the captured "now" of THIS model call in the space's zone with its offset and weekday,
+     * yesterday, tomorrow, this week and last week as dates of that zone (weeks start on
+     * {@see FIRST_WEEKDAY_OF_THE_WEEK}) — the model computed "tomorrow" or "last week" itself and got it wrong
+     * repeatably. A user-role wire entry at the volatile tail (after the image fallback, before the reply-language
      * cue), so the cacheable prefix stays byte-stable. Pure: never reads the wall clock; null without a zone or a
      * captured instant (legacy conversation / pre-rollout reconstruction).
      */
@@ -1372,8 +1381,20 @@ class AgentModelInput extends ValueObject
         if ($this->timezone === null || $this->clockInstant === null) {
             return null;
         }
+        $localNow = \DateTimeImmutable::createFromInterface($this->clockInstant)->setTimezone($this->timezone);
+        $localToday = $localNow->setTime(0, 0);
+        $daysSinceWeekStart = ((int)$localToday->format('N') - static::FIRST_WEEKDAY_OF_THE_WEEK + 7) % 7;
+        $thisWeekStart = $localToday->modify('-' . $daysSinceWeekStart . ' days');
+        $yesterday = $localToday->modify('-1 day');
+        $tomorrow = $localToday->modify('+1 day');
         return '[SIGNAL:clock] now = ' . $this->clockInstant->formatForModel($this->timezone)
-            . ' (' . (clone $this->clockInstant)->setTimezone($this->timezone)->format('l') . ')';
+            . ' (' . $localNow->format('l') . ')'
+            . ' · yesterday = ' . $yesterday->format('Y-m-d') . ' (' . $yesterday->format('l') . ')'
+            . ' · tomorrow = ' . $tomorrow->format('Y-m-d') . ' (' . $tomorrow->format('l') . ')'
+            . ' · this week (' . $thisWeekStart->format('D') . '–' . $thisWeekStart->modify('+6 days')->format('D') . ') = '
+            . $thisWeekStart->format('Y-m-d') . ' … ' . $thisWeekStart->modify('+6 days')->format('Y-m-d')
+            . ' · last week = ' . $thisWeekStart->modify('-7 days')->format('Y-m-d') . ' … '
+            . $thisWeekStart->modify('-1 day')->format('Y-m-d');
     }
 
     /** Whether the loaded-skills block carries the SITUATION line: a loaded skill is cut by the resolved variants. */

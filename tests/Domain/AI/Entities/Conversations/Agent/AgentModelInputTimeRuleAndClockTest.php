@@ -89,11 +89,28 @@ class AgentModelInputTimeRuleAndClockTest extends UnitTestCase
         $agentContext = $this->context('America/New_York');
         self::assertNull($agentContext->clockTailHint(), 'no captured instant → no signal');
         $agentContext->clockInstant = DateTime::fromTimestamp((new \DateTimeImmutable('2026-07-01 12:00:00', new \DateTimeZone('UTC')))->getTimestamp());
-        self::assertSame('[SIGNAL:clock] now = 2026-07-01 08:00:00-04:00 (Wednesday)', $agentContext->clockTailHint());
+        self::assertSame(
+            '[SIGNAL:clock] now = 2026-07-01 08:00:00-04:00 (Wednesday) · yesterday = 2026-06-30 (Tuesday) · tomorrow = 2026-07-02'
+                . ' (Thursday) · this week (Mon–Sun) = 2026-06-29 … 2026-07-05 · last week = 2026-06-22 … 2026-06-28',
+            $agentContext->clockTailHint()
+        );
 
         $legacy = $this->context(null);
         $legacy->clockInstant = DateTime::fromTimestamp(1_789_000_000);
         self::assertNull($legacy->clockTailHint(), 'a legacy conversation gets no clock signal');
+    }
+
+    public function testTheClockNamesTheDaysAndWeeksOfTheSpacesZoneOnASundayNightAfterMidnight(): void
+    {
+        // Sunday 01:29 in Berlin is still Saturday in UTC: every date is the space's, the week ends on this Sunday
+        $agentContext = $this->context('Europe/Berlin');
+        $agentContext->clockInstant = DateTime::fromTimestamp((new \DateTimeImmutable('2026-11-15 00:29:25', new \DateTimeZone('UTC')))->getTimestamp());
+
+        self::assertSame(
+            '[SIGNAL:clock] now = 2026-11-15 01:29:25+01:00 (Sunday) · yesterday = 2026-11-14 (Saturday) · tomorrow = 2026-11-16'
+                . ' (Monday) · this week (Mon–Sun) = 2026-11-09 … 2026-11-15 · last week = 2026-11-02 … 2026-11-08',
+            $agentContext->clockTailHint()
+        );
     }
 
     public function testUserMessageWireBracketCarriesTheZonedSendTimeOrTheLegacyForm(): void

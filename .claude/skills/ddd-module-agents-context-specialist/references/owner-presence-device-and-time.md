@@ -92,7 +92,7 @@ The model never does zone arithmetic and never sees a UTC moment.
 What the model reads about time:
 
 - the TIME_RULE segment "Times are the … local time: <zone>." (stable; under `onceWhenChanged` the epoch record's zone);
-- the tail entry `[SIGNAL:clock] now = … (weekday)` with ONE instant captured per call
+- the tail entry `[SIGNAL:clock] now = … (weekday) · yesterday · tomorrow · this week (Mon–Sun) · last week` (dates of the space's zone, the week start `AgentModelInput::FIRST_WEEKDAY_OF_THE_WEEK`, redeclarable) with ONE instant captured per call
   (`AgentModelInput::$clockInstant`, recorded as `RequestSnapshot::$clockAt`, re-used by a rebuild);
 - owner brackets in the zone in effect at their position;
 - `[SIGNAL:time-zone]` when the zone is only a country default (`everyCall`; a note under `onceWhenChanged`): ask once

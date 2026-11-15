@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.1.0-alpha.29
+
+- `[SIGNAL:clock]` also names yesterday, tomorrow, this week and last week as dates of the space's zone (weeks from
+  `AgentModelInput::FIRST_WEEKDAY_OF_THE_WEEK`, Monday; an application redeclares it): models computed "tomorrow" as the
+  day after and read "last week" as the rolling seven days. The recorded-run normalization covers the new dates.
+- `[SIGNAL:answer-content]`: a still-open part of the request — "a question is answered by the read that answers it, an
+  order by the call that carries it out — a question is never an order to write" (it said "make its call now", read as
+  an order to call the remaining write tool).
+- Web: the polling spec of `AgentChat` no longer races its 150 ms answer delay under load (800 ms).
+- `load_skills` and `load_tool` descriptions: "callable again at any step" is replaced by "A skill already loaded is
+  never loaded again — its tools are in your tool list: call them." / "A tool already in your tool list is never loaded
+  again — call it." (static text, the cached prefix stays stable across turns).
+- A later repeated `load_skills` of a turn (the one followed by the step without tools) is answered with the loaded
+  skills and their tools (`LoadSkillsTool::buildResultOfRepeatedCallBeforeAStepWithoutTools()`) instead of the generic
+  repeat text about the work being done and the next plan item.
+
 ## 0.1.0-alpha.28
 
 - The search across an account's conversations answers from the owner's dialogue only, and decides it INSIDE its

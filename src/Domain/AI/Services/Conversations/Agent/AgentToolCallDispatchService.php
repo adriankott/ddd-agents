@@ -191,7 +191,17 @@ class AgentToolCallDispatchService extends Service
                         $this->buildCallableToolNamesOfLoadedSkills($agentRun, $conversation, $callMessage)
                     )
                     : null;
-                $resultContent = $repeatedSkillLoadResult ?? ($earlierUnsavedCall !== null ? $repeatedCallCheck->buildUnsavedRepeatCorrective($earlierUnsavedCall) : sprintf(
+                // a later repeated `load_skills` of the turn: the tool-less step follows, and the answer still names the
+                // loaded skills and their tools — the generic text ("the work IS done", "the next open item") is false
+                // after a skill load that did nothing, on a turn that may have no plan
+                $repeatedSkillLoadResultBeforeAStepWithoutTools = $toolName === LoadSkillsTool::NAME && $repeatedSkillLoadResult === null
+                    ? LoadSkillsTool::buildResultOfRepeatedCallBeforeAStepWithoutTools(
+                        $repeatCount,
+                        $callMessage->getLoadedCapabilities()?->getLoadedSkillNames() ?? [],
+                        $this->buildCallableToolNamesOfLoadedSkills($agentRun, $conversation, $callMessage)
+                    )
+                    : null;
+                $resultContent = $repeatedSkillLoadResult ?? $repeatedSkillLoadResultBeforeAStepWithoutTools ?? ($earlierUnsavedCall !== null ? $repeatedCallCheck->buildUnsavedRepeatCorrective($earlierUnsavedCall) : sprintf(
                     'You have already called `%s` with these exact arguments %d times and the result has '
                     . 'not changed. Do NOT call it again. If the call SUCCEEDED earlier, the work IS done — nothing '
                     . 'failed and nothing is unavailable, so NEVER tell the user you lack access: the platform closes '

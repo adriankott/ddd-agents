@@ -118,7 +118,7 @@ describe("AgentChat with the package defaults", () => {
   });
 
   test("follows a client without a subscription through the polling default: the delayed answer arrives by itself", async () => {
-    const client = buildClient({ assistantAnswerDelayMs: 150, withoutChangeSubscription: true });
+    const client = buildClient({ assistantAnswerDelayMs: 800, withoutChangeSubscription: true });
     render(
       <AgentsProvider client={client}>
         <AgentChat conversationId={1} agentSpaceKey={7} pollingOptions={{ runningIntervalMs: 50, idleIntervalMs: 100 }} />
@@ -134,6 +134,7 @@ describe("AgentChat with the package defaults", () => {
         "Show the top keywords",
       ),
     );
+    // the delay is far above the time the user bubble takes under load, so the answer is not there yet
     expect(screen.queryByText("The top keyword is dentist kassel.")).toBeNull();
     await screen.findByText("The top keyword is dentist kassel.", undefined, { timeout: 3000 });
 

@@ -155,10 +155,11 @@ class LoadToolTool extends ValueObject implements AgentMetaTool
                 // the wording names the sub-skills only while their tools are listed
                 'description' => ($this->subSkillTools->isEmpty()
                     ? 'Load one or more tools from a skill you already have, to gain their full parameters. '
-                        . 'Call when a task needs a tool listed below that is not yet available; callable again at any step. '
+                        . 'Call when a task needs a tool listed below that is not yet available. A tool already in your tool '
+                        . 'list is never loaded again — call it. '
                     : 'Load one or more of the tools listed below to gain their full parameters: tools of a skill '
                         . 'you already have, and tools of its sub-skills. Call when a task needs one of them — never work around '
-                        . 'a listed tool by hand; callable again at any step. ')
+                        . 'a listed tool by hand. A tool already in your tool list is never loaded again — call it. ')
                     . "Available tools:\n" . implode("\n", $lines),
                 'parameters' => [
                     'type' => 'object',

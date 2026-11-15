@@ -142,8 +142,11 @@ step is left (`armForcedOwnerReportCallIfOwed()`; `ddd-module-agents-autonomy-sp
   when the repeat guard answers a `load_skills` call while tools of loaded skills are callable, the first model step
   of the turn with such a call is answered with those tools by name (`LoadSkillsTool::buildResultOfRepeatedCall()`)
   and the dispatch does not force the tool-less step. The next repeated `load_skills` of the turn
-  (`AgentRepeatedToolCallCheck::hasRepeatGuardAnsweredASkillLoadInAnEarlierStepOfTheTurn()`) gets the generic
-  corrective and the tool-less step. The calls of one model step are answered alike; a step begins at the row with
+  (`AgentRepeatedToolCallCheck::hasRepeatGuardAnsweredASkillLoadInAnEarlierStepOfTheTurn()`) gets the tool-less step
+  and an answer that still names the loaded skills and their tools
+  (`LoadSkillsTool::buildResultOfRepeatedCallBeforeAStepWithoutTools()`: answer from what the conversation holds, a
+  part that needed one of those tools is not done yet, never "no access"); the generic corrective only when no skill
+  is loaded or no tool of a loaded skill is callable. The calls of one model step are answered alike; a step begins at the row with
   the usage stamp.
 - The identical write after its FINAL refusal in this turn (`MCPToolResponse::finalRefusal()`, carried as
   `ToolCall::$wasRefusedAsFinal`, stored only when true; `AgentRepeatedToolCallCheck::findFinalRefusalOfTheSameWriteInTurn()`)
