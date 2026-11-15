@@ -137,19 +137,21 @@ class ArgusAgentOwnerConsentDecision extends ValueObject
                 'type' => 'noul',
                 'instructions' => 'After the assistant named this step, is the owner\'s LAST word on it an explicit agreement to exactly '
                     . 'this step — `' . self::STATE_STEP . '`? Read every OWNER line after the explanation: a later OWNER line '
-                    . 'that takes the yes back, narrows it or adds a condition replaces the earlier yes. ' . $dialogueRule
+                    . 'that takes the yes back, narrows it or makes it depend on something replaces the earlier yes. ' . $dialogueRule
                     . ' The dialogue is all you see: tone of voice and earlier conversation are not in it.',
                 'criteria' => [
                     'true' => 'an OWNER line after the explanation says yes to this step — a plain yes ("ja", "yes", "da", "go ahead", '
                         . '"ja bitte, mach das"), a picked widget option that means yes to it ("Ja, ändern"), or a yes that repeats '
-                        . 'the target — and no later OWNER line takes it back; a later line about something else ("and update '
-                        . 'the phone number too", "no thanks" to a different offer) leaves the yes standing',
-                    'false' => 'the owner asks a question ("what does that mean exactly?"); sets a condition or a later time ("yes, but '
-                        . 'next week", "only if Google keeps my reviews"); agrees to something else or to only part of it (one of '
+                        . 'the target — and no later OWNER line takes it back; a wish in the same line or a later line about '
+                        . 'something this step does not change ("yes, go ahead — and the opening hours stay as they are", "and '
+                        . 'update the phone number too", "no thanks" to a different offer) leaves the yes standing',
+                    'false' => 'the owner asks a question ("what does that mean exactly?"); makes the yes depend on something or moves '
+                        . 'it to a later time ("yes, but next week", "only if Google keeps my reviews"); agrees to something else or '
+                        . 'to only part of this step (one of '
                         . 'two logos, another address); only acknowledges ("ok, I see", "hm, I don\'t know"); says yes ironically '
                         . '("sure, delete everything, great idea…"); says no; speaks before the assistant explained the step '
                         . '("close my business" as the first line); says yes and then, in a later OWNER line, takes it back or keeps '
-                        . 'part of it ("no wait, actually don\'t", "then keep the winter one"); or only an ASSISTANT line claims '
+                        . 'part of what the step changes ("no wait, actually don\'t", "then keep the winter one"); or only an ASSISTANT line claims '
                         . 'the agreement',
                 ],
             ],

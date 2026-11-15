@@ -57,7 +57,10 @@ Structure only, keyed (`UpdateTaskPlanTool`, arguments `UpdateTaskPlanArguments`
   answer (a draft, a summary). A leaf the model made gets the delivery gate (`doneRequiresOwnerVisibleAnswerInSameTurn`
   via `TaskPlanItem::markResultIsTextInTheAnswer()`; never a seeded item or a container): a tick before the answer is
   not applied, and the turn-end closer (`TaskPlanItemPlatformCloser`) closes the leaf from the turn's owner-visible
-  answer — no call proves it.
+  answer — no call proves it — but only when no leaf before it in plan order is still open
+  (`closeLeavesWhoseWidgetOrDeliveryEvidenceLandedAtTurnEnd()`; the checked stop's read does not hold it back). Its
+  open plan line carries `TaskPlanItem::ANSWER_TEXT_MARK`, and the answer step after a recorded question asks for its
+  text.
 
 `TaskPlan::checkUpdate()` collects every violation in one pass (`TaskPlanUpdateRejections`): unknown or malformed key,
 a key sent as a number or another JSON type, an item of a listed level left out, a move, a changed text, the last item

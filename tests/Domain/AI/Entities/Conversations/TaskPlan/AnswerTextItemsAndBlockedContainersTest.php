@@ -48,6 +48,44 @@ class AnswerTextItemsAndBlockedContainersTest extends UnitTestCase
         self::assertSame(TaskPlanItem::STATUS_DONE, TaskPlanItemPlatformCloser::forItem($draftItem)->applyTurnEndEvidenceClosing($withAnswer));
     }
 
+    public function testTheOpenItemsLineSaysItsTextBelongsInTheAnswer(): void
+    {
+        $draftItem = new TaskPlanItem();
+        $draftItem->text = 'Post draft as text';
+        $draftItem->markResultIsTextInTheAnswer();
+
+        self::assertSame(
+            '[ ] 3 Post draft as text — text in your answer: write it in the answer of this turn; the platform closes it from that answer',
+            $draftItem->toCompactTailHintLine('3', false)
+        );
+    }
+
+    public function testAnAnswerTextItemBehindAnOpenLeafStaysOpenAtTurnEndButNotInTheCheckedStopsRead(): void
+    {
+        $waitingItem = new TaskPlanItem();
+        $waitingItem->text = 'Load the rankings after the owner answered';
+        $draftItem = new TaskPlanItem();
+        $draftItem->text = 'Post draft as text';
+        $draftItem->markResultIsTextInTheAnswer();
+        $taskPlanItems = new TaskPlanItems();
+        $taskPlanItems->add($waitingItem);
+        $taskPlanItems->add($draftItem);
+        $answeredTurn = TaskPlanEvidence::forTurn(
+            $this->messageSet([$this->message(10, AIConversationMessage::ROLE_USER, 'status, rankings and a post')]),
+            10,
+            'Your profile is complete. Shall I load the rankings for all three locations?'
+        );
+
+        self::assertTrue($taskPlanItems->hasOwedOpenItemsAfterCandidateTextEvidence($answeredTurn), 'the waiting item is still owed');
+        $closings = $taskPlanItems->closeLeavesWhoseWidgetOrDeliveryEvidenceLandedAtTurnEnd($answeredTurn);
+        self::assertFalse($closings->hasClosings(), 'an earlier item is open: the answer is no proof that the draft is in it');
+        self::assertTrue($draftItem->isOpen());
+
+        $waitingItem->status = TaskPlanItem::STATUS_DONE;
+        self::assertSame(['2'], $taskPlanItems->closeLeavesWhoseWidgetOrDeliveryEvidenceLandedAtTurnEnd($answeredTurn)->getClosedNumberPaths());
+        self::assertFalse($draftItem->isOpen());
+    }
+
     public function testASeededItemOrAContainerIsNotMarked(): void
     {
         $seededItem = new TaskPlanItem();

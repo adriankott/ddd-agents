@@ -403,15 +403,28 @@ class TaskPlanItems extends ObjectSet
      * closed here. Returns the closings (item key → status written: `done` or `not_applicable` for a widget the owner
      * declined). The turn end is the one write (`AIConversationTaskPlanRecordService::closePlanLeavesAtTurnEnd()`); the
      * checked stop runs this closer on a COPY of the plan only ({@see hasOwedOpenItemsAfterCandidateTextEvidence()}).
+     *
+     * An item whose result is text in the answer ({@see TaskPlanItem::isResultTextInTheAnswer()}) closes only when no
+     * leaf before it in plan order is still open (with `$holdsAnswerTextItemsBehindOpenItems`): an answer written while
+     * an earlier part waits (a question to the owner) is no proof that the later text is in it — the item stays open
+     * and shows again next turn. The checked stop's read does not hold them back (it never bounces for them).
      */
-    public function closeLeavesWhoseWidgetOrDeliveryEvidenceLandedAtTurnEnd(TaskPlanEvidence $taskPlanEvidence): TaskPlanLeafClosings
-    {
+    public function closeLeavesWhoseWidgetOrDeliveryEvidenceLandedAtTurnEnd(
+        TaskPlanEvidence $taskPlanEvidence,
+        bool $holdsAnswerTextItemsBehindOpenItems = true
+    ): TaskPlanLeafClosings {
         $taskPlanLeafClosings = new TaskPlanLeafClosings();
+        $anEarlierLeafIsOpen = false;
         foreach ($this->buildItemAddresses()->getLeaves() as $taskPlanItemAddress) {
-            $closingStatus = TaskPlanItemPlatformCloser::forItem($taskPlanItemAddress->item)->applyTurnEndEvidenceClosing($taskPlanEvidence);
+            $taskPlanItem = $taskPlanItemAddress->item;
+            if ($holdsAnswerTextItemsBehindOpenItems && $anEarlierLeafIsOpen && $taskPlanItem->isResultTextInTheAnswer()) {
+                continue;
+            }
+            $closingStatus = TaskPlanItemPlatformCloser::forItem($taskPlanItem)->applyTurnEndEvidenceClosing($taskPlanEvidence);
             if ($closingStatus !== null) {
                 $taskPlanLeafClosings->addClosing($taskPlanItemAddress->key, $closingStatus);
             }
+            $anEarlierLeafIsOpen = $anEarlierLeafIsOpen || ($taskPlanItem->isOpen() && !$taskPlanItemAddress->hasBlockedAncestor);
         }
         return $taskPlanLeafClosings;
     }
@@ -424,7 +437,7 @@ class TaskPlanItems extends ObjectSet
     public function hasOwedOpenItemsAfterCandidateTextEvidence(TaskPlanEvidence $taskPlanEvidence): bool
     {
         $taskPlanItemsCopy = self::buildFromRepositoryArrayAsStored($this->toRepositoryArray());
-        $taskPlanItemsCopy->closeLeavesWhoseWidgetOrDeliveryEvidenceLandedAtTurnEnd($taskPlanEvidence);
+        $taskPlanItemsCopy->closeLeavesWhoseWidgetOrDeliveryEvidenceLandedAtTurnEnd($taskPlanEvidence, false);
         return $taskPlanItemsCopy->hasOwedOpenItems();
     }
 

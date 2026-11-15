@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.0-alpha.43
+
+- `inAnswer` plan items: the open line says the text belongs in this turn's answer (`TaskPlanItem::ANSWER_TEXT_MARK`);
+  the answer step after a recorded owner question asks for the text of every such item; and the turn-end closer
+  closes one only when no leaf before it in plan order is still open — an answer that asked the owner about an
+  earlier part closed a draft it never carried.
+- Owner-consent decision (`owner_explicitly_agreed_afterwards`): a wish in the same line about something the step does
+  not change ("yes, go ahead — and the opening hours stay as they are") leaves the yes standing; what refuses is a yes
+  that depends on something, moves to a later time, covers only part of this step, or keeps part of what the step
+  changes. A yes with such a wish was read as a condition and the owner was asked again.
+
 ## 0.1.0-alpha.42
 
 - The module ships eleven more console commands as bases an application subclasses under the same name: the chat

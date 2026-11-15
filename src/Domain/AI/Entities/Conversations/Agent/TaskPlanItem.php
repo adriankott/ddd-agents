@@ -1140,6 +1140,9 @@ class TaskPlanItem extends ValueObject
         return $clippedText . '…';
     }
 
+    /** The plan-line suffix of an open item whose result is text in the answer ({@see isResultTextInTheAnswer()}). */
+    public const string ANSWER_TEXT_MARK = ' — text in your answer: write it in the answer of this turn; the platform closes it from that answer';
+
     /**
      * The COMPACT plan line of this node: `[status] <key> <title>` ({@see buildPlanLineTitle()}); the
      * `← next` item alone carries its full text (its procedure). A blocked or not-applicable item keeps its reason and an
@@ -1155,8 +1158,9 @@ class TaskPlanItem extends ValueObject
         $obstaclePrefix = $statusNote !== '' && $this->status === self::STATUS_OPEN
             ? '(obstacle noted, retry: ' . self::clipForPlanLine($statusNote, self::COMPACT_LINE_NOTE_CHARS) . ') '
             : '';
+        $answerTextMark = $this->isResultTextInTheAnswer() && $this->isOpen() ? self::ANSWER_TEXT_MARK : '';
         if ($carriesNextMarker) {
-            return '[ ] ' . $obstaclePrefix . $key . ' ' . $this->text . ($closesItself ? self::SELF_CLOSING_NEXT_MARK : '') . ' ← next';
+            return '[ ] ' . $obstaclePrefix . $key . ' ' . $this->text . ($closesItself ? self::SELF_CLOSING_NEXT_MARK : '') . $answerTextMark . ' ← next';
         }
         $labelledTitle = $key . ' ' . $this->buildPlanLineTitle();
         $reason = $statusNote !== '' ? self::clipForPlanLine($statusNote, self::COMPACT_LINE_NOTE_CHARS) : 'no reason given';
@@ -1170,7 +1174,7 @@ class TaskPlanItem extends ValueObject
             $this->status === self::STATUS_NOT_APPLICABLE => '[– n/a: ' . $reason . '] ' . $labelledTitle,
             !$this->isOpen() => '[✓] ' . $labelledTitle,
             $this->isAwaitingOwnerOffer() => '[⏳ awaiting the owner\'s answer on the widget — END YOUR TURN; nothing to do here] ' . $labelledTitle,
-            default => '[ ] ' . $obstaclePrefix . $labelledTitle . ($closesItself ? self::SELF_CLOSING_MARK : ''),
+            default => '[ ] ' . $obstaclePrefix . $labelledTitle . ($closesItself ? self::SELF_CLOSING_MARK : '') . $answerTextMark,
         };
     }
 
