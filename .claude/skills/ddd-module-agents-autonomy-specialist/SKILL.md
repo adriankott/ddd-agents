@@ -1,6 +1,6 @@
 ---
 name: ddd-module-agents-autonomy-specialist
-description: "Explains and extends how the agent of mgamadeus/ddd-agents works without the owner present, and what it may do then. Covers delegation (delegate, check_delegations, message_sub_agent, wait_for_sub_agents, one sub-agent per call, the concurrency cap, run-end notifications, continuation runs, deadlines, background operations), schedules and unattended runs (the fire steps a host command drives, skip reasons, the Schedule.Run purpose, backoff, done criteria, time zones, the state sweep, the budget pot, the self-replication guard), automation eligibility, mandates (MCPToolRequiresMandate, one-instruction grants, grantMandate, revocation), the supervisor (off by default, steer, correct) and owner reports (send_owner_report, template reports, late delivery, the report mail). Use when the agent should delegate or run a task later, a schedule does not fire or fires twice, a sub-agent result never arrives, a tool is refused for a missing mandate, no report mail is sent, or supervision should be switched on."
+description: "Explains and extends how the agent of mgamadeus/ddd-agents works without the owner present, and what it may do then. Covers delegation (delegate with parallelTasks, check_delegations, message_sub_agent, wait_for_sub_agents, the concurrency cap, run-end notifications, continuation runs, deadlines, background operations), schedules and unattended runs (the fire steps a host command drives, skip reasons, the Schedule.Run purpose, backoff, done criteria, time zones, the state sweep, the budget pot, the self-replication guard), automation eligibility, mandates (MCPToolRequiresMandate, one-instruction grants, grantMandate, revocation), the supervisor (off by default, steer, correct) and owner reports (send_owner_report, template reports, late delivery, the report mail). Use when the agent should delegate or run a task later, a schedule does not fire or fires twice, a sub-agent result never arrives, a tool is refused for a missing mandate, no report mail is sent, or supervision should be switched on."
 metadata:
   author: mgamadeus
   version: "0.1.0"
@@ -42,8 +42,9 @@ Not here: the conversation tree, run claims and the release of a child's run (lo
    `INITIATOR_TYPE_ADMIN_TASK`, or of a host's own owner-absent type without a `scheduleId`, gets the per-request
    grant attempted from its own seed message. A host that starts such runs gives them a `scheduleId` or keeps gated
    tools out of them. The supervisor skips every run that is not owner-present (`AIConversation::canBeSupervised()`).
-2. **One `delegate` call starts one sub-agent, one level deep.** Its answer is final at the spawn; the result arrives
-   later as exactly one signal row per run end (`SIGNAL_SOURCE_SUB_AGENT_RUN_ENDED`). A child never delegates.
+2. **One `delegate` row is one sub-agent, one level deep.** A call with `parallelTasks` starts one per item, each on
+   its own row. Its answer is final at the spawn; the result arrives later as exactly one signal row per run end
+   (`SIGNAL_SOURCE_SUB_AGENT_RUN_ENDED`). A child never delegates.
 3. **The package ships the fire command, not its cron line; the sweep is a host command.** Without the host's cron
    line for `app:ai-conversation:fire-due-schedules` no schedule fires; without the host's sweep, reaper and owed-work
    commands no deadline times out, no lost notification is re-sent and no owed report is delivered late.

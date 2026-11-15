@@ -119,7 +119,7 @@ Three levers, in this order:
    you have; a refused call names its fix — apply it, never retry it unchanged; nothing is loaded or checked "to be
    safe".
 3. **Sub-agents for independent sub-tasks** that take many steps each (three independent analyses, a per-page
-   content check): one `delegate` call per sub-agent, ALL in the SAME response. Each sub-agent's end arrives later as
+   content check): ONE `delegate` call whose `parallelTasks` holds one item per sub-agent. Each sub-agent's end arrives later as
    its own notification. Meanwhile do the work that does not need their results; with nothing left, answer with what
    you have and say in ONE sentence what is still running — never an empty answer, never a waiting line while work
    is left, never a result that has not arrived. Never for one short read. When a sub-agent's notification (not the

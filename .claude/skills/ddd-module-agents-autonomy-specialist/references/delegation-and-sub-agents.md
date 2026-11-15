@@ -12,7 +12,9 @@ Contents: the model in short · the four tools · who can start a sub-agent · t
 - **One level only.** A child is never offered `delegate`; a child that still calls it gets
   `AIConversationDelegationSpawnService::ONE_LEVEL_REFUSAL`. A tool result inside a child starts no sub-agent and the
   platform's background requests are skipped for children. There is no depth setting.
-- **One `delegate` call starts one sub-agent.** Parallel work is several `delegate` calls in one model response.
+- **One `delegate` row is one sub-agent.** A call starts one sub-agent; a call whose `parallelTasks` holds several
+  items starts one per item — the call's own row carries the first item, every further item gets a `delegate` row of
+  its own right after it (see "Parallel tasks of one call").
 - The `delegate` row **is the sub-agent's record**: its `delegationResults` column holds one
   `DelegationSubAgentRecord` under `DelegationResults::SUB_AGENT_KEY`. Each change of state is one guarded write on one
   run of that record; after the spawn the parent never writes the column again.
@@ -30,7 +32,7 @@ tool shares belongs to the tools skill `ddd-module-agents-tools-specialist`.
 
 | Tool | Offered | Arguments and effect |
 |---|---|---|
-| `delegate` (`DelegateTool`) | every step of a root conversation | `label` (at most `AgentDelegationTask::LABEL_MAX_LENGTH` characters), and either `task` + `skill_names` (an agent task) or `toolName` + `toolArguments` (one tool run, no model). A call that names `toolName` is a tool run; its `task` text is ignored. |
+| `delegate` (`DelegateTool`) | every step of a root conversation | `label` (at most `AgentDelegationTask::LABEL_MAX_LENGTH` characters), and either `task` + `skill_names` (an agent task) or `toolName` + `toolArguments` (one tool run, no model). A call that names `toolName` is a tool run; its `task` text is ignored. Or `parallelTasks`: two or more items of that shape, one sub-agent each; the top-level task fields are then not read, one item is the call itself. |
 | `check_delegations` (`CheckDelegationsTool`) | from the first `delegate` row on | no argument: one line per sub-agent, the newest `DelegationStatusReport::RECORDS_IN_FULL_MAX`; `subAgent` (a number or "#3"): every run of that sub-agent, its full result and the child's newest `DelegationStatusReport::DRILL_DOWN_STEPS_MAX` steps |
 | `message_sub_agent` (`MessageSubAgentTool`) | beside `check_delegations` | `subAgent`, `message` (cut to `MessageSubAgentArguments::MESSAGE_MAX_LENGTH`) — see "Results, messages and continuations" |
 | `wait_for_sub_agents` (`WaitForSubAgentsTool`) | only on a root turn opened by run-end notifications alone while a run that resumes the parent is unfinished | `reason`; a completed call ends the turn without text |
@@ -38,6 +40,26 @@ tool shares belongs to the tools skill `ddd-module-agents-tools-specialist`.
 `wait_for_sub_agents` refuses when the owner wrote during the turn, when the turn was not opened by notifications
 alone, or when no sub-agent still runs; each refusal forces a step without tools so the model answers.
 `message_sub_agent` refuses inside a sub-agent and refuses the same message to the same sub-agent twice in a turn.
+
+## Parallel tasks of one call
+
+`DelegateToolArguments::fromToolCallArguments()` reads `parallelTasks` (`DelegateToolArguments::PARALLEL_TASKS_ARGUMENT`)
+into `DelegateToolParallelTaskArguments`, one `DelegateToolArguments` per item with its `parallelTaskItemNumber`.
+`AIConversationDelegationSpawnService::spawnParallelTasksOfModelCall()` then:
+
+- puts the first item on the call's own row and every further item on a `delegate` row appended after it
+  (`call_fanout_` id, the item in the single-task shape, the call's `emittedBatchId` — set to the call's id when the
+  step had one call, so the sync guard "a sub-agent of this step failed" spans the items);
+- runs the model's guards per item: a refused item, or one without a task shape, is a `NOT_RUN` record on its own row
+  and that row FAILED; the other items run. A call whose items name no task at all is rejected as a whole, no rows;
+- async, queues every child and admits them together once every row exists (`promoteQueuedDelegations()` once); sync,
+  runs them inline in item order;
+- answers the call's row with the first item's answer plus `DelegateTool::buildParallelTasksAnswerTail()` (the other
+  items started, the ones refused); every further row carries its own answer.
+
+The name is not `tasks`: rows stored before one sub-agent per call carry `arguments.tasks[]`, and their readers
+(`DelegationResults::buildSubAgentRecords()`, `getDelegationTaskCount()`, the activity line, the web's
+`derive-agent-activity`) count those items as the row's sub-agents.
 
 ## Who can start a sub-agent
 

@@ -2,7 +2,7 @@
 
 **Reader:** package maintainer
 
-Contents: a sub-agent's result arrives as a notification · one sub-agent per delegate call · exactly one notification per run end · one level of delegation · eligibility is its own gate · the state sweep stamps a reason · a scheduled run is a purposed conversation · one delivery path per run · the fire claim is a compare-and-set · the unit of a one-instruction mandate is the owner's request · a mandate is declared per tool · unattended runs are never granted a mandate · the supervisor is off by default · the tandem is the only writer · call first, then the report · a template report needs no model call
+Contents: a sub-agent's result arrives as a notification · one sub-agent per delegate row · exactly one notification per run end · one level of delegation · eligibility is its own gate · the state sweep stamps a reason · a scheduled run is a purposed conversation · one delivery path per run · the fire claim is a compare-and-set · the unit of a one-instruction mandate is the owner's request · a mandate is declared per tool · unattended runs are never granted a mandate · the supervisor is off by default · the tandem is the only writer · call first, then the report · a template report needs no model call
 
 ## A sub-agent's result arrives as a notification
 
@@ -21,18 +21,22 @@ it was the model before one sub-agent per call).
 **Would change if.** Children were always short and inline, so that no child ever outlived the parent's step — then
 the synchronous path, which exists for console and evaluation runs, could be the only one.
 
-## One sub-agent per delegate call
+## One sub-agent per delegate row
 
-**Rule.** One `delegate` call starts one sub-agent: an agent task or one tool run. Parallel work is several calls in
-one response. The schema has no task list, no wait condition, no quorum and no timeout.
+**Rule.** One `delegate` row carries one sub-agent: an agent task or one tool run. Parallel work is ONE call whose
+`parallelTasks` holds one item per sub-agent; the call's row carries the first item, every further item gets a row of
+its own. The schema has no wait condition, no quorum and no timeout.
 
-**Reason.** One call, one record, one number, one result: every state change is one guarded write on one run of one
+**Reason.** One row, one record, one number, one result: every state change is one guarded write on one run of one
 record, and the model sees exactly what it started. The model, not a platform wait rule, decides what to do when a
-result arrives.
+result arrives. The list exists because models did not emit several `delegate` calls in one response, however often
+the texts asked for it (three sequential runs instead of one parallel group), while they fill an array argument in one
+call reliably.
 
 **Rejected.** A task list per call with a wait condition (`ALL`, `ANY`, `QUORUM`) and children writing into one shared
 map on the call row — two meanings of "done", N writers on one row, three numberings of children, and prompt texts
-that contradicted the schema. Fixing those defects one by one was considered and rejected as the larger change.
+that contradicted the schema. Several sub-agent records on one row, and splitting the model's call into invented
+calls of its own (the provider's server-side state knows only the call it emitted).
 
 **Would change if.** A model provider offered native parallel sub-agent calls with their own result channel.
 

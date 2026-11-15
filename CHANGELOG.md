@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.0-alpha.36
+
+- `delegate` takes `parallelTasks`: ONE call starts one sub-agent per item (each item `label` and `task` +
+  `skill_names` or `toolName` + `toolArguments`). The call's row carries the first item; every further item gets a
+  `delegate` row of its own right after it, with its own record, number, deadline and run-end notification. Each item
+  passes the model's guards on its own (a refused item fails its own row only); async, the children are admitted
+  together once every row exists. A one-item list is the single form. Models emitted several `delegate` calls one
+  response at a time despite the texts; an array argument is filled in one call.
+- The `delegate` description, the `parallelTasks` description, the call row's answer line naming the other items and
+  the per-item rejection carry the agreed wording; `Agentic.md` rule 3 says "ONE `delegate` call whose `parallelTasks`
+  holds one item per sub-agent".
+
 ## 0.1.0-alpha.35
 
 - `[SIGNAL:answer-step]` after a platform-written widget that ends the purpose: the text the last tool result asks for —

@@ -13,7 +13,9 @@ use DDD\Domain\AI\Entities\Conversations\Agent\Delegation\AgentDelegationAwaited
 use DDD\Domain\AI\Entities\Conversations\Agent\Delegation\AgentDelegationToolRunTask;
 use DDD\Domain\AI\Entities\Conversations\Agent\Delegation\AgentSubAgentRequest;
 use DDD\Domain\AI\Entities\Conversations\Agent\Tools\AgentMetaToolCallAnswer;
+use DDD\Domain\AI\Entities\Conversations\Agent\Tools\DelegateTool;
 use DDD\Domain\AI\Entities\Conversations\Agent\Tools\DelegateToolArguments;
+use DDD\Domain\AI\Entities\Conversations\Agent\Tools\DelegateToolParallelTaskArguments;
 use DDD\Domain\AI\Entities\Conversations\Agent\Tools\MessageSubAgentArguments;
 use DDD\Domain\AI\Entities\Conversations\Agent\Tools\MessageSubAgentTool;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolEffectCatalog;
@@ -501,6 +503,20 @@ class AIConversationDelegationSpawnService extends Service
             return self::ONE_LEVEL_REFUSAL;
         }
         $delegateToolArguments = DelegateToolArguments::fromToolCallArguments($delegateToolCall->arguments);
+        if ($delegateToolArguments->parallelTaskArguments !== null && $delegateToolArguments->namesTaskInAParallelTaskItem()) {
+            return $this->spawnParallelTasksOfModelCall(
+                $agentRun,
+                $agentChildTurnRunner,
+                $parentConversation,
+                $delegateToolCall,
+                $delegateCallMessage,
+                $delegateToolArguments->parallelTaskArguments,
+                $transientMessageIds,
+                $modelNameOverride,
+                $consoleStream,
+                $async
+            );
+        }
         $agentSubAgentRequest = AgentSubAgentRequest::forModelCall($delegateToolArguments);
         $subAgentNumber = $this->messagesService()->findNextSubAgentNumber($parentConversation);
         $now = new DateTime();
@@ -519,6 +535,139 @@ class AIConversationDelegationSpawnService extends Service
         $spawnAnswer = $this->spawnSubAgent($agentRun, $agentChildTurnRunner, $parentConversation, $agentSubAgentRequest, $subAgentNumber, $delegateCallMessage, $transientMessageIds, $modelNameOverride, $consoleStream, $async);
         $delegateToolCall->markCompleted();
         return $spawnAnswer;
+    }
+
+    /**
+     * The model's `delegate` call with `parallelTasks`: ONE sub-agent per item, one row per sub-agent. The call's own
+     * row carries the first item; every further item gets a `delegate` row of its own right after it (the
+     * `call_fanout_` id family, in the single-task shape of the model's call, the call's emission batch) — so each
+     * sub-agent keeps its own record, number, deadline and run-end notification. Every item passes the model-only
+     * guards of a call of its own ({@see findRefusalOfModelRequestedTask()}); a refused item is a NOT_RUN record on its
+     * row and that row FAILED, the other items run. Async, the children are queued and admitted together once every row
+     * exists (a fast child never ends before its siblings' rows exist); sync, each runs inline in item order. Returns the
+     * call row's answer: the first item's answer and the line that names the other items' sub-agents.
+     *
+     * @throws AgentRunClaimLostException the run claim was lost while a claim-fenced write ran
+     * @throws MessageIndexLockUnavailableException
+     */
+    protected function spawnParallelTasksOfModelCall(
+        AgentRun $agentRun,
+        AgentChildTurnRunnerInterface $agentChildTurnRunner,
+        AIConversation $parentConversation,
+        ToolCall $delegateToolCall,
+        AIConversationMessage $delegateCallMessage,
+        DelegateToolParallelTaskArguments $delegateToolParallelTaskArguments,
+        AgentTransientMessageIds $transientMessageIds,
+        ?string $modelNameOverride,
+        ?AgentConsoleStream $consoleStream,
+        bool $async
+    ): string {
+        $runsAsync = $async && isset($parentConversation->id);
+        // the items are one emission: the sync guard "a sub-agent of this step failed" reads the batch id
+        $delegateToolCall->emittedBatchId ??= $delegateToolCall->toolCallId;
+        /** @var AIConversationMessage[] $itemRows */
+        $itemRows = [];
+        /** @var string[] $itemAnswers keyed like $itemRows */
+        $itemAnswers = [];
+        foreach ($delegateToolParallelTaskArguments->getElements() as $itemArguments) {
+            $isCallRow = $itemRows === [];
+            $agentSubAgentRequest = AgentSubAgentRequest::forModelCall($itemArguments);
+            $itemRow = $isCallRow
+                ? $delegateCallMessage
+                : $this->appendParallelTaskRow($parentConversation, $delegateToolCall, $itemArguments, $agentSubAgentRequest, $transientMessageIds);
+            $itemToolCall = $itemRow->toolCall;
+            $subAgentNumber = $this->messagesService()->findNextSubAgentNumber($parentConversation);
+            $now = new DateTime();
+            $notRunRecord = null;
+            if ($agentSubAgentRequest === null) {
+                $notRunRecord = DelegationSubAgentRecord::notRunWithoutTask($subAgentNumber, $itemArguments, $now);
+            } else {
+                $delegationSubAgentRefusal = $this->findRefusalOfModelRequestedTask($agentRun, $parentConversation, $agentSubAgentRequest, $itemToolCall, $async);
+                if ($delegationSubAgentRefusal !== null) {
+                    $notRunRecord = DelegationSubAgentRecord::notRun($subAgentNumber, $agentSubAgentRequest, $delegationSubAgentRefusal->failureReason, $delegationSubAgentRefusal->corrective, $now);
+                }
+            }
+            if (!$isCallRow) {
+                // the row is stored with a valid answer before its record: a process that stops in between leaves no
+                // call without a result on the wire, and the record's write needs the stored row
+                $itemToolCall->result = $notRunRecord !== null
+                    ? $notRunRecord->buildSpawnAnswerText(null)
+                    : DelegationSubAgentRecord::queued($subAgentNumber, $agentSubAgentRequest, 0, $now)->buildAnswerTextBeforeAdmission();
+                $this->messagesService()->persistMessageUnderRun($agentRun, $itemRow, $consoleStream);
+            }
+            if ($notRunRecord !== null) {
+                $itemAnswers[] = $this->refuseSubAgent($parentConversation, $itemToolCall, $itemRow, $notRunRecord);
+            } else {
+                $itemAnswers[] = $this->spawnSubAgent(
+                    $agentRun,
+                    $agentChildTurnRunner,
+                    $parentConversation,
+                    $agentSubAgentRequest,
+                    $subAgentNumber,
+                    $itemRow,
+                    $transientMessageIds,
+                    $modelNameOverride,
+                    $consoleStream,
+                    $async,
+                    !$runsAsync
+                );
+                $itemToolCall->markCompleted();
+            }
+            $itemRows[] = $itemRow;
+        }
+        if ($runsAsync) {
+            $admittedChildIds = $this->promoteQueuedDelegations($parentConversation->getTreeRootConversationId());
+            foreach ($itemRows as $itemIndex => $itemRow) {
+                $itemRecord = $itemRow->delegationResults->subAgent;
+                if (!$itemRecord->isNotRun()) {
+                    $isAdmitted = in_array((int)$itemRecord->childConversationId, $admittedChildIds, true);
+                    $itemAnswers[$itemIndex] = $itemRecord->buildSpawnAnswerText($isAdmitted ? null : AIConversationRunClaimsService::DELEGATION_CONCURRENCY_CAP);
+                }
+            }
+        }
+        $otherItemRecords = new DelegationSubAgentRecords();
+        foreach ($itemRows as $itemIndex => $itemRow) {
+            if ($itemIndex === 0) {
+                continue;
+            }
+            // the further rows are answered and stored now; the call's own row is answered by the dispatch
+            $itemRow->toolCall->result = $itemAnswers[$itemIndex];
+            $this->messagesService()->persistMessageUnderRun($agentRun, $itemRow, $consoleStream);
+            $otherItemRecords->add($itemRow->delegationResults->subAgent);
+        }
+        $this->aiTrace('turn.subAgents.parallelTasks', [
+            'parentConversationId' => $parentConversation->id ?? null,
+            'itemCount' => count($itemRows),
+            'async' => $runsAsync,
+        ]);
+        return $itemAnswers[0] . DelegateTool::buildParallelTasksAnswerTail($otherItemRecords);
+    }
+
+    /**
+     * The `delegate` row of a further item of the model's `parallelTasks` call, appended to the parent and not yet
+     * stored: the item in the single-task shape of a call of its own (an item without a task keeps its own fields),
+     * in the call's emission batch.
+     */
+    protected function appendParallelTaskRow(
+        AIConversation $parentConversation,
+        ToolCall $delegateToolCall,
+        DelegateToolArguments $itemArguments,
+        ?AgentSubAgentRequest $agentSubAgentRequest,
+        AgentTransientMessageIds $transientMessageIds
+    ): AIConversationMessage {
+        $itemRow = $this->messagesService()->appendNewMessage(
+            $parentConversation,
+            $transientMessageIds,
+            AIConversationMessage::MESSAGE_TOOL_CALL,
+            '',
+            authorType: AIConversationMessage::AUTHOR_ASSISTANT
+        );
+        $itemCallArguments = $agentSubAgentRequest !== null
+            ? $agentSubAgentRequest->buildDelegateCallArguments()
+            : ($itemArguments->label !== null ? ['label' => $itemArguments->label] : []);
+        $itemRow->toolCall = ToolCall::buildPlatformDelegateCall('call_fanout_' . RecordedRunClockAndIdSources::mintHexToken(8), $itemCallArguments);
+        $itemRow->toolCall->emittedBatchId = $delegateToolCall->emittedBatchId;
+        return $itemRow;
     }
 
     /** The text a sub-agent conversation's own `delegate` call gets (one level of delegation). */
