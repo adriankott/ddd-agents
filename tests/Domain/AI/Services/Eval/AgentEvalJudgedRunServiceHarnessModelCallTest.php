@@ -70,7 +70,10 @@ class AgentEvalJudgedRunServiceHarnessModelCallTest extends IntegrationTestCase
         $agentEvalJudgedRunService->callModel($this->buildScope(), 'driver-model', 'Write the next owner message.', AgentAIUsageScope::AI_AGENT_SIMULATE_OWNER);
 
         self::assertSame(AgentAIUsageScope::AI_AGENT_SIMULATE_OWNER, $agentEvalJudgedRunService->lastCompletionRequest?->getAIUsageScope());
-        self::assertStringStartsWith(AgentEvalJudgedRunService::EVAL_HARNESS_SYSTEM_PROMPT, (string)$agentEvalJudgedRunService->lastCompletionRequest?->modelInput?->composeSystemContent(), 'the harness system prompt, never the agent\'s identity');
+        $modelInput = $agentEvalJudgedRunService->lastCompletionRequest?->modelInput;
+        self::assertSame(AgentEvalJudgedRunService::EVAL_HARNESS_SYSTEM_PROMPT, trim((string)$modelInput?->composeSystemContent()), 'the harness system prompt alone: no identity, presence, skill catalog or memory section');
+        self::assertCount(1, $modelInput->messages ?? [], 'the prompt is the one message');
+        self::assertSame('Write the next owner message.', $modelInput->messages[0]->message ?? null);
     }
 
     public function testTheEnvelopeIsClosedWhenTheCallThrows(): void

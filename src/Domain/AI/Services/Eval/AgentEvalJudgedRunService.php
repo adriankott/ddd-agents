@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DDD\Domain\AI\Services\Eval;
 
+use DDD\Domain\AI\Entities\Conversations\Agent\AgentModelInput;
 use DDD\Domain\AI\Entities\Conversations\Agent\Prompts\AgentAIPromptNames;
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Entities\Conversations\Compaction\AIConversationCompactionNode;
@@ -500,11 +501,27 @@ class AgentEvalJudgedRunService extends AgentEvalRunnerService
             $argusAIAgentConversation->capturedToolCalls = null;
             $argusAIAgentConversation->aiModelNameOverride = $aiModelName;
             $argusAIAgentConversation->setAIUsageScope($aiUsageScope);
-            $argusAIAgentConversation->modelInput = $promptMessage->buildModelInputUpToAndIncludingThisMessage($promptConversation, static::EVAL_HARNESS_SYSTEM_PROMPT);
+            $argusAIAgentConversation->modelInput = $this->buildHarnessModelInput($promptMessage);
             return $this->loadHarnessCompletion($argusAIAgentConversation);
         } finally {
             $aIUsageEnvelopesService->closeEnvelope($evaluationEnvelopeContext);
         }
+    }
+
+    /**
+     * The model input of a harness model call: the harness system prompt ({@see EVAL_HARNESS_SYSTEM_PROMPT}) and the
+     * prompt as the one owner message — none of the platform's sections of an agent call (who the agent talks to, the
+     * skill catalog, the memories, the product, the clock): the driver and the judge are no agent of the platform.
+     *
+     * @param AIConversationMessage $promptMessage
+     * @return AgentModelInput
+     */
+    protected function buildHarnessModelInput(AIConversationMessage $promptMessage): AgentModelInput
+    {
+        $agentModelInput = AgentModelInput::newInstance();
+        $agentModelInput->systemPrompt = static::EVAL_HARNESS_SYSTEM_PROMPT;
+        $agentModelInput->messages = [$promptMessage];
+        return $agentModelInput;
     }
 
     /**

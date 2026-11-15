@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.0-alpha.52
+
+- The driver's and the judge's model calls of a judged run (`AgentEvalJudgedRunService::callModel()`) send the
+  harness system prompt and the prompt as the one message — none of the platform's sections of an agent call (owner
+  presence, skill catalog, memories, product, clock); `buildHarnessModelInput()` builds it.
+
 ## 0.1.0-alpha.51
 
 - After a model step that only repeated `load_skills` (every call loaded nothing new), `load_skills` is held back for
