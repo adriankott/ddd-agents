@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.0-alpha.32
+
+- A structured tool result (a response DTO without markdown rendering, a bare domain object) now hands the model its
+  platform note (`MCPToolResponsePlatformNoteProvider`) and its dictated widget type
+  (`MCPToolResponseDictatedWidgetTypeProvider`); only a markdown-rendered result did. A search DTO, which must stay
+  structured for `groupsFromToolCallId`, can name its call id in the note.
+
 ## 0.1.0-alpha.31
 
 - `ConversationSearchResults` widget description (model-facing `.md`): the agent names the search's tool call in

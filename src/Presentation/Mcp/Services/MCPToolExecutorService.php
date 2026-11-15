@@ -930,13 +930,10 @@ class MCPToolExecutorService extends Service
             if (($result->applied ?? null) === false) {
                 $loopControlFields['applied'] = false;
             }
-            $response = new MCPToolResponse($result->toLlmMarkdown(), $loopControlFields !== [] ? $loopControlFields : null);
-            if ($result instanceof MCPToolResponsePlatformNoteProvider) {
-                $response->setPlatformNoteForModel($result->buildPlatformNoteForModel());
-            }
-            if ($result instanceof MCPToolResponseDictatedWidgetTypeProvider) {
-                $response->setDictatedWidgetType($result->getDictatedWidgetType());
-            }
+            $response = $this->applyResultNoteAndDictatedWidgetType(
+                $result,
+                new MCPToolResponse($result->toLlmMarkdown(), $loopControlFields !== [] ? $loopControlFields : null)
+            );
             if ($result instanceof RestResponseDto || $result instanceof DefaultObject) {
                 // The facts of the result ride PERSISTED beside the markdown for the application's account record:
                 // the model reads the prose, the platform keeps the numbers; the wire strips this field.
@@ -956,7 +953,10 @@ class MCPToolExecutorService extends Service
             return $response;
         }
         if ($result instanceof RestResponseDto) {
-            $structuredResponse = new MCPToolResponse("Successful response for '$toolName'", $this->serializeForModel($result));
+            $structuredResponse = $this->applyResultNoteAndDictatedWidgetType(
+                $result,
+                new MCPToolResponse("Successful response for '$toolName'", $this->serializeForModel($result))
+            );
             $structuredResponse->setBindableResultRecord($this->buildBindableResultRecord($result, null, true));
             return $structuredResponse;
         }
@@ -967,12 +967,31 @@ class MCPToolExecutorService extends Service
         // "Recursion detected" on any back-reference (e.g. Booking->workshop->bookings->Booking). Tools
         // should return a RestResponseDto, but this guards every domain object regardless.
         if ($result instanceof DefaultObject) {
-            return new MCPToolResponse("Successful response for '$toolName'", $this->serializeForModel($result));
+            return $this->applyResultNoteAndDictatedWidgetType(
+                $result,
+                new MCPToolResponse("Successful response for '$toolName'", $this->serializeForModel($result))
+            );
         }
         if (is_object($result) && method_exists($result, 'getContent')) {
             return new MCPToolResponse((string)$result->getContent());
         }
         return new MCPToolResponse(is_string($result) ? $result : json_encode($result, JSON_THROW_ON_ERROR));
+    }
+
+    /**
+     * The platform note ({@see MCPToolResponsePlatformNoteProvider}) and the dictated widget type
+     * ({@see MCPToolResponseDictatedWidgetTypeProvider}) of a result, set on its response — for a markdown rendering
+     * and a structured one alike.
+     */
+    protected function applyResultNoteAndDictatedWidgetType(mixed $result, MCPToolResponse $response): MCPToolResponse
+    {
+        if ($result instanceof MCPToolResponsePlatformNoteProvider) {
+            $response->setPlatformNoteForModel($result->buildPlatformNoteForModel());
+        }
+        if ($result instanceof MCPToolResponseDictatedWidgetTypeProvider) {
+            $response->setDictatedWidgetType($result->getDictatedWidgetType());
+        }
+        return $response;
     }
 
     /**

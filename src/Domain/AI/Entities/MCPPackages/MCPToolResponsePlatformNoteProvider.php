@@ -9,7 +9,9 @@ namespace DDD\Domain\AI\Entities\MCPPackages;
  * next, why a page failed. The note reaches the model on the wire right after the
  * result ({@see \DDD\Domain\AI\Entities\Conversations\Messages\ToolCall::$platformNoteForModel}) but is kept OUT of the
  * stored result: the injection screening reads only the result, and our own instructions to the model scored
- * 0.65–0.96 as "an instruction aimed at an AI" and got whole page reads removed.
+ * 0.65–0.96 as "an instruction aimed at an AI" and got whole page reads removed. Read for every rendering of the
+ * result: markdown ({@see \DDD\Domain\Base\Entities\LlmMarkdownRenderable}) and structured (a response DTO,
+ * a domain object) alike.
  */
 interface MCPToolResponsePlatformNoteProvider
 {
