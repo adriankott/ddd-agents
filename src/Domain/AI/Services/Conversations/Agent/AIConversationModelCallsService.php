@@ -481,6 +481,7 @@ class AIConversationModelCallsService extends Service
             if ($agentAppendOnlyCall !== null && $agentAppendOnlyCall->appendedHistoryItems->insertionOfThisCall !== null) {
                 $requestSnapshot->appendedSkillNames = $agentAppendOnlyCall->appendedSkillNamesOfThisCall !== [] ? $agentAppendOnlyCall->appendedSkillNamesOfThisCall : null;
                 $requestSnapshot->appendedToolNames = $agentAppendOnlyCall->appendedToolNamesOfThisCall !== [] ? $agentAppendOnlyCall->appendedToolNamesOfThisCall : null;
+                $requestSnapshot->appendedPreloadLoadCallSkillNames = $agentAppendOnlyCall->appendedPreloadLoadCallSkillNamesOfThisCall !== [] ? $agentAppendOnlyCall->appendedPreloadLoadCallSkillNamesOfThisCall : null;
                 $requestSnapshot->appendedSituationChange = $agentAppendOnlyCall->appendedSituationChangeOfThisCall ? true : null;
                 $requestSnapshot->appendedSituationKind = $agentAppendOnlyCall->appendedSituationKindOfThisCall;
                 $requestSnapshot->appendedSituationNames = $agentAppendOnlyCall->appendedSituationNamesOfThisCall !== [] ? $agentAppendOnlyCall->appendedSituationNamesOfThisCall : null;

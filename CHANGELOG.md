@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.0-alpha.55
+
+- Append-only loading: skills the platform loaded before the turn's first model call (a preload: decision model, plan
+  item, structural) are appended behind a `load_skills` call and its result — the shape of the model's own load —
+  in front of the item that carries their tools and instructions. Seen only as instructions, a preloaded skill was
+  loaded again as the model's first call. Recorded in `RequestSnapshot::$appendedPreloadLoadCallSkillNames`,
+  re-rendered byte for byte by the later calls of the epoch (call id `call_preload_<row index>`); the result text is
+  `AIConversationMessage::LOAD_SKILLS_RESULT_LOADED`. The system-prompt swap is unchanged.
+- A tool's `@example {}` of its argument set goes out as `"examples":[{}]`, no longer `[[]]`.
+
 ## 0.1.0-alpha.54
 
 - A `load_skills` call the step held back (append-only loading: refused with the held-back text, never run) is no

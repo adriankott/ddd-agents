@@ -161,6 +161,13 @@ class RequestSnapshot extends ValueObject
     /** @var string[]|null The tools this call appended (the `additional_tools` item), same use. */
     public ?array $appendedToolNames = null;
 
+    /**
+     * @var string[]|null The skills the PLATFORM loaded (a preload before the turn's first model call) that this call
+     *      appended as a `load_skills` call and its result in front of its item — the shape of the model's own load;
+     *      a later call renders the same pair from it at {@see $appendedAfterMessageIndex}. Null = none.
+     */
+    public ?array $appendedPreloadLoadCallSkillNames = null;
+
     /** @var bool|null This call appended a `# Situation` entry (the sections for its {@see $variants}). */
     public ?bool $appendedSituationChange = null;
 

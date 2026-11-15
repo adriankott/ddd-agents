@@ -167,6 +167,10 @@ class ToolDefinition extends ValueObject
         if (is_array($parameters) && (($parameters['properties'] ?? null) === [])) {
             $parameters['properties'] = new \stdClass();
         }
+        // the same for an example of the argument set: `@example {}` decodes to an empty LIST, sent as `"examples":[[]]`
+        if (is_array($parameters) && is_array($parameters['examples'] ?? null)) {
+            $parameters['examples'] = array_map(static fn (mixed $example): mixed => $example === [] ? new \stdClass() : $example, $parameters['examples']);
+        }
         // ARGUMENTS FILLED FROM THE SPACE: ToolDefinition is the AGENT-LOOP wire shape only (the HTTP-MCP server
         // serves MCPBundle::buildDocumentation instead), and in the loop the executor fills an omitted argument of
         // this kind from the conversation's space. So HERE the property is truly optional — teach the model to omit

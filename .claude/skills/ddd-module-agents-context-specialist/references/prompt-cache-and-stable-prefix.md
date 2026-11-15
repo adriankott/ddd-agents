@@ -94,6 +94,11 @@ Under `conversationAppend` (`AIConversation::buildPrefixEpoch()` → `AgentPrefi
   (read from `RequestSnapshot::$appendedSkillNames`, `$appendedToolNames`, `$appendedSituationChange`, anchored at
   `$appendedAfterMessageIndex`) and appends what is new: skills loaded since (their instructions as a `developer`
   message), joining tools (an `additional_tools` item) and a `# Situation` entry for a variant change.
+- **A preload looks like the model's own load.** Skills the platform loaded before the turn's first model call
+  (decision model, plan item, structural — any `LoadedCapability::$source` but `model`) are appended behind a
+  `load_skills` call and its result (`call_preload_<row index>`, `AIConversationMessage::LOAD_SKILLS_RESULT_LOADED`),
+  recorded in `RequestSnapshot::$appendedPreloadLoadCallSkillNames` and re-rendered at the same position. Shown only as
+  instructions, the preloaded skill was loaded again by the model as its first call; its own load it never repeats.
 - **Conditional meta tools** (`AgentAppendOnlyCall::CONDITIONAL_META_TOOL_NAMES`) join once where their condition
   first holds and stay; a cold epoch carries them top-level (`AgentPrefixEpoch::$carriedConditionalMetaToolNames`).
 - **Reachable tool set top-level.** When the estimated schemas of every tool the purpose may reach fit

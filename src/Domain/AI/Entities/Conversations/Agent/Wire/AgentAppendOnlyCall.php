@@ -11,6 +11,7 @@ use DDD\Domain\AI\Entities\Conversations\Agent\Tools\MessageSubAgentTool;
 use DDD\Domain\AI\Entities\Conversations\Agent\Tools\SendOwnerReportTool;
 use DDD\Domain\AI\Entities\Conversations\Agent\Tools\WaitForSubAgentsTool;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
+use DDD\Domain\AI\Entities\Conversations\Messages\LoadedCapability;
 use DDD\Domain\AI\Entities\Conversations\Variants\AIConversationVariants;
 use DDD\Domain\AI\Entities\Skills\AISkills;
 
@@ -67,6 +68,9 @@ class AgentAppendOnlyCall
 
     /** @var string[] The tools THIS call appended (recorded on its request snapshot). */
     public array $appendedToolNamesOfThisCall = [];
+
+    /** @var string[] The preloaded skills THIS call appended as a `load_skills` call (recorded on its request snapshot). */
+    public array $appendedPreloadLoadCallSkillNamesOfThisCall = [];
 
     /** Whether THIS call appended a `# Situation` entry (recorded on its request snapshot). */
     public bool $appendedSituationChangeOfThisCall = false;
@@ -179,6 +183,11 @@ class AgentAppendOnlyCall
                 $includesQueryOptionsSyntax,
                 $includesSharedParams
             );
+            $recordedPreloadSkillNames = $rendersSkillTextOfRow ? array_values(array_intersect($requestSnapshot->appendedPreloadLoadCallSkillNames ?? [], $recordedSkillNames)) : [];
+            if ($recordedPreloadSkillNames !== [] && $requestSnapshot->appendedAfterMessageIndex !== null) {
+                $agentAppendedHistoryInsertion->preloadLoadCallSkillNames = $recordedPreloadSkillNames;
+                $agentAppendedHistoryInsertion->preloadLoadCallId = AgentAppendedHistoryInsertion::buildPreloadLoadCallId($requestSnapshot->appendedAfterMessageIndex);
+            }
             if (!$agentAppendedHistoryInsertion->isEmpty()) {
                 $agentAppendOnlyCall->appendedHistoryItems->addInsertionBeforeMessageIndex(
                     self::findInsertionMessageIndex($agentModelInput->messages, $requestSnapshot->appendedAfterMessageIndex, (int)$message->indexInConversation),
@@ -213,7 +222,22 @@ class AgentAppendOnlyCall
             !$queryOptionsSyntaxShown && self::namedSkillsExposeQueryOptions($resolvedSkills, $skillNamesToAppendNow),
             !$sharedParamsShown && self::namedSkillsExposeSharedParams($resolvedSkills, $skillNamesToAppendNow)
         );
+        // skills the platform loaded before the turn's first model call (no model step since the newest owner row) go on
+        // the wire as a `load_skills` call and its result in front of the item: the model repeated the load of a
+        // preloaded skill it saw only as instructions, never its own load
+        $newestMessage = $agentModelInput->getNewestMessage();
+        $preloadSkillNames = $newestMessage !== null && !isset($newestMessage->toolCall) && isset($newestMessage->indexInConversation)
+            ? array_values(array_filter($skillNamesToAppendNow, static function (string $skillName) use ($agentModelInput): bool {
+                $loadedCapability = $agentModelInput->loadedCapabilities?->getByName($skillName);
+                return $loadedCapability !== null && $loadedCapability->source !== null && $loadedCapability->source !== LoadedCapability::SOURCE_MODEL;
+            }))
+            : [];
+        if ($preloadSkillNames !== []) {
+            $agentAppendedHistoryInsertion->preloadLoadCallSkillNames = $preloadSkillNames;
+            $agentAppendedHistoryInsertion->preloadLoadCallId = AgentAppendedHistoryInsertion::buildPreloadLoadCallId((int)$newestMessage->indexInConversation);
+        }
         if (!$agentAppendedHistoryInsertion->isEmpty()) {
+            $agentAppendOnlyCall->appendedPreloadLoadCallSkillNamesOfThisCall = $preloadSkillNames;
             $agentAppendOnlyCall->appendedHistoryItems->insertionOfThisCall = $agentAppendedHistoryInsertion;
             $agentAppendOnlyCall->appendedSkillNamesOfThisCall = $skillNamesToAppendNow;
             $agentAppendOnlyCall->appendedToolNamesOfThisCall = $toolNamesToAppendNow;

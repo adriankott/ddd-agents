@@ -84,6 +84,9 @@ use Symfony\Component\Validator\Constraints\NotNull;
 #[LazyLoadRepo(LazyLoadRepo::DB, repoClass: DBAIConversationMessage::class)]
 class AIConversationMessage extends Entity
 {
+    /** The answer to a `load_skills` call that loaded the skills it named (also the answer of a preload's load call on the wire). */
+    public const string LOAD_SKILLS_RESULT_LOADED = 'Skills loaded; their tools are now available.';
+
     use ChangeHistoryTrait, QueryOptionsTrait;
 
     /** @var string The system role is used to set high-level instructions or behavior for the assistant before any user interaction begins */
@@ -1623,7 +1626,7 @@ class AIConversationMessage extends Entity
         if (array_diff($activeSkillNames, $priorLoadedSkillNames) === []) {
             return $notLoadedSentence !== '' ? 'Nothing was loaded: ' . $notLoadedSentence : 'No skills loaded.';
         }
-        return 'Skills loaded; their tools are now available.' . ($notLoadedSentence !== '' ? ' NOT loaded: ' . $notLoadedSentence : '');
+        return self::LOAD_SKILLS_RESULT_LOADED . ($notLoadedSentence !== '' ? ' NOT loaded: ' . $notLoadedSentence : '');
     }
 
     /**
