@@ -24,6 +24,7 @@ use DDD\Domain\AI\Entities\Evals\AgentEvalEvictionTurnFigures;
 use DDD\Domain\AI\Entities\Evals\AgentEvalHarnessToolCall;
 use DDD\Domain\AI\Entities\Evals\AgentEvalHarnessToolCalls;
 use DDD\Domain\AI\Entities\Evals\AgentEvalNotApplicableReason;
+use DDD\Domain\AI\Entities\Evals\AgentEvalRestoreBracket;
 use DDD\Domain\AI\Entities\Evals\AgentEvalRestorePlan;
 use DDD\Domain\AI\Entities\Evals\AgentEvalRunOptions;
 use DDD\Domain\AI\Entities\Evals\AgentEvalRunOutcome;
@@ -169,7 +170,7 @@ class AgentEvalRunnerService extends Service
                     continue;
                 }
                 $this->simulateOwnerIdleBeforeNextTurn($conversation, $followUpIdleMinutes[$followUpPosition] ?? 0);
-                $this->appendFollowUpOwnerMessage($conversation, $followUpPrompt, $agentEvalRunOptions);
+                $this->appendOwnerMessage($conversation, $followUpPrompt, $agentEvalRunOptions);
                 $this->startNextOwnerTurnOnFreshState($conversation);
                 $this->driveAgent($conversation, $agentEvalScope, $agentEvalRunOptions);
             }
@@ -217,31 +218,56 @@ class AgentEvalRunnerService extends Service
     }
 
     /**
-     * Appends one follow-up owner message, stamped like a live owner message (the wire timestamp and the reply-language
-     * pointer render only with a creation time), and stores it when the conversation is stored. A new owner turn
-     * re-arms the report obligation; a transient conversation mirrors that in memory.
+     * Appends one owner message as a live owner message arrives: stamped with its creation time (the wire timestamp
+     * and the reply-language pointer render only with one), carrying the simulated owner device and the conversation's
+     * loaded capabilities, stored when the conversation is stored, and — on a stored conversation — followed by the
+     * inbound-activity stamp the platform writes with every owner message (`lastInboundMessageAt`, which the recovery
+     * of a lost resume and the idle finalize read; {@see AIConversationsService::recordInboundMessageActivity()}). A
+     * new owner turn re-arms the report obligation; a transient conversation mirrors that in memory and writes no stamp.
+     *
+     * Every owner message after the first goes through here, except the turns of the eviction trajectory
+     * ({@see runEvictionTrajectory()}, transient, no inbound stamp); the first owner message of a case is written by
+     * {@see buildConversation()} with the same stamps but without the inbound-activity stamp.
      *
      * @param AIConversation $conversation
-     * @param string $followUpPrompt
+     * @param string $ownerMessageText
      * @param AgentEvalRunOptions $agentEvalRunOptions
      * @return void
      */
-    protected function appendFollowUpOwnerMessage(AIConversation $conversation, string $followUpPrompt, AgentEvalRunOptions $agentEvalRunOptions): void
+    protected function appendOwnerMessage(AIConversation $conversation, string $ownerMessageText, AgentEvalRunOptions $agentEvalRunOptions): void
     {
         if (!isset($conversation->id)) {
             $conversation->reportDeliveredAt = null;
         }
-        $followUpOwnerMessage = AIConversationMessage::newInstance();
-        $followUpOwnerMessage->getChangeHistory()->createdTime = new DateTime();
-        $followUpOwnerMessage->ownerDevice = $agentEvalRunOptions->simulatedOwnerDevice;
+        $ownerMessage = AIConversationMessage::newInstance();
+        $ownerMessage->getChangeHistory()->createdTime = new DateTime();
+        $ownerMessage->ownerDevice = $agentEvalRunOptions->simulatedOwnerDevice;
         $conversation->appendMessage(
-            $followUpOwnerMessage,
+            $ownerMessage,
             AIConversationMessage::MESSAGE_TEXT,
-            $followUpPrompt,
+            $ownerMessageText,
             role: AIConversationMessage::ROLE_USER,
             authorType: AIConversationMessage::AUTHOR_USER
         );
-        $this->persistUserMessageIfPersisted($conversation, $followUpOwnerMessage);
+        $this->persistUserMessageIfPersisted($conversation, $ownerMessage);
+        $this->recordInboundActivityIfPersisted($conversation);
+    }
+
+    /**
+     * Stamps the inbound activity of an owner message on a stored conversation, as the platform does when an owner
+     * message arrives; a transient conversation is left as it is.
+     *
+     * @param AIConversation $conversation
+     * @return void
+     */
+    protected function recordInboundActivityIfPersisted(AIConversation $conversation): void
+    {
+        if (!isset($conversation->id)) {
+            return;
+        }
+        /** @var AIConversationsService $aIConversationsService */
+        $aIConversationsService = DDDService::instance()->getService(AIConversationsService::class);
+        $aIConversationsService->recordInboundMessageActivity($conversation);
     }
 
     /**
@@ -294,12 +320,38 @@ class AgentEvalRunnerService extends Service
      * reports one line ({@see AgentEvalHarnessToolCall::buildReportLine()}). The case's tool block guards the agent's
      * run, never these calls ({@see executeHarnessToolCall()}).
      *
+     * The bracket is opened by {@see openRestoreBracket()} and closed by {@see closeRestoreBracket()}; a run of
+     * another shape (a subclass's own run of a case) takes the same bracket around it.
+     *
      * @param AgentEvalScope $agentEvalScope
      * @param AgentEvalCase $agentEvalCase a case with a `restore` block
      * @param AgentEvalRunOptions $agentEvalRunOptions
      * @return AgentEvalRunOutcome
      */
     public function runWithRestore(AgentEvalScope $agentEvalScope, AgentEvalCase $agentEvalCase, AgentEvalRunOptions $agentEvalRunOptions): AgentEvalRunOutcome
+    {
+        $agentEvalRestoreBracket = $this->openRestoreBracket($agentEvalScope, $agentEvalCase, $agentEvalRunOptions);
+        try {
+            return $this->run($agentEvalScope, $agentEvalCase, $agentEvalRunOptions);
+        } finally {
+            $this->closeRestoreBracket($agentEvalRestoreBracket, $agentEvalScope, $agentEvalRunOptions);
+        }
+    }
+
+    /**
+     * Opens the restore bracket of a case before the agent runs: authenticates the scope's owner, notes when the
+     * harness calls start, builds the provenance (which stores the scope's agent space through the hooks when it has
+     * none), takes every tool package and the arguments the platform fills, applies the case's tool block, runs the
+     * preparation steps and captures the current values. When a preparation step or the capture ends the case, what
+     * the earlier steps created is removed and the tool block is lifted before the error reaches the caller; the
+     * bracket is then never handed out and must not be closed.
+     *
+     * @param AgentEvalScope $agentEvalScope
+     * @param AgentEvalCase $agentEvalCase a case with a `restore` block
+     * @param AgentEvalRunOptions $agentEvalRunOptions
+     * @return AgentEvalRestoreBracket what {@see closeRestoreBracket()} needs, in a `finally` after the run
+     */
+    protected function openRestoreBracket(AgentEvalScope $agentEvalScope, AgentEvalCase $agentEvalCase, AgentEvalRunOptions $agentEvalRunOptions): AgentEvalRestoreBracket
     {
         $this->authenticateOwnerOfScope($agentEvalScope);
         $harnessCallsStartedAt = new DateTime();
@@ -309,22 +361,54 @@ class AgentEvalRunnerService extends Service
         // names are unique across all packages
         $packageClasses = $this->getPackageClassesOfEverySkill();
         $argumentsFilledByThePlatform = $this->getAgentEvalRunHooksService()->getHarnessToolCallArguments($agentEvalScope);
+        $agentEvalRestoreBracket = AgentEvalRestoreBracket::forRestorePlan(
+            $agentEvalRestorePlan,
+            $harnessToolCallProvenance,
+            $packageClasses,
+            $argumentsFilledByThePlatform,
+            $harnessCallsStartedAt
+        );
         $this->applyToolBlockOfCase($agentEvalCase, $agentEvalRunOptions);
         try {
-            $undoCalls = $this->runPreparationSteps($agentEvalRestorePlan, $packageClasses, $harnessToolCallProvenance, $argumentsFilledByThePlatform, $agentEvalRunOptions);
+            $agentEvalRestoreBracket->undoCalls = $this->runPreparationSteps($agentEvalRestorePlan, $packageClasses, $harnessToolCallProvenance, $argumentsFilledByThePlatform, $agentEvalRunOptions);
             try {
-                $capturedValues = $this->captureOriginalValues($agentEvalRestorePlan, $packageClasses, $harnessToolCallProvenance, $argumentsFilledByThePlatform, $agentEvalRunOptions);
+                $agentEvalRestoreBracket->capturedValues = $this->captureOriginalValues($agentEvalRestorePlan, $packageClasses, $harnessToolCallProvenance, $argumentsFilledByThePlatform, $agentEvalRunOptions);
             } catch (Throwable $captureFailure) {
                 // what the preparation created is removed all the same
-                $this->runUndoCalls($undoCalls, $packageClasses, $harnessToolCallProvenance, $argumentsFilledByThePlatform, $agentEvalRunOptions);
+                $this->runUndoCalls($agentEvalRestoreBracket->undoCalls, $packageClasses, $harnessToolCallProvenance, $argumentsFilledByThePlatform, $agentEvalRunOptions);
                 throw $captureFailure;
             }
-            try {
-                return $this->run($agentEvalScope, $agentEvalCase, $agentEvalRunOptions);
-            } finally {
-                $this->restoreAfterTheRun($agentEvalRestorePlan, $capturedValues, $undoCalls, $packageClasses, $harnessToolCallProvenance, $argumentsFilledByThePlatform, $agentEvalRunOptions);
-                $this->getAgentEvalRunHooksService()->releaseHostHoldsAfterHarnessCalls($agentEvalScope, $harnessCallsStartedAt, $agentEvalRunOptions);
-            }
+        } catch (Throwable $openingFailure) {
+            $this->liftToolBlockOfCase($agentEvalRunOptions);
+            throw $openingFailure;
+        }
+        return $agentEvalRestoreBracket;
+    }
+
+    /**
+     * Closes an opened restore bracket after the run, also when the run threw: the revert write, the `after` steps,
+     * the removal of what the preparation created (the last created first), the release of what the harness calls
+     * left held since the bracket opened, and — always, also when one of these threw — the lift of the case's tool
+     * block.
+     *
+     * @param AgentEvalRestoreBracket $agentEvalRestoreBracket the bracket {@see openRestoreBracket()} returned
+     * @param AgentEvalScope $agentEvalScope
+     * @param AgentEvalRunOptions $agentEvalRunOptions
+     * @return void
+     */
+    protected function closeRestoreBracket(AgentEvalRestoreBracket $agentEvalRestoreBracket, AgentEvalScope $agentEvalScope, AgentEvalRunOptions $agentEvalRunOptions): void
+    {
+        try {
+            $this->restoreAfterTheRun(
+                $agentEvalRestoreBracket->agentEvalRestorePlan,
+                $agentEvalRestoreBracket->capturedValues,
+                $agentEvalRestoreBracket->undoCalls,
+                $agentEvalRestoreBracket->packageClasses,
+                $agentEvalRestoreBracket->harnessToolCallProvenance,
+                $agentEvalRestoreBracket->argumentsFilledByThePlatform,
+                $agentEvalRunOptions
+            );
+            $this->getAgentEvalRunHooksService()->releaseHostHoldsAfterHarnessCalls($agentEvalScope, $agentEvalRestoreBracket->harnessCallsStartedAt, $agentEvalRunOptions);
         } finally {
             $this->liftToolBlockOfCase($agentEvalRunOptions);
         }
@@ -1085,10 +1169,9 @@ class AgentEvalRunnerService extends Service
     }
 
     /**
-     * Builds a fresh conversation of the scope with one owner message for an evaluation turn: attached to the scope
-     * without writing, carrying the run's settings (the evaluation marker, the arms and the case's tool block), the
-     * creation stamps of the arms and the run's budget lift; stored with its first message when the run stores its
-     * conversations and `$persist` allows it. Recorded on the options as the run's built conversation.
+     * Builds a fresh conversation of the scope with one owner message for an evaluation turn: assembled like every
+     * evaluated conversation ({@see assembleConversation()}); stored with its first message when the run stores its
+     * conversations and `$persist` allows it.
      *
      * @param AgentEvalScope $agentEvalScope
      * @param string $prompt
@@ -1098,20 +1181,7 @@ class AgentEvalRunnerService extends Service
      */
     protected function buildConversation(AgentEvalScope $agentEvalScope, string $prompt, AgentEvalRunOptions $agentEvalRunOptions, bool $persist = true): AIConversation
     {
-        $conversation = AIConversation::newInstance();
-        $agentEvalRunOptions->recordBuiltConversation($conversation);
-        $conversation->accountId = $agentEvalScope->getOwnerAccountId();
-        $this->getAgentEvalRunHooksService()->attachNewConversationToScope($conversation, $agentEvalScope);
-        $conversation->messages = AIConversationMessages::newInstance();
-        $conversation->runSettings = $this->buildEvalRunSettings($agentEvalRunOptions);
-        $agentEvalArms = $agentEvalRunOptions->getAgentEvalArms();
-        $conversation->contextRetentionSettings = ContextRetentionSettings::buildForNewConversation(
-            null,
-            $agentEvalArms->skillLoadingStrategy,
-            $agentEvalArms->rebuildEpochOnSituationChange,
-            $agentEvalArms->stateChangeDelivery
-        );
-        $conversation->budgetBypass = $this->isConsoleBudgetBypassGranted();
+        $conversation = $this->assembleConversation($agentEvalScope, $agentEvalRunOptions);
         if ($agentEvalRunOptions->persistConversations && $persist) {
             // stored before the first turn: the decision layer's sites need an id
             $this->storeAssembledConversation($conversation, $agentEvalScope);
@@ -1128,6 +1198,36 @@ class AgentEvalRunnerService extends Service
         $firstOwnerMessage = $ownerMessage;
         $conversation->messages->add($ownerMessage);
         $this->persistUserMessageIfPersisted($conversation, $firstOwnerMessage);
+        return $conversation;
+    }
+
+    /**
+     * Assembles a fresh, empty conversation of the scope as every evaluated conversation starts: recorded on the options
+     * as the run's built conversation (what the teardown cleans up after), owned by the scope's owner, attached to the
+     * scope without writing, without messages, carrying the run's settings (the evaluation marker, the arms and the
+     * case's tool block), the creation stamps of the arms (with no arm chosen: the platform's defaults, as a live new
+     * conversation gets them) and the run's budget lift. Nothing is stored.
+     *
+     * @param AgentEvalScope $agentEvalScope
+     * @param AgentEvalRunOptions $agentEvalRunOptions
+     * @return AIConversation
+     */
+    protected function assembleConversation(AgentEvalScope $agentEvalScope, AgentEvalRunOptions $agentEvalRunOptions): AIConversation
+    {
+        $conversation = AIConversation::newInstance();
+        $agentEvalRunOptions->recordBuiltConversation($conversation);
+        $conversation->accountId = $agentEvalScope->getOwnerAccountId();
+        $this->getAgentEvalRunHooksService()->attachNewConversationToScope($conversation, $agentEvalScope);
+        $conversation->messages = AIConversationMessages::newInstance();
+        $conversation->runSettings = $this->buildEvalRunSettings($agentEvalRunOptions);
+        $agentEvalArms = $agentEvalRunOptions->getAgentEvalArms();
+        $conversation->contextRetentionSettings = ContextRetentionSettings::buildForNewConversation(
+            null,
+            $agentEvalArms->skillLoadingStrategy,
+            $agentEvalArms->rebuildEpochOnSituationChange,
+            $agentEvalArms->stateChangeDelivery
+        );
+        $conversation->budgetBypass = $this->isConsoleBudgetBypassGranted();
         return $conversation;
     }
 

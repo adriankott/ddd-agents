@@ -27,6 +27,9 @@ class MCPToolExecutorServiceScriptedDouble extends MCPToolExecutorService
         $this->scriptedResultsByToolName[$toolName][] = new ToolResult($content, $isError);
     }
 
+    /** @var string|null The tool whose execution throws instead of answering (after it is recorded) */
+    public ?string $failingToolName = null;
+
     public function execute(string $toolName, ?array $arguments, array $packageClasses, ?array $logContext = null, ?MCPServerProvidedInput $serverProvidedInput = null): ToolResult
     {
         $this->executedCalls[] = [
@@ -37,6 +40,9 @@ class MCPToolExecutorServiceScriptedDouble extends MCPToolExecutorService
             'everyWriteToolBlocked' => static::$everyWriteToolBlocked,
             'provenance' => $serverProvidedInput,
         ];
+        if ($toolName === $this->failingToolName) {
+            throw new \RuntimeException('executor unreachable');
+        }
         if (($this->scriptedResultsByToolName[$toolName] ?? []) === []) {
             return new ToolResult('{}');
         }

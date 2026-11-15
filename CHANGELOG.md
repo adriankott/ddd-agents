@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.1.0-alpha.49
+
+- The judged run of an eval case moves into the package: `AgentEvalJudgedRunService` (extends
+  `AgentEvalRunnerService`) — `runSim()` / `runSimWithRestore()` (a driver model plays the owner after the opening
+  prompt and the case's scripted follow-ups, a judge model returns the verdict; the restore bracket around the run),
+  `runCompactionTreeEval()` (a long conversation whose compaction tree is judged; a stored run reads the stored tree),
+  `callModel()` (a plain completion in `ENVELOPE.AI.AGENT.EVALUATION`, booked as `AI.AGENT.SIMULATE.OWNER` or
+  `AI.AGENT.JUDGE.EVALUATION`), `judgeVerdict()` (an unparseable answer is asked once more; a cut-off verdict is judged
+  once more, a second cut-off is `ERROR`), the owner-visible transcript and the judge's trace
+  (`AgentEvalJudgeTraceMessageLines`, the audit blocks, `AgentEvalRunCounts`). Override points with neutral defaults:
+  `applyCaseFixtures()`, `buildHostEndStateTextForJudge()`, `buildTextOfHostWidgetShownToOwner()`,
+  `applyHostSectionsToVerdictPrompt()`, `isHostOwnerReplyRow()` and the texts `getEmptyDriverReplyText()`,
+  `getEmptyCompactionTreeDriverReplyText()`, `getDefaultCompactionTreeRubricText()`,
+  `getTruncatedTwiceVerdictReasons()`; default models `getDefaultJudgeModelName()` / `getDefaultDriverModelName()`.
+- Objects of the judged run: `AgentEvalSimCase`, `AgentEvalJudgeVerdict`, `AgentEvalRunCounts` (stored count key
+  `toolWidgets`), `AgentEvalSimRunResult`, `AgentEvalCompactionTreeRunResult`, `AgentEvalJudgedRunOptions`,
+  `AgentEvalRestoreBracket`.
+- Four prompt files under `config/app/AI/Prompts/AI/Agent/Evaluation/` (`Driver.md`, `Verdict.md`,
+  `CompactionTreeDriver.md`, `CompactionTreeVerdict.md`) named by `AgentAIPromptNames::APP_AI_AGENT_EVALUATION_*`; an
+  application replaces a file whole.
+- `AgentEvalRunnerService`: the restore bracket is split into `openRestoreBracket()` / `closeRestoreBracket()`
+  (`runWithRestore()` unchanged), `assembleConversation()` is taken out of `buildConversation()`, and the follow-up
+  owner message is written by `appendOwnerMessage()`, which on a stored conversation also stamps the inbound activity
+  (`recordInboundActivityIfPersisted()`).
+- The observability skill names the judged run (reference `building-evaluation-in-the-host.md`, § The judged run).
+- The two run results (`AgentEvalSimRunResult`, `AgentEvalCompactionTreeRunResult`) are read through their getters; they
+  have no array form.
+
 ## 0.1.0-alpha.48
 
 - Tick rules: the sentence that a question to the owner is never an answer-text item stands on its own after the

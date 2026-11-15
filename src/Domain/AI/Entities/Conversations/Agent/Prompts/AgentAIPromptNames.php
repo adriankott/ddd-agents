@@ -27,6 +27,32 @@ class AgentAIPromptNames
      */
     public const string APP_AI_AGENT_CHARACTER = 'AI.Agent.Character';
 
+    /**
+     * @var string The simulated owner of a judged compaction-tree run: one owner message per turn that opens a new
+     * topic, so the compaction tree grows. Placeholders, filled in this order: GOAL, FACTS, COMPACTION_PARAMETERS,
+     * TRANSCRIPT.
+     */
+    public const string APP_AI_AGENT_EVALUATION_COMPACTION_TREE_DRIVER = 'AI.Agent.Evaluation.CompactionTreeDriver';
+
+    /**
+     * @var string The judge of a compaction-tree run: one JSON verdict on the tree's growth, cover and fact survival.
+     * Placeholders, filled in this order: COMPACTION_PARAMETERS, GOAL, RUBRIC, TREE_EVOLUTION, FINAL_TREE, TRACE.
+     */
+    public const string APP_AI_AGENT_EVALUATION_COMPACTION_TREE_VERDICT = 'AI.Agent.Evaluation.CompactionTreeVerdict';
+
+    /**
+     * @var string The simulated owner of a judged run: the next owner message, or `[DONE]` / `[GIVE-UP]`.
+     * Placeholders, filled in this order: GOAL, FACTS, TRANSCRIPT.
+     */
+    public const string APP_AI_AGENT_EVALUATION_DRIVER = 'AI.Agent.Evaluation.Driver';
+
+    /**
+     * @var string The judge of a judged run: one JSON verdict on the trace against the case's rubric. Placeholders,
+     * filled in this order: GOAL, OPENING, RUBRIC, HOST_RULES, HOST_SECTIONS, TRACE — HOST_RULES (further lines of the
+     * minor list) and HOST_SECTIONS (further sections after the trace) are the application's and empty by default.
+     */
+    public const string APP_AI_AGENT_EVALUATION_VERDICT = 'AI.Agent.Evaluation.Verdict';
+
     /** @var string Base prompt for the AI-extensions / specialist flow (no skills/MCP tools). */
     public const string APP_AI_AGENT_GENERAL = 'AI.Agent.General';
 

@@ -16,6 +16,7 @@ use DDD\Domain\AI\Entities\Evals\AgentEvalArms;
 use DDD\Domain\AI\Entities\Evals\AgentEvalCase;
 use DDD\Domain\AI\Entities\Evals\AgentEvalHarnessToolCall;
 use DDD\Domain\AI\Entities\Evals\AgentEvalNotApplicableReason;
+use DDD\Domain\AI\Entities\Evals\AgentEvalRestoreBracket;
 use DDD\Domain\AI\Entities\Evals\AgentEvalRunOptions;
 use DDD\Domain\AI\Entities\Evals\AgentEvalScope;
 use DDD\Domain\AI\Entities\Evals\AgentEvalStateAfterRunCheck;
@@ -419,6 +420,82 @@ class AgentEvalRunnerServiceTest extends IntegrationTestCase
         self::assertSame(['createEntry', 'createEntry', 'getEntry', 'restoreEntry', 'rebuildSite', 'deleteEntry', 'deleteEntry'], $this->executorDouble->getExecutedToolNames());
         self::assertContains('releaseHostHoldsAfterHarnessCalls', $this->hooksDouble->hookCalls);
         self::assertSame([], MCPToolExecutorService::$blockedToolNames);
+    }
+
+    protected function invokeOpenRestoreBracket(AgentEvalRunnerService $agentEvalRunnerService, AgentEvalCase $agentEvalCase, AgentEvalRunOptions $agentEvalRunOptions): AgentEvalRestoreBracket
+    {
+        $openRestoreBracket = (new ReflectionClass(AgentEvalRunnerService::class))->getMethod('openRestoreBracket');
+        /** @var AgentEvalRestoreBracket $agentEvalRestoreBracket */
+        $agentEvalRestoreBracket = $openRestoreBracket->invoke($agentEvalRunnerService, $this->buildScope(), $agentEvalCase, $agentEvalRunOptions);
+        return $agentEvalRestoreBracket;
+    }
+
+    protected function invokeCloseRestoreBracket(AgentEvalRunnerService $agentEvalRunnerService, AgentEvalRestoreBracket $agentEvalRestoreBracket, AgentEvalRunOptions $agentEvalRunOptions): void
+    {
+        $closeRestoreBracket = (new ReflectionClass(AgentEvalRunnerService::class))->getMethod('closeRestoreBracket');
+        $closeRestoreBracket->invoke($agentEvalRunnerService, $agentEvalRestoreBracket, $this->buildScope(), $agentEvalRunOptions);
+    }
+
+    public function testAnOpenedBracketHoldsWhatTheCloseNeedsAndKeepsTheCaseBlockUntilItCloses(): void
+    {
+        $this->scriptRestoreCaseResults();
+        $this->hooksDouble->harnessToolCallArguments = ['spaceKey' => 17];
+        $agentEvalRunOptions = $this->buildOptions();
+        $agentEvalRunnerService = $this->buildRunnerWithoutAgentRun();
+
+        $agentEvalRestoreBracket = $this->invokeOpenRestoreBracket($agentEvalRunnerService, AgentEvalCase::fromArray($this->buildRestoreCaseFields()), $agentEvalRunOptions);
+
+        self::assertSame(['createEntry', 'createEntry', 'getEntry'], $this->executorDouble->getExecutedToolNames(), 'opening prepares and captures, nothing more');
+        self::assertSame(['entryId' => 9, 'title' => 'Before'], $agentEvalRestoreBracket->capturedValues);
+        self::assertSame(2, $agentEvalRestoreBracket->undoCalls->count());
+        self::assertSame([MCPToolExecutorService::class], $agentEvalRestoreBracket->packageClasses);
+        self::assertSame(['spaceKey' => 17], $agentEvalRestoreBracket->argumentsFilledByThePlatform);
+        self::assertSame(17, $agentEvalRestoreBracket->harnessToolCallProvenance->agentSpaceId);
+        self::assertInstanceOf(DateTime::class, $agentEvalRestoreBracket->harnessCallsStartedAt);
+        self::assertSame(['restoreEntry'], MCPToolExecutorService::$blockedToolNames, 'the case block guards whatever runs inside the bracket');
+        self::assertSame(5, AuthService::instance()->getAccount()?->id);
+
+        $this->invokeCloseRestoreBracket($agentEvalRunnerService, $agentEvalRestoreBracket, $agentEvalRunOptions);
+
+        self::assertSame(['createEntry', 'createEntry', 'getEntry', 'restoreEntry', 'rebuildSite', 'deleteEntry', 'deleteEntry'], $this->executorDouble->getExecutedToolNames());
+        self::assertSame(['spaceKey' => 17, 'entryId' => 9, 'title' => 'Before'], $this->executorDouble->executedCalls[3]['arguments']);
+        self::assertSame(102, $this->executorDouble->executedCalls[5]['arguments']['entryId'], 'the last created is removed first');
+        self::assertSame('restore release: nothing held', $this->progressLinesRecorder->progressLines[7]);
+        self::assertSame([], MCPToolExecutorService::$blockedToolNames, 'closing lifts the case block');
+        self::assertSame([], $agentEvalRunOptions->blockedToolNames);
+    }
+
+    public function testAFailedOpeningLiftsTheCaseBlockItApplied(): void
+    {
+        $this->executorDouble->scriptResult('createEntry', '{"content":[{"text":"quota used up"}]}', true);
+        $agentEvalRunOptions = $this->buildOptions();
+
+        try {
+            $this->invokeOpenRestoreBracket($this->buildRunnerWithoutAgentRun(), AgentEvalCase::fromArray($this->buildRestoreCaseFields()), $agentEvalRunOptions);
+            self::fail('a failed preparation step must end the case');
+        } catch (AgentEvalPreconditionNotEstablishedException) {
+        }
+        self::assertSame([], MCPToolExecutorService::$blockedToolNames);
+        self::assertSame([], $agentEvalRunOptions->blockedToolNames);
+        self::assertNotContains('releaseHostHoldsAfterHarnessCalls', $this->hooksDouble->hookCalls);
+    }
+
+    public function testAFailedRestoreCallStillLiftsTheCaseBlockWhenTheBracketCloses(): void
+    {
+        $this->scriptRestoreCaseResults();
+        $agentEvalRunOptions = $this->buildOptions();
+        $agentEvalRunnerService = $this->buildRunnerWithoutAgentRun();
+        $agentEvalRestoreBracket = $this->invokeOpenRestoreBracket($agentEvalRunnerService, AgentEvalCase::fromArray($this->buildRestoreCaseFields()), $agentEvalRunOptions);
+        $this->executorDouble->failingToolName = 'restoreEntry';
+
+        try {
+            $this->invokeCloseRestoreBracket($agentEvalRunnerService, $agentEvalRestoreBracket, $agentEvalRunOptions);
+            self::fail('the failed restore call must reach the caller');
+        } catch (RuntimeException $restoreFailure) {
+            self::assertSame('executor unreachable', $restoreFailure->getMessage());
+        }
+        self::assertSame([], MCPToolExecutorService::$blockedToolNames, 'the block is lifted all the same');
+        self::assertNotContains('releaseHostHoldsAfterHarnessCalls', $this->hooksDouble->hookCalls, 'the release follows the restore, as before the split');
     }
 
     public function testRunCasePicksTheRestoreOrchestrationOnlyForACaseWithARestoreBlock(): void

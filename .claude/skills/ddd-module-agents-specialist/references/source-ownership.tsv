@@ -19,6 +19,7 @@ src/Domain/AI/**/TurnEvents/**	observability
 src/Domain/AI/**/Evals/**	observability
 src/Domain/AI/**/RecordedRuns/**	observability
 src/Domain/AI/Services/Eval/**	observability
+config/app/AI/Prompts/AI/Agent/Evaluation/**	observability
 src/Domain/AI/Services/Conversations/Quality/**	observability
 src/Domain/AI/Entities/Conversations/Quality/**	observability
 src/Domain/AI/Services/Conversations/AIConversationAuditRenderService.php	observability
