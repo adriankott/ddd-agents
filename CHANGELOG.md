@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.0-alpha.27
 
 - npm: `AgentsStateAction` carries the index signature of redux 5's `UnknownAction`, so a redux 5 / react-redux 9 host
   store that registers `WidgetHydrationReducer` stays assignable to `Store<any, UnknownAction>` (before: "Index
