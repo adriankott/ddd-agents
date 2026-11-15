@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.0-alpha.31
+
+- `ConversationSearchResults` widget description (model-facing `.md`): the agent names the search's tool call in
+  `groupsFromToolCallId` instead of copying the groups; the payload example shows what the agent writes and what the
+  widget receives after the platform filled it.
+
 ## 0.1.0-alpha.30
 
 - `ConversationSearchResults`: a block may name the search's tool call in `groupsFromToolCallId` instead of carrying

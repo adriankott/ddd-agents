@@ -12,22 +12,27 @@ description: Renders the result of searchConversations (cross-chat semantic reca
 Shows the matches from `searchConversations` grouped by conversation — reuses the same `AgentSearchResults` view the chat's own search panel uses. Each group is a card: conversation title (or "Untitled chat") · relative date, then its matched message rows (You / the agent + excerpt, query terms highlighted), with an arrow to open that conversation. Few groups render inline; many open in the canvas side panel.
 
 ## Data structure — DATA-COMPLETE (no re-fetch)
-**Unlike a self-hydrating widget, this widget does NOT fetch anything.** It renders entirely from the payload. The agent copies the `query` and the grouped results from the `searchConversations` tool output straight into the payload — the search is never re-run.
+**Unlike a self-hydrating widget, this widget does NOT fetch anything.** It renders entirely from the payload. The agent names the search's tool call in `groupsFromToolCallId`; the platform writes that call's `groups` (and the `query`, when the block's is empty) into the block when the message is stored — the search is never re-run, and the agent never copies the groups.
 ```ts
 interface ConversationSearchResultsPayload {
   query: string;                       // the search query, used to highlight matched terms
   title?: string;                      // short LLM headline (user's language) shown on the collapsed canvas card; falls back to the query
   display?: "inline" | "canvas";       // OPTIONAL — normally OMIT; the widget auto-picks inline (few) vs canvas (many)
+  groupsFromToolCallId?: string;       // written by the agent INSTEAD of `groups`: the id of the search's tool call; the platform fills `groups` from its stored result
   groups: {
     conversationId?: number;           // the source chat (the open-arrow target)
     title?: string;                    // the chat's title
     summary?: string;                  // the chat's summary recap (shown under the title)
     dateTime?: string;                 // "Y-m-d H:i:s" of the most-recent matched message
     hits: { role?: string; excerpt?: string; dateTime?: string; indexInConversation?: number; messageId?: number }[];
-  }[];                                 // dateTime per hit = that message's timestamp (shown on the row)
+  }[];  // filled by the platform (see above); what the widget renders — dateTime per hit = that message's timestamp (shown on the row)
 }
 ```
-Just copy the `groups` from the `searchConversations` result verbatim (title · summary · dateTime · hits with their per-message dateTime are all in it). Concrete payload example:
+What the agent writes:
+```json
+{ "type": "ConversationSearchResults", "query": "facebook", "groupsFromToolCallId": "<id of the search's tool call>" }
+```
+What the widget receives after the platform filled it:
 ```json
 {
   "query": "facebook",
@@ -41,7 +46,7 @@ Just copy the `groups` from the `searchConversations` result verbatim (title · 
 ```
 
 ## When to use
-- After calling `searchConversations` — render the matches as this widget instead of re-listing them in prose.
+- After a search across earlier conversations — write the block with `groupsFromToolCallId` instead of re-listing the matches in prose.
 - Few matches → they render inline; many → they open in the canvas side panel automatically (or set `display`).
 - Skip for a single in-conversation recall (`recallConversation`) — that's the current chat, answer inline in prose.
 
