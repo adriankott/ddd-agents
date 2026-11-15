@@ -1257,6 +1257,22 @@ class AgentModelInput extends ValueObject
     }
 
     /**
+     * Whether a COMPLETED call of `$toolName` stands after `$messagePosition` (the owner's newest input): the answer
+     * step after a question recorded in this turn ({@see AskOwnerTool}) writes the closed items' results, never the
+     * question again.
+     */
+    protected function hasCompletedCallOfToolAfterPosition(string $toolName, int $messagePosition): bool
+    {
+        for ($position = $messagePosition + 1; $position < count($this->messages); $position++) {
+            $toolCall = isset($this->messages[$position]->toolCall) ? $this->messages[$position]->toolCall : null;
+            if ($toolCall !== null && ($toolCall->name ?? null) === $toolName && $toolCall->status === AIConversationMessage::STATUS_COMPLETED) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Whether a row the platform wrote during a tool call (a tool message authored by the tool) after
      * `$messagePosition` holds a widget of one of {@see $widgetTypesThatEndThePurpose}: that widget shows the owner
      * what the turn's calls did and the result of the tool that wrote it asks for one closing line, so the answer
@@ -1583,7 +1599,9 @@ class AgentModelInput extends ValueObject
                 self::buildAnswerStepTailHint(
                     $toolLessStepIsTheBudgetClosingStep,
                     !$toolLessStepIsTheBudgetClosingStep
-                        && $this->hasPlatformWrittenWidgetThatEndsThePurposeAfterPosition($this->findNewestOwnerInputPosition())
+                        && $this->hasPlatformWrittenWidgetThatEndsThePurposeAfterPosition($this->findNewestOwnerInputPosition()),
+                    !$toolLessStepIsTheBudgetClosingStep
+                        && $this->hasCompletedCallOfToolAfterPosition(AskOwnerTool::NAME, $this->findNewestOwnerInputPosition())
                 )
             );
             $agentModelInputTailEntries->add($agentModelInputTailEntry);
@@ -1616,15 +1634,22 @@ class AgentModelInput extends ValueObject
      * asks for; the 'never a report' sentence is absent there too. The budget closing step keeps its own wording when
      * both apply.
      */
-    protected static function buildAnswerStepTailHint(bool $isBudgetClosingStep, bool $followsPlatformWrittenWidgetThatEndsThePurpose = false): string
+    protected static function buildAnswerStepTailHint(
+        bool $isBudgetClosingStep,
+        bool $followsPlatformWrittenWidgetThatEndsThePurpose = false,
+        bool $followsOwnerQuestionRecordedInThisTurn = false
+    ): string
     {
         return '[SIGNAL:answer-step] Tools are intentionally paused for '
             . 'this ONE step: the next move is owner-visible TEXT — what the previous step asks for (a rejection\'s '
             . 'instruction, a delivery, the one open question)'
             . match (true) {
                 $isBudgetClosingStep => ', or a plain report of what IS done and what happens next. ',
-                $followsPlatformWrittenWidgetThatEndsThePurpose => ': here the closing text the last tool result asks for, as that result describes it. The widget written '
-                    . 'in this turn already shows the owner what was done — no recap of it and no list of completed steps. ',
+                $followsPlatformWrittenWidgetThatEndsThePurpose => ': here the text the last tool result asks for — every part it lists, in its order. Beyond those '
+                    . 'parts: no recap of what the widget shows and no list of completed steps. ',
+                $followsOwnerQuestionRecordedInThisTurn => ': your question is recorded and shows as a widget under your text — do not repeat '
+                    . 'it. Write what the owner has not seen yet: the result of every plan item you closed in this turn, in the '
+                    . 'order of the plan; with no such result, ONE short sentence that leads to the question. ',
                 default => ': the RESULT the owed plan item promises, or its ONE question. A report of what is done or what happens next is not an answer — never end on it. ',
             }
             . 'Nothing is unavailable and you never lack access — NEVER tell the user so. Write it in the '

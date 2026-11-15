@@ -80,18 +80,23 @@ class ArgusAgentMandateApproval extends AgentMandateApproval
      */
     public function getUserContent(): string|array
     {
+        $currentDateTime = new DateTime();
         $approvalCheckPayload = [
             // the check must resolve RELATIVE durations ("one month", "2 weeks") against the request's
             // validUntil — without today's date it cannot, and it then wrongly demands an explicit end date
             // in the transcript
             // on the space's clock, the one the dialogue speaks in: a window end handed over in UTC digits reads
             // as a different hour than the customer named
-            'currentDateTime' => AgentClock::formatMoment(new DateTime(), $this->getDialogueTimezone()),
+            'currentDateTime' => AgentClock::formatMoment($currentDateTime, $this->getDialogueTimezone()),
+            // a period named by a weekday or a week ("until the end of next week") needs the weekdays: the check
+            // worked them out from the dates and refused both readings in turn
+            'currentWeekday' => AgentClock::formatWeekday($currentDateTime, $this->getDialogueTimezone()),
             'timezone' => $this->getDialogueTimezone()->getName(),
             'requestedActionClass' => $this->requestedActionClass,
             'requestedActionClassDescription' => $this->requestedActionClassDescription,
             'requestedScopeType' => $this->requestedScopeType,
             'requestedValidUntil' => $this->requestedValidUntil !== null ? AgentClock::formatMoment($this->requestedValidUntil, $this->getDialogueTimezone()) : null,
+            'requestedValidUntilWeekday' => $this->requestedValidUntil !== null ? AgentClock::formatWeekday($this->requestedValidUntil, $this->getDialogueTimezone()) : null,
             'requestedConstraintsNote' => $this->requestedConstraintsNote,
             'dialogue' => $this->dialogueExcerptSource,
         ];

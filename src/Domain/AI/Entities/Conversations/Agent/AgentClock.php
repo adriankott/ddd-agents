@@ -34,6 +34,12 @@ class AgentClock
         return (clone $moment)->setTimezone(self::modelFacingTimezone($timezone))->format('Y-m-d');
     }
 
+    /** A moment's WEEKDAY (English name) on the model's clock: a period named by a weekday is never worked out from a date. */
+    public static function formatWeekday(DateTime $moment, ?DateTimeZone $timezone = null): string
+    {
+        return (clone $moment)->setTimezone(self::modelFacingTimezone($timezone))->format('l');
+    }
+
     /** An explicit zone, else the executor region's zone, else UTC. */
     public static function modelFacingTimezone(?DateTimeZone $timezone = null): DateTimeZone
     {

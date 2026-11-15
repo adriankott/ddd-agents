@@ -6,6 +6,7 @@ namespace DDD\Tests\Agents\Domain\AI\Entities\Conversations\Agent;
 
 use DDD\Domain\AI\Entities\Conversations\Agent\AgentModelInput;
 use DDD\Domain\AI\Entities\Conversations\Agent\Context\AgentModelInputTailEntry;
+use DDD\Domain\AI\Entities\Conversations\Agent\Tools\AskOwnerTool;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
 use DDD\Domain\AI\Entities\Conversations\Messages\ToolCall;
 use DDD\Tests\Agents\Domain\AI\Entities\Conversations\Agent\Probes\PurposeStubbingConversation;
@@ -177,8 +178,30 @@ class AgentModelInputAnswerContractAfterPurposeEndingWidgetTest extends UnitTest
             $this->buildPlatformWrittenWidgetRow('Summary'),
         ]), 'none');
 
-        self::assertStringContainsString('the closing text the last tool result asks for', $answerStepText);
+        self::assertStringContainsString(': here the text the last tool result asks for — every part it lists, in its order. Beyond those '
+            . 'parts: no recap of what the widget shows and no list of completed steps. ', $answerStepText);
         self::assertStringNotContainsString('never end on it', $answerStepText);
+    }
+
+    public function testTheTextOnlyStepAfterAQuestionRecordedInThisTurnAsksForTheClosedItemsResultsNotTheQuestion(): void
+    {
+        $answerStepText = (string)$this->findAnswerStepText($this->buildModelInput([
+            $this->buildOwnerTextMessage('Do items 1 and 2, then ask me whether to go on.'),
+            $this->buildCompletedToolCallMessage('recordAim'),
+            $this->buildCompletedToolCallMessage(AskOwnerTool::NAME),
+        ], []), 'none');
+
+        self::assertStringContainsString(': your question is recorded and shows as a widget under your text — do not repeat '
+            . 'it. Write what the owner has not seen yet: the result of every plan item you closed in this turn, in the '
+            . 'order of the plan; with no such result, ONE short sentence that leads to the question. ', $answerStepText);
+        self::assertStringNotContainsString('or its ONE question', $answerStepText);
+
+        $askedBeforeTheOwnersNewestText = (string)$this->findAnswerStepText($this->buildModelInput([
+            $this->buildCompletedToolCallMessage(AskOwnerTool::NAME),
+            $this->buildOwnerTextMessage('Yes, go on.'),
+            $this->buildCompletedToolCallMessage('recordAim'),
+        ], []), 'none');
+        self::assertSame(self::DEFAULT_ANSWER_STEP_TEXT, $askedBeforeTheOwnersNewestText, 'a question of an earlier turn was answered by the owner');
     }
 
     public function testWithoutThatWidgetRowTheAnswerStepKeepsTheDefaultWording(): void

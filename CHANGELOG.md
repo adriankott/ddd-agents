@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.0-alpha.35
+
+- `[SIGNAL:answer-step]` after a platform-written widget that ends the purpose: the text the last tool result asks for —
+  every part it lists, in its order (the closing line alone dropped the owed sentences the result listed first).
+- `[SIGNAL:answer-step]` after an owner question recorded in this turn (`askOwner`): a fourth wording — the results of
+  the plan items closed in the turn, never the question again (the question was repeated as the whole answer).
+- Mandate approval check: the payload names `currentWeekday` and `requestedValidUntilWeekday` on the space's clock
+  (`AgentClock::formatWeekday()`); the prompt `ApprovalCheck.md` uses them for periods named by a weekday or a week and
+  approves a window that matches one of two honest readings.
+
 ## 0.1.0-alpha.34
 
 - `send_owner_report`: a `REPORT` declared before the report is refused while the task plan holds open items the model

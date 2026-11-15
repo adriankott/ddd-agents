@@ -130,6 +130,9 @@ loop must ask `findActiveMandateFor()` itself.
    dialogue as injection and refused instead of judging. A verdict counts only with a boolean `approved` and a matching
    `verdictCode` (`AgentMandateApproval::VERDICT_CONSENT_FOUND` or one of `REJECTION_VERDICT_CODES`); anything else
    is retried once, then reported as "did not complete", never as a rejection.
+   The payload gives `currentDateTime` / `requestedValidUntil` on the space's clock plus their weekdays
+   (`currentWeekday`, `requestedValidUntilWeekday`, `AgentClock::formatWeekday()`): a period named by a weekday or a
+   week is judged from them, and a period with two honest readings is approved when the window matches one.
 4. Approved: the ACTIVE row with the excerpt, then `supersedeCoveredMandates()` (same class, covered space). An
    account-wide grant replaces the class's mandates of every space; a grant for one space never narrows an account-wide
    mandate to that space (`AgentMandate::isSupersededBy()`) — narrowing is left to an explicit revoke.
