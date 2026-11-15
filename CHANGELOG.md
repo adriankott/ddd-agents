@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.0-alpha.37
+
+- A sub-agent's result reaches the parent whole up to 8,000 characters (`DelegationRunEndNotification::VERDICT_MAX_LENGTH`,
+  was 4,000): measured results of research sub-agents were 3,200–7,000 characters, and a cut one cost the parent a
+  `check_delegations` call that read the whole result again on a grown context. Longer results are still cut with the
+  pointer to `check_delegations`.
+- Sub-agent directive (`SubAgentDirective.md`): a sub-agent is told that the main conversation is handed the first
+  8,000 characters (about 1,000 words) of its result at once and reads the rest only with a further call — keep the
+  result within that length, the findings first. Both numbers come from the constant (`{%VERDICT_MAX_LENGTH%}`,
+  `{%VERDICT_MAX_WORDS%}`).
+
 ## 0.1.0-alpha.36
 
 - `delegate` takes `parallelTasks`: ONE call starts one sub-agent per item (each item `label` and `task` +

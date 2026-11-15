@@ -208,6 +208,9 @@ The text: status line, the verdict cut at `DelegationRunEndNotification::VERDICT
 sub-agents, and the request's next step on its last run end. A failed tool run reads "FAILED: <tool> — … Nothing was
 saved by it.". A record that notifies without resuming, or a run that ended `superseded`, writes the WITHOUT_RESUME
 source.
+The sub-agent is told that length: `SubAgentDirective.md` names it through `{%VERDICT_MAX_LENGTH%}` and `{%VERDICT_MAX_WORDS%}` (a
+eighth of it), filled from the constant (`AIConversation::findSubAgentDirectiveText()`), so a result fits and the parent needs no `check_delegations`
+read. A host's own copy of the directive keeps the placeholder or writes the number itself.
 
 After the commit a notification that resumes also stamps the parent's inbound activity and sends the realtime running
 signal. The row is never merged into another row, and every release probes for waiting rows afterwards; that probe

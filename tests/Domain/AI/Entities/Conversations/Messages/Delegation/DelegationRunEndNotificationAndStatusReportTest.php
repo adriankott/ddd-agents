@@ -94,7 +94,7 @@ class DelegationRunEndNotificationAndStatusReportTest extends UnitTestCase
                 AgentSubAgentRequest::forToolResultTask($pageTask, '', $agentDelegationRequestFromToolResult, $producingToolCall),
                 812400 + $pageNumber,
                 self::moment('10:00:00')
-            )->withRunEnded(DelegationSubAgentRun::STATUS_COMPLETED, str_repeat('page ', 1000), null, null, 0.02, $now);
+            )->withRunEnded(DelegationSubAgentRun::STATUS_COMPLETED, str_repeat('page ', 2000), null, null, 0.02, $now);
             $requestRecords->add($pageRecord);
             $pageNumber++;
         }
@@ -143,7 +143,7 @@ class DelegationRunEndNotificationAndStatusReportTest extends UnitTestCase
         $now = self::moment('10:03:00');
         $storedLine = ToolCall::RESULT_MARKER_PLATFORM_STORED . ' the social profile links of the own website: facebook.com/example.';
         $warmUpRecord = self::buildRunningRecord(2, 'Own website', '10:00:00')
-            ->withRunEnded(DelegationSubAgentRun::STATUS_COMPLETED, str_repeat('page text ', 500) . "\n" . $storedLine, null, null, 0.01, $now);
+            ->withRunEnded(DelegationSubAgentRun::STATUS_COMPLETED, str_repeat('page text ', 1000) . "\n" . $storedLine, null, null, 0.01, $now);
 
         $delegationRunEndNotification = DelegationRunEndNotification::buildFor($warmUpRecord, 1, new DelegationSubAgentRecords(), new DelegationSubAgentRecords(), $now);
 

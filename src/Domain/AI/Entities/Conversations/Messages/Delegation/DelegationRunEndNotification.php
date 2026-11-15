@@ -20,7 +20,7 @@ use DDD\Infrastructure\Base\DateTime\DateTime;
 class DelegationRunEndNotification extends ValueObject
 {
     /** The longest verdict a notification carries; a longer one is cut with a pointer to the drill-down. */
-    public const int VERDICT_MAX_LENGTH = 4000;
+    public const int VERDICT_MAX_LENGTH = 8000;
 
     /** The other unfinished sub-agents named in the "Still running" line; the rest are counted. */
     public const int STILL_RUNNING_NAMED_MAX = 8;

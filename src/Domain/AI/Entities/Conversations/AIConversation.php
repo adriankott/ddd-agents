@@ -54,6 +54,7 @@ use DDD\Domain\AI\Entities\Conversations\Compaction\AIConversationCompactionPres
 use DDD\Domain\AI\Entities\Conversations\Compaction\AIConversationMessageCompactionContext;
 use DDD\Domain\AI\Entities\Conversations\Compaction\CompactionBudgets;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
+use DDD\Domain\AI\Entities\Conversations\Messages\Delegation\DelegationRunEndNotification;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessages;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationOwnerTurns;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationToolCallHistory;
@@ -2694,6 +2695,10 @@ class AIConversation extends Entity
         /** @var AIPromptsService $aIPromptsService */
         $aIPromptsService = AIPrompt::getService();
         $subAgentDirectivePrompt = $aIPromptsService->getAIPromptByName(AgentAIPromptNames::APP_AI_AGENT_SUB_AGENT_DIRECTIVE);
+        // the length the parent's run-end notification hands over at once, from its constant (`8,000`, about 1,000 words
+        // at eight characters a word)
+        $subAgentDirectivePrompt?->setParameter('VERDICT_MAX_LENGTH', number_format(DelegationRunEndNotification::VERDICT_MAX_LENGTH));
+        $subAgentDirectivePrompt?->setParameter('VERDICT_MAX_WORDS', number_format(intdiv(DelegationRunEndNotification::VERDICT_MAX_LENGTH, 8)));
         return $subAgentDirectivePrompt?->getPromptTextWithParametersApplied() ?? '';
     }
 
