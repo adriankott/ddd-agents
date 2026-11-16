@@ -8,6 +8,7 @@ use DDD\Domain\AI\Entities\AgentSpaces\AgentSpace;
 use DDD\Domain\AI\Entities\Conversations\Agent\OfferedSkillCatalog;
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Entities\Conversations\Messages\OwnerDevice;
+use DDD\Domain\AI\Entities\Conversations\Schedules\AIConversationSchedule;
 use DDD\Domain\AI\Entities\Evals\AgentEvalCase;
 use DDD\Domain\AI\Entities\Evals\AgentEvalNotApplicableReason;
 use DDD\Domain\AI\Entities\Evals\AgentEvalNotApplicableReasons;
@@ -18,6 +19,7 @@ use DDD\Domain\AI\Entities\MCPPackages\MCPToolEffectCatalog;
 use DDD\Domain\AI\Entities\Skills\AISkills;
 use DDD\Domain\AI\Interfaces\AIConversationProgressReporterInterface;
 use DDD\Domain\AI\Services\AgentSpaces\AgentSpacesService;
+use DDD\Domain\Base\Entities\Entity;
 use DDD\Domain\Common\Entities\Accounts\Account;
 use DDD\Infrastructure\Base\DateTime\DateTime;
 use DDD\Infrastructure\Services\DDDService;
@@ -28,7 +30,8 @@ use RuntimeException;
  * What an application adds to one evaluation run: the scope of the run, how a new conversation is attached to it and
  * when its agent space is stored, what the application's tools left behind and still hold, what it knows about whether
  * a case applies, the arguments the platform fills on a tool call of the space, the channel of a simulated owner
- * device, the memory curation after a turn and the tools that write to a real external profile.
+ * device, the memory curation after a turn, the tools that write to a real external profile, the entity a probe call
+ * of the scope is billed to and how a schedule an evaluation creates is attached to the scope.
  *
  * The defaults know only what the module knows: the scope is a stored agent space named by the case or the caller,
  * a conversation gets the scope's stored space, the module never creates a space, a harness tool call gets no argument
@@ -328,6 +331,43 @@ class AgentEvalRunHooksService extends Service
             }
         }
         return $outwardActionToolNames;
+    }
+
+    /**
+     * The entity within the owner's account a model call made for the scope is billed to, when the call belongs to no
+     * conversation (a probe of a guard or another single model call of an evaluation command). Reads only.
+     *
+     * The default: the billing entity of the scope's agent space ({@see AgentSpace::findBillingEntity()}); null (the
+     * account is billed) for a scope without a space or a space without one.
+     *
+     * @param AgentEvalScope $agentEvalScope
+     * @return Entity|null
+     */
+    public function findBillingEntityOfScope(AgentEvalScope $agentEvalScope): ?Entity
+    {
+        $agentSpace = $agentEvalScope->getAgentSpace();
+        return $agentSpace !== null ? $agentSpace->findBillingEntity() : null;
+    }
+
+    /**
+     * Attaches a NEW schedule an evaluation command creates for the scope (before it is stored) to the scope, as a
+     * conversation of the run is attached ({@see attachNewConversationToScope()}).
+     *
+     * The default: the scope's stored agent space, as the id and as the object; a scope without a stored space leaves
+     * the schedule at account level (the module never creates a space).
+     *
+     * @param AIConversationSchedule $schedule a schedule without an id
+     * @param AgentEvalScope $agentEvalScope
+     * @return void
+     */
+    public function attachNewScheduleToScope(AIConversationSchedule $schedule, AgentEvalScope $agentEvalScope): void
+    {
+        $storedAgentSpace = $agentEvalScope->getStoredAgentSpace();
+        if ($storedAgentSpace === null) {
+            return;
+        }
+        $schedule->agentSpaceId = $agentEvalScope->getAgentSpaceId();
+        $schedule->agentSpace = $storedAgentSpace;
     }
 
     /** The agent-spaces service, resolved through the container (an application's same-path subclass included). */

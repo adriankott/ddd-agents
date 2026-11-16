@@ -25,6 +25,7 @@ use RuntimeException;
  * - a run of the tools command: a loose file `<date>_<time>-<model>-<scope>.json` (a run in one process, the case
  *   rows with their message traces) or a folder of that name (a run in child processes) holding one file per case run
  *   (`<caseId>.json`, `<caseId>.rep<k>.json`) and `_summary.json` (the case rows without their message traces);
+ * - a loose run file of another evaluation command: `<date>_<time>-<model>-<name>.json` ({@see writeLooseRunFile()});
  * - a suite run: a folder `<date>_<time>-suite[-<label>]` holding a folder per model and flavor
  *   (`<model>-<flavor>/`) with one file per case (`<suite>-<caseId>.json`), the child's result file while it runs
  *   (`.result-<suite>-<caseId>.json`) and `_summary.json`; beside them `_progress.json` while the run is on,
@@ -250,10 +251,53 @@ class AgentEvalResultFilesService extends Service
         return $summaryFile;
     }
 
+    /**
+     * Writes a result document a parent process reads that is no run summary, creating its folder when it is missing.
+     *
+     * @param string $resultFile
+     * @param array $document the stored document of the result file (an object's `toArray()`, e.g. the result of a
+     *                        recall run), encoded with {@see JSON_FLAGS}
+     * @return void
+     */
+    public function writeResultDocument(string $resultFile, array $document): void
+    {
+        $this->writeFile($resultFile, $this->encodeJsonDocument($document));
+    }
+
     /** Writes the whole result of a run (the message traces included) to the result file a parent process reads. */
     public function writeResultFile(string $resultFile, AgentEvalRunSummary $runSummary): void
     {
         $this->writeFile($resultFile, $this->encodeJsonDocument($runSummary->toArray(true)));
+    }
+
+    // ------------------------------------------------------------------ a loose run file of another command
+
+    /**
+     * The name of a loose run file of an evaluation command, `<date>_<time>-<model>-<name>.json` (no model:
+     * `default`): the date-led name the retention sweep recognises.
+     */
+    public function getLooseRunFileName(int $writtenAtTimestamp, ?string $modelName, string $runFileName): string
+    {
+        return date('Y-m-d_His', $writtenAtTimestamp) . '-' . $this->getSafeFileNameSegment($modelName ?? static::DEFAULT_MODEL_FOLDER_NAME)
+            . '-' . $this->getSafeFileNameSegment($runFileName) . '.json';
+    }
+
+    /**
+     * Writes the stored document of one run of an evaluation command as a loose file in the results folder
+     * ({@see getLooseRunFileName()}, the moment of writing as its date), creating the folder when it is missing.
+     *
+     * @param string|null $modelName the model of the run; null = `default`
+     * @param string $runFileName what the name carries after the model (e.g. the name of the evaluation)
+     * @param array $document the stored document of the run (an object's `toArray()`)
+     * @param int $jsonFlags how the document is encoded ({@see JSON_FLAGS} unless the file has always been written
+     *                       otherwise)
+     * @return string the written file
+     */
+    public function writeLooseRunFile(?string $modelName, string $runFileName, array $document, int $jsonFlags = self::JSON_FLAGS): string
+    {
+        $runFile = $this->getResultsDirectory() . '/' . $this->getLooseRunFileName(time(), $modelName, $runFileName);
+        $this->writeFile($runFile, (string)json_encode($document, $jsonFlags));
+        return $runFile;
     }
 
     // ------------------------------------------------------------------ a suite run

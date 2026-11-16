@@ -12,7 +12,8 @@ use DDD\Tests\Agents\Support\UnitTestCase;
 /**
  * The judge verdicts are read from the evaluation log that names the conversation: the verdict line, the score, the
  * case and the VIOLATED / PARTIAL findings; a log of a conversation not asked for and a log without a verdict line
- * give none; a later log of the same conversation replaces the verdict read before.
+ * give none; a later log of the same conversation replaces the verdict read before; a log that cannot be read is
+ * skipped and counted, and the count is named only when it is not 0.
  */
 class AgentRunReportCommandVerdictsTest extends UnitTestCase
 {
@@ -55,6 +56,41 @@ class AgentRunReportCommandVerdictsTest extends UnitTestCase
         self::assertSame('second.case', $verdicts->getByConversationId(4711)?->caseId);
         self::assertSame('', AgentRunReportVerdict::none()->getJudgeCellText());
         self::assertFalse(AgentRunReportVerdict::none()->hasVerdict());
+    }
+
+    public function testAnUnreadableLogIsSkippedAndCounted(): void
+    {
+        $directory = sys_get_temp_dir() . '/run-report-' . uniqid();
+        mkdir($directory);
+        file_put_contents($directory . '/readable.log', "conversation started (id 4712)\n  ✔ PASS 92% notes.multi — 7t/DONE\n");
+        file_put_contents($directory . '/locked-a.log', "conversation started (id 4711)\n  ✘ FAIL 10% a\n");
+        file_put_contents($directory . '/locked-b.log', "conversation started (id 4713)\n  ✘ FAIL 10% b\n");
+        chmod($directory . '/locked-a.log', 0000);
+        chmod($directory . '/locked-b.log', 0000);
+        try {
+            if (is_readable($directory . '/locked-a.log')) {
+                self::markTestSkipped('the test process reads every file (it runs as a superuser)');
+            }
+            $verdicts = (new AgentRunReportCommand())->readVerdictsFromLogs($directory, [4711, 4712, 4713]);
+        } finally {
+            chmod($directory . '/locked-a.log', 0644);
+            chmod($directory . '/locked-b.log', 0644);
+            array_map('unlink', glob($directory . '/*.log') ?: []);
+            rmdir($directory);
+        }
+
+        self::assertSame(2, $verdicts->unreadableLogFileCount);
+        self::assertSame('2 log files could not be read and were skipped', $verdicts->getUnreadableLogFilesNote());
+        self::assertSame('PASS', $verdicts->getByConversationId(4712)?->verdict);
+        self::assertNull($verdicts->getByConversationId(4711));
+    }
+
+    public function testEveryReadableLogLeavesNoNote(): void
+    {
+        $verdicts = AgentRunReportVerdicts::newInstance();
+        self::assertNull($verdicts->getUnreadableLogFilesNote(), 'nothing is printed at 0');
+        $verdicts->unreadableLogFileCount = 1;
+        self::assertSame('1 log file could not be read and was skipped', $verdicts->getUnreadableLogFilesNote());
     }
 
     public function testAFindingKeepsItsMarkerAndAtMostTwoHundredSixtyCharacters(): void

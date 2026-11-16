@@ -38,7 +38,7 @@ class PackageDefaultConfigAndPromptsTest extends TestCase
         'agentPersona' => ['agentName', 'productName'],
         'agentApplicationWording' => ['billingEntityName', 'agentSpaceName', 'agentSpaceContextLabel', 'agentSpaceContextStateKind', 'agentSpaceContextSubjectName', 'ownerConsentSameTargetExamples', 'ownerConsentSameTargetWrittenDifferentlyExample', 'ownerConsentDifferentTargetExamples'],
         'evalOutboundRecipients' => ['allowedEmailDomains', 'allowedEmailAddresses', 'allowedPhoneNumbersE164'],
-        'evalSuite' => ['resultsDirectory', 'resourceGroupByFixture', 'exclusiveFixtures'],
+        'evalSuite' => ['resultsDirectory', 'resourceGroupByFixture', 'exclusiveFixtures', 'suites', 'fixturePaths'],
         'skillNamespaceGroups' => [],
     ];
 

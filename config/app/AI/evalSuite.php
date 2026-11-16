@@ -17,9 +17,21 @@ declare(strict_types=1);
  *   key is its name). Empty in the package.
  * `exclusiveFixtures`: the fixtures whose write cases change state the behaviour of other cases depends on; such a
  *   case runs alone on its agent space. Empty in the package.
+ * `suites`: suite name => `['folder' => <fixture folder>, 'kind' => <task kind>, 'default' => <bool>, 'flavors' =>
+ *   <string[]>]` — the suites a suite run can plan, read by
+ *   {@see \DDD\Domain\AI\Services\Eval\AgentEvalSuitePlanService::getSuiteDefinitions()}. `kind` is a task kind
+ *   (`toolsCase`, `selectionCase`, `recallCase` or an application's own); `default` (true when absent) says whether a
+ *   run without a suite list takes the suite; `flavors` (every flavor when absent) names the flavors it runs in. A
+ *   relative folder is taken relative to the kernel project directory. Empty in the package: it ships no fixtures.
+ * `fixturePaths`: name => the default fixture of a single evaluation command, read by
+ *   {@see \DDD\Domain\AI\Services\Eval\AgentEvalSuitePlanService::findFixturePath()}; relative to the kernel project
+ *   directory unless absolute. `selection` names one fixture FILE (the selection evaluation reads one file); `tools`,
+ *   `recall`, `guard` name a file or a folder of fixture files; `eviction` names one file. Empty in the package.
  */
 return [
     'resultsDirectory' => 'var/agent-evals',
     'resourceGroupByFixture' => [],
     'exclusiveFixtures' => [],
+    'suites' => [],
+    'fixturePaths' => [],
 ];

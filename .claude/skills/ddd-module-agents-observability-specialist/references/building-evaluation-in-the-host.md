@@ -2,27 +2,28 @@
 
 **Reader:** host developer
 
-Contents: what ships, what does not · the parts of a runner · driving one case · reading the outcome · the judge · the judged run · the suite · throwaway spaces and cleanup · checklist · full class names
+Contents: what ships, what does not · the parts of a runner · driving one case · reading the outcome · the judge · the judged run · the suite · the evaluation commands · throwaway spaces and cleanup · checklist · full class names
 
 The package ships the safety layers, the recorded runs, the read models an evaluation needs, the run of ONE case
 (`AgentEvalRunnerService` with the application's `AgentEvalRunHooksService`) and the judged run of one case
-(`AgentEvalJudgedRunService`: a simulated owner and a judge), and the parts a suite is built from: its objects,
-its stored runs, its result files and the run report ([the suite](#the-suite)). The suite command itself is the
-host's: a host that evaluates its agent builds it as a console command of its own around the runner. This reference names what each
-part calls in the package.
+(`AgentEvalJudgedRunService`: a simulated owner and a judge), the parts a suite is built from: its objects, its
+stored runs, its result files and the run report ([the suite](#the-suite)), and nine evaluation commands on them
+([the evaluation commands](#the-evaluation-commands)). The fixtures are the host's: without them the commands find
+no case. This reference names what each part calls in the package.
 
 ## What ships, what does not
 
 | Ships | Does not ship |
 |---|---|
 | the eval marker and the eval switches on `RunSettings` | a case file loader (the case object `AgentEvalCase` reads a decoded case) |
-| the eval tool block and the outbound recipient guard ([eval-safety](eval-safety.md)) | a suite command, its child processes and retries |
+| the eval tool block and the outbound recipient guard ([eval-safety](eval-safety.md)) | the fixtures (case files, suites) and the configuration that names them (`AI.evalSuite.fixturePaths`, `AI.evalSuite.suites`) |
+| the nine evaluation commands with child processes, retries and stop handling ([the evaluation commands](#the-evaluation-commands)) | the host's subclasses where it names its own scope, case shape or texts |
 | `AgentEvalResult` (a verdict value object) and the assertions over a run (`AgentEvalExpectation`: expected tool, skill, status, arguments, plan, state after the run) | |
 | the run of one case: `AgentEvalRunnerService::runCase()` / `run()` / `runWithRestore()` — the tool block applied and lifted, follow-up turns, purpose, reload, restore (`AgentEvalRestorePlan`, `AgentEvalHarnessToolCalls`), the state check, the teardown, applicability (`AgentEvalApplicabilityFacts`), the eviction trajectory, the recall seed, the figures (`AgentEvalRunFigures`) | the application's part of a run: the 13 hooks of `AgentEvalRunHooksService` (scope, ineligible scope, withheld skills, harness arguments, …), overridden in a same-path subclass |
 | `AIConversationAuditRenderService` (the deterministic audit blocks a judge reads); the judged run with its driver and verdict prompts and its model calls ([the judged run](#the-judged-run)) | the application's override points of the judged run |
 | request snapshots, turn events, metrics, the integrity report | |
 | record and replay with the comparison ([record-and-replay](record-and-replay.md)) | |
-| the suite's objects, its planning service, its stored runs, its result files and the run report ([the suite](#the-suite)) | the suite command, the application's task kinds and their planning, the application's own dated folders in the results folder |
+| the suite's objects, its planning service, its stored runs, its result files and the run report ([the suite](#the-suite)) | the application's task kinds and their planning, the application's own dated folders in the results folder |
 | `AgentEvalOutboundGuardHooksService`, `AgentEvalAccountsService` as override points | test accounts, test spaces and their cleanup |
 
 ## The parts of a runner
@@ -136,6 +137,52 @@ What the package ships for it:
   of stored conversations. An application's same-path subclass of the service names the id its usage log files a
   conversation's cost under (`findUsageLogScopeIdOfConversation()`), reads the decision model's cost from its usage
   log (`findModelCostInUsageLog()`) and drops its prefix of skill section ids (`getSkillSectionIdPrefixToDrop()`).
+  A failed usage-log read is named below the run table (`<run>: decision cost not read: <exception class>`), and so
+  are unreadable evaluation logs.
+- **Configuration** (`evalSuite.php`): `suites` (suite name => folder, task kind, `default`, `flavors`; read by
+  `AgentEvalSuitePlanService::getSuiteDefinitions()`) and `fixturePaths` (command name => fixture file or folder; read
+  by `findFixturePath()`; `findFixtureAt()` / `findFixtureFilesAt()` read one file or every `*.json` of a folder). A
+  relative path is taken relative to the kernel project directory. Both are empty in the package.
+- **Stored run options** (`AgentEvalStoredRunOptions`): what `AgentEvalSuiteRunsService::recordSuiteRun()` and
+  `AgentEvalSuiteRun::forFinishedRun()` store as the run's options; `AgentEvalSuiteRun::getRunOptions()` reads them
+  back (`toArray()` is the stored document).
+
+## The evaluation commands
+
+All on the base `AgentEvalConsoleCommand` (`src/Symfony/Commands/Agents/`), live unless said otherwise:
+
+| Command | What it does | Fixture key | Override points |
+|---|---|---|---|
+| `app:ai-agent:eval-tools` | runs the tools cases (expectation, performance budget, state after the run), `--judge` in the judged flavor, `--repeat`; in this process or in child processes on the suite schedule | `tools` | `runCaseOfOwnShape()`, `buildPlanOptionsOfRun()`, the `*_LABEL` / `*_SKIP_REASON` constants |
+| `app:ai-agent:eval-suite` | every configured suite on every model and flavor, one child process per case, reads in a pool and writes in lanes per space and resource; pass and performance verdict against a baseline | `AI.evalSuite.suites` | `getDefaultModelName()`, `getRetriedInfrastructureErrors()`, `getChildCommandNameOfKind()`, `buildApplicationArgumentsOfTask()`, `buildPlanOptions()`, `buildFixturesOfSuite()`, `configureApplicationOptions()`, `isIsolateWholeScopeRequested()`, `getDecisionLayerLabel()`, `describeStopRequest()` |
+| `app:ai-agent:eval-selection` | whether the expected skill was loaded; accuracy; `--json`, `--result-file` for a suite parent | `selection` (one file) | `getDefaultFixturePath()`, `findFallbackScopeValueOfRow()`, `describeMissingScope()` |
+| `app:ai-agent:eval-recall` | seeds past conversations, asks on a fresh one, checks the recall tool and the mentioned facts; deletes the seed unless `--keep-seed` | `recall` | `getDefaultFixturePaths()` |
+| `app:ai-agent:eval-tiers` | the tools cases per model tier; pass rate and efficiency per tier | `tools` | `getDefaultFixturePaths()` |
+| `app:ai-agent:eval-analyze` | offline: classifies the failed cases of a stored run (a run ended on its step budget is `STALL`) and prints reproduce lines | — | `buildReproduceArguments()` |
+| `app:ai-agent:eval-eviction` | multi-skill trajectories on one conversation; the load curve and whether eviction fired | `eviction` (one file) | `trajectoryNamesItsScope()`, `getScopeWordOfSkipLine()` |
+| `app:ai-agent:eval-guard` | the injection guard probe: variants × inputs × `--runs`, false-block and bypass rate; `--parallel` children, each ended at its 1,200 s ceiling; each probe under its own evaluation envelope | `guard` | the guard class by same-path subclass (`ArgusAgentSentinelCanaryGuard::newInstance()`) |
+| `app:ai-agent:eval-schedule-runs` | fires one evaluation schedule `--runs` times and compares the structure of its reports; needs the workers | — | `configureReportOptions()`, `validateReportOptions()`, `runInsteadOfFiring()`, `afterRunEnded()`, `describeScope()`, `describeEvalAccountsSource()`, `describeRequiredOptions()` |
+
+What every command shares (the base):
+
+- **Scope:** `--agentSpaceId` and the options the agent-spaces service declares in the application's words. A case
+  names its own space; the options name the space of the cases that name none
+  (`resolveFallbackAgentSpaceId()`); an option that resolves to no stored space is refused, and the two options
+  together are refused. A parent hands the options to its children as given (`buildScopeArgumentsForChild()`).
+- **Budget:** `--ignore-budget` lifts the AI budget cap for the process (the spend is still booked) and is handed to
+  every child (`buildBudgetArgumentsForChild()`).
+- **Output:** progress lines go to the console's error output, indented by two spaces, so `-q` silences them and a
+  `--json` document on the standard output stays pure. Result files go into the results folder
+  (`AI.evalSuite.resultsDirectory`); a missing folder is created.
+- **Children:** a child runs the console with the parent's own command name (`getChildCommandName()`), so a host's subclass that
+  repeats the `#[AsCommand]` name runs in its children too.
+- **Stop:** a command that stops gracefully (`handlesStopSignals()`; `eval-suite`) counts SIGINT / SIGTERM: the first
+  asks for a stop (as does a `STOP` file in the run folder, through `requestStop()`), the second ends everything still
+  running (`isStopRequested()`, `isKillRequested()`, override point `onStopSignal()`).
+- **Application hooks:** a guard probe is billed to `AgentEvalRunHooksService::findBillingEntityOfScope()` (default:
+  the space's billing entity); a schedule the command creates is attached by `attachNewScheduleToScope()` (default:
+  the stored space). Every task and options object of a plan comes from `AgentEvalSuitePlanService::createTask()` /
+  `createPlanOptions()`, so a host's same-path class is used everywhere.
 
 ## Throwaway spaces and cleanup
 
@@ -171,4 +218,6 @@ The classes this reference names, with their namespace (for the `use` lines of a
 `DDD\Domain\AI\Entities\Evals\SuiteRuns\AgentEvalSuiteCases\{AgentEvalSuiteCase, AgentEvalSuiteCases}` ·
 `DDD\Domain\AI\Services\Conversations\RunReports\AIConversationRunReportService` ·
 `DDD\Symfony\Commands\Agents\AgentRunReportCommand` ·
+`DDD\Symfony\Commands\Agents\{AgentEvalConsoleCommand, AgentEvalToolsCommand, AgentEvalSuiteCommand, AgentEvalSelectionCommand, AgentEvalRecallCommand, AgentEvalTiersCommand, AgentEvalAnalyzeCommand, AgentEvalEvictionCommand, AgentEvalGuardCommand, AgentEvalScheduleRunsCommand}` ·
+`DDD\Domain\AI\Entities\Evals\{AgentEvalStoredRunOptions, AgentEvalSuiteDefinition, AgentEvalSuiteDefinitions, AgentEvalEvictionTurn, AgentEvalEvictionTurns}` ·
 `DDD\Domain\AI\Entities\Conversations\Messages\RunSettings`

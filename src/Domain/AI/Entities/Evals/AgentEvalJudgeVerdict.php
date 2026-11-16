@@ -259,6 +259,19 @@ class AgentEvalJudgeVerdict extends ValueObject
     }
 
     /**
+     * The error of a run whose verdict is an evaluation error ({@see VERDICT_ERROR}: the judge gave no verdict, e.g.
+     * its answer was cut off twice): `judge evaluation error: <reasons>`, so the roll-ups count the case as an error,
+     * not as a failed case. Null for every other verdict.
+     */
+    public function findEvaluationError(): ?string
+    {
+        if ($this->getVerdict() !== static::VERDICT_ERROR) {
+            return null;
+        }
+        return 'judge evaluation error: ' . $this->getReasons();
+    }
+
+    /**
      * Turns the verdict into an evaluation error: `verdict` becomes ERROR and `reasons` says why. Every other key stays
      * where it is (a salvaged verdict keeps its truncation flag and its raw head).
      *

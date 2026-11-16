@@ -15,7 +15,7 @@ use DDD\Domain\Base\Entities\ValueObject;
  *
  *  - {@see FORMAT_SUITE} ({@see buildForSuite()}): the summary a parallel suite writes per run folder and the selection
  *    evaluation prints — `total`, `passed`, `errors`, `notApplicable`, `model`, `flavor`, `arms`, `metrics`, `cases`
- *    (without message traces);
+ *    (the message traces only in a result file, {@see toArray()});
  *  - {@see FORMAT_TOOLS} ({@see buildForToolsRun()}): the summary of a tools evaluation — `total`, `passed`,
  *    `notApplicable`, `model`, `flavor`, `arms`, `repeat`, `metrics` (with the task-plan size and, when measured, the
  *    repetitions, the plan-dynamics and the skill-preload figures), `cases`.
@@ -265,8 +265,10 @@ class AgentEvalRunSummary extends ValueObject
     /**
      * The summary as it is written: the stored document of `<suite run>/<model>-<flavor>/_summary.json` (suite format),
      * and of `<run>.json`, `<run>/_summary.json` and the child's result file `.result-<suite>-<caseId>.json` (tools
-     * format). The suite format never carries the rows' message traces; the tools format carries them when
-     * `$withMessageTraces` is true (its loose run file, its result file and its printed JSON), not in its summary file.
+     * format), and of the result file a child of a suite run writes (either format). Both formats carry the rows'
+     * message traces only when `$withMessageTraces` is true — the result file a parent reads (the parent writes the
+     * trace into the case file and leaves it out of `_summary.json`), the loose run file and the printed JSON of a tools
+     * run — never in a summary file.
      *
      * @return array
      */
@@ -282,7 +284,7 @@ class AgentEvalRunSummary extends ValueObject
                 'flavor' => $this->flavor,
                 'arms' => $this->arms,
                 'metrics' => $this->buildMetricsArray(),
-                'cases' => $this->caseRows->toArraysWithoutMessages(),
+                'cases' => $withMessageTraces ? $this->caseRows->toArrays() : $this->caseRows->toArraysWithoutMessages(),
             ];
         }
         return [

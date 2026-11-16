@@ -9,7 +9,7 @@ use DDD\Domain\AI\Entities\Conversations\AIConversation;
 /**
  * What one evaluation run returns: the driven conversation — the lossless trace (loaded skills, tool calls with their
  * results and status, the final text, tokens and cost per message) — and what the reload of a stored conversation saw.
- * A recall run adds the ids of the conversations it seeded, an eviction run its rows per turn.
+ * A recall run adds the ids of the conversations it seeded, an eviction run its owner turns ({@see AgentEvalEvictionTurns}).
  *
  * A plain object of one run; no container service.
  *
@@ -29,11 +29,8 @@ class AgentEvalRunOutcome
     /** @var int[] The ids of the conversations a recall run seeded */
     protected array $seededConversationIds = [];
 
-    /**
-     * @var array[] The rows of an eviction run, one per owner turn, each by key: `prompt`, `snapshot`,
-     * `newlyLoaded`, `evicted`, `metrics`
-     */
-    protected array $evictionTurns = [];
+    /** @var AgentEvalEvictionTurns|null The owner turns of an eviction run; null for every other run */
+    protected ?AgentEvalEvictionTurns $evictionTurns = null;
 
     /**
      * The outcome of a run that drove `$conversation`.
@@ -82,17 +79,29 @@ class AgentEvalRunOutcome
     }
 
     /**
-     * @param array[] $evictionTurns one row per owner turn, as {@see $evictionTurns}
+     * @param AgentEvalEvictionTurns $agentEvalEvictionTurns the owner turns of an eviction run, in the order they ran
      * @return void
      */
-    public function recordEvictionTurns(array $evictionTurns): void
+    public function recordEvictionTurnSet(AgentEvalEvictionTurns $agentEvalEvictionTurns): void
     {
-        $this->evictionTurns = array_values($evictionTurns);
+        $this->evictionTurns = $agentEvalEvictionTurns;
     }
 
-    /** @return array[] The rows of an eviction run, one per owner turn */
+    /** The owner turns of an eviction run; an empty set for every other run. */
+    public function getEvictionTurnSet(): AgentEvalEvictionTurns
+    {
+        return $this->evictionTurns ?? AgentEvalEvictionTurns::newInstance();
+    }
+
+    /**
+     * The owner turns of an eviction run as rows, each by key: `prompt`, `snapshot`, `newlyLoaded`, `evicted`,
+     * `metrics` ({@see AgentEvalEvictionTurn::toArray()}); none for every other run.
+     *
+     * @deprecated read {@see getEvictionTurnSet()}; this reader stays for callers of the row form
+     * @return array[]
+     */
     public function getEvictionTurns(): array
     {
-        return $this->evictionTurns;
+        return $this->getEvictionTurnSet()->toArray();
     }
 }

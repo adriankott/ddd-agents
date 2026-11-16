@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DDD\Tests\Agents\Integration\Evals;
 
+use DDD\Domain\AI\Entities\Evals\AgentEvalStoredRunOptions;
 use DDD\Domain\AI\Entities\Evals\SuiteRuns\AgentEvalSuiteCases\AgentEvalSuiteCase;
 use DDD\Domain\AI\Entities\Evals\SuiteRuns\AgentEvalSuiteCases\AgentEvalSuiteCases;
 use DDD\Domain\AI\Entities\Evals\SuiteRuns\AgentEvalSuiteRun;
@@ -144,7 +145,7 @@ class AgentEvalSuiteRunsDatabaseTest extends DatabaseTestCase
             'app:ai-agent:eval-suite',
             'default-suite',
             1_761_658_758,
-            ['model' => 'VENDOR.MODEL_A', 'flavor' => 'judge'],
+            AgentEvalStoredRunOptions::fromStoredDocument(['model' => 'VENDOR.MODEL_A', 'flavor' => 'judge']),
             'run-folder-default',
             AgentEvalSuiteRunRecordTest::loadFixtureCaseRows()
         );

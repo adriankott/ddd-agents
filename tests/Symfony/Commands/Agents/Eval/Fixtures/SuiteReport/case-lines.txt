@@ -1,0 +1,10 @@
+  PASS call    tools      catalog.pass                                    12 s · 3 calls · 1 turns  [10/40 · 2 running · 7 queued]
+  FAIL judge   tools      catalog.fail                                   100 s · 11 calls · 4 turns  [11/40 · 2 running · 7 queued]
+         ✗ tool not called: expected one of [getItems]
+         ✗ a long failure text — a long failure text — a long failure text — a long failure text — a long failure text — a long failure text — a long failure text — a long failure text — a long failure text — a long failure text — 
+         ✗ status: expected COMPLETED, got FAILED
+  ERR  judge   tools      catalog.error                                    0 s  [12/40 · 2 running · 7 queued]
+         ! the child process left no result (exit code 3): xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  N/A  call    tools      catalog.not-applicable                           2 s · 0 calls · 0 turns  [13/40 · 2 running · 7 queued]
+         the preparation step answered an error
+  PASS call    taskplandelivery catalog.a-case-id-that-is-much-longer-than-i  1235 s  [14/40 · 2 running · 7 queued]

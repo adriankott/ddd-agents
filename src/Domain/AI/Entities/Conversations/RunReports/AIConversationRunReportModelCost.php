@@ -20,6 +20,9 @@ class AIConversationRunReportModelCost extends ValueObject
     /** @var int The model calls */
     public int $calls = 0;
 
+    /** @var string|null The class of the exception the read of the usage log ended in; null when the read worked or none was made */
+    public ?string $readFailure = null;
+
     /**
      * @param float $costInUSD
      * @param int $calls
@@ -41,5 +44,19 @@ class AIConversationRunReportModelCost extends ValueObject
     public static function none(): static
     {
         return static::forCostAndCalls(0.0, 0);
+    }
+
+    /**
+     * No cost and no call because the read of the usage log failed: the class of the exception is kept, so the report
+     * says the cost was not read instead of showing a zero as if it were measured.
+     *
+     * @param string $readFailure the class of the exception the read ended in
+     * @return static
+     */
+    public static function forReadFailure(string $readFailure): static
+    {
+        $modelCost = static::none();
+        $modelCost->readFailure = $readFailure;
+        return $modelCost;
     }
 }

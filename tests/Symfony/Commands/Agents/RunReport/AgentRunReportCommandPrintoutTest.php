@@ -115,6 +115,59 @@ class AgentRunReportCommandPrintoutTest extends IntegrationTestCase
         self::assertStringStartsWith(' -', $displayLines[$firstNoteLine - 2], 'the notes follow the run table');
     }
 
+    public function testAFailedUsageLogReadIsNamedBelowTheRunTableOnlyForTheRunItConcerns(): void
+    {
+        $this->runReportServiceDouble->usageLogReadFails = true;
+        $this->runReportServiceDouble->snapshotReadFails = true;
+        $commandTester = new CommandTester(new AgentRunReportProbeCommand());
+
+        $commandTester->execute(RunReportPrintoutRuns::buildCommandInput(['--no-tools' => true], $this->logDirectory));
+
+        $displayLines = explode("\n", $commandTester->getDisplay());
+        $noteLines = array_values(array_filter($displayLines, static fn (string $displayLine): bool => str_contains($displayLine, ' not ')));
+        self::assertSame([
+            RunReportPrintoutRuns::FULL_RUN_ID . ': plan size not measured: ' . RuntimeException::class,
+            RunReportPrintoutRuns::VARIANTS_RUN_ID . ': plan size not measured: ' . RuntimeException::class,
+            RunReportPrintoutRuns::FULL_RUN_ID . ': decision cost not read: ' . RuntimeException::class,
+        ], $noteLines, 'the run without a usage-log id reads no cost and has no note; the decision-cost notes follow the plan-size notes');
+        $decisionNoteLine = (int)array_search($noteLines[2], $displayLines, true);
+        self::assertSame($noteLines[1], $displayLines[$decisionNoteLine - 1]);
+    }
+
+    public function testAWorkingUsageLogReadPrintsNoNote(): void
+    {
+        $commandTester = new CommandTester(new AgentRunReportProbeCommand());
+
+        $commandTester->execute(RunReportPrintoutRuns::buildCommandInput(['--no-tools' => true], $this->logDirectory));
+
+        self::assertStringNotContainsString('decision cost not read', $commandTester->getDisplay());
+        self::assertStringNotContainsString('could not be read', $commandTester->getDisplay());
+    }
+
+    public function testUnreadableLogFilesAreCountedInOneLineBelowTheRunTable(): void
+    {
+        $unreadableLogPath = $this->logDirectory . '/unreadable.log';
+        file_put_contents($unreadableLogPath, "conversation started (id 4711)\n");
+        chmod($unreadableLogPath, 0000);
+        if (is_readable($unreadableLogPath)) {
+            chmod($unreadableLogPath, 0644);
+            self::markTestSkipped('the test process reads every file (it runs as a superuser)');
+        }
+        $commandTester = new CommandTester(new AgentRunReportProbeCommand());
+        try {
+            $commandTester->execute(RunReportPrintoutRuns::buildCommandInput(['--no-tools' => true, '--log-dir' => true], $this->logDirectory));
+        } finally {
+            chmod($unreadableLogPath, 0644);
+        }
+
+        $displayLines = explode("\n", $commandTester->getDisplay());
+        self::assertContains('1 log file could not be read and was skipped', $displayLines);
+        self::assertSame(1, substr_count($commandTester->getDisplay(), 'could not be read'), 'one line');
+        $noteLine = (int)array_search('1 log file could not be read and was skipped', $displayLines, true);
+        self::assertSame('', $displayLines[$noteLine - 1]);
+        self::assertStringStartsWith(' -', $displayLines[$noteLine - 2], 'the line follows the run table');
+    }
+
     public function testTheDecisionCostIsReadOncePerReportedRunThatTheUsageLogFiles(): void
     {
         $commandTester = new CommandTester(new AgentRunReportProbeCommand());

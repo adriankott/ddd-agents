@@ -1,0 +1,10 @@
+Eval suite — 31 case runs · models [m-one, m-two] · flavors [call, judge]
+  suites:  tools 22 · selection 6 · recall 3
+  access:  read 17 · write 12 · exclusive 2
+  lanes:   7:posts 4 · 7:catalog 2 · 8:posts 1 · 8:catalog 1 · 9:posts 1 · 9:* 1 · 10:posts 1 · 11:posts 1 … (9 lanes)
+  waves:   group:1 2 · group:2 1
+  time:    one after the other 1 h 06 min · planned 12 min 34 s with 24 processes (bound by lane 7:posts)
+  effort:  platform default — configured m-one medium · m-two none, the effort site may raise a turn
+  decision: platform on — skillPreload on · turnClosing off · replyLanguage on · turn closing deterministicCounter · TRANSIENT run: no decision site runs
+  arms:    decision-model-skill-preload on · agent-wire-api responses
+

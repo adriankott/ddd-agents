@@ -46,6 +46,51 @@ class AgentEvalSimCase extends ValueObject
     }
 
     /**
+     * The judged case of a tools case (one fixture serves both flavors): the case's `prompt` is the opening owner
+     * turn; `goal`, `userFacts` and `successRubric` are the case's own, else the default texts `$agentEvalJudgedCaseTexts`
+     * ({@see AgentEvalJudgedCaseTexts::forCase()}); `maxTurns`, the flat `maxStepsPerTurn` (as
+     * `runSettings.maxStepsPerTurn`), `compactionSettings`, `reportChannel`, `scheduledRun`, `purposeName` and the
+     * scripted owner turns (`followUpPrompts`, `followUpIdleMinutes`) ride through in the judged run's form. Every other
+     * key of the case (its scope, its tool block, `restore`, an application's own fixture keys) is kept unchanged
+     * behind the judged keys, which win.
+     */
+    public static function fromEvaluatedCase(AgentEvalCase $agentEvalCase, AgentEvalJudgedCaseTexts $agentEvalJudgedCaseTexts): static
+    {
+        $caseFields = $agentEvalCase->toArray();
+        $judgedFields = [
+            'goal' => (string)($caseFields['goal'] ?? $agentEvalJudgedCaseTexts->goal),
+            'openingPrompt' => $agentEvalCase->getPrompt(),
+            'userFacts' => (string)($caseFields['userFacts'] ?? $agentEvalJudgedCaseTexts->ownerFacts),
+            'successRubric' => (string)($caseFields['successRubric'] ?? $agentEvalJudgedCaseTexts->successRubric),
+        ];
+        if (isset($caseFields['maxTurns'])) {
+            $judgedFields['maxTurns'] = (int)$caseFields['maxTurns'];
+        }
+        if (isset($caseFields['maxStepsPerTurn'])) {
+            $judgedFields['runSettings']['maxStepsPerTurn'] = (int)$caseFields['maxStepsPerTurn'];
+        }
+        if (is_array($caseFields['compactionSettings'] ?? null)) {
+            $judgedFields['compactionSettings'] = $caseFields['compactionSettings'];
+        }
+        if (isset($caseFields['reportChannel'])) {
+            $judgedFields['reportChannel'] = (string)$caseFields['reportChannel'];
+        }
+        if ((bool)($caseFields['scheduledRun'] ?? false)) {
+            $judgedFields['scheduledRun'] = true;
+        }
+        if (isset($caseFields['purposeName'])) {
+            $judgedFields['purposeName'] = (string)$caseFields['purposeName'];
+        }
+        if (is_array($caseFields['followUpPrompts'] ?? null) && $caseFields['followUpPrompts'] !== []) {
+            $judgedFields['followUpPrompts'] = array_values(array_map('strval', $caseFields['followUpPrompts']));
+            if (is_array($caseFields['followUpIdleMinutes'] ?? null)) {
+                $judgedFields['followUpIdleMinutes'] = array_values(array_map('intval', $caseFields['followUpIdleMinutes']));
+            }
+        }
+        return static::fromArray($judgedFields + $caseFields);
+    }
+
+    /**
      * The case exactly as it was built, unknown keys included.
      *
      * @return array<string, mixed>

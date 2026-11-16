@@ -13,6 +13,15 @@ use DDD\Symfony\Commands\Agents\AgentCompactConversationCommand;
 use DDD\Symfony\Commands\Agents\AgentCompactFinalizedConversationsCommand;
 use DDD\Symfony\Commands\Agents\AgentDeliverOwedReportsAndResumeOwedTurnsCommand;
 use DDD\Symfony\Commands\Agents\AgentDiagnoseResumeCommand;
+use DDD\Symfony\Commands\Agents\AgentEvalAnalyzeCommand;
+use DDD\Symfony\Commands\Agents\AgentEvalEvictionCommand;
+use DDD\Symfony\Commands\Agents\AgentEvalGuardCommand;
+use DDD\Symfony\Commands\Agents\AgentEvalRecallCommand;
+use DDD\Symfony\Commands\Agents\AgentEvalScheduleRunsCommand;
+use DDD\Symfony\Commands\Agents\AgentEvalSelectionCommand;
+use DDD\Symfony\Commands\Agents\AgentEvalSuiteCommand;
+use DDD\Symfony\Commands\Agents\AgentEvalTiersCommand;
+use DDD\Symfony\Commands\Agents\AgentEvalToolsCommand;
 use DDD\Symfony\Commands\Agents\AgentExecuteToolCallCommand;
 use DDD\Symfony\Commands\Agents\AgentFireDueSchedulesCommand;
 use DDD\Symfony\Commands\Agents\AgentInspectConversationCommand;
@@ -84,6 +93,15 @@ class PackageAgentCommandsRegistrationTest extends IntegrationTestCase
         'app:mcp:documentation' => MCPDocumentationCommand::class,
         'app:mcp:clear-cache' => MCPClearCacheCommand::class,
         'app:ai:composed-view:export-node-schema' => ComposedViewNodeSchemaExportCommand::class,
+        'app:ai-agent:eval-tools' => AgentEvalToolsCommand::class,
+        'app:ai-agent:eval-selection' => AgentEvalSelectionCommand::class,
+        'app:ai-agent:eval-recall' => AgentEvalRecallCommand::class,
+        'app:ai-agent:eval-tiers' => AgentEvalTiersCommand::class,
+        'app:ai-agent:eval-analyze' => AgentEvalAnalyzeCommand::class,
+        'app:ai-agent:eval-suite' => AgentEvalSuiteCommand::class,
+        'app:ai-agent:eval-eviction' => AgentEvalEvictionCommand::class,
+        'app:ai-agent:eval-guard' => AgentEvalGuardCommand::class,
+        'app:ai-agent:eval-schedule-runs' => AgentEvalScheduleRunsCommand::class,
     ];
 
     /** @var string The tool-call child: run by name, never listed */
@@ -127,12 +145,12 @@ class PackageAgentCommandsRegistrationTest extends IntegrationTestCase
 
         $visibleCommandNames = array_keys(self::COMMAND_CLASSES_BY_NAME);
         $visibleCommandNames = array_values(array_diff($visibleCommandNames, [self::HIDDEN_COMMAND_NAME]));
-        self::assertCount(31, $visibleCommandNames);
+        self::assertCount(40, $visibleCommandNames);
         self::assertSame([], array_values(array_diff($visibleCommandNames, $listedCommandNames)), 'every visible command is listed');
         self::assertNotContains(self::HIDDEN_COMMAND_NAME, $listedCommandNames);
         self::assertContains(self::HIDDEN_COMMAND_NAME, $hiddenCommandNames);
         $textListProcess = $this->runConsoleScript('list', '--raw');
-        self::assertSame(31, preg_match_all('/^app:(ai-(agent|conversation|schedule)|mcp|ai:composed-view):\S+/m', $textListProcess->getOutput()), 'the text listing names the 31 visible commands');
+        self::assertSame(40, preg_match_all('/^app:(ai-(agent|conversation|schedule)|mcp|ai:composed-view):\S+/m', $textListProcess->getOutput()), 'the text listing names the 40 visible commands');
 
         $helpProcess = $this->runConsoleScript('help', self::HIDDEN_COMMAND_NAME);
         self::assertSame(0, $helpProcess->getExitCode(), $helpProcess->getErrorOutput());

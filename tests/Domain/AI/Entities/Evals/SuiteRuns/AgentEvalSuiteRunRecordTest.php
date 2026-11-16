@@ -7,6 +7,7 @@ namespace DDD\Tests\Agents\Domain\AI\Entities\Evals\SuiteRuns;
 use DateTimeZone;
 use DDD\Domain\AI\Entities\Evals\AgentEvalCaseRow;
 use DDD\Domain\AI\Entities\Evals\AgentEvalCaseRows;
+use DDD\Domain\AI\Entities\Evals\AgentEvalStoredRunOptions;
 use DDD\Domain\AI\Entities\Evals\SuiteRuns\AgentEvalSuiteCases\AgentEvalSuiteCase;
 use DDD\Domain\AI\Entities\Evals\SuiteRuns\AgentEvalSuiteCases\AgentEvalSuiteCases;
 use DDD\Domain\AI\Entities\Evals\SuiteRuns\AgentEvalSuiteRun;
@@ -55,7 +56,7 @@ class AgentEvalSuiteRunRecordTest extends UnitTestCase
         self::assertSame('app:ai-agent:eval-suite', $agentEvalSuiteRun->command);
         self::assertSame('run-folder-default', $agentEvalSuiteRun->logDirectoryName);
         self::assertSame(gmdate('Y-m-d H:i:s', self::STARTED_AT_TIMESTAMP), $agentEvalSuiteRun->startedAt->format('Y-m-d H:i:s'));
-        self::assertSame(['models' => ['VENDOR.MODEL_A'], 'model' => 'VENDOR.MODEL_A', 'flavor' => 'judge', 'arms' => []], $agentEvalSuiteRun->getRunOptions());
+        self::assertSame(['models' => ['VENDOR.MODEL_A'], 'model' => 'VENDOR.MODEL_A', 'flavor' => 'judge', 'arms' => []], $agentEvalSuiteRun->getRunOptions()->toArray());
         self::assertCount(6, $agentEvalSuiteRun->agentEvalSuiteCases);
         self::assertStringContainsString('1/5 passed, 2 failed, 1 errors, 1 failed as expected, 1 not applicable', $agentEvalSuiteRun->getSummaryLine());
         self::assertStringContainsString('1 h 02 min', $agentEvalSuiteRun->getSummaryLine());
@@ -187,7 +188,7 @@ class AgentEvalSuiteRunRecordTest extends UnitTestCase
             str_repeat('h', 130),
             $startedAt,
             DateTime::fromTimestamp(self::STARTED_AT_TIMESTAMP + 65),
-            [],
+            AgentEvalStoredRunOptions::none(),
             '',
             AgentEvalCaseRows::newInstance()
         );
@@ -196,7 +197,8 @@ class AgentEvalSuiteRunRecordTest extends UnitTestCase
         self::assertNull($agentEvalSuiteRun->suiteLabel);
         self::assertNull($agentEvalSuiteRun->logDirectoryName);
         self::assertNull($agentEvalSuiteRun->runOptionsJson, 'no options, no JSON');
-        self::assertSame([], $agentEvalSuiteRun->getRunOptions());
+        self::assertSame([], $agentEvalSuiteRun->getRunOptions()->toArray());
+        self::assertTrue($agentEvalSuiteRun->getRunOptions()->isEmpty());
         self::assertSame(0, $agentEvalSuiteRun->casesTotal);
         self::assertCount(0, $agentEvalSuiteRun->agentEvalSuiteCases);
         self::assertStringEndsWith('· 1 min 05 s · 0/0 passed', $agentEvalSuiteRun->getSummaryLine());
@@ -236,7 +238,7 @@ class AgentEvalSuiteRunRecordTest extends UnitTestCase
             'eval-host',
             $startedAt,
             $finishedAt,
-            ['models' => ['VENDOR.MODEL_A'], 'model' => 'VENDOR.MODEL_A', 'flavor' => 'judge', 'arms' => []],
+            AgentEvalStoredRunOptions::fromStoredDocument(['models' => ['VENDOR.MODEL_A'], 'model' => 'VENDOR.MODEL_A', 'flavor' => 'judge', 'arms' => []]),
             'run-folder-default',
             static::loadFixtureCaseRows()
         );

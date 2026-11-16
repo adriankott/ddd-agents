@@ -9,10 +9,13 @@ use DDD\Domain\AI\Entities\Evals\AgentEvalCase;
 use DDD\Domain\AI\Entities\Evals\AgentEvalDurationPriors;
 use DDD\Domain\AI\Entities\Evals\AgentEvalFixture;
 use DDD\Domain\AI\Entities\Evals\AgentEvalFixtures;
+use DDD\Domain\AI\Entities\Evals\AgentEvalSuiteDefinition;
+use DDD\Domain\AI\Entities\Evals\AgentEvalSuiteDefinitions;
 use DDD\Domain\AI\Entities\Evals\AgentEvalSuitePlanOptions;
 use DDD\Domain\AI\Entities\Evals\AgentEvalSuiteTask;
 use DDD\Domain\AI\Entities\Evals\AgentEvalSuiteTasks;
 use DDD\Infrastructure\Libs\Config;
+use DDD\Infrastructure\Services\DDDService;
 use DDD\Infrastructure\Services\Service;
 
 /**
@@ -27,12 +30,18 @@ use DDD\Infrastructure\Services\Service;
  * it in its service configuration; callers obtain this service through
  * `DDDService::instance()->getService(AgentEvalSuitePlanService::class)`):
  *
+ *  - {@see createTask()} and {@see createPlanOptions()}: every task and every options object of a plan is created
+ *    here (default: `newInstance()`, which gives the application's same-path class), so an application that keeps
+ *    a value of its own on its task or options class gets its class everywhere;
  *  - {@see buildTasksOfApplicationKind()}: the tasks of the application's own kinds (default: none);
  *  - {@see assignScopeOfCaseToTask()}: the scope a case runs in when the application's fixtures name it by a key of
  *    their own (default: the case's `agentSpaceId`, else the options' fallback agent space);
  *  - {@see getDurationPriors()}: the duration priors, extended by the application's kinds;
  *  - {@see getResourceGroupByFixture()} and {@see getExclusiveFixtureNames()}: read from the configuration keys
- *    `AI.evalSuite.resourceGroupByFixture` and `AI.evalSuite.exclusiveFixtures` (empty in the module).
+ *    `AI.evalSuite.resourceGroupByFixture` and `AI.evalSuite.exclusiveFixtures` (empty in the module);
+ *  - {@see getSuiteDefinitions()} and {@see findFixturePath()}: the suites a suite run can plan and the fixture
+ *    files of the single evaluation commands, read from `AI.evalSuite.suites` and `AI.evalSuite.fixturePaths`
+ *    (empty in the module: it ships no fixtures).
  */
 class AgentEvalSuitePlanService extends Service
 {
@@ -54,6 +63,12 @@ class AgentEvalSuitePlanService extends Service
     /** @var string The resource key of a selection case whose fixture names no expected skill */
     public const string RESOURCE_SELECTION = 'selection';
 
+    /** @var string The configuration key of the suites a suite run can plan */
+    public const string CONFIG_KEY_SUITES = 'AI.evalSuite.suites';
+
+    /** @var string The configuration key of the fixture file or folder of each single evaluation command */
+    public const string CONFIG_KEY_FIXTURE_PATHS = 'AI.evalSuite.fixturePaths';
+
     /** @var int The wall-clock ceiling of a case's child process unless the case declares its own */
     public const int DEFAULT_CASE_TIMEOUT_SECONDS = 600;
 
@@ -62,6 +77,112 @@ class AgentEvalSuitePlanService extends Service
 
     /** @var float The duration prior of a task whose kind and flavor have none */
     public const float DEFAULT_ESTIMATED_SECONDS = 60.0;
+
+    /**
+     * A new task of the plan, the application's same-path class when it has one. Every task the planning builds is
+     * created here; an application that keeps the scope on its own task class may refuse another class where it reads
+     * the task.
+     */
+    public function createTask(): AgentEvalSuiteTask
+    {
+        return AgentEvalSuiteTask::newInstance();
+    }
+
+    /**
+     * New options of a plan, the application's same-path class when it has one. A command creates the options of its
+     * plan here ({@see buildPlanOptions()}).
+     */
+    public function createPlanOptions(): AgentEvalSuitePlanOptions
+    {
+        return AgentEvalSuitePlanOptions::newInstance();
+    }
+
+    /**
+     * The options of a plan for the models and flavors of a run, created by {@see createPlanOptions()}.
+     *
+     * @param array $modelNames model names in order; null = the conversation default
+     * @param string[] $flavors
+     * @return AgentEvalSuitePlanOptions
+     */
+    public function buildPlanOptions(array $modelNames, array $flavors): AgentEvalSuitePlanOptions
+    {
+        $agentEvalSuitePlanOptions = $this->createPlanOptions();
+        $agentEvalSuitePlanOptions->modelNames = array_values($modelNames);
+        $agentEvalSuitePlanOptions->flavors = array_values(array_map('strval', $flavors));
+        return $agentEvalSuitePlanOptions;
+    }
+
+    /**
+     * The suites a suite run can plan (`AI.evalSuite.suites`), in the order of the configuration: per suite name its
+     * fixture folder (relative to the kernel project directory unless absolute), the kind of its tasks, whether a run
+     * without a suite list takes it (`default`, true when absent) and the flavors it runs in (`flavors`, every flavor
+     * when absent). An entry without a folder or a kind is skipped. Empty in the module.
+     */
+    public function getSuiteDefinitions(): AgentEvalSuiteDefinitions
+    {
+        $agentEvalSuiteDefinitions = AgentEvalSuiteDefinitions::newInstance();
+        $configuredSuites = Config::get(static::CONFIG_KEY_SUITES);
+        foreach (is_array($configuredSuites) ? $configuredSuites : [] as $suiteName => $suiteFields) {
+            if (!is_array($suiteFields) || !is_string($suiteFields['folder'] ?? null) || !is_string($suiteFields['kind'] ?? null)) {
+                continue;
+            }
+            $agentEvalSuiteDefinition = AgentEvalSuiteDefinition::forSuite(
+                (string)$suiteName,
+                $this->resolveConfiguredPath($suiteFields['folder']),
+                $suiteFields['kind'],
+                (bool)($suiteFields['default'] ?? true),
+                is_array($suiteFields['flavors'] ?? null) ? array_values(array_map('strval', $suiteFields['flavors'])) : []
+            );
+            $agentEvalSuiteDefinitions->add($agentEvalSuiteDefinition);
+        }
+        return $agentEvalSuiteDefinitions;
+    }
+
+    /**
+     * The fixture file or folder of a single evaluation command (`AI.evalSuite.fixturePaths`, by the name the
+     * command asks for, e.g. `tools` or `selection`), as an absolute path; null when the configuration names none
+     * (the module names none: it ships no fixtures).
+     */
+    public function findFixturePath(string $fixturePathName): ?string
+    {
+        $fixturePaths = Config::get(static::CONFIG_KEY_FIXTURE_PATHS);
+        $fixturePath = is_array($fixturePaths) ? ($fixturePaths[$fixturePathName] ?? null) : null;
+        return is_string($fixturePath) && trim($fixturePath) !== '' ? $this->resolveConfiguredPath(trim($fixturePath)) : null;
+    }
+
+    /**
+     * The fixture of one file: its decoded JSON document; null when the file is missing or holds no JSON object or
+     * list (a top-level JSON list passes too and gives a fixture without named keys). The single-file counterpart of
+     * {@see findFixturesInFolder()}, which also requires a `cases` list.
+     */
+    public function findFixtureAt(string $fixturePath): ?AgentEvalFixture
+    {
+        if (!is_file($fixturePath)) {
+            return null;
+        }
+        $decodedFixture = json_decode((string)file_get_contents($fixturePath), true);
+        return is_array($decodedFixture) ? AgentEvalFixture::fromDecodedFile($fixturePath, $decodedFixture) : null;
+    }
+
+    /**
+     * The fixture files a path names: the file itself, or the `*.json` files of a folder sorted by name (as `glob()`
+     * returns them); none for a path that does not exist.
+     *
+     * @return string[]
+     */
+    public function findFixtureFilesAt(string $fixturePath): array
+    {
+        if (is_file($fixturePath)) {
+            return [$fixturePath];
+        }
+        return is_dir($fixturePath) ? (glob(rtrim($fixturePath, '/') . '/*.json') ?: []) : [];
+    }
+
+    /** A configured path as an absolute path: a relative one is taken relative to the kernel project directory. */
+    protected function resolveConfiguredPath(string $configuredPath): string
+    {
+        return str_starts_with($configuredPath, '/') ? rtrim($configuredPath, '/') : DDDService::instance()->getRootDir() . '/' . rtrim($configuredPath, '/');
+    }
 
     /**
      * The decoded fixtures of a folder, one per `*.json` file in the order of the folder listing; a file that is no
@@ -159,7 +280,7 @@ class AgentEvalSuitePlanService extends Service
         if ($agentEvalCase->requiresVision() && !$agentEvalSuitePlanOptions->modelCanSeeImages($modelName)) {
             return null;
         }
-        $agentEvalSuiteTask = AgentEvalSuiteTask::newInstance();
+        $agentEvalSuiteTask = $this->createTask();
         if (!$this->assignScopeOfCaseToTask($agentEvalSuiteTask, $agentEvalCase, $agentEvalSuitePlanOptions, true)) {
             return null;
         }
@@ -192,7 +313,7 @@ class AgentEvalSuitePlanService extends Service
                     if (!$agentEvalSuitePlanOptions->matchesCaseFilter($agentEvalCase->getId())) {
                         continue;
                     }
-                    $agentEvalSuiteTask = AgentEvalSuiteTask::newInstance();
+                    $agentEvalSuiteTask = $this->createTask();
                     if (!$this->assignScopeOfCaseToTask($agentEvalSuiteTask, $agentEvalCase, $agentEvalSuitePlanOptions, true)) {
                         continue;
                     }
@@ -225,7 +346,7 @@ class AgentEvalSuitePlanService extends Service
         foreach ($agentEvalSuitePlanOptions->modelNames as $modelName) {
             foreach ($agentEvalFixtures->getElements() as $agentEvalFixture) {
                 foreach ($agentEvalFixture->getCases()->getElements() as $agentEvalCase) {
-                    $agentEvalSuiteTask = AgentEvalSuiteTask::newInstance();
+                    $agentEvalSuiteTask = $this->createTask();
                     if (!$this->assignScopeOfCaseToTask($agentEvalSuiteTask, $agentEvalCase, $agentEvalSuitePlanOptions, false)) {
                         continue;
                     }

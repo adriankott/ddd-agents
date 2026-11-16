@@ -154,6 +154,30 @@ class AgentEvalRunSummaryTest extends UnitTestCase
         self::assertSame(0.0, AgentEvalRunSummary::buildForSuite($this->rows(['case' => 'a', 'passed' => false]), 'm', 'call')->avgCostPerCaseUsd, 'no timed row');
     }
 
+    /**
+     * A recall row keeps its trace in the result file its child writes (the parent writes it into the case file): the
+     * suite format carries the traces with the flag, and its summary file never does. The rows without a trace (a
+     * selection row) give the same document with and without the flag.
+     */
+    public function testTheSuiteFormatCarriesTheTracesOnlyWithTheFlag(): void
+    {
+        $caseRows = $this->rows(
+            ['id' => 'recall.a', 'case' => 'recall.a', 'passed' => true, 'durationMs' => 10, 'error' => null, 'messages' => ['the recall trace']],
+            ['skill' => 'Selection.Skill', 'case' => 'selection.b', 'passed' => false, 'durationMs' => 20]
+        );
+        $summary = AgentEvalRunSummary::buildForSuite($caseRows, 'VENDOR.MODEL', 'call');
+
+        $withTraces = $summary->toArray(true);
+        $withoutTraces = $summary->toArray();
+
+        self::assertSame(['total', 'passed', 'errors', 'notApplicable', 'model', 'flavor', 'arms', 'metrics', 'cases'], array_keys($withTraces));
+        self::assertSame(['the recall trace'], $withTraces['cases'][0]['messages']);
+        self::assertSame(['id', 'case', 'passed', 'durationMs', 'error', 'messages'], array_keys($withTraces['cases'][0]), 'the row keeps its key order');
+        self::assertArrayNotHasKey('messages', $withoutTraces['cases'][0]);
+        self::assertSame($withoutTraces['cases'][1], $withTraces['cases'][1], 'a row without a trace is the same row');
+        self::assertSame(array_diff_key($withTraces, ['cases' => 1]), array_diff_key($withoutTraces, ['cases' => 1]));
+    }
+
     public function testASummaryReadBackFromItsFileGivesTheSameSummary(): void
     {
         $caseRows = $this->rows(

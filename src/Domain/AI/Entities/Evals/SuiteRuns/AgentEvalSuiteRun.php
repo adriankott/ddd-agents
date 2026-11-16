@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DDD\Domain\AI\Entities\Evals\SuiteRuns;
 
 use DDD\Domain\AI\Entities\Evals\AgentEvalCaseRows;
+use DDD\Domain\AI\Entities\Evals\AgentEvalStoredRunOptions;
 use DDD\Domain\AI\Entities\Evals\SuiteRuns\AgentEvalSuiteCases\AgentEvalSuiteCase;
 use DDD\Domain\AI\Entities\Evals\SuiteRuns\AgentEvalSuiteCases\AgentEvalSuiteCases;
 use DDD\Domain\AI\Repo\DB\Evals\SuiteRuns\DBAgentEvalSuiteRun;
@@ -124,7 +125,7 @@ class AgentEvalSuiteRun extends Entity implements LlmMarkdownRenderable
      * @param string|null $host the host name of the machine that ran the run
      * @param DateTime $startedAt when the run started (UTC)
      * @param DateTime $finishedAt when the run ended (UTC)
-     * @param array<string, mixed> $runOptions the run's options; `model` / `flavor` are the default of a row without its own
+     * @param AgentEvalStoredRunOptions $runOptions the run's options; `model` / `flavor` are the default of a row without its own
      * @param string|null $logDirectoryName the folder of the traces in the results folder
      * @param AgentEvalCaseRows $caseRows the case rows of the run, in the order they finished
      * @return static
@@ -135,7 +136,7 @@ class AgentEvalSuiteRun extends Entity implements LlmMarkdownRenderable
         ?string $host,
         DateTime $startedAt,
         DateTime $finishedAt,
-        array $runOptions,
+        AgentEvalStoredRunOptions $runOptions,
         ?string $logDirectoryName,
         AgentEvalCaseRows $caseRows
     ): static {
@@ -154,7 +155,7 @@ class AgentEvalSuiteRun extends Entity implements LlmMarkdownRenderable
      * @param string|null $host
      * @param DateTime $startedAt
      * @param DateTime $finishedAt
-     * @param array<string, mixed> $runOptions
+     * @param AgentEvalStoredRunOptions $runOptions
      * @param string|null $logDirectoryName
      * @param AgentEvalCaseRows $caseRows
      * @return void
@@ -165,7 +166,7 @@ class AgentEvalSuiteRun extends Entity implements LlmMarkdownRenderable
         ?string $host,
         DateTime $startedAt,
         DateTime $finishedAt,
-        array $runOptions,
+        AgentEvalStoredRunOptions $runOptions,
         ?string $logDirectoryName,
         AgentEvalCaseRows $caseRows
     ): void {
@@ -174,12 +175,12 @@ class AgentEvalSuiteRun extends Entity implements LlmMarkdownRenderable
         $this->host = $host !== null && $host !== '' ? mb_substr($host, 0, static::HOST_MAX_LENGTH) : null;
         $this->startedAt = $startedAt;
         $this->finishedAt = $finishedAt;
-        $this->runOptionsJson = $runOptions !== [] ? (string)json_encode($runOptions, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : null;
+        $this->runOptionsJson = !$runOptions->isEmpty() ? (string)json_encode($runOptions->toArray(), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : null;
         $this->logDirectoryName = $logDirectoryName !== null && $logDirectoryName !== ''
             ? mb_substr($logDirectoryName, 0, static::LOG_DIRECTORY_NAME_MAX_LENGTH)
             : null;
-        $runModelName = is_string($runOptions['model'] ?? null) ? $runOptions['model'] : null;
-        $runFlavor = is_string($runOptions['flavor'] ?? null) ? $runOptions['flavor'] : null;
+        $runModelName = $runOptions->getModelName();
+        $runFlavor = $runOptions->getFlavor();
         $agentEvalSuiteCases = AgentEvalSuiteCases::newInstance();
         foreach ($caseRows->getElements() as $caseRow) {
             $agentEvalSuiteCase = AgentEvalSuiteCase::newInstance();
@@ -238,14 +239,13 @@ class AgentEvalSuiteRun extends Entity implements LlmMarkdownRenderable
     }
 
     /**
-     * The run's options decoded ({@see $runOptionsJson}); empty when none were stored.
-     *
-     * @return array<string, mixed>
+     * The run's options decoded ({@see $runOptionsJson}); empty options when none were stored or the column holds no
+     * JSON object.
      */
-    public function getRunOptions(): array
+    public function getRunOptions(): AgentEvalStoredRunOptions
     {
         $runOptions = $this->runOptionsJson !== null ? json_decode($this->runOptionsJson, true) : null;
-        return is_array($runOptions) ? $runOptions : [];
+        return AgentEvalStoredRunOptions::fromStoredDocument(is_array($runOptions) ? $runOptions : []);
     }
 
     /** The cases that counted: every case but the not-applicable ones. */

@@ -22,6 +22,22 @@ use Symfony\Component\DependencyInjection\Attribute\Exclude;
 #[Exclude]
 class AgentRunReportVerdicts extends ObjectSet
 {
+    /** @var int The log files that could not be read and were skipped */
+    public int $unreadableLogFileCount = 0;
+
+    /**
+     * The line that names the skipped unreadable log files; null when every log file was read (nothing is printed).
+     */
+    public function getUnreadableLogFilesNote(): ?string
+    {
+        if ($this->unreadableLogFileCount === 0) {
+            return null;
+        }
+        return $this->unreadableLogFileCount === 1
+            ? '1 log file could not be read and was skipped'
+            : $this->unreadableLogFileCount . ' log files could not be read and were skipped';
+    }
+
     /**
      * @param int $aiConversationId
      * @return AgentRunReportVerdict|null the verdict of that conversation; null when no log names it

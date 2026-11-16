@@ -1,0 +1,60 @@
+{
+    "skill": "Catalog",
+    "cases": [
+        {
+            "id": "catalog.pass",
+            "agentSpaceId": 7,
+            "prompt": "Which items are on sale?",
+            "expect": {"tool": "getItems"},
+            "childScript": {
+                "row": {"skill": "Catalog", "case": "catalog.pass", "tool": "getItems", "passed": true, "matchedTool": "getItems", "performance": {"ownerTurns": 1, "modelCalls": 3, "modelCallsPerOwnerTurn": 3, "toolCalls": 2, "agentSeconds": 4.2, "secondsPerOwnerTurn": [4.2], "inputTokens": 1000, "cachedInputTokens": 200, "outputTokens": 100, "costUsd": 0.0021}, "failures": [], "totalTokens": 1100, "costUsd": 0.0021, "durationMs": 5000, "messages": [{"role": "user", "content": "Which items are on sale?"}]}
+            }
+        },
+        {
+            "id": "catalog.fail",
+            "agentSpaceId": 7,
+            "prompt": "Show the items.",
+            "expect": {"tool": "getItems"},
+            "childScript": {
+                "row": {"skill": "Catalog", "case": "catalog.fail", "tool": "getItems", "passed": false, "matchedTool": null, "performance": {"ownerTurns": 1, "modelCalls": 2, "modelCallsPerOwnerTurn": 2, "toolCalls": 0, "agentSeconds": 2.5, "secondsPerOwnerTurn": [2.5], "inputTokens": 800, "cachedInputTokens": 0, "outputTokens": 50, "costUsd": 0.0012}, "failures": ["tool not called: expected one of [getItems]"], "totalTokens": 850, "costUsd": 0.0012, "durationMs": 3000, "messages": []}
+            }
+        },
+        {
+            "id": "catalog.retry",
+            "agentSpaceId": 7,
+            "prompt": "Count the items.",
+            "expect": {"tool": "getItems"},
+            "childScript": {
+                "firstAttemptRow": {"skill": "Catalog", "case": "catalog.retry", "tool": "getItems", "passed": false, "error": "SQLSTATE[40001]: Serialization failure: 1213 Deadlock found when trying to get lock; try restarting transaction"},
+                "row": {"skill": "Catalog", "case": "catalog.retry", "tool": "getItems", "passed": true, "matchedTool": "getItems", "performance": {"ownerTurns": 1, "modelCalls": 2, "modelCallsPerOwnerTurn": 2, "toolCalls": 1, "agentSeconds": 3.0, "secondsPerOwnerTurn": [3.0], "inputTokens": 900, "cachedInputTokens": 100, "outputTokens": 80, "costUsd": 0.0015}, "failures": [], "totalTokens": 980, "costUsd": 0.0015, "durationMs": 4000, "messages": []},
+                "stderr": "restore capture getItems done\n"
+            }
+        },
+        {
+            "id": "catalog.no-result",
+            "agentSpaceId": 7,
+            "prompt": "List the items.",
+            "expect": {"tool": "getItems"},
+            "childScript": {"stderr": "PHP Fatal error:  boom\n  in   the child\n", "exitCode": 3}
+        },
+        {
+            "id": "catalog.restore-refused",
+            "agentSpaceId": 7,
+            "prompt": "Rename the first item.",
+            "expect": {"tool": "getItems"},
+            "childScript": {
+                "row": {"skill": "Catalog", "case": "catalog.restore-refused", "tool": "getItems", "passed": false, "error": "cURL error 28: Operation timed out after 300000 milliseconds"},
+                "stderr": "restore writeItems [ERROR] the write was refused\n"
+            }
+        },
+        {
+            "id": "catalog.not-applicable",
+            "agentSpaceId": 7,
+            "prompt": "Reply to the newest review.",
+            "expect": {"tool": "getItems"},
+            "childScript": {
+                "row": {"skill": "Catalog", "case": "catalog.not-applicable", "tool": "getItems", "passed": null, "outcome": "notApplicable", "notApplicableReason": "preconditionNotEstablished", "notApplicableDetail": "the preparation step answered an error"}
+            }
+        }
+    ]
+}

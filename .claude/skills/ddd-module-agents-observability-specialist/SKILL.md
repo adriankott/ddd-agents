@@ -1,6 +1,6 @@
 ---
 name: ddd-module-agents-observability-specialist
-description: "Watches, debugs, records, replays and evaluates runs of the mgamadeus/ddd-agents loop. Covers the turn that never answers (run states, resume diagnosis, recovery), request snapshots, the sent payload, context composition, prompt-cache diff, integrity and delegation reports, turn and trace events, AGENT_TRACE, the console printer, transcript and TUI view, record and replay, eval safety (evalRun, tool blocks, outbound guard), metrics, costs, scorecards, the eval runner and judged run, the evaluation suite (planning, schedule, stored suite runs, result files, baseline read, retention sweep), run report app:ai-agent:run-report, control panel, admin drive. Use when a turn never answers, a run stays RUNNING, IDLE, FAILED or AWAITING_DELEGATES, what the model saw is needed, a console chat is built, a run is replayed, a test run must not send mail, agent cost is measured, an eval runner or judge is built, to plan a parallel eval suite, compare a run with a baseline, store or read suite runs, or print a run report."
+description: "Watches, debugs, records, replays and evaluates mgamadeus/ddd-agents runs. Covers the turn that never answers (run states, resume diagnosis, recovery), request snapshots, the sent payload, context composition, prompt-cache diff, integrity and delegation reports, turn and trace events, AGENT_TRACE, console printer, transcript, TUI, record and replay, eval safety (evalRun, outbound guard), metrics, costs, scorecards, eval runner, judged run, the eval suite (planning, schedule, stored runs, result files, baseline, retention sweep), run report, the eval commands app:ai-agent:eval-* (tools, suite, selection, recall, tiers, analyze, eviction, guard, schedule-runs), control panel. Use when a turn never answers, a run stays RUNNING, FAILED or AWAITING_DELEGATES, what the model saw is needed, a run is replayed, a test run must not send mail, cost is measured, an eval runner or judge is built, to plan a parallel eval suite, compare with a baseline, store suite runs, print a run report or run an eval command."
 metadata:
   author: mgamadeus
   version: "0.2.0"
@@ -18,9 +18,12 @@ recording-session contract `AgentRecordedRunSessionInterface`, the diagnosis and
 (`app:ai-agent:diagnose`, `app:ai-agent:validate-conversation`, `app:ai-agent:cache-diff`,
 `app:ai-agent:activity-lines`, `app:ai-agent:tool-response-stats`, `app:ai-agent:skill-token-map`,
 `app:ai-agent:context-eviction-sim`, `app:ai-conversation:search-inspect`, `app:ai-agent:run-report`; the full list with the maintenance
-commands is in `ddd-module-agents-specialist`) and the line editor a console chat reads its input with
-(`src/Symfony/Commands/Agents/Chat/`), but **no chat, replay or evaluation command**: those are console commands of
-the host, built on the contracts below.
+commands is in `ddd-module-agents-specialist`), the nine evaluation commands on the base `AgentEvalConsoleCommand`
+(`app:ai-agent:eval-tools`, `eval-suite`, `eval-selection`, `eval-recall`, `eval-tiers`, `eval-analyze`,
+`eval-eviction`, `eval-guard`, `eval-schedule-runs`; [building-evaluation-in-the-host](references/building-evaluation-in-the-host.md)
+§ The evaluation commands) and the line editor a console chat reads its input with
+(`src/Symfony/Commands/Agents/Chat/`), but **no chat or replay command and no fixtures**: those are the host's, built
+on the contracts below.
 
 > Installation, transports, workers and the full host-duty table: `ddd-module-agents-specialist`. How a turn runs,
 > is claimed, released and recovered: `ddd-module-agents-loop-specialist`.
@@ -71,6 +74,10 @@ the host, built on the contracts below.
    the turn transport on `sync://` in the recording process.
 9. **No closures in the host's commands** (the package's own rule): pass a value object or call a named method; a
    short callback for `array_map` / `usort` is fine.
+10. **The package's evaluation commands run nothing without the host's fixtures.** `AI.evalSuite.fixturePaths` names
+    the default fixture of each single command and `AI.evalSuite.suites` the suites `eval-suite` plans; both are empty
+    in the package. A host adapts a command by a subclass that repeats its `#[AsCommand]` name and overrides its
+    override points (scope, fixtures, texts); a child process runs the subclass because it runs the parent's own name.
 
 ## Traps
 
@@ -187,6 +194,7 @@ stuck-run list with `AIConversationStuckRunsReadService::findStuckRuns()` the sa
 | Agent time, owner time, tool failures, cost per conversation, scorecards | [metrics-and-cost](references/metrics-and-cost.md) |
 | Build an evaluation runner, judge and suite | [building-evaluation-in-the-host](references/building-evaluation-in-the-host.md) |
 | Run a judged case (a simulated owner and a judge verdict) or a compaction-tree run; adapt its prompt files or override points | [building-evaluation-in-the-host](references/building-evaluation-in-the-host.md) § The judged run |
+| Run or adapt an evaluation command (`eval-tools`, `eval-suite`, `eval-selection`, `eval-recall`, `eval-tiers`, `eval-analyze`, `eval-eviction`, `eval-guard`, `eval-schedule-runs`); configure its fixtures and suites; stop a running suite | [building-evaluation-in-the-host](references/building-evaluation-in-the-host.md) § The evaluation commands |
 | Build an admin control panel; drive, edit or branch a conversation as an admin | [control-panel-and-admin-drive](references/control-panel-and-admin-drive.md) |
 | Read the turn events and the trace events of a conversation | [trace-and-turn-events](references/trace-and-turn-events.md) |
 

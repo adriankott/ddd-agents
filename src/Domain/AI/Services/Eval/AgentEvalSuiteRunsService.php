@@ -6,6 +6,7 @@ namespace DDD\Domain\AI\Services\Eval;
 
 use DateTimeZone;
 use DDD\Domain\AI\Entities\Evals\AgentEvalCaseRows;
+use DDD\Domain\AI\Entities\Evals\AgentEvalStoredRunOptions;
 use DDD\Domain\AI\Entities\Evals\SuiteRuns\AgentEvalSuiteCases\AgentEvalSuiteCases;
 use DDD\Domain\AI\Entities\Evals\SuiteRuns\AgentEvalSuiteRun;
 use DDD\Domain\AI\Entities\Evals\SuiteRuns\AgentEvalSuiteRuns;
@@ -40,7 +41,7 @@ class AgentEvalSuiteRunsService extends EntitiesService
      * @param string $command the console command that ran
      * @param string|null $suiteLabel what the run covered
      * @param int $startedAtTimestamp when the run started (Unix time)
-     * @param array<string, mixed> $runOptions the run's options (models, flavors, suites, arms …); `model` / `flavor` are the default of a row without its own
+     * @param AgentEvalStoredRunOptions $runOptions the run's options as the command states them; `model` / `flavor` are the default of a row without its own
      * @param string|null $logDirectoryName the folder of the traces in the results folder
      * @param AgentEvalCaseRows $caseRows the case rows of the run
      * @return AgentEvalSuiteRun|null the stored run, or null when the write failed (logged, the evaluation goes on)
@@ -49,7 +50,7 @@ class AgentEvalSuiteRunsService extends EntitiesService
         string $command,
         ?string $suiteLabel,
         int $startedAtTimestamp,
-        array $runOptions,
+        AgentEvalStoredRunOptions $runOptions,
         ?string $logDirectoryName,
         AgentEvalCaseRows $caseRows
     ): ?AgentEvalSuiteRun {

@@ -91,6 +91,26 @@ class AgentEvalSuiteTasks extends ObjectSet
     }
 
     /**
+     * The tasks with every case run `$repeat` times: per task (in the order of the set) its runs 1 … `$repeat`
+     * ({@see AgentEvalSuiteTask::buildRepetition()}); the same tasks when `$repeat` is 1 or less (a case that runs once
+     * keeps its task id and repetition 0).
+     */
+    public function buildRepeatedTasks(int $repeat): static
+    {
+        if ($repeat <= 1) {
+            return $this->buildCopy();
+        }
+        $repeatedTasks = static::newInstance();
+        foreach ($this->getElements() as $agentEvalSuiteTask) {
+            for ($repetition = 1; $repetition <= $repeat; $repetition++) {
+                $repeatedTask = $agentEvalSuiteTask->buildRepetition($repetition);
+                $repeatedTasks->add($repeatedTask);
+            }
+        }
+        return $repeatedTasks;
+    }
+
+    /**
      * The task ids in the order of the set.
      *
      * @return string[]

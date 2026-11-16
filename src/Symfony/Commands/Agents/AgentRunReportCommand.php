@@ -136,6 +136,10 @@ class AgentRunReportCommand extends AgentConsoleCommand
 
         $runReports = $this->findReportsOfConversationIds($conversationIds);
         $this->renderRunTable($symfonyStyle, $conversationIds, $runReports, $verdicts, $markdown);
+        $unreadableLogFilesNote = $verdicts->getUnreadableLogFilesNote();
+        if ($unreadableLogFilesNote !== null) {
+            $symfonyStyle->writeln($unreadableLogFilesNote);
+        }
         if (!(bool)$input->getOption('no-tools')) {
             $this->renderSlowestToolsTable($symfonyStyle, $conversationIds, $runReports, $markdown);
         }
@@ -205,6 +209,7 @@ class AgentRunReportCommand extends AgentConsoleCommand
         $printedRows[] = $runReportTotals->getPrintedRow();
         $this->renderTable($symfonyStyle, static::RUN_TABLE_HEADERS, $printedRows, $markdown);
         $this->renderPlanSizeNotMeasuredNotes($symfonyStyle, $conversationIds, $runReports);
+        $this->renderDecisionCostNotReadNotes($symfonyStyle, $conversationIds, $runReports);
     }
 
     /**
@@ -222,6 +227,26 @@ class AgentRunReportCommand extends AgentConsoleCommand
             $planSizeNotMeasuredNote = $runReports->getByConversationId($conversationId)?->getPlanSizeNotMeasuredNote();
             if ($planSizeNotMeasuredNote !== null) {
                 $symfonyStyle->writeln($conversationId . ': ' . $planSizeNotMeasuredNote);
+            }
+        }
+    }
+
+    /**
+     * Below the run table (after the plan-size notes), one line per reported run whose decision model's cost was not
+     * read because the read of the usage log failed (`<run>: decision cost not read: <exception class>`); nothing when
+     * every read worked.
+     *
+     * @param SymfonyStyle $symfonyStyle
+     * @param int[] $conversationIds
+     * @param AIConversationRunReports $runReports
+     * @return void
+     */
+    protected function renderDecisionCostNotReadNotes(SymfonyStyle $symfonyStyle, array $conversationIds, AIConversationRunReports $runReports): void
+    {
+        foreach ($conversationIds as $conversationId) {
+            $decisionCostNotReadNote = $runReports->getByConversationId($conversationId)?->getDecisionCostNotReadNote();
+            if ($decisionCostNotReadNote !== null) {
+                $symfonyStyle->writeln($conversationId . ': ' . $decisionCostNotReadNote);
             }
         }
     }
@@ -350,7 +375,8 @@ class AgentRunReportCommand extends AgentConsoleCommand
 
     /**
      * The judge verdicts and findings of the evaluation logs (`*.log` in the folder) that name one of the given
-     * conversations. A log without the verdict line is skipped; a log that cannot be read is skipped.
+     * conversations. A log without the verdict line is skipped; a log that cannot be read is skipped and counted
+     * ({@see AgentRunReportVerdicts::$unreadableLogFileCount}).
      *
      * @param string $logDirectory
      * @param int[] $conversationIds
@@ -361,10 +387,15 @@ class AgentRunReportCommand extends AgentConsoleCommand
         $verdicts = AgentRunReportVerdicts::newInstance();
         foreach (glob(rtrim($logDirectory, '/') . '/*.log') ?: [] as $logPath) {
             try {
-                $logText = (string)file_get_contents($logPath);
+                $logContents = @file_get_contents($logPath);
             } catch (Throwable) {
+                $logContents = false;
+            }
+            if ($logContents === false) {
+                $verdicts->unreadableLogFileCount++;
                 continue;
             }
+            $logText = $logContents;
             $runVerdict = $this->parseVerdictOfLog($logText, $conversationIds);
             if ($runVerdict !== null) {
                 $verdicts->addOrReplace($runVerdict);

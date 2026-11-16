@@ -50,7 +50,13 @@ class AgentEvalSuiteTask extends ValueObject
     /** @var string Changes state other cases depend on (several resources at once, a shared grant): alone on its scope */
     public const string ACCESS_EXCLUSIVE = 'exclusive';
 
-    /** @var string Unique within a suite run: `<model>|<flavor>|<suite>|<caseId>`. */
+    /** @var string Between a task id and the repetition of a repeated case: `<task id>#<repetition>` */
+    public const string REPETITION_SEPARATOR = '#';
+
+    /**
+     * @var string Unique within a suite run: `<model>|<flavor>|<suite>|<caseId>`, for a run of a repeated case
+     * followed by `#<repetition>` ({@see buildRepetition()}).
+     */
     public string $taskId = '';
 
     /** @var string The kind of the task: one of the `KIND_*` constants or an application's own kind. */
@@ -107,6 +113,31 @@ class AgentEvalSuiteTask extends ValueObject
      * schedule's wall-time estimate reads it. 60 for a task the planning did not estimate.
      */
     public float $estimatedSeconds = 60.0;
+
+    /**
+     * @var int Which run of a repeated case the task is, 1-based (its case file is `<caseId>.rep<k>.json`, its row
+     * carries `repetition`); 0 for a case that runs once.
+     */
+    public int $repetition = 0;
+
+    /**
+     * The task of run `$repetition` (1-based) of this case: a copy with the repetition and the task id
+     * `<task id>#<repetition>`, so the runs of one case are told apart by the schedule. Nothing else changes: the runs
+     * of one case share the scope, the resource and the run folder.
+     */
+    public function buildRepetition(int $repetition): static
+    {
+        $repeatedTask = clone $this;
+        $repeatedTask->repetition = $repetition;
+        $repeatedTask->taskId = $this->taskId . static::REPETITION_SEPARATOR . $repetition;
+        return $repeatedTask;
+    }
+
+    /** Whether the task is one run of a repeated case. */
+    public function isRepetition(): bool
+    {
+        return $this->repetition > 0;
+    }
 
     /** The run this task belongs to: one result folder and one summary per run. */
     public function getRunKey(): string

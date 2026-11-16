@@ -6,6 +6,7 @@ namespace DDD\Tests\Agents\Domain\AI\Services\Conversations\RunReports;
 
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Entities\Conversations\RunReports\AIConversationRunReportMessageRows;
+use DDD\Domain\AI\Entities\Conversations\RunReports\AIConversationRunReportModelCost;
 use DDD\Domain\AI\Services\Conversations\Metrics\AIConversationMetricsService;
 use DDD\Domain\AI\Services\Conversations\RunReports\AIConversationRunReportService;
 use DDD\Domain\Base\Entities\StaticRegistry;
@@ -19,8 +20,9 @@ use RuntimeException;
 /**
  * The run-report service: the module's own class reads no usage log (no decision cost, no read) and drops no prefix of
  * skill section ids; the report of a conversation carries the conversation's id and the plan snapshots of its rows;
- * a failed snapshot read leaves the rows without snapshots and the report says why its plan size is missing; a
- * conversation without rows has no report.
+ * a failed snapshot read leaves the rows without snapshots and the report says why its plan size is missing; a failed
+ * usage-log read gives no decision cost and the report says the cost was not read; a conversation without rows has no
+ * report.
  */
 class AIConversationRunReportServiceTest extends IntegrationTestCase
 {
@@ -85,6 +87,36 @@ class AIConversationRunReportServiceTest extends IntegrationTestCase
         self::assertNotNull($runReport);
         self::assertNull($runReport->taskPlanSize, 'no plan size without the snapshots');
         self::assertSame('plan size not measured: ' . RuntimeException::class, $runReport->getPlanSizeNotMeasuredNote());
+    }
+
+    public function testAUsageLogReadThatFailsGivesNoCostAndTheReportSaysWhy(): void
+    {
+        $runReportServiceDouble = new RunReportServiceWithScriptedReadsDouble();
+        $runReportServiceDouble->usageLogReadFails = true;
+        $rows = AIConversationRunReportMessageRows::fromRowArrays(RunReportPrintoutRuns::getMessageRowsByConversationId()[RunReportPrintoutRuns::FULL_RUN_ID]);
+
+        $decisionModelCost = $runReportServiceDouble->findDecisionModelCost($this->conversation(RunReportPrintoutRuns::FULL_RUN_ID), $rows);
+
+        self::assertSame(0.0, $decisionModelCost->costInUSD);
+        self::assertSame(0, $decisionModelCost->calls);
+        self::assertSame(RuntimeException::class, $decisionModelCost->readFailure);
+        $runReport = $runReportServiceDouble->findReportOfConversation($this->conversation(RunReportPrintoutRuns::FULL_RUN_ID));
+        self::assertNotNull($runReport);
+        self::assertSame(0.0, $runReport->decisionModelCostInUSD);
+        self::assertSame('decision cost not read: ' . RuntimeException::class, $runReport->getDecisionCostNotReadNote());
+        self::assertNull($runReport->getPlanSizeNotMeasuredNote(), 'the snapshot read worked');
+    }
+
+    public function testARunWithoutAUsageLogIdOrWithAWorkingReadCarriesNoNote(): void
+    {
+        $runReportServiceDouble = new RunReportServiceWithScriptedReadsDouble();
+
+        $fullRunReport = $runReportServiceDouble->findReportOfConversation($this->conversation(RunReportPrintoutRuns::FULL_RUN_ID));
+        $variantsRunReport = $runReportServiceDouble->findReportOfConversation($this->conversation(RunReportPrintoutRuns::VARIANTS_RUN_ID));
+
+        self::assertNull($fullRunReport?->getDecisionCostNotReadNote(), 'the read worked');
+        self::assertNull($variantsRunReport?->getDecisionCostNotReadNote(), 'no usage-log id, no read');
+        self::assertNull(AIConversationRunReportModelCost::none()->readFailure);
     }
 
     public function testEveryRowGetsItsSnapshotOrNull(): void

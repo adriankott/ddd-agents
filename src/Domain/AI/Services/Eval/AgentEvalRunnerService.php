@@ -20,7 +20,9 @@ use DDD\Domain\AI\Entities\Conversations\Usage\AgentAIUsageScope;
 use DDD\Domain\AI\Entities\Environment\AgentApplicationNames;
 use DDD\Domain\AI\Entities\Evals\AgentEvalApplicabilityFacts;
 use DDD\Domain\AI\Entities\Evals\AgentEvalCase;
+use DDD\Domain\AI\Entities\Evals\AgentEvalEvictionTurn;
 use DDD\Domain\AI\Entities\Evals\AgentEvalEvictionTurnFigures;
+use DDD\Domain\AI\Entities\Evals\AgentEvalEvictionTurns;
 use DDD\Domain\AI\Entities\Evals\AgentEvalHarnessToolCall;
 use DDD\Domain\AI\Entities\Evals\AgentEvalHarnessToolCalls;
 use DDD\Domain\AI\Entities\Evals\AgentEvalNotApplicableReason;
@@ -982,14 +984,14 @@ class AgentEvalRunnerService extends Service
      * Drives a multi-turn eviction trajectory on ONE continuing conversation: each prompt is appended to the same
      * conversation (the loaded capabilities carry forward and the eviction sweep runs on the real telemetry), and after
      * every turn the loaded-capabilities eviction snapshot is captured with what was newly loaded and what was evicted
-     * since the previous turn, and the turn's figures ({@see AgentEvalEvictionTurnFigures}). The retention settings
-     * of the trajectory (eager loading, low thresholds) make a few varied prompts grow the carried load fast.
+     * since the previous turn, and the turn's figures ({@see AgentEvalEvictionTurn}). The retention settings of the
+     * trajectory (eager loading, low thresholds) make a few varied prompts grow the carried load fast.
      *
      * @param AgentEvalScope $agentEvalScope
      * @param string[] $prompts the owner turns, in order; blank ones are skipped
      * @param ContextRetentionSettings $contextRetentionSettings
      * @param AgentEvalRunOptions $agentEvalRunOptions
-     * @return AgentEvalRunOutcome the conversation, with one row per turn ({@see AgentEvalRunOutcome::getEvictionTurns()})
+     * @return AgentEvalRunOutcome the conversation, with its owner turns ({@see AgentEvalRunOutcome::getEvictionTurnSet()})
      * @throws RuntimeException when no prompt is left
      */
     public function runEvictionTrajectory(
@@ -999,7 +1001,7 @@ class AgentEvalRunnerService extends Service
         AgentEvalRunOptions $agentEvalRunOptions
     ): AgentEvalRunOutcome {
         $this->authenticateOwnerOfScope($agentEvalScope);
-        $evictionTurns = [];
+        $agentEvalEvictionTurns = AgentEvalEvictionTurns::newInstance();
         $previousCapabilityNames = [];
         $conversation = null;
         foreach (array_values($prompts) as $prompt) {
@@ -1019,21 +1021,20 @@ class AgentEvalRunnerService extends Service
             $this->driveAgent($conversation, $agentEvalScope, $agentEvalRunOptions);
             $turnSeconds = (hrtime(true) - $turnStartedAt) / 1e9;
             $evictionSnapshot = $this->captureEvictionSnapshot($conversation, $contextRetentionSettings);
-            $currentCapabilityNames = $evictionSnapshot->getCapabilityNames();
-            $evictionTurns[] = [
-                'prompt' => $prompt,
-                'snapshot' => $evictionSnapshot->toArray(),
-                'newlyLoaded' => array_values(array_diff($currentCapabilityNames, $previousCapabilityNames)),
-                'evicted' => array_values(array_diff($previousCapabilityNames, $currentCapabilityNames)),
-                'metrics' => AgentEvalEvictionTurnFigures::fromCurrentTurnOfConversation($conversation, $turnSeconds)->toArray(),
-            ];
-            $previousCapabilityNames = $currentCapabilityNames;
+            $agentEvalEvictionTurn = AgentEvalEvictionTurn::forTurn(
+                $prompt,
+                $evictionSnapshot,
+                $previousCapabilityNames,
+                AgentEvalEvictionTurnFigures::fromCurrentTurnOfConversation($conversation, $turnSeconds)
+            );
+            $agentEvalEvictionTurns->add($agentEvalEvictionTurn);
+            $previousCapabilityNames = $evictionSnapshot->getCapabilityNames();
         }
         if ($conversation === null) {
             throw new RuntimeException('Eviction trajectory needs at least one non-empty prompt');
         }
         $agentEvalRunOutcome = AgentEvalRunOutcome::forConversation($conversation);
-        $agentEvalRunOutcome->recordEvictionTurns($evictionTurns);
+        $agentEvalRunOutcome->recordEvictionTurnSet($agentEvalEvictionTurns);
         return $agentEvalRunOutcome;
     }
 

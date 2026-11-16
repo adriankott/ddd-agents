@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace DDD\Domain\AI\Entities\Evals;
 
+use DDD\Domain\AI\Entities\Conversations\Agent\AgentEvalResult;
+use DDD\Domain\AI\Entities\Conversations\Agent\TaskPlanSize;
+use DDD\Domain\AI\Entities\Conversations\AIConversation;
+use DDD\Domain\AI\Entities\Conversations\Widgets\WidgetBlocks;
 use DDD\Domain\Base\Entities\ValueObject;
 
 /**
@@ -18,6 +22,13 @@ use DDD\Domain\Base\Entities\ValueObject;
  *
  * A row whose case does not apply to its agent space is NOT APPLICABLE ({@see buildNotApplicable()}): it carries no
  * pass (`passed: null`) and counts neither as a pass nor as a fail.
+ *
+ * Each kind of evaluated case has its row factory, which writes the keys in the order the stored files have always
+ * had them: the deterministic run of a tools case ({@see buildForDeterministicRun()}), its judged run
+ * ({@see buildForJudgedRun()}), a run that ended in an error ({@see buildFailedOfCase()}), a case that does not apply
+ * ({@see buildNotApplicableOfCase()}), a selection case ({@see buildForSelectionRun()}), a recall case
+ * ({@see buildForRecallRun()}) and the rows a parent writes for a child process that timed out or printed no result
+ * ({@see buildForTimedOutChildProcess()}, {@see buildForUnparseableChildOutput()}).
  *
  * @phpstan-consistent-constructor
  */
@@ -34,6 +45,15 @@ class AgentEvalCaseRow extends ValueObject
 
     /** @var string[] The markers of a harness line that reports a refused restore step */
     public const array REFUSED_HARNESS_STEP_MARKERS = ['[ERROR]', 'was NOT executed', '"isError":true'];
+
+    /** @var string The error of the row a parent writes for a child process it ended at its ceiling */
+    public const string CHILD_PROCESS_TIMED_OUT_ERROR = 'child process timed out';
+
+    /** @var string The error of the row a parent writes for a child process whose output holds no result */
+    public const string CHILD_OUTPUT_UNPARSEABLE_ERROR = 'no parseable JSON from child process';
+
+    /** @var string The flavor a judged run writes into its rows */
+    public const string FLAVOR_JUDGE = AgentEvalSuiteTask::FLAVOR_JUDGE;
 
     /** @var array<string, mixed> The row's keys and values, in their order */
     protected array $rowFields = [];
@@ -78,6 +98,250 @@ class AgentEvalCaseRow extends ValueObject
     public static function buildFailedWithError(array $identifyingFields, string $error): static
     {
         return static::fromArray($identifyingFields + ['passed' => false, 'error' => $error]);
+    }
+
+    /**
+     * The row of a case that does not apply: the header (for a tools case `skill`, `case`, `tool`, `flavor`, the
+     * scope), then `passed: null`, the outcome and the reason ({@see buildNotApplicable()}).
+     */
+    public static function buildNotApplicableOfCase(AgentEvalCaseRowHeader $agentEvalCaseRowHeader, AgentEvalNotApplicableReason $agentEvalNotApplicableReason): static
+    {
+        return static::buildNotApplicable($agentEvalCaseRowHeader->toArray(), $agentEvalNotApplicableReason);
+    }
+
+    /**
+     * The row of a case whose run ended in an error: the header, `passed: false`, `flavor` when given (the judged run
+     * and an application's own kinds name it, the deterministic run does not), then the error.
+     */
+    public static function buildFailedOfCase(AgentEvalCaseRowHeader $agentEvalCaseRowHeader, ?string $flavor, string $error): static
+    {
+        $rowFields = $agentEvalCaseRowHeader->toArray() + ['passed' => false];
+        if ($flavor !== null) {
+            $rowFields['flavor'] = $flavor;
+        }
+        $rowFields['error'] = $error;
+        return static::fromArray($rowFields);
+    }
+
+    /**
+     * The row of a deterministic run of a tools case: the header (`skill`, `case`, `tool`), then `passed`,
+     * `matchedTool`, `conversationId`, `skillPreload`, `planDynamics`, `taskPlanSize`, `reload` (the reload
+     * diagnostics of a stored run, else null), `performance`, `loadedSkills`, `calledTools`, `failures`, `finalText`,
+     * `widgetBlocks`, `toolCallCount`, `workToolCallCount`, `inputTokens`, `outputTokens`, `totalTokens`, `costUsd`,
+     * `durationMs`, `messages`. The pass and the failures are the expectation's result as the caller completed it
+     * (with the performance budget and the state check).
+     *
+     * @param AgentEvalCaseRowHeader $agentEvalCaseRowHeader
+     * @param AgentEvalResult $agentEvalResult the result of the case's expectation
+     * @param AgentEvalCaseRunMeasurement $agentEvalCaseRunMeasurement the measured run
+     * @param AgentEvalRunOutcome $agentEvalRunOutcome the run (its reload diagnostics)
+     * @param bool $conversationsPersisted whether the run stored its conversations (only then a reload is diagnosed)
+     * @param AgentEvalSkillPreloadSummary|null $agentEvalSkillPreloadSummary null when the run measured none
+     * @param AgentEvalPlanDynamicsSummary|null $agentEvalPlanDynamicsSummary null when the run measured none
+     * @return static
+     */
+    public static function buildForDeterministicRun(
+        AgentEvalCaseRowHeader $agentEvalCaseRowHeader,
+        AgentEvalResult $agentEvalResult,
+        AgentEvalCaseRunMeasurement $agentEvalCaseRunMeasurement,
+        AgentEvalRunOutcome $agentEvalRunOutcome,
+        bool $conversationsPersisted,
+        ?AgentEvalSkillPreloadSummary $agentEvalSkillPreloadSummary,
+        ?AgentEvalPlanDynamicsSummary $agentEvalPlanDynamicsSummary
+    ): static {
+        $messagesOfTree = $agentEvalCaseRunMeasurement->messagesOfTree;
+        $toolCallHistory = $messagesOfTree->buildToolCallHistory();
+        return static::fromArray($agentEvalCaseRowHeader->toArray() + [
+            'passed' => $agentEvalResult->passed,
+            'matchedTool' => $agentEvalResult->matchedTool,
+            'conversationId' => $agentEvalCaseRunMeasurement->getConversationId(),
+            'skillPreload' => $agentEvalSkillPreloadSummary?->toArray(),
+            'planDynamics' => $agentEvalPlanDynamicsSummary?->toArray(),
+            'taskPlanSize' => TaskPlanSize::fromMessagesOfConversation($agentEvalCaseRunMeasurement->conversation)?->toReportFields(),
+            'reload' => $conversationsPersisted ? $agentEvalRunOutcome->getReloadDiagnostics() : null,
+            'performance' => $agentEvalCaseRunMeasurement->runFigures->toArray(),
+            'loadedSkills' => $messagesOfTree->getLoadedSkillNames(),
+            'calledTools' => $toolCallHistory->getCalledToolNames(),
+            'failures' => $agentEvalResult->failures,
+            'finalText' => $messagesOfTree->getFinalAssistantText(),
+            'widgetBlocks' => WidgetBlocks::fromMarkdown((string)$messagesOfTree->getFinalAssistantText())->buildBlockSyntaxRecords(),
+            'toolCallCount' => $toolCallHistory->countToolCalls(),
+            'workToolCallCount' => $toolCallHistory->countWorkToolCalls(),
+            'inputTokens' => $messagesOfTree->getTotalInputTokens(),
+            'outputTokens' => $messagesOfTree->getTotalOutputTokens(),
+            'totalTokens' => $messagesOfTree->getTotalTokens(),
+            'costUsd' => $messagesOfTree->getTotalCostUsd(),
+            'durationMs' => $agentEvalCaseRunMeasurement->durationMs,
+            'messages' => $agentEvalCaseRunMeasurement->messagesTrace,
+        ]);
+    }
+
+    /**
+     * The row of a judged run of a tools case: the header (`skill`, `case`, `tool`), then `passed` (the judge passed
+     * the run and the performance budget holds), `flavor: judge`, `compactionFired`, `conversationId`, `failures` (of
+     * the performance budget), `performance`, `verdict`, `turns`, `stopReason`, `loadedSkills`, `calledTools`,
+     * `finalText`, `widgetBlocks`, `toolCallCount`, `workToolCallCount`, `inputTokens`, `outputTokens`, `totalTokens`,
+     * `costUsd`, `durationMs`, `messages`, and `error` when the judge gave no verdict
+     * ({@see AgentEvalJudgeVerdict::findEvaluationError()}).
+     *
+     * @param AgentEvalCaseRowHeader $agentEvalCaseRowHeader
+     * @param AgentEvalSimRunResult $agentEvalSimRunResult the judged run
+     * @param AgentEvalCaseRunMeasurement $agentEvalCaseRunMeasurement the measured run of its conversation
+     * @param string[] $performanceFailures the failures of the case's performance budget
+     * @return static
+     */
+    public static function buildForJudgedRun(
+        AgentEvalCaseRowHeader $agentEvalCaseRowHeader,
+        AgentEvalSimRunResult $agentEvalSimRunResult,
+        AgentEvalCaseRunMeasurement $agentEvalCaseRunMeasurement,
+        array $performanceFailures
+    ): static {
+        $agentEvalJudgeVerdict = $agentEvalSimRunResult->getAgentEvalJudgeVerdict();
+        $messagesOfTree = $agentEvalCaseRunMeasurement->messagesOfTree;
+        $toolCallHistory = $messagesOfTree->buildToolCallHistory();
+        $agentEvalCaseRow = static::fromArray($agentEvalCaseRowHeader->toArray() + [
+            'passed' => $agentEvalJudgeVerdict->isPass() && $performanceFailures === [],
+            'flavor' => static::FLAVOR_JUDGE,
+            'compactionFired' => $agentEvalCaseRunMeasurement->conversation->getCompactionCoveredUpToIndex() !== null,
+            'conversationId' => $agentEvalCaseRunMeasurement->getConversationId(),
+            'failures' => $performanceFailures,
+            'performance' => $agentEvalCaseRunMeasurement->runFigures->toArray(),
+            'verdict' => $agentEvalJudgeVerdict->toArray(),
+            'turns' => $agentEvalSimRunResult->getTurns(),
+            'stopReason' => $agentEvalSimRunResult->getStopReason(),
+            'loadedSkills' => $messagesOfTree->getLoadedSkillNames(),
+            'calledTools' => $toolCallHistory->getCalledToolNames(),
+            'finalText' => $messagesOfTree->getFinalAssistantText(),
+            'widgetBlocks' => WidgetBlocks::fromMarkdown((string)$messagesOfTree->getFinalAssistantText())->buildBlockSyntaxRecords(),
+            'toolCallCount' => $toolCallHistory->countToolCalls(),
+            'workToolCallCount' => $toolCallHistory->countWorkToolCalls(),
+            'inputTokens' => $messagesOfTree->getTotalInputTokens(),
+            'outputTokens' => $messagesOfTree->getTotalOutputTokens(),
+            'totalTokens' => $messagesOfTree->getTotalTokens(),
+            'costUsd' => $messagesOfTree->getTotalCostUsd(),
+            'durationMs' => $agentEvalCaseRunMeasurement->durationMs,
+            'messages' => $agentEvalCaseRunMeasurement->messagesTrace,
+        ]);
+        $evaluationError = $agentEvalJudgeVerdict->findEvaluationError();
+        if ($evaluationError !== null) {
+            $agentEvalCaseRow->setValue('error', $evaluationError);
+        }
+        return $agentEvalCaseRow;
+    }
+
+    /**
+     * The row of a skill-selection case: the header (`skill` — the expected skills as the fixture names them, `A|B`
+     * for either — and `case`), then `passed` (one of the expected skills was loaded), `conversationId`, `failures`,
+     * `loadedSkills`, `calledTools`, `toolCallCount`, `workToolCallCount`, `totalTokens`, `costUsd`, `durationMs`,
+     * `performance`.
+     *
+     * @param AgentEvalCaseRowHeader $agentEvalCaseRowHeader
+     * @param string $expectedSkills the expected skills, `|`-separated
+     * @param AgentEvalCaseRunMeasurement $agentEvalCaseRunMeasurement the measured run
+     * @return static
+     */
+    public static function buildForSelectionRun(AgentEvalCaseRowHeader $agentEvalCaseRowHeader, string $expectedSkills, AgentEvalCaseRunMeasurement $agentEvalCaseRunMeasurement): static
+    {
+        $messagesOfTree = $agentEvalCaseRunMeasurement->messagesOfTree;
+        $toolCallHistory = $messagesOfTree->buildToolCallHistory();
+        $loadedSkillNames = $messagesOfTree->getLoadedSkillNames();
+        $selectionHit = array_intersect(array_map('trim', explode('|', $expectedSkills)), $loadedSkillNames) !== [];
+        return static::fromArray($agentEvalCaseRowHeader->toArray() + [
+            'passed' => $selectionHit,
+            'conversationId' => $agentEvalCaseRunMeasurement->getConversationId(),
+            'failures' => $selectionHit ? [] : [sprintf("skill not loaded: expected '%s', loaded [%s]", $expectedSkills, implode(', ', $loadedSkillNames))],
+            'loadedSkills' => $loadedSkillNames,
+            'calledTools' => $toolCallHistory->getCalledToolNames(),
+            'toolCallCount' => $toolCallHistory->countToolCalls(),
+            'workToolCallCount' => $toolCallHistory->countWorkToolCalls(),
+            'totalTokens' => $messagesOfTree->getTotalTokens(),
+            'costUsd' => $messagesOfTree->getTotalCostUsd(),
+            'durationMs' => $agentEvalCaseRunMeasurement->durationMs,
+            'performance' => $agentEvalCaseRunMeasurement->runFigures->toArray(),
+        ]);
+    }
+
+    /**
+     * The row of a cross-conversation recall case: `id`, `case` (both the case id), `passed` (no error, one of the
+     * expected tools was called — `expect.tool` as a list, no check without one — and every expected mention
+     * (`expectMentions`) is in the final answer), `failures`, `performance` (null when the run threw before its
+     * conversation existed), `durationMs`, `totalTokens`, `costUsd`, `seededConversationIds`, `calledTools`, `toolOk`,
+     * `missingMentions`, `finalText`, `error` (null when none), `messages`. The tools and the answer are those of the
+     * driven conversation itself, not of its delegations.
+     *
+     * @param AgentEvalCase $agentEvalCase the recall case
+     * @param AIConversation|null $conversation the driven conversation; null when the run threw before it
+     * @param mixed $messagesTrace the trace of the conversation's messages; null = none
+     * @param int[] $seededConversationIds the conversations the run seeded (also when it threw after the seed)
+     * @param string|null $error the error the run ended in; null when none
+     * @param int $durationMs the wall milliseconds of the run
+     * @return static
+     */
+    public static function buildForRecallRun(
+        AgentEvalCase $agentEvalCase,
+        ?AIConversation $conversation,
+        mixed $messagesTrace,
+        array $seededConversationIds,
+        ?string $error,
+        int $durationMs
+    ): static {
+        $caseId = (string)($agentEvalCase->toArray()['id'] ?? 'unknown');
+        $expect = $agentEvalCase->getExpect();
+        $expectedToolNames = array_map('strval', is_array($expect['tool'] ?? null) ? $expect['tool'] : []);
+        $expectedMentions = $agentEvalCase->getApplicationValue('expectMentions');
+        $expectedMentions = array_map('strval', is_array($expectedMentions) ? $expectedMentions : []);
+        $calledToolNames = $conversation?->messages?->buildToolCallHistory()->getCalledToolNames() ?? [];
+        $finalText = (string)($conversation?->getLastAssistantText() ?? '');
+        $performance = $conversation !== null ? AgentEvalRunFigures::fromConversation($conversation)->toArray() : null;
+        $toolOk = $expectedToolNames === [] || array_intersect($expectedToolNames, $calledToolNames) !== [];
+        $missingMentions = array_values(array_filter(
+            $expectedMentions,
+            static fn (string $mention): bool => $mention !== '' && mb_stripos($finalText, $mention) === false
+        ));
+        $failures = [];
+        if (!$toolOk) {
+            $failures[] = sprintf('tool not called: expected one of [%s], called [%s]', implode(', ', $expectedToolNames), implode(', ', $calledToolNames));
+        }
+        foreach ($missingMentions as $missingMention) {
+            $failures[] = "the answer does not mention '{$missingMention}'";
+        }
+        return static::fromArray([
+            'id' => $caseId,
+            'case' => $caseId,
+            'passed' => $error === null && $toolOk && $missingMentions === [],
+            'failures' => $failures,
+            'performance' => $performance,
+            'durationMs' => $durationMs,
+            'totalTokens' => $performance['totalTokens'] ?? 0,
+            'costUsd' => $performance['costUsd'] ?? 0.0,
+            'seededConversationIds' => array_values($seededConversationIds),
+            'calledTools' => array_values($calledToolNames),
+            'toolOk' => $toolOk,
+            'missingMentions' => $missingMentions,
+            'finalText' => $finalText,
+            'error' => $error,
+            'messages' => $messagesTrace,
+        ]);
+    }
+
+    /**
+     * The row a parent writes for a case whose child process it ended at its ceiling: `case`, `passed: false`, the
+     * failure that names the ceiling, the error {@see CHILD_PROCESS_TIMED_OUT_ERROR}.
+     */
+    public static function buildForTimedOutChildProcess(string $caseId, int $timeoutSeconds): static
+    {
+        return static::fromArray([
+            'case' => $caseId,
+            'passed' => false,
+            'failures' => ["the case's child process exceeded its {$timeoutSeconds}s ceiling and was killed (raise the case's timeoutSeconds when the flow is legitimately that long)"],
+            'error' => static::CHILD_PROCESS_TIMED_OUT_ERROR,
+        ]);
+    }
+
+    /** The row a parent writes for a case whose child process printed no result: `case`, `passed: false`, the error. */
+    public static function buildForUnparseableChildOutput(string $caseId): static
+    {
+        return static::fromArray(['case' => $caseId, 'passed' => false, 'error' => static::CHILD_OUTPUT_UNPARSEABLE_ERROR]);
     }
 
     /**
@@ -324,6 +588,17 @@ class AgentEvalCaseRow extends ValueObject
         $this->rowFields['access'] = $agentEvalSuiteTask->access;
         $this->rowFields['lane'] = $agentEvalSuiteTask->getLane();
         $this->rowFields['processSeconds'] = round($processSeconds, 1);
+    }
+
+    /**
+     * Stamps which run of a repeated case the row is (`repetition`, appended; a key the row carries keeps its place).
+     * Nothing for a case that runs once (`$repetition` 0).
+     */
+    public function stampRepetition(int $repetition): void
+    {
+        if ($repetition > 0) {
+            $this->rowFields['repetition'] = $repetition;
+        }
     }
 
     /**

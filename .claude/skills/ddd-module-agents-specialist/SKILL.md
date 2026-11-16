@@ -207,9 +207,10 @@ with the same name.
 | `app:ai-agent:run-report` | the per-run report of stored conversations: judge verdict and findings from the evaluation logs (`--log-dir`), wall and agent seconds, model and tool calls, the time split with the parallel gain, the slowest tools, the variants timeline, the plan size, the suite total | no | no |
 | `app:ai-agent:compact` | runs one compaction round of a conversation in the console and prints the tree and the cover; `--show-only` renders only | no | yes, unless `--show-only` (makes model calls) |
 | `app:ai-conversation:search-inspect` | runs the conversation search stage by stage, rights off and on, inside the search envelope | no | no (makes model calls; `--embed` writes embeddings) |
+| `app:ai-agent:eval-tools`, `eval-suite`, `eval-selection`, `eval-recall`, `eval-tiers`, `eval-analyze`, `eval-eviction`, `eval-guard`, `eval-schedule-runs` | the evaluation commands on the base `AgentEvalConsoleCommand`: they run the host's fixtures (`AI.evalSuite.fixturePaths`, `AI.evalSuite.suites`), store result files and suite runs; `eval-analyze` reads a stored run offline (`ddd-module-agents-observability-specialist`) | no | yes (make model calls; `eval-analyze` does not) |
 
-The host still writes its own replay and evaluation commands (`ddd-module-agents-observability-specialist`); for the
-commands above it writes subclasses only where it needs an override point ([references/host-duties.md](references/host-duties.md)).
+The host still writes its own replay command and its evaluation fixtures (`ddd-module-agents-observability-specialist`);
+for the commands above it writes subclasses only where it needs an override point ([references/host-duties.md](references/host-duties.md)).
 
 ## Templates
 

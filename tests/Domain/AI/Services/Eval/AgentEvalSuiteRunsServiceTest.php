@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DDD\Tests\Agents\Domain\AI\Services\Eval;
 
+use DDD\Domain\AI\Entities\Evals\AgentEvalStoredRunOptions;
 use DDD\Domain\AI\Entities\Evals\SuiteRuns\AgentEvalSuiteRun;
 use DDD\Domain\AI\Services\Eval\AgentEvalSuiteCasesService;
 use DDD\Domain\AI\Services\Eval\AgentEvalSuiteRunsService;
@@ -25,7 +26,7 @@ class AgentEvalSuiteRunsServiceTest extends UnitTestCase
             'app:ai-agent:eval-tools',
             'all',
             1_761_658_758,
-            ['model' => 'VENDOR.MODEL_A'],
+            AgentEvalStoredRunOptions::fromStoredDocument(['model' => 'VENDOR.MODEL_A']),
             'run-folder',
             AgentEvalSuiteRunRecordTest::loadFixtureCaseRows()
         );
@@ -41,7 +42,7 @@ class AgentEvalSuiteRunsServiceTest extends UnitTestCase
             'app:ai-agent:eval-tools',
             'all',
             1_761_658_758,
-            ['model' => 'VENDOR.MODEL_A', 'flavor' => 'call'],
+            AgentEvalStoredRunOptions::forSingleModelRun('VENDOR.MODEL_A', 'call', []),
             'run-folder',
             AgentEvalSuiteRunRecordTest::loadFixtureCaseRows()
         );

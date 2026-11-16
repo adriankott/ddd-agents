@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.1.0-alpha.61
+
+- Added: the evaluation commands `app:ai-agent:eval-tools`, `eval-suite`, `eval-selection`, `eval-recall`,
+  `eval-tiers`, `eval-analyze`, `eval-eviction`, `eval-guard`, `eval-schedule-runs` on the shared base
+  `AgentEvalConsoleCommand` (scope options `--agentSpaceId` and the application's scope option, `--ignore-budget`,
+  result files in the configured results folder, child processes on the suite schedule with resource lanes, stop on
+  the first signal or a `STOP` file). An application subclasses a command (repeating its `#[AsCommand]` name) where it
+  names its own scope, fixtures or texts.
+- Added: `AgentEvalSuitePlanService::findFixtureAt()`, `findFixtureFilesAt()`, `findFixturePath()`,
+  `getSuiteDefinitions()`, `createTask()`, `createPlanOptions()`; `AgentEvalResultFilesService::writeResultDocument()`
+  and `writeLooseRunFile()`; `AgentEvalConsoleCommand::requestStop()`; `AgentEvalRunHooksService::findBillingEntityOfScope()`
+  and `attachNewScheduleToScope()`; the configuration keys `AI.evalSuite.fixturePaths` and `AI.evalSuite.suites`
+  (both empty in the package, which ships no fixtures). A host that replaces `evalSuite.php` adds the two keys.
+- **Breaking** for a host that calls them: `AgentEvalSuiteRunsService::recordSuiteRun()`,
+  `AgentEvalSuiteRun::forFinishedRun()` and `applyFinishedRun()` take `AgentEvalStoredRunOptions` instead of an array,
+  and `AgentEvalSuiteRun::getRunOptions()` returns it (`toArray()` gives the former array).
+- **Breaking:** `AgentEvalRunOutcome::recordEvictionTurns(array)` is replaced by
+  `recordEvictionTurnSet(AgentEvalEvictionTurns)`, without a forwarding method; the reader `getEvictionTurns()` stays
+  as a deprecated array reader beside `getEvictionTurnSet()`.
+- Changed: `app:ai-agent:run-report` prints two notes below the run table when they apply
+  (`<run>: decision cost not read: <exception class>`, `<n> log file(s) could not be read and was/were skipped`);
+  `AIConversationRunReportModelCost::forReadFailure()` keeps the class of a failed usage-log read.
+- Changed: a suite-format result file written with message traces requested keeps the rows' `messages`
+  (`AgentEvalRunSummary::toArray(true)`); a summary file never carries them.
+
 ## 0.1.0-alpha.60
 
 - A node class names former node types that stored trees still carry in `ComposedViewNode::LEGACY_NODE_TYPES`

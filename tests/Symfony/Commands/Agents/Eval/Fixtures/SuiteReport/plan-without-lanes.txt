@@ -1,0 +1,9 @@
+Eval suite — 3 case runs · models [m-one] · flavors [call]
+  suites:  tools 3
+  access:  read 3
+  lanes:   none
+  time:    one after the other 1 min 45 s · planned 0 min 35 s with 4 processes (bound by the read pool)
+  effort:  FIXED low
+  decision: platform on — skillPreload on · turnClosing off · replyLanguage on · turn closing deterministicCounter
+  arms:    reasoning-effort low
+

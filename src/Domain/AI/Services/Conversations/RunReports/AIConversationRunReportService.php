@@ -118,8 +118,10 @@ class AIConversationRunReportService extends Service
      * The DECISION model's cost of a run (usage scope {@see AgentAIUsageScope::AI_AGENT_DECIDE_TURN}), apart from the
      * agent model's cost on the rows. The usage log books no conversation id, so it is read by the id the application
      * files the run under ({@see findUsageLogScopeIdOfConversation()}) within the run's time window
-     * ({@see AIConversationRunReportTimeWindow}). No cost and no call when the run has no such id, no row carries a
-     * time, or a read fails.
+     * ({@see AIConversationRunReportTimeWindow}). No cost and no call when the run has no such id or no row carries a
+     * time. When the read fails the cost carries the class of the exception
+     * ({@see AIConversationRunReportModelCost::forReadFailure()}): the report then says the cost was not read
+     * ({@see AIConversationRunReport::getDecisionCostNotReadNote()}).
      *
      * @param AIConversation $conversation
      * @param AIConversationRunReportMessageRows $rows the message rows (for the time window)
@@ -137,8 +139,8 @@ class AIConversationRunReportService extends Service
                 return AIConversationRunReportModelCost::none();
             }
             return $this->findModelCostInUsageLog(AgentAIUsageScope::AI_AGENT_DECIDE_TURN, $usageLogScopeId, $timeWindow);
-        } catch (Throwable) {
-            return AIConversationRunReportModelCost::none();
+        } catch (Throwable $usageLogReadFailure) {
+            return AIConversationRunReportModelCost::forReadFailure($usageLogReadFailure::class);
         }
     }
 

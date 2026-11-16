@@ -1,0 +1,31 @@
+{
+    "runs": [
+        {
+            "runKey": "m-one|call",
+            "rows": [
+                {"case": "t.a", "suite": "tools", "fixture": "Catalog", "model": "m-one", "flavor": "call", "passed": true, "performance": {"ownerTurns": 1, "modelCalls": 3, "toolCalls": 2, "agentSeconds": 6.0, "secondsPerOwnerTurn": [6.0], "inputTokens": 1000, "cachedInputTokens": 400, "outputTokens": 200, "totalTokens": 1200, "costUsd": 0.002, "decisionModelMs": 300, "firstModelOutputSecondsPerOwnerTurn": [1.2], "firstAnswerSecondsPerOwnerTurn": [5.5], "uncachedInputTokensPerOwnerTurn": [600], "uncachedInputTokens": 600, "conversationWallSeconds": 6.4}, "failures": [], "totalTokens": 1200, "costUsd": 0.002, "durationMs": 6400, "access": "read", "lane": "7:Catalog", "processSeconds": 12.3},
+                {"case": "t.b", "suite": "tools", "fixture": "Catalog", "model": "m-one", "flavor": "call", "passed": false, "performance": {"ownerTurns": 2, "modelCalls": 8, "toolCalls": 5, "agentSeconds": 18.5, "secondsPerOwnerTurn": [10.0, 8.5], "inputTokens": 5000, "cachedInputTokens": 1000, "outputTokens": 700, "totalTokens": 5700, "costUsd": 0.009, "decisionModelMs": 900, "firstModelOutputSecondsPerOwnerTurn": [1.8, 2.1], "firstAnswerSecondsPerOwnerTurn": [9.0, 8.0], "uncachedInputTokensPerOwnerTurn": [2500, 1500], "uncachedInputTokens": 4000, "conversationWallSeconds": 19.0}, "failures": ["tool not called: expected one of [getItems]", "status: expected COMPLETED, got FAILED", "argsContain: query lacks \"sale\"", "a fourth failure the line leaves out"], "totalTokens": 5700, "costUsd": 0.009, "durationMs": 19000, "access": "write", "lane": "7:Catalog", "processSeconds": 40.1, "restoreFailed": true, "retriedAfter": "cURL error 28", "firstAttempt": {"error": "cURL error 28: Operation timed out", "processSeconds": 20.0, "harnessLog": []}},
+                {"case": "t.c", "suite": "tools", "fixture": "Catalog", "model": "m-one", "flavor": "call", "passed": false, "error": "the child process left no result (exit code 255): PHP Fatal error: boom", "access": "read", "lane": "7:Catalog", "processSeconds": 3.0},
+                {"case": "s.a", "suite": "selection", "fixture": "seo", "model": "m-one", "flavor": "call", "passed": true, "performance": {"ownerTurns": 1, "modelCalls": 1, "toolCalls": 0, "agentSeconds": 2.0, "secondsPerOwnerTurn": [2.0], "inputTokens": 600, "cachedInputTokens": 0, "outputTokens": 40, "totalTokens": 640, "costUsd": 0.0004}, "totalTokens": 640, "costUsd": 0.0004, "durationMs": 2100, "access": "read", "lane": "7:Seo", "processSeconds": 5.5},
+                {"case": "t.na", "suite": "tools", "fixture": "Catalog", "model": "m-one", "flavor": "call", "passed": null, "outcome": "notApplicable", "notApplicableReason": "preconditionNotEstablished", "notApplicableDetail": "the preparation step answered an error: no published reply on the agent space", "access": "write", "lane": "7:Catalog", "processSeconds": 1.4}
+            ]
+        },
+        {
+            "runKey": "m-one|judge",
+            "rows": [
+                {"case": "t.a", "suite": "tools", "fixture": "Catalog", "model": "m-one", "flavor": "judge", "passed": true, "performance": {"ownerTurns": 3, "modelCalls": 7, "toolCalls": 4, "agentSeconds": 21.0, "secondsPerOwnerTurn": [8.0, 7.0, 6.0], "inputTokens": 9000, "cachedInputTokens": 6000, "outputTokens": 900, "totalTokens": 9900, "costUsd": 0.011}, "totalTokens": 9900, "costUsd": 0.011, "durationMs": 70000, "access": "read", "lane": "7:Catalog", "processSeconds": 75.0},
+                {"case": "t.d", "suite": "tools", "fixture": "Catalog", "model": "m-one", "flavor": "judge", "passed": false, "performance": {"ownerTurns": 2, "modelCalls": 5, "toolCalls": 3, "agentSeconds": 14.0, "secondsPerOwnerTurn": [7.0, 7.0], "inputTokens": 7000, "cachedInputTokens": 3000, "outputTokens": 600, "totalTokens": 7600, "costUsd": 0.008}, "failures": ["judge: the answer named an item the catalog does not carry"], "totalTokens": 7600, "costUsd": 0.008, "durationMs": 50000, "access": "read", "lane": "7:Catalog", "processSeconds": 52.0}
+            ]
+        }
+    ],
+    "baselineRowsByRunKey": {
+        "m-one|call": [
+            {"case": "t.a", "suite": "tools", "passed": true, "performance": {"ownerTurns": 1, "modelCalls": 3, "toolCalls": 2, "agentSeconds": 14.0, "secondsPerOwnerTurn": [14.0], "inputTokens": 1000, "cachedInputTokens": 400, "outputTokens": 200, "totalTokens": 1200, "costUsd": 0.002}},
+            {"case": "t.b", "suite": "tools", "passed": true, "performance": {"ownerTurns": 2, "modelCalls": 4, "toolCalls": 3, "agentSeconds": 16.0, "secondsPerOwnerTurn": [8.0, 8.0], "inputTokens": 3000, "cachedInputTokens": 1000, "outputTokens": 500, "totalTokens": 3500, "costUsd": 0.005}},
+            {"case": "s.a", "suite": "selection", "passed": true, "performance": {"ownerTurns": 1, "modelCalls": 1, "toolCalls": 0, "agentSeconds": 2.0, "secondsPerOwnerTurn": [2.0], "inputTokens": 600, "cachedInputTokens": 0, "outputTokens": 40, "totalTokens": 640, "costUsd": 0.0004}}
+        ],
+        "m-one|judge": [
+            {"case": "t.a", "suite": "tools", "passed": true, "performance": {"ownerTurns": 3, "modelCalls": 7, "toolCalls": 4, "agentSeconds": 21.0, "secondsPerOwnerTurn": [8.0, 7.0, 6.0], "inputTokens": 9000, "cachedInputTokens": 6000, "outputTokens": 900, "totalTokens": 9900, "costUsd": 0.011}}
+        ]
+    }
+}

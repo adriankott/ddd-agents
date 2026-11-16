@@ -78,6 +78,9 @@ class AIConversationRunReport extends ValueObject
     /** @var int The decision model's calls, read from a usage log */
     public int $decisionModelCalls = 0;
 
+    /** @var string|null The class of the exception the read of the decision model's cost ended in; null when it worked */
+    public ?string $decisionModelCostReadFailure = null;
+
     /** @var float Blocking tool seconds summed ({@see AIConversationMetrics::$toolSeconds}) */
     public float $toolSeconds = 0.0;
 
@@ -149,6 +152,16 @@ class AIConversationRunReport extends ValueObject
     {
         $this->decisionModelCostInUSD = $decisionModelCost->costInUSD;
         $this->decisionModelCalls = $decisionModelCost->calls;
+        $this->decisionModelCostReadFailure = $decisionModelCost->readFailure;
+    }
+
+    /**
+     * Why the decision model's cost of the run was not read: `decision cost not read: <exception class>` when the read
+     * of the usage log failed; null when it worked or the run has no usage log to read.
+     */
+    public function getDecisionCostNotReadNote(): ?string
+    {
+        return $this->decisionModelCostReadFailure !== null ? 'decision cost not read: ' . $this->decisionModelCostReadFailure : null;
     }
 
     /**
