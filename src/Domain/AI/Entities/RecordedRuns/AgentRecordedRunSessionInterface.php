@@ -111,10 +111,10 @@ interface AgentRecordedRunSessionInterface
      *
      * @param AIConversation $rootConversation
      * @param array<string, int|string|null> $scopeIdsByName
-     * @param array<string, mixed> $runFields the harness's own fields (turns, case, models)
-     * @return array<string, mixed>
+     * @param AgentRecordedRunFields $runFields the harness's own fields (turns, case, models)
+     * @return AgentRecordedRunRecording
      */
-    public function buildRecording(AIConversation $rootConversation, array $scopeIdsByName, array $runFields): array;
+    public function buildRecording(AIConversation $rootConversation, array $scopeIdsByName, AgentRecordedRunFields $runFields): AgentRecordedRunRecording;
 
     /**
      * The replay compared with its recording.
@@ -128,8 +128,8 @@ interface AgentRecordedRunSessionInterface
     /**
      * The one-line summary a harness prints of a run snapshot: model calls, rows per section, dispatched messages.
      *
-     * @param array<string, mixed> $snapshot
+     * @param AgentRecordedRunSnapshot $agentRecordedRunSnapshot
      * @return string
      */
-    public function describeRun(array $snapshot): string;
+    public function describeRun(AgentRecordedRunSnapshot $agentRecordedRunSnapshot): string;
 }

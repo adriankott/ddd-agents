@@ -1,32 +1,33 @@
 ---
 name: ddd-module-agents-observability-specialist
-description: "Watches, debugs, records, replays and evaluates mgamadeus/ddd-agents runs. Covers the turn that never answers (run states, resume diagnosis, recovery), request snapshots, sent payload, prompt-cache diff, integrity and delegation reports, turn and trace events, AGENT_TRACE, console printer, transcript, TUI, record and replay, eval safety (evalRun, outbound guard), metrics, costs, scorecards, eval runner, judged run, eval suite, baseline, run report, the app:ai-agent:eval-* commands (tools, suite, selection, recall, tiers, analyze, eviction, guard, schedule-runs, compaction-tree, conversations-purge), decision-fixtures, decision-stats, decision replay, seed-account lease and clean start, control panel. Use when a turn never answers, a run stays RUNNING, FAILED or AWAITING_DELEGATES, what the model saw is needed, a run is replayed, a test run must not send mail, cost is measured, a runner, judge or suite is built, an eval command runs or old eval conversations are purged."
+description: "Watches, debugs, records, replays and evaluates mgamadeus/ddd-agents runs and documents every package console command. Covers the command reference (chat record and replay, inspect, diagnose, cache-diff, run-report, app:ai-agent:eval-*, eval purge, decision commands, app:mcp:compare-tool-calls; options, defaults, exit codes, envelopes, --ignore-budget, --agentSpaceId, STOP file, override points), the eval fixture format (case keys, expect, restore, stateAfterRun, AI.evalSuite, result files), tool-call comparison scripts, seed accounts, the turn that never answers, request snapshots, turn and trace events, AGENT_TRACE, console printer, eval safety, metrics, costs. Use when a turn never answers, a run stays RUNNING, FAILED or AWAITING_DELEGATES, what the model saw is needed, a console command or option is looked up, an eval case or fixture is written, an eval suite runs, a refactor or MCP package change is proved by replay, a command is replaced, a test run must not send mail, or cost is measured."
 metadata:
   author: mgamadeus
-  version: "0.2.0"
+  version: "0.3.0"
   module: mgamadeus/ddd-agents
 ---
 
 # Agents Observability Specialist
 
 How to see what a run of the agent did and what the model saw, how to reproduce it, and how to measure and evaluate
-the agent — on top of the services and value objects the package ships. The package ships the base of its console
-commands (`AgentConsoleCommand`: the account of a run, lifted rights, the budget option, the usage envelope, the
-progress reporter `AgentConsoleProgressReporter`, the space options), the option traits
-`ContextRetentionSettingsOptionsTrait` and `AgentEvalArmOptionsTrait`, the arms object `AgentEvalArms`, the
-recording-session contract `AgentRecordedRunSessionInterface`, the diagnosis and measurement commands
-(`app:ai-agent:diagnose`, `app:ai-agent:validate-conversation`, `app:ai-agent:cache-diff`,
-`app:ai-agent:activity-lines`, `app:ai-agent:tool-response-stats`, `app:ai-agent:skill-token-map`,
-`app:ai-agent:context-eviction-sim`, `app:ai-conversation:search-inspect`, `app:ai-agent:run-report`; the full list with the maintenance
-commands is in `ddd-module-agents-specialist`), the ten evaluation commands on the base `AgentEvalConsoleCommand`
-(`app:ai-agent:eval-tools`, `eval-suite`, `eval-selection`, `eval-recall`, `eval-tiers`, `eval-analyze`,
-`eval-eviction`, `eval-guard`, `eval-schedule-runs`, `eval-compaction-tree`; [building-evaluation-in-the-host](references/building-evaluation-in-the-host.md)
-§ The evaluation commands), the decision commands (`app:ai-agent:decision-fixtures`, `app:ai-agent:decision-stats`,
-the abstract replay base `AgentDecisionReplayCommand`), the evaluation purge (`app:ai-agent:eval-conversations-purge`
-on `AIConversationEvalPurgeService`), the seed-account lease and clean start (`AgentEvalSeedAccountLeasesService`,
-`AgentEvalSeedAccountResetService`; § Seed accounts, clean start and the purge) and the line editor a console chat reads its input with
-(`src/Symfony/Commands/Agents/Chat/`), but **no chat or replay command and no fixtures**: those are the host's, built
-on the contracts below.
+the agent — with the console commands the package ships and the services and value objects behind them. The package
+ships 46 commands (45 listed, plus the hidden tool-call child) on the base `AgentConsoleCommand` (the account of a run,
+lifted rights, the budget option, the usage envelope, the progress reporter `AgentConsoleProgressReporter`, the space
+options) and, for evaluation, `AgentEvalConsoleCommand` (scope fallback, child processes, stop signals), with the
+option traits `ContextRetentionSettingsOptionsTrait` and `AgentEvalArmOptionsTrait` and the arms object
+`AgentEvalArms`: the console chat (`app:ai-agent:chat`, `app:ai-agent:chat-tui`) with the record and replay of a run
+(`--record-run-for-comparison` / `--replay-run-and-compare` on `AgentRecordedRunsService` and the per-run
+`AgentRecordedRunSession` behind the contract `AgentRecordedRunSessionInterface`), inspection and diagnosis
+(`app:ai-agent:inspect`, `app:ai-agent:diagnose`, `app:ai-agent:validate-conversation`, `app:ai-agent:cache-diff`,
+`app:ai-agent:run-report`, …), the ten evaluation commands (`app:ai-agent:eval-tools`, `app:ai-agent:eval-suite` and
+siblings), the tool-call comparison of one MCP package (`app:mcp:compare-tool-calls`), the evaluation purge
+(`app:ai-agent:eval-conversations-purge` on `AIConversationEvalPurgeService`), the seed-account lease and clean start
+(`AgentEvalSeedAccountLeasesService`, `AgentEvalSeedAccountResetService`), the decision commands
+(`app:ai-agent:decision-fixtures`, `app:ai-agent:decision-stats`, the abstract replay base `AgentDecisionReplayCommand`),
+the scheduled maintenance and the line editor a console chat reads its input with (`src/Symfony/Commands/Agents/Chat/`).
+Every command, option, default and exit code: [console-commands](references/console-commands.md); the fixtures the
+evaluation commands read: [evaluation-fixtures](references/evaluation-fixtures.md). The fixtures and the comparison
+scripts are the application's.
 
 > Installation, transports, workers and the full host-duty table: `ddd-module-agents-specialist`. How a turn runs,
 > is claimed, released and recovered: `ddd-module-agents-loop-specialist`.
@@ -35,52 +36,62 @@ on the contracts below.
 
 | This skill | Another skill |
 |---|---|
+| the console command reference: options, defaults, exit codes, envelopes, override points, replacing a command | the cron list and the host duties around the scheduled commands (`ddd-module-agents-specialist`) |
+| the evaluation fixture format, the `AI.evalSuite` configuration, the result files | how a tool declares itself read-only for the eval write block (`ddd-module-agents-tools-specialist`) |
 | the symptom table "a turn that never answers" and the read-only diagnosis | run claims, release, recovery mechanics (`ddd-module-agents-loop-specialist`) |
 | request snapshots, the reconstructed payload, cache diff, integrity report | what goes into the model input, context reduction (`ddd-module-agents-context-specialist`) |
 | turn events, trace events, `AITraceLogTrait` | the task plan and its trace while working on a plan (`ddd-module-agents-loop-specialist`) |
 | the console printer, console stream, HTML transcript, TUI view model | the chat HTTP routes and controller traits (`ddd-module-agents-specialist`) |
-| record and replay, the recorded-run comparison | delegation and sub-agent runs themselves (`ddd-module-agents-autonomy-specialist`) |
+| record and replay, the recorded-run comparison, the tool-call comparison | delegation and sub-agent runs themselves (`ddd-module-agents-autonomy-specialist`) |
 | eval safety: `evalRun`, eval tool blocks, the outbound recipient guard | owner consent and mandates for real runs (`ddd-module-agents-decisions-and-guards-specialist`) |
 | conversation metrics, cost reads, scorecard worker | usage envelopes and cost summaries of a turn (`ddd-module-agents-loop-specialist`) |
 | the control panel statistics, the admin drive and truncate | widgets and the realtime push (`ddd-module-agents-widgets-specialist`) |
+| the decision commands (statistics, fixtures, replay base) | decision sites themselves (`ddd-module-agents-decisions-and-guards-specialist`) |
 
 ## Rules that always hold
 
-1. **Diagnose read-only first.** `AIConversationResumeDiagnosis::buildFor()` replays the resume's two loads and says
-   whether a resume would drive a turn — without driving one. Run it (and read the stored state columns) before you
-   dispatch, retry or edit anything.
+1. **Diagnose read-only first.** `app:ai-agent:diagnose <id>` (without options) replays the resume's two loads and says
+   whether a resume would drive a turn — without driving one (`AIConversationResumeDiagnosis::buildFor()`). Run it (and
+   read the stored state columns) before you dispatch, retry or edit anything.
 2. **A repair is a recovery pass, never a hand-edited row.** The package repairs every stuck state through a service
    method (`findStuckConversationIds()`, `findConversationIdsWithInboundLeftIdle()`, `retryUnansweredTurn()`, …);
-   the host's console commands call them. Writing `runState` or `resumeAttempts` by SQL skips the claim fence.
+   `app:ai-agent:reap` and `app:ai-conversation:deliver-owed-reports-and-resume-owed-turns` call them. Writing
+   `runState` or `resumeAttempts` by SQL skips the claim fence.
 3. **The slim request snapshot is not the payload.** A request snapshot stores model, effort, times, hashes and
    timings. The full sent payload and raw response exist only when `storeRequestSnapshot` was on for that
    conversation before the call; otherwise `reconstructSentPayloadForDisplay()` rebuilds it, and the rebuild shows
    today's system prompt, skills and space state, not necessarily what was sent.
 4. **Every console turn opens a usage envelope.** `generateAgentReply()` makes model calls; outside a worker nobody
-   opens the envelope for you (`AIUsageEnvelopesService::openEnvelope()` with
-   `AgentAIUsageScope::ENVELOPE_AI_CONVERSATION_TURN`, closed in a `finally`). Without one the calls are not grouped
-   under the turn and a budget lift granted on the envelope does nothing; the envelope middleware of the workers is
-   a host duty of `ddd-module-agents-specialist`.
-5. **The synchronous console path never drives a conversation a worker may hold.** `generateAgentReply()` takes no
-   run claim. Drive only an IDLE conversation from the console; otherwise dispatch with
-   `resumeConversationIfReady()` (`async: true`) and inspect afterwards. `app:ai-agent:diagnose --drive` is such a
-   synchronous drive and takes no claim either; `--retry` dispatches the resume to the workers instead.
-6. **An eval run is marked before its first drive.** `RunSettings::$evalRun` decides the tool block, the outbound
+   opens the envelope for you. The package's commands open one per turn (`ENVELOPE.AI.CONVERSATION.TURN`); an
+   application's own command opens it with `openUsageEnvelope()` and closes it in a `finally`. Without one the calls are
+   not grouped under the turn and a budget lift granted on the envelope does nothing; the envelope middleware of the
+   workers is a host duty of `ddd-module-agents-specialist`.
+5. **The synchronous console path never drives a conversation a worker may hold.** `generateAgentReply()` takes no run
+   claim. Drive only an IDLE conversation from the console (`app:ai-agent:chat` inline, `app:ai-agent:diagnose --drive`);
+   otherwise dispatch (`app:ai-agent:chat --async`, `app:ai-agent:diagnose --retry`) and inspect afterwards.
+6. **`--ignore-budget` lifts the cap for this process only.** The spend is still booked; a child process gets the
+   option handed on by the evaluation base; `app:ai-agent:eval-suite` lifts by default and keeps the cap with
+   `--enforce-budget`. A command without the option runs under the application's budget gate.
+7. **An eval run is marked before its first drive.** `RunSettings::$evalRun` decides the tool block, the outbound
    guard's eval context, the report-mail skip and the statistics exclusion. A conversation stamped later has already
-   run unguarded.
-7. **The outbound guard guards only the send points that call it.** `EvalOutboundRecipientsService` checks a
-   recipient when a host's mail, SMS, call, push or webhook sender asks; a sender that does not ask is unguarded.
-8. **Record and replay in one console process.** The recorders are process statics
+   run unguarded. The package's evaluation commands mark every conversation they build.
+8. **The outbound guard guards only the send points that call it.** `EvalOutboundRecipientsService` checks a
+   recipient when an application's mail, SMS, call, push or webhook sender asks; a sender that does not ask is
+   unguarded.
+9. **Record and replay in one console process.** The recorders are process statics
    (`ArgusApiOperations::$transportRecording`, `MCPToolExecutorService::$toolResultRecording`,
-   `RecordedRunClockAndIdSources`). A job consumed by a worker resets the Argus and tool recorders, so a recording
-   made in a worker loses them when the next job starts; the pinned clock and id sources are not reset there. Run
-   the turn transport on `sync://` in the recording process.
-9. **No closures in the host's commands** (the package's own rule): pass a value object or call a named method; a
-   short callback for `array_map` / `usort` is fine.
-10. **The package's evaluation commands run nothing without the host's fixtures.** `AI.evalSuite.fixturePaths` names
-    the default fixture of each single command and `AI.evalSuite.suites` the suites `eval-suite` plans; both are empty
-    in the package. A host adapts a command by a subclass that repeats its `#[AsCommand]` name and overrides its
-    override points (scope, fixtures, texts); a child process runs the subclass because it runs the parent's own name.
+   `RecordedRunClockAndIdSources`). A job consumed by a worker resets the Argus and tool recorders, so a recording made
+   in a worker loses them when the next job starts; the pinned clock and id sources are not reset there. The chat's
+   recorded run keeps every dispatched message and runs it in the console process.
+10. **The package's evaluation commands run nothing without the application's fixtures.** `AI.evalSuite.fixturePaths`
+    names the default fixture of each single command and `AI.evalSuite.suites` the suites `eval-suite` plans; both are
+    empty in the package. `app:mcp:compare-tool-calls` likewise reads the application's scripts.
+11. **A package command is replaced, not edited.** A subclass outside `DDD\Symfony\Commands\` that repeats
+    `#[AsCommand]` with the same name wins (`FrameworkCommandsYieldPass` of `mgamadeus/ddd` removes the package's
+    service of that name); override its documented protected methods. A child process runs the subclass because it
+    runs the parent's own name.
+12. **No closures in the application's commands** (the package's own rule): pass a value object or call a named
+    method; a short callback for `array_map` / `usort` is fine.
 
 ## Traps
 
@@ -91,115 +102,98 @@ on the contracts below.
   recovered by this process.
 - `AGENT_TRACE` is read from the raw process environment first; an inline `AGENT_TRACE=1` before the command works,
   and the lines are logged at INFO — a logger configured for errors only drops them.
-- A recording made per owner turn needs a turn set on replay (the instance property `turnOrdinal` of the installed `ArgusTransportRecording`: `$argusTransportRecording->turnOrdinal`) and the other
-  way round; the player refuses to match across turns.
+- `--agentSpaceId` with an empty value is refused, never read as account level; together with one of the application's
+  own space options it is refused too.
+- An evaluation command prints its progress on the error output; read the standard output for its `--json` document.
+- `app:ai-agent:eval-tools --case=<id>` runs in this process even with `--parallel`; only `--repeat` > 1 forces child
+  processes for one case.
+- A suite case without `access` that only reads runs with every write tool refused — a judged case whose rubric needs a
+  write declares `"access": "write"`.
+- A chat replay refuses a recording whose wire settings or passed `--agentSpaceId` differ from the recorded ones, and a
+  tool-call comparison refuses a script whose text changed since the recording: record again after such a change.
+- A recording made per owner turn needs a turn set on replay (the instance property `turnOrdinal` of the installed
+  `ArgusTransportRecording`) and the other way round; the player refuses to match across turns.
 - The comparison covers the conversation tree only: a supervisor conversation is outside it, so record without the
   supervisor.
 - `AgentConversationScorecardsService` writes nothing by default; the scorecard worker runs and logs `scorecard.done`
-  with no row behind it until the host overrides it.
+  with no row behind it until the application overrides it.
 
-## Minimal template: the host's inspect command
+## Minimal template: an application's subclass of a package command
 
-The package's commands cover the parts one at a time: `app:ai-agent:diagnose <conversationId>` (the resume
-diagnosis), `app:ai-agent:validate-conversation <conversationId>` (the integrity report, exit 1 on a violation) and
-`app:ai-agent:cache-diff <conversationId>` (the prompt-cache diff). A host that wants the diagnosis, the integrity
-report, the delegation tree and the transcript of one conversation in one read-only view writes this command: rights
-lifted for the read, exits non-zero on an integrity violation.
+The package's `app:ai-agent:inspect` prints the space of a conversation by its id. An application that knows its space
+by something more telling replaces the command under the same name and overrides one point; everything else (options,
+rights lifted, exit codes) stays the package's.
 
 ```php
 <?php
 
 declare(strict_types=1);
 
-namespace App\Symfony\Commands\AI;
+namespace App\Symfony\Commands\Agents;
 
+use DDD\Domain\AI\Entities\AgentSpaces\AgentSpace;
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
-use DDD\Domain\AI\Entities\Conversations\Diagnostics\AIConversationDelegationTreeReport;
-use DDD\Domain\AI\Entities\Conversations\Diagnostics\AIConversationIntegrityReport;
-use DDD\Domain\AI\Entities\Conversations\Diagnostics\AIConversationResumeDiagnosis;
-use DDD\Domain\AI\Services\Conversations\AgentMessagePrinterInterface;
-use DDD\Domain\AI\Services\Conversations\AIConversationDelegationBatchesService;
-use DDD\Domain\AI\Services\Conversations\AIConversationMessagesService;
-use DDD\Domain\AI\Services\Conversations\AIConversationsService;
-use DDD\Domain\AI\Services\Conversations\TurnEvents\AIConversationTurnEventsService;
-use DDD\Infrastructure\Services\DDDService;
+use DDD\Symfony\Commands\Agents\AgentInspectConversationCommand;
+use DDD\Symfony\Commands\Agents\Inspect\ConversationHeaderRow;
 use Symfony\Component\Console\Attribute\AsCommand;
-use Symfony\Component\Console\Command\Command;
-use Symfony\Component\Console\Input\InputArgument;
-use Symfony\Component\Console\Input\InputInterface;
-use Symfony\Component\Console\Output\OutputInterface;
 
-#[AsCommand(name: 'app:agent:inspect-conversation', description: 'Diagnoses one agent conversation, read-only')]
-class AgentConversationInspectCommand extends Command
+#[AsCommand(name: 'app:ai-agent:inspect', description: 'Prints one stored agent conversation, read-only')]
+class ApplicationInspectConversationCommand extends AgentInspectConversationCommand
 {
-    protected function configure(): void
+    protected function describeAgentSpaceRow(AIConversation $conversation): ConversationHeaderRow
     {
-        $this->addArgument('conversationId', InputArgument::REQUIRED, 'The conversation to inspect');
-    }
-
-    protected function execute(InputInterface $input, OutputInterface $output): int
-    {
-        DDDService::instance()->deactivateEntityRightsRestrictions();
-        try {
-            /** @var AIConversationsService $aIConversationsService */
-            $aIConversationsService = DDDService::instance()->getService(AIConversationsService::class);
-            $conversation = $aIConversationsService->find((int)$input->getArgument('conversationId'), false);
-            if (!$conversation instanceof AIConversation) {
-                $output->writeln('<error>no such conversation</error>');
-                return Command::FAILURE;
-            }
-            /** @var AIConversationDelegationBatchesService $batchesService */
-            $batchesService = DDDService::instance()->getService(AIConversationDelegationBatchesService::class);
-            $output->writeln(AIConversationResumeDiagnosis::buildFor($conversation, $batchesService)->toLlmMarkdown());
-
-            /** @var AIConversationMessagesService $aIConversationMessagesService */
-            $aIConversationMessagesService = DDDService::instance()->getService(AIConversationMessagesService::class);
-            /** @var AIConversationTurnEventsService $aIConversationTurnEventsService */
-            $aIConversationTurnEventsService = DDDService::instance()->getService(AIConversationTurnEventsService::class);
-            $integrityReport = AIConversationIntegrityReport::buildFromRecords(
-                $aIConversationMessagesService->findIntegrityProjectionRows($conversation),
-                $aIConversationTurnEventsService->findIntegrityRecordsOfConversation($conversation),
-                $conversation->runState
-            );
-            foreach ($integrityReport->violations as $integrityViolation) {
-                $output->writeln("<error>{$integrityViolation->check}</error> {$integrityViolation->detail}");
-            }
-
-            // the diagnosis left the bounded tail on the object: reload every row before rendering
-            $conversation->messages = $conversation->findMessagesInOrder(null, null, false);
-            $output->writeln(AIConversationDelegationTreeReport::buildFor($conversation, $batchesService)->toLlmMarkdown());
-            /** @var AgentMessagePrinterInterface $agentMessagePrinter */
-            $agentMessagePrinter = DDDService::instance()->getService(AgentMessagePrinterInterface::class);
-            $output->write($agentMessagePrinter->renderTranscript($conversation, true, false, false));
-            return $integrityReport->hasViolations() ? Command::FAILURE : Command::SUCCESS;
-        } finally {
-            DDDService::instance()->restoreEntityRightsRestrictionsStateSnapshot();
+        // the relations of the space are attached before the header is built
+        $agentSpace = isset($conversation->agentSpace) ? $conversation->agentSpace : null;
+        if (!$agentSpace instanceof AgentSpace) {
+            return parent::describeAgentSpaceRow($conversation);
         }
+        return new ConversationHeaderRow(
+            'agent space',
+            $agentSpace->id . ' (owner account ' . ($agentSpace->accountId ?? '?') . ', time zone ' . ($agentSpace->timezone ?? ConversationHeaderRow::NO_VALUE) . ')'
+        );
     }
 }
 ```
 
-The command name is the host's choice. Add a prompt-cache section with `PromptCacheDiffReport::fromMessages()` and a
-stuck-run list with `AIConversationStuckRunsReadService::findStuckRuns()` the same way
-([debugging-a-turn](references/debugging-a-turn.md)).
+The override points of every command and how a new command is added:
+[console-commands](references/console-commands.md#how-an-application-adds-its-own-command-or-replaces-one).
+
+## First commands for a question
+
+| Question | Command |
+|---|---|
+| Talk to the agent, watch every tool call | `app:ai-agent:chat --agentSpaceId=<id> -m "…"` (`--debug`, `--full`, `-i`) |
+| Why did this conversation not answer? | `app:ai-agent:diagnose <id>`, then `app:ai-agent:validate-conversation <id>` |
+| What is in this conversation? | `app:ai-agent:inspect <id>` (`--snapshots --full` for the sent payloads) |
+| Why did the prompt cache miss? | `app:ai-agent:cache-diff <id>` |
+| Which tool result is too large? Which skill costs most tokens? | `app:ai-agent:tool-response-stats`, `app:ai-agent:skill-token-map` |
+| Did a refactor of the loop change a run? | `app:ai-agent:chat --turns-file=<f> --record-run-for-comparison=<run.json>` before, `--replay-run-and-compare=<run.json>` after |
+| Did a change of an MCP package change what the model receives? | `app:mcp:compare-tool-calls --script=<Package> --record=<file>` before, `--replay-and-compare=<file>` after |
+| Run the evaluation | `app:ai-agent:eval-suite --dry-run`, then without it; one area: `app:ai-agent:eval-tools --skill=<skill>` |
+| Analyse a failed run | `app:ai-agent:eval-analyze [<run>]`, `app:ai-agent:run-report <ids> --log-dir=<folder>` |
+| Clean up evaluation conversations | `app:ai-agent:eval-conversations-purge` (dry run), then `--apply` |
 
 ## Task or symptom → reference
 
-**Host developer**
+**Application developer**
 
 | Task or symptom | Reference |
 |---|---|
+| Which command does it, which options and defaults, what it writes, its exit codes, its envelope, `--ignore-budget` | [console-commands](references/console-commands.md) |
+| Replace a package command or add one on the shared bases; scope options, arms, stop file, child processes | [console-commands](references/console-commands.md#the-shared-bases) |
+| Write an evaluation case or fixture: case keys, `expect`, `restore`, `stateAfterRun`, judged keys, suite lanes; configure `AI.evalSuite`; read the result files | [evaluation-fixtures](references/evaluation-fixtures.md) |
 | The owner wrote and the agent never answers; a run stays RUNNING, IDLE, FAILED, QUEUED or CANCELLED; a parent waits for its sub-agents forever | [a-turn-that-never-answers](references/a-turn-that-never-answers.md) |
 | What did the model see on this call; which tools were offered; why did the cache miss | [debugging-a-turn](references/debugging-a-turn.md) |
-| Build a console chat, an inspect command, an HTML transcript or a TUI | [console-chat-on-the-printer](references/console-chat-on-the-printer.md) |
-| Record a run and replay it against the recording to prove a refactor | [record-and-replay](references/record-and-replay.md) |
+| Adapt the console chat, build an HTML transcript or a TUI on the printer | [console-chat-on-the-printer](references/console-chat-on-the-printer.md) |
+| Record a run and replay it against the recording to prove a refactor; drive the session from another harness | [record-and-replay](references/record-and-replay.md) |
+| Prove an MCP package change with a comparison script; adapt the comparison session, its scope, its recorders or its stored keys | [record-and-replay](references/record-and-replay.md#the-tool-call-comparison) |
 | Keep a test run from writing to a real profile, mailbox or phone | [eval-safety](references/eval-safety.md) |
 | Agent time, owner time, tool failures, cost per conversation, scorecards | [metrics-and-cost](references/metrics-and-cost.md) |
-| Build an evaluation runner, judge and suite | [building-evaluation-in-the-host](references/building-evaluation-in-the-host.md) |
+| The runner, the judged run, the suite's parts and their override points | [building-evaluation-in-the-host](references/building-evaluation-in-the-host.md) |
 | Run a judged case (a simulated owner and a judge verdict) or a compaction-tree run; adapt its prompt files or override points | [building-evaluation-in-the-host](references/building-evaluation-in-the-host.md) § The judged run |
 | Run or adapt an evaluation command (`eval-tools`, `eval-suite`, `eval-selection`, `eval-recall`, `eval-tiers`, `eval-analyze`, `eval-eviction`, `eval-guard`, `eval-schedule-runs`, `eval-compaction-tree`); configure its fixtures and suites; stop a running suite | [building-evaluation-in-the-host](references/building-evaluation-in-the-host.md) § The evaluation commands |
 | Score a decision site against a fixture, read decision statistics, replay stored tool calls against a decision (`decision-fixtures`, `decision-stats`, `AgentDecisionReplayCommand`) | [building-evaluation-in-the-host](references/building-evaluation-in-the-host.md) § The evaluation commands |
-| Delete old evaluation conversations; give each parallel case its own seed account and a clean start; add the host's tables to the purge | [building-evaluation-in-the-host](references/building-evaluation-in-the-host.md) § Seed accounts, clean start and the purge |
+| Delete old evaluation conversations; give each parallel case its own seed account and a clean start; add the application's tables to the purge | [building-evaluation-in-the-host](references/building-evaluation-in-the-host.md) § Seed accounts, clean start and the purge |
 | Build an admin control panel; drive, edit or branch a conversation as an admin | [control-panel-and-admin-drive](references/control-panel-and-admin-drive.md) |
 | Read the turn events and the trace events of a conversation | [trace-and-turn-events](references/trace-and-turn-events.md) |
 
@@ -207,6 +201,8 @@ stuck-run list with `AIConversationStuckRunsReadService::findStuckRuns()` the sa
 
 | Task | Reference |
 |---|---|
+| Add or change a command, an option or a default; keep the command reference in step | [console-commands](references/console-commands.md) |
+| Add a case key or an `expect` key; keep the fixture reference in step | [evaluation-fixtures](references/evaluation-fixtures.md) |
 | Add a symptom or a diagnosis field; keep the diagnosis in step with the resume | [a-turn-that-never-answers](references/a-turn-that-never-answers.md) |
 | Add a turn-event kind or a trace-event type; keep the writers fail-open | [trace-and-turn-events](references/trace-and-turn-events.md) |
 | Add a column the comparison must ignore, a timing key or an id family | [record-and-replay](references/record-and-replay.md) |
@@ -218,7 +214,7 @@ stuck-run list with `AIConversationStuckRunsReadService::findStuckRuns()` the sa
 
 - `ddd-module-agents-specialist` — installation, override points (`AgentConversationScorecardsService`,
   `AgentEvalOutboundGuardHooksService`, `AgentEvalAccountsService`, the printer alias), the host-duty table and the
-  recovery command templates.
+  cron list of the scheduled commands.
 - `ddd-module-agents-loop-specialist` — run claims, release, failed turns that stay owed, the recovery passes, the
   task plan and its trace, usage envelopes and cost summaries.
 - `ddd-module-agents-context-specialist` — what the model sees on each call, the prompt cache and the stable prefix,
@@ -227,3 +223,4 @@ stuck-run list with `AIConversationStuckRunsReadService::findStuckRuns()` the sa
 - `ddd-module-agents-decisions-and-guards-specialist` — decision sites and their statistics, injection screening.
 - `ddd-module-agents-tools-specialist` — tool attributes such as `MCPToolEffect`, which the eval read-only block reads.
 - `ddd-module-agents-widgets-specialist` — the realtime signal a frontend waits for.
+- `ddd-cli-command-specialist` (ddd) — the console command pattern and the framework's own commands.

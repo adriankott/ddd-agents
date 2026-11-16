@@ -32,6 +32,12 @@ class AIConversationEvalPurgeRecordingConnection extends Connection
     /** @var mixed The value a `fetchOne()` read answers */
     public mixed $oneValue = null;
 
+    /**
+     * @var int[] The session's lock wait timeout and statement time limit a `fetchNumeric()` read answers: the read the
+     *      MariaDB dialect makes before it changes the two limits, to restore them afterwards
+     */
+    public array $sessionTimeoutValues = [50, 0];
+
     protected int $openTransactionDepth = 0;
 
     public function __construct()
@@ -105,6 +111,16 @@ class AIConversationEvalPurgeRecordingConnection extends Connection
     {
         $this->recordRead($query);
         return $this->oneValue;
+    }
+
+    /**
+     * The dialect's read of the session limits before it changes them: recorded, answered with
+     * {@see $sessionTimeoutValues}; never the purge's own read, so the scripted read error stays for that one.
+     */
+    public function fetchNumeric(string $query, array $params = [], array $types = [])
+    {
+        $this->recordedCalls[] = $query;
+        return $this->sessionTimeoutValues;
     }
 
     /** Records a read statement and throws the scripted read error once. */

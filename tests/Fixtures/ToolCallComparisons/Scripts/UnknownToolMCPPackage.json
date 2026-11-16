@@ -1,0 +1,5 @@
+{
+  "package": "ComparisonNotesMCPPackage",
+  "conversations": {"chat": {}},
+  "cases": [{"id": "unknown", "tool": "noSuchTool", "conversation": "chat"}]
+}

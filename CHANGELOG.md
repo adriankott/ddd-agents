@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.1.0-alpha.63
+
+- Requires `mgamadeus/ddd` ^3.34.1 (the recorded-run classes of the framework: write-statement audit, message
+  dispatch capture, row scope columns; on MariaDB the transaction limits of the evaluation purge are restored to the
+  session's previous values as whole numbers in one statement) and `mgamadeus/ddd-argus` ^1.6.0.
+- **Host requirement** for record and replay and for the tool-call comparison:
+  `DDD\Symfony\Messenger\Middleware\MessageDispatchCaptureMiddleware` in the middleware list of the default message
+  bus (`messenger.bus.default`). Without it a recorded or compared call SENDS the messages it dispatches instead of
+  keeping them. The middleware is a pass-through while no capture is active.
+- Added: record and replay of a run in the package. `AgentRecordedRunsService` builds the per-run
+  `AgentRecordedRunSession` (the switches it sets and restores, the queue of the messages a run dispatches, the
+  snapshot of the run's rows, the comparison of a replay with its recording); the recording file
+  `AgentRecordedRunRecording` with `AgentRecordedRunFields`, `AgentRecordedRunSnapshot`, `AgentRecordedRunCreatedIdRead`;
+  the scope of a run `AgentRecordedRunScope` and `AgentRecordedRunScopeColumns`. `app:ai-agent:chat` gains
+  `--record-run-for-comparison=<file>` (drives `--turns-file` and records the run) and `--replay-run-and-compare=<file>`
+  (drives the recorded turns, answers every Argus call and tool result from the recording and compares; exit 1 on a
+  difference), with the override points `buildRecordedRunSettingsPassedByCaller()`, `buildRecordedRunScope()`,
+  `buildRecordedRunConcludingScopeIds()` and `buildWireRecordingKeys()`.
+- Added: `app:mcp:compare-tool-calls` (`MCPCompareToolCallsCommand`): runs the comparison script of one MCP package
+  in-process; `--record` writes the recording, `--replay-and-compare` lists every difference against it (exit 1).
+  Built on `ToolCallComparisonsService` and `ToolCallComparisonSession` with the script, tool calls, conversation
+  fixtures, case outcomes, stored recording, definitions dump and id placeholders in
+  `Domain/AI/Entities/MCPPackages/ToolCallComparisons/`; an application's own recorders plug in through
+  `ToolCallComparisonHostRecordingInterface`. Known limit: the id placeholders work on the number of an id, so on an
+  empty database (every table counting from 1) rows of different tables with the same id read as one placeholder.
+- **Breaking:** `AgentRecordedRunSessionInterface::buildRecording()` takes `AgentRecordedRunFields` and returns
+  `AgentRecordedRunRecording` (was `array` / `array`).
+- **Breaking:** `AgentRecordedRunSessionInterface::describeRun()` takes `AgentRecordedRunSnapshot` (was `array`).
+- **Breaking:** `AgentRecordedRunPlayedAnswerIdTranslation::translateResponseBody()` takes an
+  `AgentRecordedRunCreatedIdsReaderInterface` instead of a `callable`.
+- **Breaking:** the protected `AgentRecordedRunPlayedAnswerIdTranslation::translateToolCallArgumentsIn()` and
+  `translateIdValues()` lose the `callable` parameter and their by-reference `bool` out-parameter; whether something
+  was translated is read from `$translations`.
+- **Breaking:** `RecordedRunClockAndIdSources::runWithPinnedSources()` is removed; use `installPinnedSources()`, which
+  returns `RecordedRunInstalledSources`, and `restoreInstalledSources()` in a `finally`.
+- **Breaking** for an application's same-name subclass of `AgentChatCommand` that declared them itself: the command
+  now declares the options `--record-run-for-comparison` / `--replay-run-and-compare`, the constant
+  `RECORDED_RUN_HARNESS` and the methods `printSharedScopeTables()`, `printComparison()` and
+  `buildWireRecordingKeys()`; remove the subclass's copies.
+- Docs: the observability skill gains a reference of every package console command (`console-commands.md`) and of
+  the evaluation fixture format (`evaluation-fixtures.md`); record and replay and the tool-call comparison are
+  documented as the package's.
+
 ## 0.1.0-alpha.62
 
 - Added: `app:ai-agent:eval-conversations-purge` on `AIConversationEvalPurgeService`: deletes the conversation trees

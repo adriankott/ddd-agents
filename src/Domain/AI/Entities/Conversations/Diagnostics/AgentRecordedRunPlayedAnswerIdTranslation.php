@@ -19,7 +19,8 @@ use DDD\Domain\AI\Repo\DB\Conversations\DBAIConversationModel;
  * left alone (ambiguous), and an ordinal the replay has not created yet is left unchanged and reported
  * ({@see $missingCounterparts}). An id key whose table is declared ({@see findDeclaredTableOfIdKey()}) translates only ids its
  * own table created. Every replacement is recorded ({@see $translations}). Pure — the replay's created ids come from
- * a callable the harness reads them through, called only when the answer holds a candidate.
+ * a reader the harness hands in ({@see AgentRecordedRunCreatedIdsReaderInterface}), asked at most once per answer and
+ * only when the answer holds a candidate.
  *
  * Not translated, by design: a created id the played answer ECHOES in free text (its prose, a widget fence) — the
  * replay then sends a request or persists a text that names the recording's id, which the comparison reports as a
@@ -59,6 +60,12 @@ class AgentRecordedRunPlayedAnswerIdTranslation
     /** @var array<string, AgentRecordedRunCreatedIdOrdinal|null> per recorded created id: its table and 1-based ordinal; null = ambiguous */
     protected array $ordinalByRecordedId = [];
 
+    /** The reader of the answer being translated; null between answers. */
+    protected ?AgentRecordedRunCreatedIdsReaderInterface $createdIdsReaderOfCurrentAnswer = null;
+
+    /** @var array<string, int[]>|null The replay's created ids per table, ascending, read once for the answer being translated */
+    protected ?array $replayCreatedIdsByTableOfCurrentAnswer = null;
+
     /** @param array<string, int[]|string[]> $recordedCreatedIdsByTable */
     public static function forRecordedCreatedIds(array $recordedCreatedIdsByTable): static
     {
@@ -81,9 +88,12 @@ class AgentRecordedRunPlayedAnswerIdTranslation
      * The played answer as the replay hands it to the platform: its tool-call arguments with every recorded created id
      * replaced by the replay's id of the same table and ordinal. Returns the body byte-identical when nothing changed.
      *
-     * @param callable(): array<string, int[]|string[]> $findReplayCreatedIdsByTable the replay's created ids per table, ascending
+     * @param string $responseBody
+     * @param AgentRecordedRunCreatedIdsReaderInterface $createdIdsReader the replay's created ids per table, read at most once for this answer
+     * @param string $callLabel
+     * @return string
      */
-    public function translateResponseBody(string $responseBody, callable $findReplayCreatedIdsByTable, string $callLabel): string
+    public function translateResponseBody(string $responseBody, AgentRecordedRunCreatedIdsReaderInterface $createdIdsReader, string $callLabel): string
     {
         if ($this->ordinalByRecordedId === [] || !str_contains($responseBody, 'arguments')) {
             return $responseBody;
@@ -92,62 +102,83 @@ class AgentRecordedRunPlayedAnswerIdTranslation
         if (!is_array($decodedBody)) {
             return $responseBody;
         }
-        $replayCreatedIdsByTable = null;
-        $findReplayCreatedIdsOnce = function () use (&$replayCreatedIdsByTable, $findReplayCreatedIdsByTable): array {
-            if ($replayCreatedIdsByTable === null) {
-                $replayCreatedIdsByTable = [];
-                foreach ($findReplayCreatedIdsByTable() as $table => $createdIds) {
-                    $sortedCreatedIds = array_map('intval', $createdIds);
-                    sort($sortedCreatedIds);
-                    $replayCreatedIdsByTable[(string)$table] = $sortedCreatedIds;
-                }
-            }
-            return $replayCreatedIdsByTable;
-        };
-        $hasTranslated = false;
-        $translatedBody = $this->translateToolCallArgumentsIn($decodedBody, $findReplayCreatedIdsOnce, $callLabel, $hasTranslated);
-        return $hasTranslated ? (string)json_encode($translatedBody, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : $responseBody;
+        $this->createdIdsReaderOfCurrentAnswer = $createdIdsReader;
+        $this->replayCreatedIdsByTableOfCurrentAnswer = null;
+        $translationCountBefore = count($this->translations);
+        try {
+            $translatedBody = $this->translateToolCallArgumentsIn($decodedBody, $callLabel);
+        } finally {
+            $this->createdIdsReaderOfCurrentAnswer = null;
+            $this->replayCreatedIdsByTableOfCurrentAnswer = null;
+        }
+        return count($this->translations) > $translationCountBefore ? (string)json_encode($translatedBody, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : $responseBody;
     }
 
     /**
+     * The replay's created ids per table, ascending, read from the reader of the answer being translated on the first
+     * call and kept for the rest of the answer.
+     *
+     * @return array<string, int[]>
+     */
+    protected function findReplayCreatedIdsOfCurrentAnswer(): array
+    {
+        if ($this->replayCreatedIdsByTableOfCurrentAnswer === null) {
+            $replayCreatedIdsByTable = [];
+            foreach ($this->createdIdsReaderOfCurrentAnswer?->findReplayCreatedIdsByTable() ?? [] as $table => $createdIds) {
+                $sortedCreatedIds = array_map('intval', $createdIds);
+                sort($sortedCreatedIds);
+                $replayCreatedIdsByTable[(string)$table] = $sortedCreatedIds;
+            }
+            $this->replayCreatedIdsByTableOfCurrentAnswer = $replayCreatedIdsByTable;
+        }
+        return $this->replayCreatedIdsByTableOfCurrentAnswer;
+    }
+
+    /**
+     * The structure with the arguments of every tool call in it translated. A translation is recorded in
+     * {@see $translations}; an `arguments` string is re-encoded only when one of its values was translated.
+     *
      * @param array<mixed> $structure
+     * @param string $callLabel
      * @return array<mixed>
      */
-    protected function translateToolCallArgumentsIn(array $structure, callable $findReplayCreatedIdsOnce, string $callLabel, bool &$hasTranslated): array
+    protected function translateToolCallArgumentsIn(array $structure, string $callLabel): array
     {
         foreach ($structure as $key => $value) {
             if ($key === 'arguments' && is_string($value)) {
                 $decodedArguments = json_decode($value, true);
                 if (is_array($decodedArguments)) {
-                    $argumentsChanged = false;
-                    $translatedArguments = $this->translateIdValues($decodedArguments, null, $findReplayCreatedIdsOnce, $callLabel, $argumentsChanged);
-                    if ($argumentsChanged) {
+                    $translationCountBefore = count($this->translations);
+                    $translatedArguments = $this->translateIdValues($decodedArguments, null, $callLabel);
+                    if (count($this->translations) > $translationCountBefore) {
                         $structure[$key] = (string)json_encode($translatedArguments, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-                        $hasTranslated = true;
                     }
                 }
             } elseif ($key === 'arguments' && is_array($value)) {
-                $argumentsChanged = false;
-                $structure[$key] = $this->translateIdValues($value, null, $findReplayCreatedIdsOnce, $callLabel, $argumentsChanged);
-                $hasTranslated = $hasTranslated || $argumentsChanged;
+                $structure[$key] = $this->translateIdValues($value, null, $callLabel);
             } elseif (is_array($value)) {
-                $structure[$key] = $this->translateToolCallArgumentsIn($value, $findReplayCreatedIdsOnce, $callLabel, $hasTranslated);
+                $structure[$key] = $this->translateToolCallArgumentsIn($value, $callLabel);
             }
         }
         return $structure;
     }
 
     /**
+     * The arguments with every recorded created id replaced by its replay counterpart; each replacement is recorded in
+     * {@see $translations}, each reference without one in {@see $missingCounterparts}.
+     *
      * @param array<mixed> $arguments
+     * @param string|null $parentKey
+     * @param string $callLabel
      * @return array<mixed>
      */
-    protected function translateIdValues(array $arguments, ?string $parentKey, callable $findReplayCreatedIdsOnce, string $callLabel, bool &$argumentsChanged): array
+    protected function translateIdValues(array $arguments, ?string $parentKey, string $callLabel): array
     {
         foreach ($arguments as $key => $value) {
             // a list element inherits its list's key: `bookingIds: [1, 2]` names ids
             $valueKey = is_string($key) ? $key : $parentKey;
             if (is_array($value)) {
-                $arguments[$key] = $this->translateIdValues($value, $valueKey, $findReplayCreatedIdsOnce, $callLabel, $argumentsChanged);
+                $arguments[$key] = $this->translateIdValues($value, $valueKey, $callLabel);
                 continue;
             }
             $idText = is_int($value) ? (string)$value : (is_string($value) && ctype_digit($value) ? $value : null);
@@ -171,13 +202,12 @@ class AgentRecordedRunPlayedAnswerIdTranslation
                 $this->missingCounterparts[] = "{$callLabel}: played answer refers to created id {$idText}, which several tables created — left unchanged";
                 continue;
             }
-            $replayId = $createdIdOrdinal->getCounterpartIdIn($findReplayCreatedIdsOnce());
+            $replayId = $createdIdOrdinal->getCounterpartIdIn($this->findReplayCreatedIdsOfCurrentAnswer());
             if ($replayId === null) {
                 $this->missingCounterparts[] = "{$callLabel}: played answer refers to created id {$idText} ({$createdIdOrdinal->table} #{$createdIdOrdinal->ordinal}) with no replay counterpart — left unchanged";
                 continue;
             }
             $arguments[$key] = is_int($value) ? $replayId : (string)$replayId;
-            $argumentsChanged = true;
             $this->translations[] = "{$callLabel}: {$createdIdOrdinal->table} #{$createdIdOrdinal->ordinal} {$idText} → {$replayId}";
         }
         return $arguments;

@@ -1,22 +1,26 @@
-# Building the host's console chat on the printer
+# The console chat and the printer
 
 **Reader:** host developer and package maintainer
 
-Contents: what ships and what the host writes · the printer contract · one streamed turn · the contract of the chat command · after the turn · transcripts and the TUI view model · replacing the printer · for the package maintainer · full class names
+Contents: what ships and what an application adapts · the printer contract · one streamed turn · the contract of the chat command · after the turn · transcripts and the TUI view model · replacing the printer · for the package maintainer · full class names
 
 A console chat is the developer's fastest loop: type, watch every tool call and result stream past, read the payload
-of a call. The package ships the rendering and the line editor with its slash commands
-(`src/Symfony/Commands/Agents/Chat/`), not the chat command; a chat command is the host's.
+of a call. The package ships the chat commands `app:ai-agent:chat` (line-oriented, scriptable) and
+`app:ai-agent:chat-tui` (full screen, needs `php-tui/php-tui`), the rendering, and the line editor with its slash
+commands (`src/Symfony/Commands/Agents/Chat/`). Their options, exit codes and override points:
+[console-commands](console-commands.md#run-and-drive-a-conversation). An application adapts a chat by a same-name
+subclass; it writes a command of its own only for a chat the two do not cover — the contract below is what both follow.
 
-## What ships and what the host writes
+## What ships and what an application adapts
 
-| Ships in the package | The host writes |
+| Ships in the package | An application adapts (subclass of the chat command) |
 |---|---|
-| `AgentMessagePrinterInterface`, its implementation `AgentConsolePrinter` | the console command: options, input loop, auth, envelope |
-| `AgentConsoleStream` (built by the loop from the output it is given) | where the conversation comes from (new or by id) |
-| `ConsoleMarkdownRenderer` (assistant Markdown to ANSI or plain lines) | the per-turn summary line it prints |
-| `ConversationHtmlTranscript` (a self-contained HTML file) | where the HTML file is written |
-| `ConsoleViewModel`, `ConsoleViewModelBuilder`, `ConsoleViewBlock`, `ConsoleViewLine` (a terminal-neutral view model) | the full-screen shell, if any |
+| `app:ai-agent:chat`, `app:ai-agent:chat-tui` (`AgentChatCommand`, `AgentChatTuiCommand`, scope rules in `AgentConsoleChatScopeTrait`) | whom the chat talks as and where a new conversation is placed (`resolveChatScope()`, `findAgentSpaceForNewConversation()`, `createConversationInAgentSpace()`) |
+| `AgentMessagePrinterInterface`, its implementation `AgentConsolePrinter` | the printer, by an alias (below) |
+| `AgentConsoleStream` (built by the loop from the output it is given) | the memory curation after a turn (`curateMemoryAfterTurn()`) |
+| `ConsoleMarkdownRenderer` (assistant Markdown to ANSI or plain lines) | its slash commands (`buildSlashCommandRegistry()`) |
+| `ConversationHtmlTranscript` (a self-contained HTML file; `--html`) | the interactive headline (`getInteractiveChatTitle()`) |
+| `ConsoleViewModel`, `ConsoleViewModelBuilder`, `ConsoleViewBlock`, `ConsoleViewLine` (a terminal-neutral view model) | the recorded-run comparison (`--record-run-for-comparison`, `--replay-run-and-compare`): the settings a replay must match (`buildRecordedRunSettingsPassedByCaller()`), its scope names (`buildRecordedRunScope()`, `buildRecordedRunConcludingScopeIds()`), the wire settings it carries (`buildWireRecordingKeys()`); [record-and-replay](record-and-replay.md) |
 
 ## The printer contract
 
@@ -37,8 +41,9 @@ hides a sub-agent's own rows (the delegate call and its verdict stay). The assis
 ## One streamed turn
 
 `AIConversationAgentService::generateAgentReply()` streams every row it persists to the output it is given (through
-an `AgentConsoleStream`); `$timings` adds a line per model call and tool with its seconds. A host's command drives one
-owner turn in three steps (inside its command class; services from the container):
+an `AgentConsoleStream`); `$timings` adds a line per model call and tool with its seconds. `app:ai-agent:chat` drives
+one owner turn in these three steps; an application's own command does the same (inside its command class; services
+from the container):
 
 1. **Load the messages first.** `appendMessage()` reads `$conversation->messages`: a new conversation gets an empty
    `AIConversationMessages::newInstance()`, an existing one its compaction nodes and its bounded tail
@@ -100,7 +105,7 @@ protected function driveStreamedOwnerTurn(AIConversation $conversation, string $
 | Side work | the console has no consumer: compaction, the recall embedding and the display summary run inline (`generateAgentReply()` defaults). `compactionEnabled: false` / `sideWorkEnabled: false` measure the turn alone |
 | Input | repair the encoding and strip control characters from terminal input before appending; one invalid byte breaks the JSON of the request |
 | Worker path | `resumeConversationIfReady($conversation, async: true)` dispatches the turn instead; it runs silently (no output stream in the worker) — print the transcript afterwards |
-| Without it | a host can only watch its agent through the database rows and its frontend |
+| Without a chat | an application can only watch its agent through the database rows and its frontend |
 
 ## After the turn
 

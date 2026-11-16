@@ -2,12 +2,16 @@
 
 **Reader:** host developer and package maintainer
 
-Contents: what it proves · the three recording points · what a recording holds · the pieces of a harness · a complete harness · reading a comparison · limits · for the package maintainer · full class names
+Contents: what it proves · the three recording points · what a recording holds · the package's session and service · the chat's options · a harness of the host · reading a comparison · the tool-call comparison · limits · for the package maintainer · full class names
 
 Record a run of the agent on one build, replay it on the next, and compare: the rows written, the messages
 dispatched and the requests sent to the model must be the same after normalization. It is the identity proof of a
-refactor of the loop. The package ships the recording points and the comparison; the harness — a console command that records
-or replays one run — is the host's.
+refactor of the loop. The package ships the recording points, the per-run session that installs them
+(`AgentRecordedRunSession`, created by `AgentRecordedRunsService::startSession()`), the comparison and the chat's
+`--record-run-for-comparison` / `--replay-run-and-compare` (options, refusals and exit codes:
+[console-commands](console-commands.md#appai-agentchat--agentchatcommand)); a host adds its scope columns and, for
+another harness (an evaluation run), drives the same session from its own command. The same proof for ONE MCP package,
+without the loop, is the tool-call comparison ([below](#the-tool-call-comparison)).
 
 ## What it proves
 
@@ -23,7 +27,7 @@ the normalization does not cover yet.
 |---|---|---|---|
 | Argus calls | `DDD\Domain\Base\Repo\Argus\Utils\ArgusApiOperations::$transportRecording`, holding a `DDD\Domain\Base\Repo\Argus\Utils\ArgusTransportRecording` (ddd-argus) | `ArgusTransportRecording::forRecording()`: every Argus call goes to the network and is kept (endpoint, body, response, its kind, its turn, whether it ran inside a tool) | `ArgusTransportRecording::forPlaying($entries)`: every call is answered from the recording — same turn and kind, the identical body first, else the oldest unused one; a call with no answer left fails |
 | Tool results | `DDD\Presentation\Mcp\Services\MCPToolExecutorService::$toolResultRecording`, holding a `DDD\Domain\AI\Entities\MCPPackages\ToolResultRecording` | `ToolResultRecording::forRecording()`: each tool result with its arguments and the AI costs the tool booked | `ToolResultRecording::forPlaying($entries)`: the tool does not run; the same tool with the same arguments first, else the oldest unused result of that tool; its recorded costs are booked again |
-| Clock and ids | `DDD\Domain\AI\Libs\RecordedRuns\RecordedRunClockAndIdSources` (a static library, not a service), with the sources in `DDD\Domain\AI\Entities\RecordedRuns` | `runWithPinnedSources($nowSource, $idSource, $work)` with `RecordedRunNowSource::pinnedAt()` and `RecordedRunIdSource::seeded()` | the same moment and seed, so the n-th id and every "now" read through it are the same bytes |
+| Clock and ids | `DDD\Domain\AI\Libs\RecordedRuns\RecordedRunClockAndIdSources` (a static library, not a service), with the sources in `DDD\Domain\AI\Entities\RecordedRuns` | `installPinnedSources($nowSource, $idSource)` with `RecordedRunNowSource::pinnedAt()` and `RecordedRunIdSource::seeded()`; it returns the sources installed before, which `restoreInstalledSources()` puts back in a `finally` | the same moment and seed, so the n-th id and every "now" read through it are the same bytes |
 
 While a tool runs, the executor marks the Argus recording `insideToolExecution`: a recorded in-tool call is not
 expected from a replay that plays the tool's result. `ArgusTransportRecording::forPlayingWithLiveTools()` answers
@@ -35,8 +39,11 @@ every call, in-tool calls from the in-tool recordings, for a comparison whose to
 `ArgusApiOperations::resetForNewJob()` drops `$transportRecording`, `AgentWorkerStateResetter` drops
 `MCPToolExecutorService::$toolResultRecording` and the two harness switches below. A recording made in a worker
 process therefore loses its recorders when the next job starts. The pinned clock and id sources are not reset there;
-`runWithPinnedSources()` puts them back itself, on return and on a throw. A `sync://` dispatch runs inside the
-console process without the reset, so run the turn transport on `sync://`.
+the caller of `installPinnedSources()` puts them back with `restoreInstalledSources()`, on return and on a throw. The
+session keeps every dispatched message in the framework's `RecordedRunMessageQueue` and runs it in the console process
+(`runQueuedMessages()`); after the worker-state reset of each such job the queue asks the session to set its switches
+again. A host registers the framework's `MessageDispatchCaptureMiddleware` in its bus and ends its worker-state reset
+with `RecordedRunMessageQueue::resetDispatchCaptureForNewJob()`.
 
 Two switches belong to the harness: `AgentDecisionModelCircuitBreakerService::$harnessMode` (true: the decision
 model's circuit breaker never opens and never reads or writes its shared key, so a breaker opened by another process
@@ -45,32 +52,36 @@ process, whose Argus calls would bypass the recording and reach the network). Se
 
 ## What a recording holds
 
-The host stores one JSON file per run, with:
+`AgentRecordedRunRecording` is the stored document (version `RECORDING_VERSION`, 3). Its top-level keys, in order:
+`version`, `toolsRunLive`, `recordedConversationId`, `scopeIds`, `idSeed`, the harness's own fields
+(`AgentRecordedRunFields`: `harness`, the settings a replay must match, `async`, `turns`, the wire settings …), then
+`idNormalization`, `createdIdReadReport` (`AgentRecordedRunCreatedIdRead`), `calls`
+(`ArgusTransportRecording::toStorageArray()`), `toolResults` (`ToolResultRecording::toStoredEntries()`) and `snapshot`
+(`AgentRecordedRunSnapshot`: the tree rows and the dispatched messages, normalized). A harness may append its fields
+after the snapshot (`withAppendedRunFields()`). Scope names and field names are the host's strings; the package never
+renames a stored key, so a recording made on one build replays on the next.
 
-- the Argus entries (`ArgusTransportRecording::toStorageArray()`) and the tool results
-  (`ToolResultRecording::toStoredEntries()`);
-- the owner texts, the scope ids by name, the pinned moment and the id seed;
-- the record-time snapshot (tree rows and dispatched messages, normalized) and the run's id normalization
-  (`AgentRecordedRunIdNormalization::toArray()`: the high-water marks, the created ids, the scope ids).
+`AgentRecordedRunRecording::fromJson()` refuses another version and a document without `calls`, `snapshot` or
+`idNormalization`; `findReplayRefusal($harness, $settingsPassedByTheCaller)` refuses the recording of another harness
+and a passed setting that differs from the recorded one (a setting passed as null is not checked).
 
-## The pieces of a harness
+## The package's session and service
 
-| Piece | What the host does |
+| Piece | What it does |
 |---|---|
-| The recorder instances | `ArgusApiOperations::$transportRecording` and `MCPToolExecutorService::$toolResultRecording` are static slots; the harness creates the instances (`ArgusTransportRecording::forRecording()`, `forPlaying()`, …), keeps a reference and installs them. `turnOrdinal`, `idCounterparts`, `playedAnswerTranslator`, `playedRequests` are **instance** properties of that `ArgusTransportRecording`: `$argusTransportRecording->turnOrdinal = 2` |
-| High-water marks | `AgentRecordedRunIdNormalization::withHighWaterMarks($highWaterMarksByTable, $tableByFamily)`. The five families are the constants `FAMILY_CONVERSATION`, `FAMILY_MESSAGE`, `FAMILY_DELEGATION_BATCH`, `FAMILY_COMPACTION_NODE`, `FAMILY_SCHEDULE`; `$tableByFamily` maps each to its table name, read from the generated model (`DBAIConversationModel::getTableName()`, `DBAIConversationMessageModel`, `DBAIConversationDelegationBatchModel`, `DBAIConversationCompactionNodeModel`, `DBAIConversationScheduleModel`). `$highWaterMarksByTable` holds the highest `id` of each table at the run start, keyed by that table name; a table the host's tools write may be added under its own name. An id of a table without a mark is never normalized |
-| Reading ids | the framework's connection: `EntityManagerFactory::getInstance()->getConnection()` (a Doctrine DBAL connection; `fetchOne()`, `fetchFirstColumn()`) — the package itself reads the same way |
-| Created ids | after the run, per table every `id` above its mark, ascending, as `[table => int[]]` into `addMintedIds()` (only ids above the mark are kept) |
-| Scope ids | `addScopeIds(['agentSpace' => $id, …])` with the ids of the rows the harness created before the run; on replay the replay's and the recording's ids both, so both read as `<agentSpace>` |
-| Dispatched messages | the package ships no collector. A Messenger middleware of the host, first in the bus, appends one `AgentRecordedRunDispatchedMessage::forMessageClassAndBody($class, $body)` per dispatched (not received) message and sets its `outcome` after the handler ran; with the transports on `sync://` the handler runs inside the dispatch |
-| Turns | before each owner turn `$argusTransportRecording->turnOrdinal = <turn number>`, after it null |
-| Comparison | `AgentRecordedRunComparison::buildComparison()` (below) |
+| `AgentRecordedRunsService::startSession($recording, $toolsRunLive)` | a new session, not started: a replay of `$recording`, or a recording (`null`) |
+| `findRecording($path)` / `writeRecording($path, $recording)` | the recording file, read and checked / written pretty-printed |
+| `getScopeColumnsByName()` | `AgentRecordedRunScopeColumns`: per scope name the columns a table carries for it, in priority order. Package default: `agentSpace` → `agentSpaceId`, `account` → `accountId`; a host lists the columns of its own tables |
+| `buildPlayedAnswerIdTranslation($recordedCreatedIdsByTable)` | the translation of played answers of a live-tools replay; a host returns its subclass of `AgentRecordedRunPlayedAnswerIdTranslation` that declares the id keys of its tools (`TABLE_BY_ID_KEY`) |
+| `newSession()` | the session class a host derives |
+| `AgentRecordedRunSession` | the per-run object (`#[Exclude]`, never a container service): `setScope(AgentRecordedRunScope)` / `setScopeIds()`, `setRootConversation()`, `start()`, `beginTurn()`, `runQueuedMessages()`, `stop()` in a `finally`, then `buildRecording($root, $scopeIds, $runFields)` or `compareWithRecording($root, $scopeIds)` (or `concludeRun()`); it is the queue's host and the translator of played answers |
+| `AgentRecordedRunScope` | the run's scope ids, root conversation and the scope names it shares with other runs; a table read through a shared scope's column is listed by `describeSharedScopeTables()` |
 
-`buildComparison()` takes seven arguments:
+The comparison itself is `AgentRecordedRunComparison::buildComparison()` with seven arguments:
 
 | # | Argument | What |
 |---|---|---|
-| 1 | `$expectedSnapshot` | the recording's snapshot: `buildTreeSnapshot($treeRows, $idNormalization)` plus `[SECTION_DISPATCHES => buildDispatchSnapshot($dispatchedMessages, $idNormalization)]`, built at record time and stored |
+| 1 | `$expectedSnapshot` | the recording's snapshot |
 | 2 | `$actualSnapshot` | the same for the replay |
 | 3 | `$expectedRequests` | per recorded position that a replay asks for (in-tool calls left out when tool results are played), `AgentRecordedRunArgusRequest::forEndpointAndRequestBody($entry['endpoint'], $entry['requestBody'])` |
 | 4 | `$actualRequests` | `AgentRecordedRunComparison::buildPlayedArgusRequests($argusPlayer->playedRequests)` |
@@ -78,286 +89,38 @@ The host stores one JSON file per run, with:
 | 6 | `$actualIdNormalization` | the replay's own normalization |
 | 7 | `$unusedRecordedCalls` | `$argusPlayer->unusedEntries()` as it is (int positions), plus each `ToolResultRecording::unusedEntries()` entry under a string key (`'tool result #3'`), so neither list overwrites the other |
 
-Afterwards `isIdentical()`, `$differences` (at most `MAX_REPORTED_DIFFERENCES`) and `$notes`. A harness that reads
-created ids per scope column reports it with `addCreatedIdReadReport()` (`AgentRecordedRunCreatedIdReadReport`); a
-replay whose tools run live translates the ids the tools minted with `$playedAnswerTranslator` and
-`AgentRecordedRunPlayedAnswerIdTranslation`, reported with `addPlayedAnswerIdTranslationReport()` — the listing below
-plays the tool results, so it needs neither.
+Afterwards `isIdentical()`, `$differences` (at most `MAX_REPORTED_DIFFERENCES`) and `$notes`; the session adds the
+created-id read reports of both runs and, for a live-tools replay, the played-answer translations.
 
-## A complete harness
+## The chat's options
 
-`runWithPinnedSources()` takes a `callable` and calls it from its own class: pass an array callable of a **public**
-method. A protected or private method is not callable from there and fails with a TypeError. The host's command
-subclasses the harness, implements its abstract turn method (one synchronous turn of the root conversation inside a turn
-envelope, see console-chat-on-the-printer) and stores the array `record()` returns as JSON.
+`app:ai-agent:chat --turns-file=<file> --record-run-for-comparison=<run.json>` drives the lines on a new conversation
+and writes the recording (`harness` = `app:ai-agent:chat`, the settings of `buildRecordedRunSettingsPassedByCaller()`,
+`async`, `turns`, the wire settings of `buildWireRecordingKeys()`); `--replay-run-and-compare=<run.json>` drives the
+recorded turns and prints `recorded-run comparison IDENTICAL: …` (exit 0) or `… DIFFERS …` with one line per
+difference (exit 1); a refused replay exits with `Command::INVALID`. A host adapts the chat through three hooks:
+`buildRecordedRunSettingsPassedByCaller()` (the option that names its scope), `buildRecordedRunScope()` and
+`buildRecordedRunConcludingScopeIds()` (its scope names).
 
-```php
-<?php
+## A harness of the host
 
-declare(strict_types=1);
-
-namespace App\Symfony\Commands\AI\RecordedRuns;
-
-use DDD\Domain\AI\Entities\Conversations\AIConversation;
-use DDD\Domain\AI\Entities\Conversations\Diagnostics\AgentRecordedRunArgusRequest;
-use DDD\Domain\AI\Entities\Conversations\Diagnostics\AgentRecordedRunComparison;
-use DDD\Domain\AI\Entities\Conversations\Diagnostics\AgentRecordedRunDispatchedMessage;
-use DDD\Domain\AI\Entities\Conversations\Diagnostics\AgentRecordedRunIdNormalization;
-use DDD\Domain\AI\Entities\MCPPackages\ToolResultRecording;
-use DDD\Domain\AI\Entities\RecordedRuns\RecordedRunIdSource;
-use DDD\Domain\AI\Entities\RecordedRuns\RecordedRunNowSource;
-use DDD\Domain\AI\Libs\RecordedRuns\RecordedRunClockAndIdSources;
-use DDD\Domain\AI\Repo\DB\Conversations\Agent\DBAIConversationDelegationBatchModel;
-use DDD\Domain\AI\Repo\DB\Conversations\Compaction\DBAIConversationCompactionNodeModel;
-use DDD\Domain\AI\Repo\DB\Conversations\DBAIConversationModel;
-use DDD\Domain\AI\Repo\DB\Conversations\Messages\DBAIConversationMessageModel;
-use DDD\Domain\AI\Repo\DB\Conversations\Schedules\DBAIConversationScheduleModel;
-use DDD\Domain\AI\Services\Conversations\AgentToolCallForkJoinService;
-use DDD\Domain\AI\Services\Conversations\AIConversationsService;
-use DDD\Domain\AI\Services\Decisions\AgentDecisionModelCircuitBreakerService;
-use DDD\Domain\Base\Repo\Argus\Utils\ArgusApiOperations;
-use DDD\Domain\Base\Repo\Argus\Utils\ArgusTransportRecording;
-use DDD\Domain\Base\Repo\Argus\Utils\RecordedRunIdCounterparts;
-use DDD\Domain\Base\Repo\DB\Doctrine\EntityManagerFactory;
-use DDD\Infrastructure\Base\DateTime\DateTime;
-use DDD\Infrastructure\Services\DDDService;
-use DDD\Presentation\Mcp\Services\MCPToolExecutorService;
-
-abstract class AgentRecordedRunHarness
-{
-    /** The harness of this moment, read by the dispatch capture middleware; null in every normal run. */
-    public static ?self $activeHarness = null;
-
-    public ?ArgusTransportRecording $argusTransportRecording = null;
-
-    public ?ToolResultRecording $toolResultRecording = null;
-
-    /** @var AgentRecordedRunDispatchedMessage[] filled by the dispatch capture middleware */
-    public array $dispatchedMessages = [];
-
-    /** @var string[] */
-    public array $ownerTexts = [];
-
-    public ?AIConversation $rootConversation = null;
-
-    /** One synchronous owner turn of the run's root conversation; returns that conversation. */
-    abstract protected function driveOwnerTurn(string $ownerText): AIConversation;
-
-    /** @return array<string, string> id family => table */
-    public static function buildTableByFamily(): array
-    {
-        return [
-            AgentRecordedRunIdNormalization::FAMILY_CONVERSATION => DBAIConversationModel::getTableName(),
-            AgentRecordedRunIdNormalization::FAMILY_MESSAGE => DBAIConversationMessageModel::getTableName(),
-            AgentRecordedRunIdNormalization::FAMILY_DELEGATION_BATCH => DBAIConversationDelegationBatchModel::getTableName(),
-            AgentRecordedRunIdNormalization::FAMILY_COMPACTION_NODE => DBAIConversationCompactionNodeModel::getTableName(),
-            AgentRecordedRunIdNormalization::FAMILY_SCHEDULE => DBAIConversationScheduleModel::getTableName(),
-        ];
-    }
-
-    /** Public: RecordedRunClockAndIdSources calls it from outside this class. */
-    public function driveRecordedTurns(): void
-    {
-        foreach (array_values($this->ownerTexts) as $turnIndex => $ownerText) {
-            $this->argusTransportRecording->turnOrdinal = $turnIndex + 1;
-            try {
-                $this->rootConversation = $this->driveOwnerTurn($ownerText);
-            } finally {
-                $this->argusTransportRecording->turnOrdinal = null;
-            }
-        }
-    }
-
-    /**
-     * @param string[] $ownerTexts
-     * @param array<string, int> $scopeIdsByName the rows the harness created for the run, e.g. ['agentSpace' => 4711]
-     * @return array<string, mixed> the recording, stored as JSON by the caller
-     */
-    public function record(array $ownerTexts, array $scopeIdsByName, DateTime $pinnedMoment, string $idSeed): array
-    {
-        $idNormalization = AgentRecordedRunIdNormalization::withHighWaterMarks($this->readHighWaterMarks(), self::buildTableByFamily());
-        $idNormalization->addScopeIds($scopeIdsByName);
-        $this->ownerTexts = $ownerTexts;
-        $this->runWithRecorders(ArgusTransportRecording::forRecording(), ToolResultRecording::forRecording(), $pinnedMoment, $idSeed);
-        $snapshot = $this->buildSnapshot($idNormalization);
-        return [
-            'ownerTexts' => $ownerTexts,
-            'scopeIds' => $scopeIdsByName,
-            'pinnedMoment' => $pinnedMoment->format(DateTime::SIMPLE),
-            'idSeed' => $idSeed,
-            'calls' => $this->argusTransportRecording->toStorageArray(),
-            'toolResults' => $this->toolResultRecording->toStoredEntries(),
-            'snapshot' => $snapshot,
-            'idNormalization' => $idNormalization->toArray(),
-        ];
-    }
-
-    /**
-     * @param array<string, mixed> $recording what record() returned, read back from its JSON file
-     * @param array<string, int> $scopeIdsByName the replay's own scope rows, under the recording's names
-     */
-    public function replayAndCompare(array $recording, array $scopeIdsByName): AgentRecordedRunComparison
-    {
-        $recordedScopeIdsByName = (array)$recording['scopeIds'];
-        $idNormalization = AgentRecordedRunIdNormalization::withHighWaterMarks($this->readHighWaterMarks(), self::buildTableByFamily());
-        $idNormalization->addScopeIds($scopeIdsByName);
-        $idNormalization->addScopeIds($recordedScopeIdsByName);
-        $argusPlayer = ArgusTransportRecording::forPlaying((array)$recording['calls']);
-        $idCounterparts = new RecordedRunIdCounterparts();
-        foreach ($scopeIdsByName as $scopeName => $replayScopeId) {
-            if (isset($recordedScopeIdsByName[$scopeName])) {
-                $idCounterparts->addCounterpart($replayScopeId, $recordedScopeIdsByName[$scopeName]);
-            }
-        }
-        $argusPlayer->idCounterparts = $idCounterparts;
-        $this->ownerTexts = (array)$recording['ownerTexts'];
-        $this->runWithRecorders(
-            $argusPlayer,
-            ToolResultRecording::forPlaying((array)$recording['toolResults']),
-            new DateTime((string)$recording['pinnedMoment']),
-            (string)$recording['idSeed']
-        );
-        $actualSnapshot = $this->buildSnapshot($idNormalization);
-
-        $expectedIdNormalization = AgentRecordedRunIdNormalization::fromArray((array)$recording['idNormalization']);
-        $expectedIdNormalization->addScopeIds($scopeIdsByName);
-        $expectedRequests = [];
-        foreach ((array)$recording['calls'] as $position => $recordedCall) {
-            if (!($recordedCall['duringTool'] ?? false)) {
-                $expectedRequests[$position] = AgentRecordedRunArgusRequest::forEndpointAndRequestBody((string)$recordedCall['endpoint'], (string)$recordedCall['requestBody']);
-            }
-        }
-        $unusedRecordedCalls = $argusPlayer->unusedEntries();
-        foreach ($this->toolResultRecording->unusedEntries() as $position => $toolName) {
-            $unusedRecordedCalls['tool result #' . $position] = $toolName;
-        }
-        return AgentRecordedRunComparison::buildComparison(
-            (array)$recording['snapshot'],
-            $actualSnapshot,
-            $expectedRequests,
-            AgentRecordedRunComparison::buildPlayedArgusRequests($argusPlayer->playedRequests),
-            $expectedIdNormalization,
-            $idNormalization,
-            $unusedRecordedCalls
-        );
-    }
-
-    protected function runWithRecorders(ArgusTransportRecording $argusTransportRecording, ToolResultRecording $toolResultRecording, DateTime $pinnedMoment, string $idSeed): void
-    {
-        $this->argusTransportRecording = $argusTransportRecording;
-        $this->toolResultRecording = $toolResultRecording;
-        $this->dispatchedMessages = [];
-        ArgusApiOperations::$transportRecording = $argusTransportRecording;
-        MCPToolExecutorService::$toolResultRecording = $toolResultRecording;
-        AgentDecisionModelCircuitBreakerService::$harnessMode = true;
-        AgentToolCallForkJoinService::$forkingDisabled = true;
-        self::$activeHarness = $this;
-        try {
-            RecordedRunClockAndIdSources::runWithPinnedSources(
-                RecordedRunNowSource::pinnedAt($pinnedMoment),
-                RecordedRunIdSource::seeded($idSeed),
-                [$this, 'driveRecordedTurns']
-            );
-        } finally {
-            ArgusApiOperations::$transportRecording = null;
-            MCPToolExecutorService::$toolResultRecording = null;
-            AgentDecisionModelCircuitBreakerService::$harnessMode = false;
-            AgentToolCallForkJoinService::$forkingDisabled = false;
-            self::$activeHarness = null;
-        }
-    }
-
-    /** @return array<string, array<int, array<string, mixed>>> */
-    protected function buildSnapshot(AgentRecordedRunIdNormalization $idNormalization): array
-    {
-        /** @var AIConversationsService $aIConversationsService */
-        $aIConversationsService = DDDService::instance()->getService(AIConversationsService::class);
-        $treeRows = $aIConversationsService->findTreeRowsForRecordedRunComparison($this->rootConversation);
-        $idNormalization->addMintedIds($this->readCreatedIds($idNormalization->highWaterMarksByTable));
-        $snapshot = AgentRecordedRunComparison::buildTreeSnapshot($treeRows, $idNormalization);
-        $snapshot[AgentRecordedRunComparison::SECTION_DISPATCHES] = AgentRecordedRunComparison::buildDispatchSnapshot($this->dispatchedMessages, $idNormalization);
-        return $snapshot;
-    }
-
-    /** @return array<string, int> table => highest id now */
-    protected function readHighWaterMarks(): array
-    {
-        $connection = EntityManagerFactory::getInstance()->getConnection();
-        $highWaterMarksByTable = [];
-        foreach (self::buildTableByFamily() as $table) {
-            $highWaterMarksByTable[$table] = (int)$connection->fetchOne('SELECT COALESCE(MAX(`id`), 0) FROM `' . $table . '`');
-        }
-        return $highWaterMarksByTable;
-    }
-
-    /**
-     * @param array<string, int> $highWaterMarksByTable
-     * @return array<string, int[]> table => the ids above its mark, ascending
-     */
-    protected function readCreatedIds(array $highWaterMarksByTable): array
-    {
-        $connection = EntityManagerFactory::getInstance()->getConnection();
-        $createdIdsByTable = [];
-        foreach ($highWaterMarksByTable as $table => $highWaterMark) {
-            $createdIdsByTable[$table] = array_map('intval', $connection->fetchFirstColumn(
-                'SELECT `id` FROM `' . $table . '` WHERE `id` > :highWaterMark ORDER BY `id`',
-                ['highWaterMark' => $highWaterMark]
-            ));
-        }
-        return $createdIdsByTable;
-    }
-}
-```
-
-The dispatch capture middleware, listed first in the middleware of the host's message bus (the messenger
-configuration of the host):
+Another harness (an evaluation run on a fresh scope) drives the same session:
 
 ```php
-<?php
-
-declare(strict_types=1);
-
-namespace App\Symfony\Messenger\Middleware;
-
-use App\Symfony\Commands\AI\RecordedRuns\AgentRecordedRunHarness;
-use DDD\Domain\AI\Entities\Conversations\Diagnostics\AgentRecordedRunDispatchedMessage;
-use DDD\Domain\Base\Entities\MessageHandlers\AppMessage;
-use Symfony\Component\Messenger\Envelope;
-use Symfony\Component\Messenger\Middleware\MiddlewareInterface;
-use Symfony\Component\Messenger\Middleware\StackInterface;
-use Symfony\Component\Messenger\Stamp\ReceivedStamp;
-use Throwable;
-
-class AgentRecordedRunDispatchCaptureMiddleware implements MiddlewareInterface
-{
-    public function handle(Envelope $envelope, StackInterface $stack): Envelope
-    {
-        $harness = AgentRecordedRunHarness::$activeHarness;
-        if ($harness === null || $envelope->last(ReceivedStamp::class) !== null) {
-            return $stack->next()->handle($envelope, $stack);
-        }
-        $message = $envelope->getMessage();
-        // the body a transport would carry; hide attributes ignored, so earlier tool output cannot change it
-        $body = $message instanceof AppMessage
-            ? (string)$message->toJSON(true)
-            : (string)json_encode(get_object_vars($message), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        $dispatchedMessage = AgentRecordedRunDispatchedMessage::forMessageClassAndBody($message::class, $body);
-        $harness->dispatchedMessages[] = $dispatchedMessage;
-        try {
-            $handledEnvelope = $stack->next()->handle($envelope, $stack);
-            $dispatchedMessage->outcome = 'handled';
-            return $handledEnvelope;
-        } catch (Throwable $dispatchError) {
-            $dispatchedMessage->outcome = 'failed: ' . $dispatchError::class;
-            throw $dispatchError;
-        }
-    }
+/** @var AgentRecordedRunsService $agentRecordedRunsService */
+$agentRecordedRunsService = DDDService::instance()->getService(AgentRecordedRunsService::class);
+$agentRecordedRunSession = $agentRecordedRunsService->startSession(null, toolsRunLive: true);
+$agentRecordedRunSession->readHighWaterMarks();               // before the run creates its own scope
+$agentRecordedRunSession->setScopeIds(['agentSpace' => $agentSpaceId, 'account' => $accountId]);
+$agentRecordedRunSession->start();
+try {
+    // per owner turn: beginTurn($turnOrdinal), drive the turn, runQueuedMessages()
+} finally {
+    $agentRecordedRunSession->stop(runRemainingMessages: false);
 }
+$agentRecordedRunRecording = $agentRecordedRunSession->buildRecording($rootConversation, ['agentSpace' => $agentSpaceId], AgentRecordedRunFields::fromValuesByField(['harness' => 'my-harness']));
+$agentRecordedRunsService->writeRecording($recordingPath, $agentRecordedRunRecording);
 ```
-
-The listing reads created ids unscoped: rows another process writes into the same tables during the run count as
-created. Run it on a database nothing else writes to, or scope the read (and report it with
-`addCreatedIdReadReport()`).
 
 ## Reading a comparison
 
@@ -375,6 +138,74 @@ Ids above the high-water mark become ordinals of their creation (`<message#3>`),
 timing keys (`AgentRecordedRunIdNormalization::TIMING_KEYS`) and the screening verdict keys written later by a worker
 (`ASYNC_VERDICT_KEYS`) are dropped, and the volatile columns (`AgentRecordedRunComparison::VOLATILE_ROW_COLUMNS`) are
 never compared.
+
+## The tool-call comparison
+
+`app:mcp:compare-tool-calls` (options, the script format, the files and the exit codes:
+[console-commands](console-commands.md#appmcpcompare-tool-calls--mcpcomparetoolcallscommand)) runs the scripted tool
+calls of one MCP package in the console process through the tool executor — the real gates, hydration and rendering,
+no model — once on the unchanged build (record) and once on the build under test (replay), and compares per case what
+the model receives and every effect of the call. On the replay the tools run live; only their Argus calls are answered
+from the recording (the in-tool player, never a played tool result).
+
+| Piece | What it does |
+|---|---|
+| `ToolCallComparisonsService::buildSession($script, $packageClass, $additionalPackageClasses, $recording)` | the session of one run, not started: a record run (`$recording` null) or a replay; a replay refuses a script whose text differs from the recorded one (its hash) |
+| `ToolCallComparisonsService::newSession()` | the session object; the application's class at the session's mirrored path when it has one |
+| `findPackageClassesByShortName()`, `findBundleClasses()`, `resolvePackageClass()` | the packages and bundles below `Presentation/Mcp` of the source roots, the application's root first, so its class wins over a module class of the same short name |
+| `ToolCallComparisonSession` | the per-run object (`#[Exclude]`, never a container service): `start($bundleClasses)`, `runFixtureSteps()`, `runCase()` per case, `buildCaseDifferences()` on a replay, `stop()` in a `finally` |
+| `ToolCallComparisonRecording` | the stored document (version `RECORDING_VERSION`, 3): `harness`, `version`, `scriptName`, `scriptHash`, `packageClass`, `comparisonAgentSpaceId`, `harnessIdsByPlaceholder`, `pinnedMoment`, `idSeed`, `recordedConversationIds`, `definitionsDumpFileName`, `caseOutcomes`, `argusCalls`, `hostRecordedCalls`; `fromJson()` refuses another harness and another version |
+
+**What makes two runs byte-comparable.** The moment is pinned 2 s before the run starts
+(`PINNED_MOMENT_LEAD_SECONDS`, so a stamp the run could not pin never equals it) and the id source is re-seeded per
+call; both are stored in the recording. Every call — case, fixture or `before` call — starts in the process state of a
+fresh worker job (entity registries and Doctrine caches emptied, the connection renewed), so it reads the database,
+never what an earlier call of the run left in the process. No Argus or application cache answers, the decision model's
+breaker runs in harness mode, and every Messenger dispatch stays in the process: a case's dispatches are compared, the
+harness's dropped. The harness conversations and the run's agent space are created or prepared anew in each run and
+read as placeholders (`<comparison:agentSpace>`, `getComparisonAgentSpacePlaceholder()`); on a replay they are paired
+with the recorded ids, so a played Argus answer comes back in the replay's ids. The wall clock the run could not pin is
+normalized by one rule for statements, dispatches and the JSON of tool results: a moment under a time-named key or
+column written between the start of the run and the end of the call reads `<clock>`, the script's derived-moment keys
+and columns `<derived-clock>`, its duration keys `<duration>`, the time after a `wallClockTextPrefixes` text `<clock>`.
+
+**Which ids become placeholders.** After each call the session reads, per table, the ids above the high-water marks
+taken before the call. A table is read through the first scope column it carries: the columns of the harness
+conversations (`aiConversationId`, `parentConversationId`, `rootConversationId`), then the columns
+`AgentRecordedRunsService::getScopeColumnsByName()` lists for each scope of the run (the run's agent space, then its
+account). The ids of a table read through a scope column become placeholders (`<table#n>`). A table without a scope
+column holds every id above its mark, whoever wrote it on a shared database: its ids become placeholders only when the
+captured statements of the same call inserted into that table (an INSERT or a REPLACE); otherwise they stay raw. A row a
+call creates and deletes again in one call is gone when the ids are read: the application names such id columns in
+`buildDeletedRowIdFamilies()` and their marks in `buildHighWaterMarksOfDeletedRowFamilies()`, and the statements
+normalize them against the case's mark.
+
+**Opaque tokens.** A token derived from a harness id or minted at random in every run (a lock token in a queued message)
+is compared by which values are equal, never by its bytes: each distinct value reads `<key#n>`. The keys are the
+script's `opaqueTokenKeys` plus `findApplicationOpaqueTokenKeys()` of the session, declared for every script.
+
+**Override points of the session** (the application's class at the session's mirrored path):
+
+| Method | Decides |
+|---|---|
+| `prepareComparisonAgentSpace()` / `releaseComparisonAgentSpace()` | where the run works: by default the space the script names, read as the run's account (none: account level); an application that creates a fresh space per run does it here (before any hook is installed, so its own Argus calls are real in both runs), leases the account with `acquireSeedAccountLease()` and gives it back in the release (`releaseSeedAccountLease()`); progress lines go through `reportProgress()` and print with the command's `getProgressLinePrefix()` |
+| `refuseAnAccountOtherThanTheComparisonAccount()` | refuses an authenticated account that may not run a comparison, before anything is prepared (default: every account may) |
+| `refuseUnsafeScriptReferences()` | refuses a script that names something a call must never reach (an id of a real record), after the space is prepared (default: nothing) |
+| `assignComparisonAgentSpace()`, `getComparisonAgentSpacePlaceholder()` | how a harness conversation is put into the run's space; the placeholder of the space |
+| `buildScopeIdsByName()` | the scopes of the run in priority order (default: the agent space, then the account); an application adds its own |
+| `buildHostRecording()` | the application's own recorder of calls its tools make to its own back ends (default: none): the session builds and installs it, on a replay as a player that answers from `ToolCallComparisonRecording::getStoredHostRecordedCallsJson()`. The returned object implements `ToolCallComparisonHostRecordingInterface`, through which the session labels its calls with the call that runs (`labelCalls()`), copies the kept calls into the recording at the end of a record run (`buildStoredCallsJson()`), compares the requests of one case (`buildStoredRequestsOfCallJson()`), lists the recorded calls a replay never asked for outside harness calls (`findUnusedCallLines()`) and removes it in a `finally` (`uninstall()`). The calls travel as the JSON text of their stored document |
+| `buildDeletedRowIdFamilies()`, `buildHighWaterMarksOfDeletedRowFamilies()` | ids of rows created and deleted within one call (above) |
+| `findApplicationOpaqueTokenKeys()` | the application's opaque token keys (above) |
+
+**The script** (`ToolCallComparisonScript`) reads the application's own keys in `readHostScriptFields()` and adds its
+rules in `findHostValidationErrors()` (the whole script) and `findHostToolCallErrors()` (one call).
+
+**The stored keys.** `ToolCallComparisonRecording`, `ToolCallComparisonCaseOutcome` (one case: the tool result as the
+model receives it, `isError`, the refusal kind or the execution error, the appended rows, the write statements, the
+dispatches, the application's recorded requests, the Argus requests and their count) and
+`ToolCallComparisonDefinitionsDump` read and write their stored document through `getStoredKeyByField()`
+(field → key; the default stores every field under its own name). An application whose recordings carry other key
+names maps them there, so a recording it made before stays readable and is written byte-identically.
 
 ## Limits
 
@@ -420,4 +251,12 @@ The classes this reference names, with their namespace (for the `use` lines of a
 `DDD\Domain\Base\Repo\DB\Doctrine\EntityManagerFactory` · `DDD\Presentation\Mcp\Services\MCPToolExecutorService` ·
 `DDD\Domain\AI\Libs\RecordedRuns\RecordedRunClockAndIdSources` ·
 `DDD\Domain\AI\Entities\RecordedRuns\RecordedRunIdSource` · `DDD\Domain\AI\Entities\RecordedRuns\RecordedRunNowSource`
-· `DDD\Domain\AI\Entities\MCPPackages\ToolResultRecording`
+· `DDD\Domain\AI\Entities\MCPPackages\ToolResultRecording` ·
+`DDD\Domain\AI\Services\Eval\AgentRecordedRunsService` · `DDD\Domain\AI\Entities\RecordedRuns\AgentRecordedRunSession` ·
+`DDD\Domain\AI\Entities\RecordedRuns\AgentRecordedRunRecording` · `DDD\Domain\AI\Entities\RecordedRuns\AgentRecordedRunFields` ·
+`DDD\Domain\AI\Entities\RecordedRuns\AgentRecordedRunScope` · `DDD\Domain\AI\Entities\RecordedRuns\AgentRecordedRunScopeColumns` ·
+`DDD\Domain\AI\Entities\RecordedRuns\AgentRecordedRunSnapshot` · `DDD\Domain\AI\Entities\RecordedRuns\AgentRecordedRunCreatedIdRead` ·
+`DDD\Domain\Base\Entities\MessageHandlers\RecordedRunMessageQueue` ·
+`DDD\Symfony\Messenger\Middleware\MessageDispatchCaptureMiddleware` ·
+`DDD\Symfony\Commands\Agents\MCPCompareToolCallsCommand` · `DDD\Domain\AI\Services\Eval\ToolCallComparisonsService` ·
+`DDD\Domain\AI\Entities\MCPPackages\ToolCallComparisons\{ToolCallComparisonSession, ToolCallComparisonScript, ToolCallComparisonRecording, ToolCallComparisonCaseOutcome, ToolCallComparisonDefinitionsDump, ToolCallComparisonHostRecordingInterface}`

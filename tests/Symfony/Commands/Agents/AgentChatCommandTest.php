@@ -40,6 +40,14 @@ class AgentChatCommandTest extends UnitTestCase
         'evict-skill-turns', 'evict-min-residency', 'unload-granularity', 'skill-loading-strategy',
         'rebuild-epoch-on-situation-change', 'state-change-delivery', 'compact-trigger-tokens', 'compact-keep-messages',
         'compact-segment-messages', 'compact-fan-in', 'compact-retention', 'ignore-budget',
+        'record-run-for-comparison', 'replay-run-and-compare',
+    ];
+
+    /** @var string[] The top-level keys of a chat recording, in stored order */
+    public const array CHAT_RECORDING_KEYS = [
+        'version', 'toolsRunLive', 'recordedConversationId', 'scopeIds', 'idSeed', 'harness', 'agentSpaceId', 'async',
+        'turns', 'agentWireApi', 'skillLoadingStrategy', 'previousReasoningCarryOver', 'previousReasoningCapTokens',
+        'stateChangeDelivery', 'idNormalization', 'createdIdReadReport', 'calls', 'toolResults', 'snapshot',
     ];
 
     protected ?Account $accountBeforeTest = null;
@@ -410,6 +418,65 @@ class AgentChatCommandTest extends UnitTestCase
         self::assertSame(Command::INVALID, $commandTester->execute(['--agentSpaceId' => '7']));
         self::assertStringContainsString('recording.json: recorded under other settings', $commandTester->getDisplay());
         self::assertSame([], $this->probeCommand->agentReplyServiceDouble->replyRequests);
+    }
+
+    public function testARunIsRecordedThroughTheOptionsAndItsReplayIsIdentical(): void
+    {
+        $turnsFile = $this->writeTemporaryFile("First question\nSecond question\n");
+        $recordingFile = $this->writeTemporaryFile('');
+        unlink($recordingFile);
+        $this->probeCommand->recordedRunThroughCommand = true;
+        $recordTester = new CommandTester($this->probeCommand);
+
+        self::assertSame(Command::SUCCESS, $recordTester->execute(['--agentSpaceId' => '7', '--turns-file' => $turnsFile, '--record-run-for-comparison' => $recordingFile]), $recordTester->getDisplay());
+        $storedRecording = json_decode((string)file_get_contents($recordingFile), true);
+        self::assertSame(self::CHAT_RECORDING_KEYS, array_keys($storedRecording), 'the stored keys keep their order');
+        self::assertSame(3, $storedRecording['version']);
+        self::assertSame('app:ai-agent:chat', $storedRecording['harness']);
+        self::assertSame(7, $storedRecording['agentSpaceId']);
+        self::assertSame(['First question', 'Second question'], $storedRecording['turns']);
+        self::assertSame(['agentSpace' => 7, 'rootConversation' => AgentChatProbeCommand::STORED_CONVERSATION_ID], $storedRecording['scopeIds']);
+        self::assertSame(16, strlen($storedRecording['idSeed']), 'a recording draws its id seed');
+        self::assertStringContainsString('record/replay alone on the account — account-scoped tables: agentNotes (accountId)', $recordTester->getDisplay());
+        self::assertStringContainsString("run recording for comparison: 2 turns, 0 Argus calls, 1 conversations, 0 dispatches → {$recordingFile}", $recordTester->getDisplay());
+        self::assertSame(
+            ['First question', 'Second question'],
+            array_column($this->probeCommand->agentReplyServiceDouble->replyRequests, 'ownerMessage'),
+            'the turns of the file ran inline'
+        );
+
+        $replayTester = new CommandTester($this->probeCommand);
+        self::assertSame(Command::SUCCESS, $replayTester->execute(['--agentSpaceId' => '7', '--replay-run-and-compare' => $recordingFile]), $replayTester->getDisplay());
+        self::assertStringContainsString('recorded-run comparison IDENTICAL: 2 turns, 0 Argus calls, 1 conversations, 0 dispatches (conversation ' . AgentChatProbeCommand::STORED_CONVERSATION_ID . ')', $replayTester->getDisplay());
+        self::assertCount(4, $this->probeCommand->agentReplyServiceDouble->replyRequests, 'the replay drove the recorded turns');
+    }
+
+    public function testAReplayIsRefusedForAnotherHarnessAndForADifferingSpace(): void
+    {
+        $this->probeCommand->recordedRunThroughCommand = true;
+        $recordingOfAnotherHarness = $this->writeTemporaryFile((string)json_encode(['version' => 3, 'harness' => 'app:other:harness', 'calls' => [], 'snapshot' => [], 'idNormalization' => []]));
+        $commandTester = new CommandTester($this->probeCommand);
+
+        self::assertSame(Command::INVALID, $commandTester->execute(['--agentSpaceId' => '7', '--replay-run-and-compare' => $recordingOfAnotherHarness]));
+        self::assertStringContainsString("{$recordingOfAnotherHarness}: the recording comes from app:other:harness, not from app:ai-agent:chat", $commandTester->getDisplay());
+
+        $recordingOfAnotherSpace = $this->writeTemporaryFile((string)json_encode(['version' => 3, 'harness' => 'app:ai-agent:chat', 'agentSpaceId' => 9, 'turns' => ['Hello'], 'calls' => [], 'snapshot' => [], 'idNormalization' => []]));
+        self::assertSame(Command::INVALID, $commandTester->execute(['--agentSpaceId' => '7', '--replay-run-and-compare' => $recordingOfAnotherSpace]));
+        self::assertStringContainsString('agentSpaceId differs from the recording (recorded 9, passed 7) — omit it or pass the recorded value', $commandTester->getDisplay());
+        self::assertSame([], $this->probeCommand->agentReplyServiceDouble->replyRequests, 'a refused replay drives no turn');
+    }
+
+    public function testARecordingNeedsATurnsFileAndAReplayAReadableRecording(): void
+    {
+        $this->probeCommand->recordedRunThroughCommand = true;
+        $commandTester = new CommandTester($this->probeCommand);
+
+        self::assertSame(Command::INVALID, $commandTester->execute(['--agentSpaceId' => '7', '--record-run-for-comparison' => sys_get_temp_dir() . '/never-written.json']));
+        self::assertStringContainsString('--turns-file is missing or empty', $commandTester->getDisplay());
+
+        $missingRecording = sys_get_temp_dir() . '/no-such-recording-' . bin2hex(random_bytes(4)) . '.json';
+        self::assertSame(Command::INVALID, $commandTester->execute(['--agentSpaceId' => '7', '--replay-run-and-compare' => $missingRecording]));
+        self::assertStringContainsString("{$missingRecording} cannot be read", $commandTester->getDisplay());
     }
 
     public function testTheSettingsOptionsAreWrittenOntoAnEphemeralConversation(): void

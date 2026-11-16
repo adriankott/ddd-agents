@@ -118,7 +118,7 @@ class AgentRecordedRunComparisonTest extends UnitTestCase
         self::assertSame('<delegationBatch#1>', $conversations[1]['delegationBatchId'], 'a 3-digit batch id is replaced where it is declared');
         self::assertArrayNotHasKey('runToken', $conversations[0]);
         self::assertStringNotContainsString('decisionModelMs', (string)$conversations[0]['agentWorkingState']);
-        self::assertStringContainsString('"visitorCount":312', (string)$conversations[0]['agentWorkingState'], 'a business number equal to the batch id stays raw');
+        self::assertStringContainsString('"visitorCount":312', (string)$conversations[0]['agentWorkingState'], 'a plain number of the owner equal to the batch id stays raw');
         self::assertSame('<conversation#2>@0', $recordedSnapshot[AgentRecordedRunComparison::SECTION_MESSAGES][3]['_label']);
         self::assertStringContainsString('"emittedBatchId":"call_abc"', (string)$recordedSnapshot[AgentRecordedRunComparison::SECTION_MESSAGES][1]['toolCall'], 'the emission batch is compared, not dropped');
         self::assertStringContainsString('keyword <keywords#1> added', (string)$recordedSnapshot[AgentRecordedRunComparison::SECTION_MESSAGES][1]['toolCall'], 'a tool-minted id in free text is an ordinal');
@@ -136,7 +136,7 @@ class AgentRecordedRunComparisonTest extends UnitTestCase
         self::assertSame([], $comparison->differences);
     }
 
-    public function testAChangedReferenceToAnExistingRowAndABusinessNumberEqualToAnIdAreReported(): void
+    public function testAChangedReferenceToAnExistingRowAndAPlainNumberEqualToAnIdAreReported(): void
     {
         $recordedIdNormalization = $this->idNormalizationOfRun(500100, 312);
         $replayedIdNormalization = $this->idNormalizationOfRun(900100, 530);
@@ -152,7 +152,7 @@ class AgentRecordedRunComparisonTest extends UnitTestCase
         }
         self::assertArrayHasKey('conversations #1 <conversation#2> delegatedFromMessageId', $differencesByPrefix);
         self::assertStringContainsString('900150', $differencesByPrefix['conversations #1 <conversation#2> delegatedFromMessageId']);
-        // a business number that happens to equal the other run's batch id is no id
+        // a plain number of the owner that happens to equal the other run's batch id is no id
         self::assertArrayHasKey('messages #4 <conversation#2>@1 message', $differencesByPrefix);
     }
 
@@ -181,12 +181,12 @@ class AgentRecordedRunComparisonTest extends UnitTestCase
     public function testTheNormalizationContinuesFromTheRecordingAndReadsBothRunsScopeIdsAlike(): void
     {
         $recordedIdNormalization = $this->idNormalizationOfRun(500100, 312);
-        $recordedIdNormalization->addScopeIds(['shop' => 20161111, 'project' => null]);
+        $recordedIdNormalization->addScopeIds(['agentSpace' => 20161111, 'account' => null]);
         $recordedIdNormalization->normalizeText('first 500101');
         $restoredIdNormalization = AgentRecordedRunIdNormalization::fromArray(json_decode((string)json_encode($recordedIdNormalization->toArray()), true));
-        $restoredIdNormalization->addScopeIds(['shop' => 20162222]);
+        $restoredIdNormalization->addScopeIds(['agentSpace' => 20162222]);
 
-        self::assertSame('<conversation#2> <shop> <shop> 99999999', $restoredIdNormalization->normalizeText('500101 20161111 20162222 99999999'));
+        self::assertSame('<conversation#2> <agentSpace> <agentSpace> 99999999', $restoredIdNormalization->normalizeText('500101 20161111 20162222 99999999'));
     }
 
     public function testTwoRowsCreatedInTheOtherOrderAreADifferenceAndBothLayersNumberByCreation(): void
@@ -206,7 +206,7 @@ class AgentRecordedRunComparisonTest extends UnitTestCase
         $translation = \DDD\Domain\AI\Entities\Conversations\Diagnostics\AgentRecordedRunPlayedAnswerIdTranslation::forRecordedCreatedIds($recordedIdNormalization->createdIdsByTable);
         $translation->translateResponseBody(
             (string)json_encode(['tool_calls' => [['function' => ['arguments' => json_encode(['keywordId' => 7000101])]]]]),
-            static fn (): array => $replayedIdNormalization->createdIdsByTable,
+            ReplayCreatedIdsReaderDouble::answering($replayedIdNormalization->createdIdsByTable),
             'recorded call #1'
         );
         self::assertSame(['recorded call #1: keywords #1 7000101 → 9000201'], $translation->translations);

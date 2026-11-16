@@ -2,6 +2,12 @@
 # consumes nothing, a test reads what was sent from the in-memory transport.
 framework:
   messenger:
+    buses:
+      messenger.bus.default:
+        middleware:
+          # Keeps the messages a recorded or replayed call dispatches instead of sending them (the tool-call
+          # comparison and the recorded runs); a pass-through while no capture is active.
+          - DDD\Symfony\Messenger\Middleware\MessageDispatchCaptureMiddleware
     transports:
       sync: 'sync://'
       ai_conversation_turn: 'in-memory://'

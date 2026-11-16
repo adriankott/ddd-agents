@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DDD\Tests\Agents\Domain\AI\Entities\RecordedRuns;
 
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
+use DDD\Domain\AI\Entities\RecordedRuns\AgentRecordedRunFields;
 use DDD\Domain\AI\Entities\RecordedRuns\AgentRecordedRunSessionInterface;
 use DDD\Tests\Agents\Support\UnitTestCase;
 use ReflectionClass;
@@ -20,10 +21,10 @@ class AgentRecordedRunSessionInterfaceTest extends UnitTestCase
     /** @var array<string, string> The signature of every call, by method name: parameter types, then the return type */
     public const array SIGNATURES_BY_METHOD_NAME = [
         'beginTurn' => 'int: void',
-        'buildRecording' => 'DDD\Domain\AI\Entities\Conversations\AIConversation, array, array: array',
+        'buildRecording' => 'DDD\Domain\AI\Entities\Conversations\AIConversation, array, DDD\Domain\AI\Entities\RecordedRuns\AgentRecordedRunFields: DDD\Domain\AI\Entities\RecordedRuns\AgentRecordedRunRecording',
         'compareWithRecording' => 'DDD\Domain\AI\Entities\Conversations\AIConversation, array: DDD\Domain\AI\Entities\Conversations\Diagnostics\AgentRecordedRunComparison',
         'concludeRun' => 'DDD\Domain\AI\Entities\Conversations\AIConversation, array: void',
-        'describeRun' => 'array: string',
+        'describeRun' => 'DDD\Domain\AI\Entities\RecordedRuns\AgentRecordedRunSnapshot: string',
         'describeSharedScopeTables' => ': ?string',
         'isReplay' => ': bool',
         'readHighWaterMarks' => ': void',
@@ -73,9 +74,10 @@ class AgentRecordedRunSessionInterfaceTest extends UnitTestCase
             $agentRecordedRunSession->stop(runRemainingMessages: false);
         }
         if (!$agentRecordedRunSession->isReplay()) {
-            $recording = $agentRecordedRunSession->buildRecording($rootConversation, ['account' => 1], ['turns' => ['hello']]);
+            $agentRecordedRunRecording = $agentRecordedRunSession->buildRecording($rootConversation, ['account' => 1], AgentRecordedRunFields::fromValuesByField(['turns' => ['hello']]));
             $agentRecordedRunSession->describeSharedScopeTables();
-            self::assertSame('2 sections', $agentRecordedRunSession->describeRun($recording));
+            self::assertSame(['hello'], $agentRecordedRunRecording->getTurns());
+            self::assertSame('2 sections', $agentRecordedRunSession->describeRun($agentRecordedRunRecording->getSnapshot()));
         }
     }
 

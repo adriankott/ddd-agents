@@ -1,2 +1,14 @@
 # Names a developer skill writes in backticks that are deliberately no declaration of the package, the framework,
 # the AI or Argus module or the reference kernel. One per line: <name><TAB><reason>. Read by DeveloperSkillNamesExistTest.
+bin/console	the application's console script
+N/M	the value format of a shard option (shard N of M)
+A|B	the either-or notation of a fixture value
+A\|B	the either-or notation of a fixture value, escaped inside a table
+setup[].undo	a key path inside a fixture file
+<caseId>.rep<k>.json	a result file name pattern the evaluation writes
+<date>_<time>-<model>-<scope>.json	a result file name pattern the evaluation writes
+<date>_<time>-suite[-<label>]	a result folder name pattern the evaluation suite writes
+<date>_<time>-<model>-guard-sentinel.json	a result file name pattern the guard evaluation writes
+<recording>.definitions.json	a file name pattern the tool-call comparison writes next to its recording
+<recording>.replay-definitions.json	a file name pattern the tool-call comparison writes next to its recording
+var/eval-seed-account-leases/<prefix><accountId>.lock	a lock file pattern in the application's var folder

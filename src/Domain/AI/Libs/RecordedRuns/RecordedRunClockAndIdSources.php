@@ -5,16 +5,17 @@ declare(strict_types=1);
 namespace DDD\Domain\AI\Libs\RecordedRuns;
 
 use DDD\Domain\AI\Entities\RecordedRuns\RecordedRunIdSource;
+use DDD\Domain\AI\Entities\RecordedRuns\RecordedRunInstalledSources;
 use DDD\Domain\AI\Entities\RecordedRuns\RecordedRunNowSource;
 use DDD\Infrastructure\Base\DateTime\DateTime;
 
 /**
  * The clock source and the id source a recorded or replayed run installs, and the one place a switched site reads
  * "now" or mints an id: the wall clock and the random generator in every normal run; the pinned sources while a
- * recorded or replayed piece of work runs inside {@see runWithPinnedSources()}. A comparison harness installs the
- * sources for exactly one unit of work and the method restores the sources that were installed before, also on a
- * throw. Which sites read through it is the application's choice; an application subclass at the same path documents
- * them.
+ * recorded or replayed piece of work runs between {@see installPinnedSources()} and {@see restoreInstalledSources()}. A
+ * comparison harness installs the sources for exactly one unit of work and restores the sources that were installed
+ * before in a `finally`, also on a throw. Which sites read through it is the application's choice; an application
+ * subclass at the same path documents them.
  *
  * A static library, not a service: never fetched from the container, never in a `Services` namespace. A write path
  * may call it on every row, and a container lookup there would break every worker whose compiled container predates
@@ -29,24 +30,38 @@ class RecordedRunClockAndIdSources
     public static ?RecordedRunIdSource $installedIdSource = null;
 
     /**
-     * Runs $work with the given sources installed and restores the previously installed ones afterwards.
+     * Installs the given sources and returns the sources installed before, which the caller hands to
+     * {@see restoreInstalledSources()} in a `finally` once its piece of work ran:
      *
-     * @template T
-     * @param callable(): T $work
-     * @return T
+     *     $sourcesInstalledBefore = RecordedRunClockAndIdSources::installPinnedSources($nowSource, $idSource);
+     *     try {
+     *         // the recorded or replayed piece of work
+     *     } finally {
+     *         RecordedRunClockAndIdSources::restoreInstalledSources($sourcesInstalledBefore);
+     *     }
+     *
+     * @param RecordedRunNowSource $recordedRunNowSource
+     * @param RecordedRunIdSource $recordedRunIdSource
+     * @return RecordedRunInstalledSources the sources installed before
      */
-    public static function runWithPinnedSources(RecordedRunNowSource $recordedRunNowSource, RecordedRunIdSource $recordedRunIdSource, callable $work): mixed
+    public static function installPinnedSources(RecordedRunNowSource $recordedRunNowSource, RecordedRunIdSource $recordedRunIdSource): RecordedRunInstalledSources
     {
-        $previousNowSource = static::$installedNowSource;
-        $previousIdSource = static::$installedIdSource;
+        $sourcesInstalledBefore = RecordedRunInstalledSources::forSources(static::$installedNowSource, static::$installedIdSource);
         static::$installedNowSource = $recordedRunNowSource;
         static::$installedIdSource = $recordedRunIdSource;
-        try {
-            return $work();
-        } finally {
-            static::$installedNowSource = $previousNowSource;
-            static::$installedIdSource = $previousIdSource;
-        }
+        return $sourcesInstalledBefore;
+    }
+
+    /**
+     * Installs the sources {@see installPinnedSources()} returned: the ones installed before its piece of work.
+     *
+     * @param RecordedRunInstalledSources $sourcesInstalledBefore
+     * @return void
+     */
+    public static function restoreInstalledSources(RecordedRunInstalledSources $sourcesInstalledBefore): void
+    {
+        static::$installedNowSource = $sourcesInstalledBefore->nowSource;
+        static::$installedIdSource = $sourcesInstalledBefore->idSource;
     }
 
     /** "Now": the pinned moment while a source is installed, else the wall clock. */

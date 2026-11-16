@@ -12,6 +12,7 @@ use DDD\Domain\AI\Services\Conversations\AgentMessagePrinterInterface;
 use DDD\Domain\AI\Services\Conversations\AIConversationAgentService;
 use DDD\Domain\AI\Services\Conversations\AIConversationMessagesService;
 use DDD\Domain\AI\Services\Conversations\Memories\AgentMemoriesService;
+use DDD\Domain\AI\Services\Eval\AgentRecordedRunsService;
 use DDD\Domain\Common\Services\AccountsService;
 use DDD\Symfony\Commands\Agents\AgentChatCommand;
 use DDD\Symfony\Commands\Agents\Chat\AgentConsoleChatRecordedRun;
@@ -21,7 +22,8 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 /**
  * The chat command with every service handed in through the command's own accessors, a stored conversation that gets
- * an id instead of a row, one stored conversation `--conversationId` can resume, and a recorded run the test scripts.
+ * an id instead of a row, one stored conversation `--conversationId` can resume, and a recorded run the test scripts —
+ * or, with {@see $recordedRunThroughCommand}, the command's own recorded run on a service without database reads.
  * Reads and writes no database.
  */
 class AgentChatProbeCommand extends AgentChatCommand
@@ -53,6 +55,12 @@ class AgentChatProbeCommand extends AgentChatCommand
     /** @var int[] The conversation ids the resume looked up */
     public array $resumeLookupIds = [];
 
+    /** The recorded run is the command's own (options, session of {@see $agentRecordedRunsServiceDouble}, finish) */
+    public bool $recordedRunThroughCommand = false;
+
+    /** The service of recorded runs the command's own recorded run uses */
+    public RecordedRunsServiceWithoutDatabaseDouble $agentRecordedRunsServiceDouble;
+
     public function __construct(
         public ScriptedAgentReplyServiceDouble $agentReplyServiceDouble,
         public RecordingAgentMessagePrinterDouble $agentMessagePrinterDouble,
@@ -63,6 +71,7 @@ class AgentChatProbeCommand extends AgentChatCommand
         public AccountsServiceWithOneAccountDouble $accountsServiceDouble,
         public DelegationSpawnServiceRecordingContinuationsDouble $delegationSpawnServiceDouble
     ) {
+        $this->agentRecordedRunsServiceDouble = new RecordedRunsServiceWithoutDatabaseDouble();
         parent::__construct(self::PROBE_COMMAND_NAME);
     }
 
@@ -90,13 +99,24 @@ class AgentChatProbeCommand extends AgentChatCommand
 
     protected function startRecordedRunSession(InputInterface $input, AIConversation $conversation, OutputInterface $output): ?AgentConsoleChatRecordedRun
     {
+        if ($this->recordedRunThroughCommand) {
+            return parent::startRecordedRunSession($input, $conversation, $output);
+        }
         return $this->scriptedRecordedRun;
     }
 
     protected function finishRecordedRunSession(AgentConsoleChatRecordedRun $recordedRun, AIConversation $conversation, OutputInterface $output): int
     {
+        if ($this->recordedRunThroughCommand) {
+            return parent::finishRecordedRunSession($recordedRun, $conversation, $output);
+        }
         $this->finishedRecordedRuns[] = $recordedRun;
         return $this->finishExitCode;
+    }
+
+    protected function getAgentRecordedRunsService(): AgentRecordedRunsService
+    {
+        return $this->agentRecordedRunsServiceDouble;
     }
 
     protected function getAIConversationAgentService(): AIConversationAgentService

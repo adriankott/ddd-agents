@@ -6,7 +6,10 @@ namespace DDD\Tests\Agents\Domain\AI\Entities\RecordedRuns;
 
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Entities\Conversations\Diagnostics\AgentRecordedRunComparison;
+use DDD\Domain\AI\Entities\RecordedRuns\AgentRecordedRunFields;
+use DDD\Domain\AI\Entities\RecordedRuns\AgentRecordedRunRecording;
 use DDD\Domain\AI\Entities\RecordedRuns\AgentRecordedRunSessionInterface;
+use DDD\Domain\AI\Entities\RecordedRuns\AgentRecordedRunSnapshot;
 
 /**
  * A recording session that records the calls a harness makes on it, in order, and records nothing else.
@@ -75,10 +78,10 @@ class RecordedRunSessionDouble implements AgentRecordedRunSessionInterface
         $this->calledMethodNames[] = 'concludeRun';
     }
 
-    public function buildRecording(AIConversation $rootConversation, array $scopeIdsByName, array $runFields): array
+    public function buildRecording(AIConversation $rootConversation, array $scopeIdsByName, AgentRecordedRunFields $runFields): AgentRecordedRunRecording
     {
         $this->calledMethodNames[] = 'buildRecording';
-        return ['scopeIds' => $scopeIdsByName] + $runFields;
+        return AgentRecordedRunRecording::fromStoredRecording(['scopeIds' => $scopeIdsByName] + $runFields->toArray() + ['snapshot' => ['conversations' => [], 'messages' => []]]);
     }
 
     public function compareWithRecording(AIConversation $rootConversation, array $scopeIdsByName): AgentRecordedRunComparison
@@ -87,9 +90,9 @@ class RecordedRunSessionDouble implements AgentRecordedRunSessionInterface
         return AgentRecordedRunComparison::newInstance();
     }
 
-    public function describeRun(array $snapshot): string
+    public function describeRun(AgentRecordedRunSnapshot $agentRecordedRunSnapshot): string
     {
         $this->calledMethodNames[] = 'describeRun';
-        return count($snapshot) . ' sections';
+        return count($agentRecordedRunSnapshot->getSectionNames()) . ' sections';
     }
 }

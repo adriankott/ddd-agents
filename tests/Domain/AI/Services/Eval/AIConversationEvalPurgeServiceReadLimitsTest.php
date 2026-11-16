@@ -20,11 +20,17 @@ use RuntimeException;
  */
 class AIConversationEvalPurgeServiceReadLimitsTest extends UnitTestCase
 {
+    /** The read of the session's two limits the MariaDB dialect makes before it changes them */
+    public const string MARIADB_SESSION_LIMITS_READ = 'SELECT @@SESSION.innodb_lock_wait_timeout, @@SESSION.max_statement_time';
+
+    /** The one statement that restores the limits the session held before, as whole numbers ({@see AIConversationEvalPurgeRecordingConnection::$sessionTimeoutValues}) */
+    public const string MARIADB_SESSION_LIMITS_RESTORE = 'SET SESSION innodb_lock_wait_timeout = 50, max_statement_time = 0';
+
     /** @var string[] The calls around one read on MariaDB before the statement */
-    protected const array MARIADB_CALLS_BEFORE_A_READ = ['begin', 'SET SESSION max_statement_time = ' . AIConversationEvalPurgeService::STATEMENT_TIMEOUT_SECONDS];
+    protected const array MARIADB_CALLS_BEFORE_A_READ = ['begin', self::MARIADB_SESSION_LIMITS_READ, 'SET SESSION max_statement_time = ' . AIConversationEvalPurgeService::STATEMENT_TIMEOUT_SECONDS];
 
     /** @var string[] The calls around one read on MariaDB after the statement */
-    protected const array MARIADB_CALLS_AFTER_A_READ = ['commit', 'SET SESSION innodb_lock_wait_timeout = DEFAULT', 'SET SESSION max_statement_time = DEFAULT'];
+    protected const array MARIADB_CALLS_AFTER_A_READ = ['commit', self::MARIADB_SESSION_LIMITS_RESTORE];
 
     public function testEveryReadSiteRunsBetweenABeginAndAnEnd(): void
     {
@@ -75,7 +81,7 @@ class AIConversationEvalPurgeServiceReadLimitsTest extends UnitTestCase
             self::assertSame('the read failed', $readError->getMessage());
         }
 
-        self::assertSame(self::MARIADB_CALLS_AFTER_A_READ, array_slice($service->recordingConnection->recordedCalls, 3));
+        self::assertSame(self::MARIADB_CALLS_AFTER_A_READ, array_slice($service->recordingConnection->recordedCalls, count(self::MARIADB_CALLS_BEFORE_A_READ) + 1));
         self::assertFalse($service->recordingConnection->isTransactionActive());
     }
 
@@ -99,18 +105,19 @@ class AIConversationEvalPurgeServiceReadLimitsTest extends UnitTestCase
         $service->beginStatementLimitedRead();
         try {
             $service->findIdsWhereColumnIn('SomeTable', 'aiConversationId', [10], AIConversationEvalPurgeSettings::newInstance());
-            self::assertNotContains('SET SESSION max_statement_time = DEFAULT', $service->recordingConnection->recordedCalls, 'the inner end keeps the outer read\'s limit');
+            self::assertNotContains(self::MARIADB_SESSION_LIMITS_RESTORE, $service->recordingConnection->recordedCalls, 'the inner end keeps the outer read\'s limit');
         } finally {
             $service->endStatementLimitedRead();
         }
 
-        self::assertSame(['commit', 'commit', 'SET SESSION innodb_lock_wait_timeout = DEFAULT', 'SET SESSION max_statement_time = DEFAULT'], array_slice($service->recordingConnection->recordedCalls, -4));
+        self::assertSame(['commit', 'commit', self::MARIADB_SESSION_LIMITS_RESTORE], array_slice($service->recordingConnection->recordedCalls, -3));
+        self::assertSame(1, count(array_keys($service->recordingConnection->recordedCalls, self::MARIADB_SESSION_LIMITS_READ, true)), 'the nested change reads the session limits once, at the outer begin');
         self::assertFalse($service->recordingConnection->isTransactionActive());
     }
 
     /**
-     * Asserts that the recorded calls are a sequence of brackets `begin, SET limit, <read>, commit, clear, clear` and
-     * returns the reads in order.
+     * Asserts that the recorded calls are a sequence of brackets `begin, read of the session limits, SET limit, <read>,
+     * commit, one restore of the limits` and returns the reads in order.
      *
      * @param string[] $recordedCalls
      * @return string[]
@@ -120,11 +127,12 @@ class AIConversationEvalPurgeServiceReadLimitsTest extends UnitTestCase
         $bracketLength = count(self::MARIADB_CALLS_BEFORE_A_READ) + 1 + count(self::MARIADB_CALLS_AFTER_A_READ);
         self::assertSame(0, count($recordedCalls) % $bracketLength, implode("\n", $recordedCalls));
         $readStatements = [];
+        $readPosition = count(self::MARIADB_CALLS_BEFORE_A_READ);
         foreach (array_chunk($recordedCalls, $bracketLength) as $bracketCalls) {
-            self::assertSame(self::MARIADB_CALLS_BEFORE_A_READ, array_slice($bracketCalls, 0, 2));
-            self::assertSame(self::MARIADB_CALLS_AFTER_A_READ, array_slice($bracketCalls, 3));
-            self::assertStringStartsWith('SELECT ', $bracketCalls[2]);
-            $readStatements[] = $bracketCalls[2];
+            self::assertSame(self::MARIADB_CALLS_BEFORE_A_READ, array_slice($bracketCalls, 0, $readPosition));
+            self::assertSame(self::MARIADB_CALLS_AFTER_A_READ, array_slice($bracketCalls, $readPosition + 1));
+            self::assertStringStartsWith('SELECT ', $bracketCalls[$readPosition]);
+            $readStatements[] = $bracketCalls[$readPosition];
         }
         return $readStatements;
     }

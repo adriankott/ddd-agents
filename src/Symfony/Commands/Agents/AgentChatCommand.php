@@ -7,6 +7,7 @@ namespace DDD\Symfony\Commands\Agents;
 use DDD\Domain\AI\Entities\Conversations\Agent\Context\AgentContextSegment;
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Entities\Conversations\AIConversationDriveScope;
+use DDD\Domain\AI\Entities\Conversations\Diagnostics\AgentRecordedRunComparison;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
 use DDD\Domain\AI\Entities\Conversations\Messages\CompactionSettingsOverride;
 use DDD\Domain\AI\Entities\Conversations\Messages\ContextRetentionSettings;
@@ -16,11 +17,17 @@ use DDD\Domain\AI\Entities\Conversations\Messages\LoadedCapability;
 use DDD\Domain\AI\Entities\Conversations\Messages\RunSettings;
 use DDD\Domain\AI\Entities\Conversations\Messages\RunSettingsOverride;
 use DDD\Domain\AI\Entities\Conversations\Usage\AgentAIUsageScope;
+use DDD\Domain\AI\Entities\RecordedRuns\AgentRecordedRunFields;
+use DDD\Domain\AI\Entities\RecordedRuns\AgentRecordedRunRecording;
+use DDD\Domain\AI\Entities\RecordedRuns\AgentRecordedRunScope;
+use DDD\Domain\AI\Entities\RecordedRuns\AgentRecordedRunSession;
+use DDD\Domain\AI\Entities\RecordedRuns\AgentRecordedRunSessionInterface;
 use DDD\Domain\AI\Repo\Argus\Conversations\ArgusAIAgentConversation;
 use DDD\Domain\AI\Services\Conversations\Agent\AIConversationDelegationSpawnService;
 use DDD\Domain\AI\Services\Conversations\Agent\AIConversationModelCallsService;
 use DDD\Domain\AI\Services\Conversations\AgentMessagePrinterInterface;
 use DDD\Domain\AI\Services\Conversations\Memories\AgentMemoriesService;
+use DDD\Domain\AI\Services\Eval\AgentRecordedRunsService;
 use DDD\Infrastructure\Base\DateTime\DateTime;
 use DDD\Infrastructure\Services\DDDService;
 use DDD\Presentation\Mcp\Agent\ConversationHtmlTranscript;
@@ -41,6 +48,7 @@ use Symfony\Component\Console\Exception\InvalidOptionException;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
+use RuntimeException;
 use Throwable;
 
 /**
@@ -52,6 +60,8 @@ use Throwable;
  *   php bin/console app:ai-agent:chat --conversationId=987 -m "And compared with last month?"
  *   php bin/console app:ai-agent:chat --accountId=123 -i                  # interactive
  *   php bin/console app:ai-agent:chat --agentSpaceId=7 --turns-file=turns.txt
+ *   php bin/console app:ai-agent:chat --agentSpaceId=7 --turns-file=turns.txt --record-run-for-comparison=run.json
+ *   php bin/console app:ai-agent:chat --agentSpaceId=7 --replay-run-and-compare=run.json
  *
  * The run works as the account of `--accountId`, else as the owner of the space the options name. A new conversation
  * is created in that space ({@see createConversationInAgentSpace()}). The console has no message consumer, so the side
@@ -61,9 +71,12 @@ use Throwable;
  * Override points of an application: the scope of the run, shared with `app:ai-agent:chat-tui` through
  * {@see AgentConsoleChatScopeTrait} ({@see resolveChatScope()}, {@see findAgentSpaceForNewConversation()},
  * {@see createConversationInAgentSpace()}, the words {@see describeAgentSpaceOptions()}; the trait also holds the
- * resume of `--conversationId` and the turn inside its envelope); {@see curateMemoryAfterTurn()},
- * {@see startRecordedRunSession()} and {@see finishRecordedRunSession()} (a recorded run over several turns; none by
- * default), {@see buildSlashCommandRegistry()}, and the words {@see getInteractiveChatTitle()}.
+ * resume of `--conversationId` and the turn inside its envelope); {@see curateMemoryAfterTurn()}; the recorded-run
+ * comparison (`--record-run-for-comparison` / `--replay-run-and-compare`, {@see startRecordedRunSession()} and
+ * {@see finishRecordedRunSession()}) with the settings a replay must match
+ * ({@see buildRecordedRunSettingsPassedByCaller()}), the scope of the run ({@see buildRecordedRunScope()},
+ * {@see buildRecordedRunConcludingScopeIds()}) and the wire settings it carries ({@see buildWireRecordingKeys()});
+ * {@see buildSlashCommandRegistry()}, and the words {@see getInteractiveChatTitle()}.
  */
 #[AsCommand(
     name: 'app:ai-agent:chat',
@@ -71,9 +84,25 @@ use Throwable;
 )]
 class AgentChatCommand extends AgentConsoleCommand
 {
-    use AgentConsoleChatScopeTrait;
-    use ModelTierOptionTrait;
-    use ContextRetentionSettingsOptionsTrait;
+    use AgentConsoleChatScopeTrait, ModelTierOptionTrait, ContextRetentionSettingsOptionsTrait;
+
+    /** The harness name a recording of this command carries (a replay refuses the recording of another harness). */
+    public const string RECORDED_RUN_HARNESS = 'app:ai-agent:chat';
+
+    /** The option that records a run of several turns for a later comparison. */
+    public const string OPTION_RECORD_RUN_FOR_COMPARISON = 'record-run-for-comparison';
+
+    /** The option that replays a recording and compares the replay with it. */
+    public const string OPTION_REPLAY_RUN_AND_COMPARE = 'replay-run-and-compare';
+
+    /** @var string|null The file a recording is written to (`--record-run-for-comparison`); set when the recorded run starts */
+    protected ?string $recordingPathToWrite = null;
+
+    /** @var AgentRecordedRunRecording|null The recording a replay answers from (`--replay-run-and-compare`); set when the replay starts */
+    protected ?AgentRecordedRunRecording $replayedRecording = null;
+
+    /** @var array<string, mixed> The settings the caller passed that a replay must match, by stored field; set when the recorded run starts */
+    protected array $recordedRunSettingsPassedByCaller = [];
 
     /** @var ConsoleLineEditor|null The raw-mode line editor of the interactive prompt; created on first use, keeps the input history across turns */
     protected ?ConsoleLineEditor $lineEditor = null;
@@ -124,7 +153,9 @@ class AgentChatCommand extends AgentConsoleCommand
             ->addOption('model', null, InputOption::VALUE_OPTIONAL, 'Use this AIModel by catalog name for the agent calls; default = the conversation\'s default model. Wins over --tier.')
             ->addOption('provider', null, InputOption::VALUE_OPTIONAL, 'Debug probe: pin the gateway routing of the agent calls to this provider order (lowercase provider slugs, comma-separated) without fallback, so a per-provider latency or error probe is attributable. Console-only.')
             ->addOption('no-compact', null, InputOption::VALUE_NONE, 'No inline compaction after a turn. By default the console compacts synchronously once the conversation crosses its threshold (also with --ephemeral). Pass this to inspect the raw, uncompacted context.')
-            ->addOption('no-side-work', null, InputOption::VALUE_NONE, 'Latency benchmark: skip the side work production runs in the background, off the response path: the owner-message embedding, the memory curation after a turn and the inline compaction (implies --no-compact). Combine with --timings to measure the core turn alone.');
+            ->addOption('no-side-work', null, InputOption::VALUE_NONE, 'Latency benchmark: skip the side work production runs in the background, off the response path: the owner-message embedding, the memory curation after a turn and the inline compaction (implies --no-compact). Combine with --timings to measure the core turn alone.')
+            ->addOption(self::OPTION_RECORD_RUN_FOR_COMPARISON, null, InputOption::VALUE_REQUIRED, 'Recorded-run comparison: drive --turns-file on a NEW conversation and record every Argus call, tool result and dispatched message plus the conversation tree (root, delegation children, batches, compaction nodes) into this JSON file; with --async every turn takes the worker path, its messages run in this process')
+            ->addOption(self::OPTION_REPLAY_RUN_AND_COMPARE, null, InputOption::VALUE_REQUIRED, 'Recorded-run comparison: drive the turns of this recording on a NEW conversation (sync or worker path, as recorded), answer every Argus call and tool result from it and compare the tree rows, the dispatched messages and the sent requests; exit 1 on a difference');
     }
 
     /**
@@ -724,8 +755,12 @@ class AgentChatCommand extends AgentConsoleCommand
     }
 
     /**
-     * The recorded run the options ask for, with its session created and its scope set but not started; null when no
-     * recording is asked for (the default: the module records nothing). A run that cannot start is returned refused.
+     * The recorded-run comparison the options ask for, with its session created and its scope set but not started;
+     * null when no recording is asked for. RECORD (`--record-run-for-comparison`) drives the lines of `--turns-file`;
+     * REPLAY (`--replay-run-and-compare`) drives the recording's turns, as recorded on the worker path or inline, with
+     * every Argus call and tool result answered from it. A replay of another harness, or with a setting the caller
+     * passed that differs from the recorded one ({@see buildRecordedRunSettingsPassedByCaller()},
+     * {@see buildWireRecordingKeys()}), is returned refused, as is an unreadable recording or a missing turns file.
      *
      * @param InputInterface $input
      * @param AIConversation $conversation the conversation the turns are driven on
@@ -735,13 +770,49 @@ class AgentChatCommand extends AgentConsoleCommand
      */
     protected function startRecordedRunSession(InputInterface $input, AIConversation $conversation, OutputInterface $output): ?AgentConsoleChatRecordedRun
     {
-        return null;
+        $recordingPathToWrite = $input->hasOption(self::OPTION_RECORD_RUN_FOR_COMPARISON) ? $input->getOption(self::OPTION_RECORD_RUN_FOR_COMPARISON) : null;
+        $recordingPathToReplay = $input->hasOption(self::OPTION_REPLAY_RUN_AND_COMPARE) ? $input->getOption(self::OPTION_REPLAY_RUN_AND_COMPARE) : null;
+        $this->recordingPathToWrite = is_string($recordingPathToWrite) ? $recordingPathToWrite : null;
+        $this->replayedRecording = null;
+        if (!is_string($recordingPathToReplay) && $this->recordingPathToWrite === null) {
+            return null;
+        }
+        $this->recordedRunSettingsPassedByCaller = $this->buildRecordedRunSettingsPassedByCaller($input, $conversation);
+        $agentRecordedRunsService = $this->getAgentRecordedRunsService();
+        if (is_string($recordingPathToReplay)) {
+            try {
+                $agentRecordedRunRecording = $agentRecordedRunsService->findRecording($recordingPathToReplay);
+            } catch (RuntimeException $recordingError) {
+                return AgentConsoleChatRecordedRun::refused($recordingError->getMessage());
+            }
+            $replayRefusal = $agentRecordedRunRecording->findReplayRefusal(
+                static::RECORDED_RUN_HARNESS,
+                $this->recordedRunSettingsPassedByCaller + $this->buildWireRecordingKeys($conversation)
+            );
+            if ($replayRefusal !== null) {
+                return AgentConsoleChatRecordedRun::refused("{$recordingPathToReplay}: {$replayRefusal}");
+            }
+            $this->replayedRecording = $agentRecordedRunRecording;
+            $turns = $agentRecordedRunRecording->getTurns();
+            $async = $agentRecordedRunRecording->isAsync();
+            $agentRecordedRunSession = $agentRecordedRunsService->startSession($agentRecordedRunRecording);
+        } else {
+            $turnsFile = $input->getOption('turns-file');
+            $turns = $this->readTurnsOfFile(is_string($turnsFile) ? $turnsFile : null);
+            if ($turns === null) {
+                return AgentConsoleChatRecordedRun::refused('--turns-file is missing or empty');
+            }
+            $async = (bool)$input->getOption('async');
+            $agentRecordedRunSession = $agentRecordedRunsService->startSession(null);
+        }
+        $agentRecordedRunSession->setScope($this->buildRecordedRunScope($conversation));
+        return AgentConsoleChatRecordedRun::forSession($agentRecordedRunSession, $turns, $async);
     }
 
     /**
-     * Concludes a recorded run after its turns ran and its session stopped: writes the recording or compares the
-     * replay, prints the outcome and returns the exit code. The default (never reached without
-     * {@see startRecordedRunSession()}) succeeds.
+     * Writes the recording (record mode) or compares the replay with its recording and prints every difference
+     * (replay mode; exit 1 on a difference). The root conversation reads as a scope id
+     * ({@see buildRecordedRunConcludingScopeIds()}): the chat opens it before the session reads the high-water marks.
      *
      * @param AgentConsoleChatRecordedRun $recordedRun
      * @param AIConversation $conversation the conversation as stored after the run
@@ -751,7 +822,161 @@ class AgentChatCommand extends AgentConsoleCommand
      */
     protected function finishRecordedRunSession(AgentConsoleChatRecordedRun $recordedRun, AIConversation $conversation, OutputInterface $output): int
     {
-        return Command::SUCCESS;
+        $agentRecordedRunSession = $recordedRun->agentRecordedRunSession;
+        if ($agentRecordedRunSession === null) {
+            return Command::INVALID;
+        }
+        $scopeIdsByName = $this->buildRecordedRunConcludingScopeIds($conversation);
+        if (!$agentRecordedRunSession->isReplay()) {
+            $agentRecordedRunRecording = $agentRecordedRunSession->buildRecording($conversation, $scopeIdsByName, $this->buildRecordedRunFields($recordedRun, $conversation));
+            $agentRecordedRunsService = $this->getAgentRecordedRunsService();
+            $agentRecordedRunsService->writeRecording((string)$this->recordingPathToWrite, $agentRecordedRunRecording);
+            $this->printSharedScopeTables($agentRecordedRunSession, $output);
+            $output->writeln(sprintf(
+                '<info>run recording for comparison: %d turns, %s → %s</info>',
+                count($recordedRun->turns),
+                $agentRecordedRunSession->describeRun($agentRecordedRunRecording->getSnapshot()),
+                $this->recordingPathToWrite
+            ));
+            return Command::SUCCESS;
+        }
+        $agentRecordedRunComparison = $agentRecordedRunSession->compareWithRecording($conversation, $scopeIdsByName);
+        $this->printSharedScopeTables($agentRecordedRunSession, $output);
+        return $this->printComparison($agentRecordedRunSession, $agentRecordedRunComparison, $recordedRun, $conversation, $output);
+    }
+
+    /**
+     * The settings the caller passed that a replay must match, by the field the recording stores them under (null = not
+     * passed: the recording decides); stored as run fields of a recording. The package's: the space of `--agentSpaceId`.
+     * An application that names the scope of its chat by an option of its own returns that option.
+     *
+     * @param InputInterface $input
+     * @param AIConversation $conversation
+     * @return array<string, mixed> stored field → the value the caller passed
+     */
+    protected function buildRecordedRunSettingsPassedByCaller(InputInterface $input, AIConversation $conversation): array
+    {
+        return [self::OPTION_AGENT_SPACE_ID => $this->readIdOption($input, self::OPTION_AGENT_SPACE_ID)];
+    }
+
+    /**
+     * The scope of a recorded run: the space and the account of the conversation, both shared with other runs (the
+     * chat runs in an existing space), and the conversation as the root.
+     *
+     * @param AIConversation $conversation
+     * @return AgentRecordedRunScope
+     */
+    protected function buildRecordedRunScope(AIConversation $conversation): AgentRecordedRunScope
+    {
+        return AgentRecordedRunScope::forScopeIds(
+            [
+                AgentRecordedRunsService::SCOPE_NAME_AGENT_SPACE => $conversation->agentSpaceId ?? null,
+                AgentRecordedRunScope::SCOPE_NAME_ACCOUNT => $conversation->accountId ?? null,
+            ],
+            [AgentRecordedRunScope::SCOPE_NAME_ACCOUNT, AgentRecordedRunsService::SCOPE_NAME_AGENT_SPACE],
+            isset($conversation->id) ? (int)$conversation->id : null
+        );
+    }
+
+    /**
+     * The scope ids a recorded run names as its own when it concludes (stored as the recording's `scopeIds`): the
+     * space of the conversation and the root conversation.
+     *
+     * @param AIConversation $conversation
+     * @return array<string, int|string|null>
+     */
+    protected function buildRecordedRunConcludingScopeIds(AIConversation $conversation): array
+    {
+        return [
+            AgentRecordedRunsService::SCOPE_NAME_AGENT_SPACE => $conversation->agentSpaceId ?? null,
+            AgentRecordedRunSession::SCOPE_NAME_ROOT_CONVERSATION => (int)$conversation->id,
+        ];
+    }
+
+    /**
+     * The run fields of a chat recording, in stored order: the harness, the settings the caller passed, the worker path,
+     * the turns, then the wire settings.
+     *
+     * @param AgentConsoleChatRecordedRun $recordedRun
+     * @param AIConversation $conversation
+     * @return AgentRecordedRunFields
+     */
+    protected function buildRecordedRunFields(AgentConsoleChatRecordedRun $recordedRun, AIConversation $conversation): AgentRecordedRunFields
+    {
+        return AgentRecordedRunFields::fromValuesByField(
+            [AgentRecordedRunFields::FIELD_HARNESS => static::RECORDED_RUN_HARNESS]
+            + $this->recordedRunSettingsPassedByCaller
+            + ['async' => $recordedRun->async, 'turns' => $recordedRun->turns]
+            + $this->buildWireRecordingKeys($conversation)
+        );
+    }
+
+    /**
+     * @param AgentRecordedRunSessionInterface $agentRecordedRunSession
+     * @param OutputInterface $output
+     * @return void
+     */
+    protected function printSharedScopeTables(AgentRecordedRunSessionInterface $agentRecordedRunSession, OutputInterface $output): void
+    {
+        $sharedScopeTablesLine = $agentRecordedRunSession->describeSharedScopeTables();
+        if ($sharedScopeTablesLine !== null) {
+            $output->writeln('<comment>' . $sharedScopeTablesLine . '</comment>');
+        }
+    }
+
+    /**
+     * @param AgentRecordedRunSessionInterface $agentRecordedRunSession
+     * @param AgentRecordedRunComparison $agentRecordedRunComparison
+     * @param AgentConsoleChatRecordedRun $recordedRun
+     * @param AIConversation $conversation
+     * @param OutputInterface $output
+     * @return int `Command::SUCCESS` when identical, else `Command::FAILURE`
+     */
+    protected function printComparison(
+        AgentRecordedRunSessionInterface $agentRecordedRunSession,
+        AgentRecordedRunComparison $agentRecordedRunComparison,
+        AgentConsoleChatRecordedRun $recordedRun,
+        AIConversation $conversation,
+        OutputInterface $output
+    ): int {
+        foreach ($agentRecordedRunComparison->playedAnswerIdTranslations as $playedAnswerIdTranslation) {
+            $output->writeln('<fg=gray>  translated in a played answer: ' . $playedAnswerIdTranslation . '</>');
+        }
+        if ($agentRecordedRunComparison->isIdentical()) {
+            $output->writeln(sprintf(
+                '<info>recorded-run comparison IDENTICAL: %d turns, %s (conversation %d)</info>',
+                count($recordedRun->turns),
+                $agentRecordedRunSession->describeRun(($this->replayedRecording ?? AgentRecordedRunRecording::newInstance())->getSnapshot()),
+                (int)$conversation->id
+            ));
+            return Command::SUCCESS;
+        }
+        $output->writeln(sprintf('<error>recorded-run comparison DIFFERS (conversation %d): %d difference(s)</error>', (int)$conversation->id, count($agentRecordedRunComparison->differences)));
+        foreach ($agentRecordedRunComparison->differences as $difference) {
+            $output->writeln('  ' . $difference);
+        }
+        return Command::FAILURE;
+    }
+
+    /**
+     * The wire settings a recorded run carries and a replay must match: the conversation's wire-API row, its stamped
+     * skill-loading strategy (null for the default), its carry-over row, the cap row and the state-change delivery
+     * (null for the default) — a replay under another arm is refused. A default reads as absent, so an older recording
+     * replays unchanged.
+     *
+     * @param AIConversation $conversation
+     * @return array<string, string|null>
+     */
+    protected function buildWireRecordingKeys(AIConversation $conversation): array
+    {
+        $runSettings = $conversation->runSettings ?? null;
+        return [
+            'agentWireApi' => $runSettings?->agentWireApi,
+            'skillLoadingStrategy' => $conversation->usesConversationAppend() ? ContextRetentionSettings::SKILL_LOADING_STRATEGY_CONVERSATION_APPEND : null,
+            'previousReasoningCarryOver' => $runSettings?->previousReasoningCarryOver,
+            'previousReasoningCapTokens' => $runSettings?->previousReasoningCapTokens !== null ? (string)$runSettings->previousReasoningCapTokens : null,
+            'stateChangeDelivery' => $conversation->deliversStateChangesOnce() ? ContextRetentionSettings::STATE_CHANGE_DELIVERY_ONCE_WHEN_CHANGED : null,
+        ];
     }
 
     /**
@@ -1152,6 +1377,14 @@ class AgentChatCommand extends AgentConsoleCommand
         /** @var AIConversationDelegationSpawnService $aIConversationDelegationSpawnService */
         $aIConversationDelegationSpawnService = DDDService::instance()->getService(AIConversationDelegationSpawnService::class);
         return $aIConversationDelegationSpawnService;
+    }
+
+    /** @return AgentRecordedRunsService */
+    protected function getAgentRecordedRunsService(): AgentRecordedRunsService
+    {
+        /** @var AgentRecordedRunsService $agentRecordedRunsService */
+        $agentRecordedRunsService = DDDService::instance()->getService(AgentRecordedRunsService::class);
+        return $agentRecordedRunsService;
     }
 
     /** @return AIConversationModelCallsService */

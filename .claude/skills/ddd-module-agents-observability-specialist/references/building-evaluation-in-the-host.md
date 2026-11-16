@@ -1,4 +1,4 @@
-# What the host must build for evaluation
+# Evaluation: what ships and what the application adds
 
 **Reader:** host developer
 
@@ -10,13 +10,15 @@ The package ships the safety layers, the recorded runs, the read models an evalu
 stored runs, its result files and the run report ([the suite](#the-suite)), the evaluation and decision commands on
 them ([the evaluation commands](#the-evaluation-commands)), and the seed-account lease, the clean start and the purge
 of old evaluation conversations ([seed accounts](#seed-accounts-clean-start-and-the-purge)). The fixtures are the host's: without them the commands find
-no case. This reference names what each part calls in the package.
+no case. This reference names what each part calls in the package; every command's options, defaults, exit codes and
+override points are in [console-commands](console-commands.md#evaluation), the fixture format in
+[evaluation-fixtures](evaluation-fixtures.md).
 
 ## What ships, what does not
 
 | Ships | Does not ship |
 |---|---|
-| the eval marker and the eval switches on `RunSettings` | a case file loader (the case object `AgentEvalCase` reads a decoded case) |
+| the eval marker and the eval switches on `RunSettings`; the fixture loading (`AgentEvalSuitePlanService::findFixtureAt()`, `findFixturesInFolder()`; the case object `AgentEvalCase` reads a decoded case) | |
 | the eval tool block and the outbound recipient guard ([eval-safety](eval-safety.md)) | the fixtures (case files, suites) and the configuration that names them (`AI.evalSuite.fixturePaths`, `AI.evalSuite.suites`) |
 | the evaluation commands with child processes, retries and stop handling, the decision commands and the abstract decision replay ([the evaluation commands](#the-evaluation-commands)) | the host's subclasses where it names its own scope, case shape or texts; its decision replay commands |
 | the seed-account lease, the clean start of a seed account and the evaluation purge ([seed accounts](#seed-accounts-clean-start-and-the-purge)) | the host's seed pool keys, its own account state and the purge steps of its own tables |
@@ -151,7 +153,10 @@ What the package ships for it:
 
 ## The evaluation commands
 
-All on the base `AgentEvalConsoleCommand` (`src/Symfony/Commands/Agents/`), live unless said otherwise:
+All on the base `AgentEvalConsoleCommand` (`src/Symfony/Commands/Agents/`), live unless said otherwise; their options,
+defaults and exit codes: [console-commands](console-commands.md#evaluation). The tool-call comparison of one MCP
+package (`app:mcp:compare-tool-calls`, on the base `AgentConsoleCommand`) is in
+[record-and-replay](record-and-replay.md#the-tool-call-comparison).
 
 | Command | What it does | Fixture key | Override points |
 |---|---|---|---|

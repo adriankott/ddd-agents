@@ -6,7 +6,10 @@ namespace DDD\Tests\Agents\Symfony\Commands\Agents;
 
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Entities\Conversations\Diagnostics\AgentRecordedRunComparison;
+use DDD\Domain\AI\Entities\RecordedRuns\AgentRecordedRunFields;
+use DDD\Domain\AI\Entities\RecordedRuns\AgentRecordedRunRecording;
 use DDD\Domain\AI\Entities\RecordedRuns\AgentRecordedRunSessionInterface;
+use DDD\Domain\AI\Entities\RecordedRuns\AgentRecordedRunSnapshot;
 use RuntimeException;
 
 /**
@@ -78,9 +81,9 @@ class RecordingAgentRecordedRunSessionDouble implements AgentRecordedRunSessionI
         $this->calls[] = 'concludeRun';
     }
 
-    public function buildRecording(AIConversation $rootConversation, array $scopeIdsByName, array $runFields): array
+    public function buildRecording(AIConversation $rootConversation, array $scopeIdsByName, AgentRecordedRunFields $runFields): AgentRecordedRunRecording
     {
-        return $runFields;
+        return AgentRecordedRunRecording::fromStoredRecording($runFields->toArray());
     }
 
     public function compareWithRecording(AIConversation $rootConversation, array $scopeIdsByName): AgentRecordedRunComparison
@@ -88,7 +91,7 @@ class RecordingAgentRecordedRunSessionDouble implements AgentRecordedRunSessionI
         return new AgentRecordedRunComparison();
     }
 
-    public function describeRun(array $snapshot): string
+    public function describeRun(AgentRecordedRunSnapshot $agentRecordedRunSnapshot): string
     {
         return '';
     }

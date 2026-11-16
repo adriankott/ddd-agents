@@ -11,6 +11,7 @@ src/Domain/AI/Entities/Conversations/Agent/Context/ModelCallComposition.php	obse
 src/Domain/AI/Entities/Conversations/Messages/ToolCallArgusEndpointTiming*	observability
 src/Domain/AI/Entities/Conversations/Messages/Maintenance/AIConversationRequestSnapshotDebugPayloadRemovalReport.php	observability
 src/Domain/AI/Entities/MCPPackages/ToolResultRecording*	observability
+src/Domain/AI/Entities/MCPPackages/ToolCallComparisons/**	observability
 src/Domain/AI/Entities/Conversations/Diagnostics/**	observability
 src/Domain/AI/Entities/Conversations/ControlPanel/**	observability
 src/Domain/AI/**/Metrics/**	observability

@@ -1,0 +1,13 @@
+{
+  "package": "ComparisonNotesMCPPackage",
+  "additionalPackages": ["ComparisonArchiveMCPPackage"],
+  "description": "Records one note, keeps a snapshot of it and reads the archive.",
+  "conversations": {
+    "chat": {"ownerRows": ["Keep my notes."]}
+  },
+  "cases": [
+    {"id": "notes.record", "tool": "recordComparisonNote", "arguments": {"note": "Order coffee"}, "conversation": "chat"},
+    {"id": "notes.snapshot", "tool": "keepComparisonSnapshot", "arguments": {"note": "Order coffee"}, "conversation": "chat"},
+    {"id": "archive.read", "tool": "readComparisonArchive", "conversation": "chat", "provenance": "evalHarness"}
+  ]
+}

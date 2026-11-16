@@ -1,6 +1,6 @@
 ---
 name: ddd-module-agents-specialist
-description: "Installs, wires and runs the agent of mgamadeus/ddd-agents in a DDD host and routes to the eight agent topic skills. Covers the installation checklist, the chat controller traits and start route, the agent space (agentSpaceId, account level, its host entity), override points by same-path subclass, entitlement interfaces, listeners, the 15 config files, host wording, persona and egress, the six Messenger transports, the usage envelope middleware, workers and stop grace, the package's console commands (schedule fire, finalize, event purges, maintenance, diagnosis), the host duties with command templates (schedule state sweep, owed reports and turns, reaper), the cron list, table names, persisted class names, the package suite and the source-ownership manifest. Use when adding the agent to an application, wiring agent transports or workers, schedules never fire, a crashed turn never answers, agent event tables grow, overriding an agent service, naming agent tables, or asking which agent skill explains a file."
+description: "Installs, wires and runs the agent of mgamadeus/ddd-agents in a DDD host and routes to the eight agent topic skills. Covers the installation checklist, the chat controller traits and start route, the agent space (agentSpaceId, account level, its host entity), override points by same-path subclass, entitlement interfaces, listeners, the 15 config files, host wording, persona and egress, the six Messenger transports, the usage envelope middleware, workers and stop grace, the package's console commands (schedules, finalize, purges, maintenance, diagnosis, chat with record and replay, evaluation, decision, tool-call comparison), the host duties with command templates, the cron list, table names, persisted class names, the package suite, source ownership. Use when adding the agent to an application, wiring agent transports or workers, schedules never fire, a crashed turn never answers, agent event tables grow, overriding an agent service, naming agent tables, or asking which agent skill explains a file."
 metadata:
   author: mgamadeus
   version: "0.2.0"
@@ -183,7 +183,7 @@ with the same name.
 | `app:ai-schedule:close-for-inactive-agent-spaces` | the schedule state sweep: closes, pauses or re-arms schedules whose space or account changed its automation state | hourly | yes |
 | `app:ai-conversation:deliver-owed-reports-and-resume-owed-turns` | delivers owed reports late, resumes owed turns and inbound messages left idle; override points for the host's own passes | every five minutes | yes |
 | `app:ai-agent:reap` | wakes or expires runs whose worker died, times out sub-agent groups, wakes parents of settled groups, settles purposed conversations closed without an owner turn, re-sends lost run-end notifications | every five minutes | yes |
-| `app:ai-agent:chat` | the console chat with the agent (ephemeral or stored, `--conversationId` resumes, turns file, recorded run, slash commands) | no | yes (makes model calls) |
+| `app:ai-agent:chat` | the console chat with the agent (ephemeral or stored, `--conversationId` resumes, turns file, slash commands); `--record-run-for-comparison` / `--replay-run-and-compare` record a run and compare a replay with it (observability skill, console-commands reference) | no | yes (makes model calls) |
 | `app:ai-agent:chat-tui` | the full-screen chat (suggested `php-tui/php-tui`; without it one line names the library) | no | yes (makes model calls) |
 | `app:ai-agent:inspect` | prints one conversation: header, summary, transcript, request snapshots | no | no |
 | `app:ai-agent:jev-probe` | runs the decision probe over a fixture, one evaluation envelope per case | no | no (makes model calls) |
@@ -207,15 +207,27 @@ with the same name.
 | `app:ai-agent:run-report` | the per-run report of stored conversations: judge verdict and findings from the evaluation logs (`--log-dir`), wall and agent seconds, model and tool calls, the time split with the parallel gain, the slowest tools, the variants timeline, the plan size, the suite total | no | no |
 | `app:ai-agent:compact` | runs one compaction round of a conversation in the console and prints the tree and the cover; `--show-only` renders only | no | yes, unless `--show-only` (makes model calls) |
 | `app:ai-conversation:search-inspect` | runs the conversation search stage by stage, rights off and on, inside the search envelope | no | no (makes model calls; `--embed` writes embeddings) |
-| `app:ai-agent:eval-tools`, `eval-suite`, `eval-selection`, `eval-recall`, `eval-tiers`, `eval-analyze`, `eval-eviction`, `eval-guard`, `eval-schedule-runs` | the evaluation commands on the base `AgentEvalConsoleCommand`: they run the host's fixtures (`AI.evalSuite.fixturePaths`, `AI.evalSuite.suites`), store result files and suite runs; `eval-analyze` reads a stored run offline (`ddd-module-agents-observability-specialist`) | no | yes (make model calls; `eval-analyze` does not) |
-| `app:ai-agent:eval-compaction-tree` | a judged long run with frequent compaction from a case file (`--case-file`); judges the compaction tree per turn and at the end | no | yes (makes model calls; stores the conversation only with `--persist`) |
-| `app:ai-agent:eval-conversations-purge` | deletes the conversation trees of the configured evaluation accounts older than `--older-than-hours` (default 48) with every dependent row, in bounded chunks under a time budget below 360 s; refuses any other account | optional, e.g. hourly | only with `--apply` (dry run counts) |
-| `app:ai-agent:decision-fixtures` | sends the cases of a JSON decision fixture to the decision model and scores the picks | no | no (makes model calls) |
-| `app:ai-agent:decision-stats` | decision statistics over the turn events: per site, mode, arm, day; shadow agreement | no | no |
+| `app:ai-agent:eval-tools` | runs the tools cases of the host's fixtures, deterministic or `--judge`; in this process or in child processes; result files and a stored run (observability skill, console-commands reference) | no | yes (makes model calls) |
+| `app:ai-agent:eval-suite` | every configured suite on every model and flavor, one child process per case, lanes per space and resource; correctness and performance against a baseline; stops on a `STOP` file (observability skill, console-commands reference) | no | yes (its children make model calls) |
+| `app:ai-agent:eval-selection` | whether the expected skill was loaded; accuracy (observability skill, console-commands reference) | no | yes (makes model calls) |
+| `app:ai-agent:eval-recall` | seeds past conversations, asks on a fresh one, checks the recall tool and the facts; deletes the seed (observability skill, console-commands reference) | no | yes (makes model calls) |
+| `app:ai-agent:eval-tiers` | the tools cases under the model of each tier (observability skill, console-commands reference) | no | yes (makes model calls) |
+| `app:ai-agent:eval-analyze` | classifies the failed cases of a stored run offline and prints reproduce lines (observability skill, console-commands reference) | no | no |
+| `app:ai-agent:eval-eviction` | multi-skill trajectories on one transient conversation; the load curve (observability skill, console-commands reference) | no | no (makes model calls) |
+| `app:ai-agent:eval-guard` | the injection guard probe: variants × inputs × runs; false-block and bypass rate (observability skill, console-commands reference) | no | a run file (makes model calls) |
+| `app:ai-agent:eval-schedule-runs` | fires one evaluation schedule several times and compares its reports; needs the workers (observability skill, console-commands reference) | no | yes |
+| `app:ai-agent:eval-compaction-tree` | a judged long run with frequent compaction from a case file (`--case-file`); judges the compaction tree per turn and at the end (observability skill, console-commands reference) | no | yes (makes model calls; stores the conversation only with `--persist`) |
+| `app:ai-agent:eval-conversations-purge` | deletes the conversation trees of the configured evaluation accounts older than `--older-than-hours` (default 48) with every dependent row, in bounded chunks under a time budget below 360 s; any other account only with `--evalOnly` and the host's allowance (observability skill, console-commands reference) | optional, e.g. hourly | only with `--apply` (dry run counts) |
+| `app:ai-agent:decision-fixtures` | sends the cases of a JSON decision fixture to the decision model and scores the picks (observability skill, console-commands reference) | no | no (makes model calls) |
+| `app:ai-agent:decision-stats` | decision statistics over the turn events: per site, mode, arm, day; shadow agreement (observability skill, console-commands reference) | no | no |
+| `AgentDecisionReplayCommand` (abstract, no name) | the base of a host's replay of stored tool calls against one decision (observability skill, console-commands reference) | no | a result file (makes model calls) |
+| `app:mcp:compare-tool-calls` | runs an MCP package's comparison script in-process: `--record` writes the recording, `--replay-and-compare` lists every difference against it (exit 1) (observability skill, console-commands reference) | no | the recording files; the tools write as in a conversation |
 
-The host still writes its own replay commands (a decision replay on the abstract `AgentDecisionReplayCommand`) and its
-evaluation fixtures (`ddd-module-agents-observability-specialist`);
-for the commands above it writes subclasses only where it needs an override point ([references/host-duties.md](references/host-duties.md)).
+The package ships the chat with its record and replay, the evaluation commands and the tool-call comparison; the host
+writes its evaluation fixtures, its comparison scripts and, when it needs one, a decision replay command on the abstract
+`AgentDecisionReplayCommand`. For the commands above it writes subclasses only where it needs an override point
+([references/host-duties.md](references/host-duties.md)); every option, default, exit code and override point:
+the console-commands reference of `ddd-module-agents-observability-specialist`.
 
 ## Templates
 

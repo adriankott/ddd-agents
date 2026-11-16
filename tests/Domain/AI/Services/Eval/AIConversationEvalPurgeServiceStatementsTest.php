@@ -111,12 +111,12 @@ class AIConversationEvalPurgeServiceStatementsTest extends UnitTestCase
         self::assertSame(
             [
                 'begin',
+                AIConversationEvalPurgeServiceReadLimitsTest::MARIADB_SESSION_LIMITS_READ,
                 'SET SESSION innodb_lock_wait_timeout = ' . AIConversationEvalPurgeService::LOCK_WAIT_TIMEOUT_SECONDS,
                 'SET SESSION max_statement_time = ' . AIConversationEvalPurgeService::STATEMENT_TIMEOUT_SECONDS,
                 'DELETE FROM `SomeTable` WHERE `aiConversationId` IN (:ids) LIMIT 500',
                 'commit',
-                'SET SESSION innodb_lock_wait_timeout = DEFAULT',
-                'SET SESSION max_statement_time = DEFAULT',
+                AIConversationEvalPurgeServiceReadLimitsTest::MARIADB_SESSION_LIMITS_RESTORE,
             ],
             $service->recordingConnection->recordedCalls
         );
@@ -173,6 +173,6 @@ class AIConversationEvalPurgeServiceStatementsTest extends UnitTestCase
         } catch (\RuntimeException $writeError) {
             self::assertSame('statement over its limit', $writeError->getMessage());
         }
-        self::assertSame(['rollBack', 'SET SESSION innodb_lock_wait_timeout = DEFAULT', 'SET SESSION max_statement_time = DEFAULT'], array_slice($service->recordingConnection->recordedCalls, 4));
+        self::assertSame(['rollBack', AIConversationEvalPurgeServiceReadLimitsTest::MARIADB_SESSION_LIMITS_RESTORE], array_slice($service->recordingConnection->recordedCalls, 5));
     }
 }
