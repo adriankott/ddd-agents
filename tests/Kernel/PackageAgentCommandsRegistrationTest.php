@@ -25,6 +25,7 @@ use DDD\Symfony\Commands\Agents\AgentRequestSnapshotDebugPayloadsStripCommand;
 use DDD\Symfony\Commands\Agents\AgentToolResponseStatsCommand;
 use DDD\Symfony\Commands\Agents\AgentTraceEventsPurgeCommand;
 use DDD\Symfony\Commands\Agents\AgentTurnEventsPurgeCommand;
+use DDD\Symfony\Commands\Agents\AgentRunReportCommand;
 use DDD\Symfony\Commands\Agents\AgentValidateConversationCommand;
 use DDD\Symfony\Commands\Agents\AIConversationBackfillEmbeddingsCommand;
 use DDD\Symfony\Commands\Agents\AIConversationBackfillEnvironmentCommand;
@@ -70,6 +71,7 @@ class PackageAgentCommandsRegistrationTest extends IntegrationTestCase
         'app:ai-agent:trace-events-purge' => AgentTraceEventsPurgeCommand::class,
         'app:ai-agent:turn-events-purge' => AgentTurnEventsPurgeCommand::class,
         'app:ai-agent:validate-conversation' => AgentValidateConversationCommand::class,
+        'app:ai-agent:run-report' => AgentRunReportCommand::class,
         'app:ai-agent:skill-token-map' => SkillTokenMapCommand::class,
         'app:ai-agent:chat' => AgentChatCommand::class,
         'app:ai-agent:chat-tui' => AgentChatTuiCommand::class,
@@ -125,12 +127,12 @@ class PackageAgentCommandsRegistrationTest extends IntegrationTestCase
 
         $visibleCommandNames = array_keys(self::COMMAND_CLASSES_BY_NAME);
         $visibleCommandNames = array_values(array_diff($visibleCommandNames, [self::HIDDEN_COMMAND_NAME]));
-        self::assertCount(30, $visibleCommandNames);
+        self::assertCount(31, $visibleCommandNames);
         self::assertSame([], array_values(array_diff($visibleCommandNames, $listedCommandNames)), 'every visible command is listed');
         self::assertNotContains(self::HIDDEN_COMMAND_NAME, $listedCommandNames);
         self::assertContains(self::HIDDEN_COMMAND_NAME, $hiddenCommandNames);
         $textListProcess = $this->runConsoleScript('list', '--raw');
-        self::assertSame(30, preg_match_all('/^app:(ai-(agent|conversation|schedule)|mcp|ai:composed-view):\S+/m', $textListProcess->getOutput()), 'the text listing names the 30 visible commands');
+        self::assertSame(31, preg_match_all('/^app:(ai-(agent|conversation|schedule)|mcp|ai:composed-view):\S+/m', $textListProcess->getOutput()), 'the text listing names the 31 visible commands');
 
         $helpProcess = $this->runConsoleScript('help', self::HIDDEN_COMMAND_NAME);
         self::assertSame(0, $helpProcess->getExitCode(), $helpProcess->getErrorOutput());

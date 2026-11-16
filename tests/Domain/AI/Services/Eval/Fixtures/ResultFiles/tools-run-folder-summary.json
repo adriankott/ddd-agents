@@ -1,0 +1,111 @@
+{
+    "total": 2,
+    "passed": 1,
+    "notApplicable": 0,
+    "model": "OPENAI.GPT6_LUNA",
+    "flavor": "judge",
+    "arms": {
+        "planDynamics": "on"
+    },
+    "repeat": 1,
+    "metrics": {
+        "totalDurationMs": 31512,
+        "totalTokens": 12800,
+        "totalCostUsd": 0.0123,
+        "avgDurationMs": 31512,
+        "avgTotalTokens": 12800,
+        "avgCostPerCaseUsd": 0.01,
+        "avgToolCallCount": 2,
+        "avgWorkToolCallCount": 0,
+        "costPerPassUsd": 0.0123,
+        "performance": {
+            "measuredCases": 1,
+            "ownerTurns": 2,
+            "modelCalls": 4,
+            "avgModelCallsPerCase": 4,
+            "avgModelCallsPerOwnerTurn": 2,
+            "avgOwnerTurnsPerCase": 2,
+            "avgToolCallsPerCase": 0,
+            "agentSeconds": 31.5,
+            "avgAgentSecondsPerCase": 31.5,
+            "medianAgentSecondsPerCase": 31.5,
+            "p90AgentSecondsPerCase": 31.5,
+            "avgSecondsPerOwnerTurn": 15.8,
+            "medianSecondsPerOwnerTurn": 12,
+            "p90SecondsPerOwnerTurn": 19.5,
+            "maxSecondsPerOwnerTurn": 19.5,
+            "totalTokens": 0,
+            "avgTotalTokensPerCase": 0,
+            "cachedInputShare": null,
+            "costUsd": 0,
+            "avgCostPerCaseUsd": 0,
+            "avgCostPerOwnerTurnUsd": 0,
+            "decisionModelMs": 0,
+            "avgDecisionModelMsPerOwnerTurn": 0,
+            "medianFirstModelOutputSeconds": null,
+            "p90FirstModelOutputSeconds": null,
+            "medianFirstAnswerSeconds": null,
+            "p90FirstAnswerSeconds": null,
+            "uncachedInputTokens": 0,
+            "avgUncachedInputTokensPerOwnerTurn": 0,
+            "medianUncachedInputTokensPerOwnerTurn": null,
+            "avgUncachedInputTokensPerCase": 0,
+            "medianUncachedInputTokensPerCase": 0,
+            "medianConversationWallSeconds": null,
+            "p90ConversationWallSeconds": null
+        },
+        "taskPlanSize": null
+    },
+    "cases": [
+        {
+            "skill": "Catalog.Search",
+            "case": "catalog.last-7-days/über",
+            "tool": "searchCatalog",
+            "passed": true,
+            "flavor": "judge",
+            "compactionFired": false,
+            "conversationId": 81234,
+            "failures": [],
+            "performance": {
+                "modelCalls": 4,
+                "ownerTurns": 2,
+                "agentSeconds": 31.5,
+                "secondsPerOwnerTurn": [
+                    12,
+                    19.5
+                ],
+                "decisionModelMs": 0
+            },
+            "verdict": {
+                "verdict": "PASS",
+                "goalMet": true,
+                "grounded": null,
+                "reasons": "Answered with the results of https://example.org/a/b — «Café»."
+            },
+            "turns": 2,
+            "stopReason": "goal met",
+            "loadedSkills": [
+                "Catalog.Search"
+            ],
+            "calledTools": [
+                "load_skills",
+                "searchCatalog"
+            ],
+            "finalText": "Your results: 1. café über alles\n2. \"quoted\" / slashed",
+            "toolCallCount": 2,
+            "inputTokens": 12000,
+            "outputTokens": 800,
+            "totalTokens": 12800,
+            "costUsd": 0.0123,
+            "durationMs": 31512
+        },
+        {
+            "skill": "Catalog.Search",
+            "case": "catalog.compare",
+            "tool": "searchCatalog",
+            "passed": false,
+            "flavor": "judge",
+            "error": "judge evaluation error: cut off"
+        }
+    ]
+}

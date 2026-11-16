@@ -1,0 +1,403 @@
+{
+    "caseRowOfChild": {
+        "skill": "Catalog.Search",
+        "case": "catalog.last-7-days/über",
+        "tool": "searchCatalog",
+        "passed": true,
+        "flavor": "judge",
+        "compactionFired": false,
+        "conversationId": 81234,
+        "failures": [],
+        "performance": {
+            "modelCalls": 4,
+            "ownerTurns": 2,
+            "agentSeconds": 31.5,
+            "secondsPerOwnerTurn": [
+                12.0,
+                19.5
+            ],
+            "decisionModelMs": 0
+        },
+        "verdict": {
+            "verdict": "PASS",
+            "goalMet": true,
+            "grounded": null,
+            "reasons": "Answered with the results of https://example.org/a/b — «Café»."
+        },
+        "turns": 2,
+        "stopReason": "goal met",
+        "loadedSkills": [
+            "Catalog.Search"
+        ],
+        "calledTools": [
+            "load_skills",
+            "searchCatalog"
+        ],
+        "finalText": "Your results: 1. café über alles\n2. \"quoted\" / slashed",
+        "toolCallCount": 2,
+        "inputTokens": 12000,
+        "outputTokens": 800,
+        "totalTokens": 12800,
+        "costUsd": 0.0123,
+        "durationMs": 31512,
+        "messages": {
+            "elements": [
+                {
+                    "messageType": "TOOL_CALL",
+                    "toolName": "searchCatalog",
+                    "status": "COMPLETED",
+                    "toolArguments": "{\"days\":7}"
+                },
+                {
+                    "messageType": "ASSISTANT",
+                    "content": "Done ✓"
+                }
+            ]
+        }
+    },
+    "secondCaseRow": {
+        "skill": "Catalog.Search",
+        "case": "catalog.compare",
+        "tool": "searchCatalog",
+        "passed": false,
+        "flavor": "judge",
+        "error": "judge evaluation error: cut off",
+        "messages": {
+            "elements": []
+        }
+    },
+    "metrics": {
+        "totalDurationMs": 31512,
+        "totalTokens": 12800,
+        "totalCostUsd": 0.0123,
+        "avgDurationMs": 31512.0,
+        "avgTotalTokens": 12800.0,
+        "avgCostPerCaseUsd": 0.01,
+        "avgToolCallCount": 2.0,
+        "avgWorkToolCallCount": 0.0,
+        "costPerPassUsd": 0.0123,
+        "performance": {
+            "measuredCases": 1,
+            "ownerTurns": 2,
+            "modelCalls": 4,
+            "avgModelCallsPerCase": 4.0,
+            "avgModelCallsPerOwnerTurn": 2.0,
+            "avgOwnerTurnsPerCase": 2.0,
+            "avgToolCallsPerCase": 0.0,
+            "agentSeconds": 31.5,
+            "avgAgentSecondsPerCase": 31.5,
+            "medianAgentSecondsPerCase": 31.5,
+            "p90AgentSecondsPerCase": 31.5,
+            "avgSecondsPerOwnerTurn": 15.8,
+            "medianSecondsPerOwnerTurn": 12.0,
+            "p90SecondsPerOwnerTurn": 19.5,
+            "maxSecondsPerOwnerTurn": 19.5,
+            "totalTokens": 0,
+            "avgTotalTokensPerCase": 0.0,
+            "cachedInputShare": null,
+            "costUsd": 0.0,
+            "avgCostPerCaseUsd": 0.0,
+            "avgCostPerOwnerTurnUsd": 0.0,
+            "decisionModelMs": 0,
+            "avgDecisionModelMsPerOwnerTurn": 0,
+            "medianFirstModelOutputSeconds": null,
+            "p90FirstModelOutputSeconds": null,
+            "medianFirstAnswerSeconds": null,
+            "p90FirstAnswerSeconds": null,
+            "uncachedInputTokens": 0,
+            "avgUncachedInputTokensPerOwnerTurn": 0,
+            "medianUncachedInputTokensPerOwnerTurn": null,
+            "avgUncachedInputTokensPerCase": 0,
+            "medianUncachedInputTokensPerCase": 0.0,
+            "medianConversationWallSeconds": null,
+            "p90ConversationWallSeconds": null
+        },
+        "taskPlanSize": null
+    },
+    "suiteTask": {
+        "caseId": "catalog.last-7-days/über",
+        "suite": "tools",
+        "fixturePath": "/fixtures/Tools/Catalog.Search.json",
+        "modelName": "OPENAI.GPT6_LUNA",
+        "flavor": "judge",
+        "access": "read",
+        "agentSpaceId": 7,
+        "resourceKey": "Catalog.Search"
+    },
+    "suiteRunSummary": {
+        "total": 1,
+        "passed": 1,
+        "errors": 0,
+        "notApplicable": 0,
+        "model": "OPENAI.GPT6_LUNA",
+        "flavor": "judge",
+        "arms": [],
+        "metrics": {
+            "totalDurationMs": 31512,
+            "totalTokens": 12800,
+            "totalCostUsd": 0.0123,
+            "avgDurationMs": 31512.0,
+            "avgTotalTokens": 12800.0,
+            "avgCostPerCaseUsd": 0.0123,
+            "avgToolCallCount": 2.0,
+            "avgWorkToolCallCount": 0.0,
+            "costPerPassUsd": 0.0123,
+            "performance": {
+                "measuredCases": 1,
+                "ownerTurns": 2,
+                "modelCalls": 4,
+                "avgModelCallsPerCase": 4.0,
+                "avgModelCallsPerOwnerTurn": 2.0,
+                "avgOwnerTurnsPerCase": 2.0,
+                "avgToolCallsPerCase": 0.0,
+                "agentSeconds": 31.5,
+                "avgAgentSecondsPerCase": 31.5,
+                "medianAgentSecondsPerCase": 31.5,
+                "p90AgentSecondsPerCase": 31.5,
+                "avgSecondsPerOwnerTurn": 15.8,
+                "medianSecondsPerOwnerTurn": 12.0,
+                "p90SecondsPerOwnerTurn": 19.5,
+                "maxSecondsPerOwnerTurn": 19.5,
+                "totalTokens": 0,
+                "avgTotalTokensPerCase": 0.0,
+                "cachedInputShare": null,
+                "costUsd": 0.0,
+                "avgCostPerCaseUsd": 0.0,
+                "avgCostPerOwnerTurnUsd": 0.0,
+                "decisionModelMs": 0,
+                "avgDecisionModelMsPerOwnerTurn": 0,
+                "medianFirstModelOutputSeconds": null,
+                "p90FirstModelOutputSeconds": null,
+                "medianFirstAnswerSeconds": null,
+                "p90FirstAnswerSeconds": null,
+                "uncachedInputTokens": 0,
+                "avgUncachedInputTokensPerOwnerTurn": 0,
+                "medianUncachedInputTokensPerOwnerTurn": null,
+                "avgUncachedInputTokensPerCase": 0,
+                "medianUncachedInputTokensPerCase": 0.0,
+                "medianConversationWallSeconds": null,
+                "p90ConversationWallSeconds": null
+            }
+        },
+        "cases": [
+            {
+                "skill": "Catalog.Search",
+                "case": "catalog.last-7-days/über",
+                "tool": "searchCatalog",
+                "passed": true,
+                "flavor": "judge",
+                "compactionFired": false,
+                "conversationId": 81234,
+                "failures": [],
+                "performance": {
+                    "modelCalls": 4,
+                    "ownerTurns": 2,
+                    "agentSeconds": 31.5,
+                    "secondsPerOwnerTurn": [
+                        12.0,
+                        19.5
+                    ],
+                    "decisionModelMs": 0
+                },
+                "verdict": {
+                    "verdict": "PASS",
+                    "goalMet": true,
+                    "grounded": null,
+                    "reasons": "Answered with the results of https://example.org/a/b — «Café»."
+                },
+                "turns": 2,
+                "stopReason": "goal met",
+                "loadedSkills": [
+                    "Catalog.Search"
+                ],
+                "calledTools": [
+                    "load_skills",
+                    "searchCatalog"
+                ],
+                "finalText": "Your results: 1. café über alles\n2. \"quoted\" / slashed",
+                "toolCallCount": 2,
+                "inputTokens": 12000,
+                "outputTokens": 800,
+                "totalTokens": 12800,
+                "costUsd": 0.0123,
+                "durationMs": 31512,
+                "suite": "tools",
+                "fixture": "Catalog.Search",
+                "model": "OPENAI.GPT6_LUNA",
+                "access": "read",
+                "lane": "7:Catalog.Search",
+                "processSeconds": 41.3
+            }
+        ]
+    },
+    "progress": {
+        "at": "2026-11-16 10:00:05",
+        "total": 3,
+        "finished": 1,
+        "passed": 1,
+        "notApplicable": 0,
+        "queued": 1,
+        "running": [
+            {
+                "case": "catalog.café",
+                "suite": "tools",
+                "run": "OPENAI.GPT6_LUNA|judge",
+                "lane": "7:Catalog.Search",
+                "access": "read",
+                "pid": 4242,
+                "seconds": 12
+            }
+        ]
+    },
+    "suiteRecord": {
+        "startedAt": "2026-11-16 10:00:00",
+        "wallSeconds": 95,
+        "processSeconds": 41,
+        "speedUp": 0.4,
+        "stopped": false,
+        "settings": {
+            "models": [
+                "OPENAI.GPT6_LUNA"
+            ],
+            "flavors": [
+                "judge"
+            ],
+            "suites": [
+                "tools"
+            ],
+            "arms": {
+                "label": "nightly — café"
+            },
+            "persistedConversations": true,
+            "maxProcesses": 4,
+            "isolateWholeScope": false,
+            "configuredReasoningEffortByModel": {
+                "OPENAI.GPT6_LUNA": "medium"
+            },
+            "platformDecisionLayer": {
+                "mode": "shadow",
+                "sites": {
+                    "turnClose": "shadow",
+                    "skillPreload": "off"
+                },
+                "turnClosingMode": "deterministicCounter"
+            }
+        },
+        "plan": {
+            "tasks": 3,
+            "bySuite": [],
+            "byAccess": [],
+            "byRun": [],
+            "lanes": [],
+            "waves": [],
+            "sequentialWallSeconds": 0,
+            "estimatedWallSeconds": 0,
+            "boundBy": "",
+            "unschedulableTasks": 0
+        },
+        "baseline": null,
+        "baselineChoice": null,
+        "verdict": {
+            "correctness": "PASSED",
+            "performance": "NOT_COMPARED"
+        },
+        "total": 1,
+        "passed": 1,
+        "notApplicable": 0,
+        "runs": {
+            "OPENAI.GPT6_LUNA|judge": {
+                "model": "OPENAI.GPT6_LUNA",
+                "flavor": "judge",
+                "total": 1,
+                "passed": 1,
+                "errors": 0,
+                "notApplicable": 0,
+                "notApplicableCases": [],
+                "restoreFailedCases": [],
+                "retriedCases": [],
+                "failedCases": [],
+                "bySuite": {
+                    "tools": {
+                        "total": 1,
+                        "notApplicable": 0,
+                        "passed": 1,
+                        "performance": {
+                            "measuredCases": 1,
+                            "ownerTurns": 2,
+                            "modelCalls": 4,
+                            "avgModelCallsPerCase": 4.0,
+                            "avgModelCallsPerOwnerTurn": 2.0,
+                            "avgOwnerTurnsPerCase": 2.0,
+                            "avgToolCallsPerCase": 0.0,
+                            "agentSeconds": 31.5,
+                            "avgAgentSecondsPerCase": 31.5,
+                            "medianAgentSecondsPerCase": 31.5,
+                            "p90AgentSecondsPerCase": 31.5,
+                            "avgSecondsPerOwnerTurn": 15.8,
+                            "medianSecondsPerOwnerTurn": 12.0,
+                            "p90SecondsPerOwnerTurn": 19.5,
+                            "maxSecondsPerOwnerTurn": 19.5,
+                            "totalTokens": 0,
+                            "avgTotalTokensPerCase": 0.0,
+                            "cachedInputShare": null,
+                            "costUsd": 0.0,
+                            "avgCostPerCaseUsd": 0.0,
+                            "avgCostPerOwnerTurnUsd": 0.0,
+                            "decisionModelMs": 0,
+                            "avgDecisionModelMsPerOwnerTurn": 0,
+                            "medianFirstModelOutputSeconds": null,
+                            "p90FirstModelOutputSeconds": null,
+                            "medianFirstAnswerSeconds": null,
+                            "p90FirstAnswerSeconds": null,
+                            "uncachedInputTokens": 0,
+                            "avgUncachedInputTokensPerOwnerTurn": 0,
+                            "medianUncachedInputTokensPerOwnerTurn": null,
+                            "avgUncachedInputTokensPerCase": 0,
+                            "medianUncachedInputTokensPerCase": 0.0,
+                            "medianConversationWallSeconds": null,
+                            "p90ConversationWallSeconds": null
+                        }
+                    }
+                },
+                "performance": {
+                    "measuredCases": 1,
+                    "ownerTurns": 2,
+                    "modelCalls": 4,
+                    "avgModelCallsPerCase": 4.0,
+                    "avgModelCallsPerOwnerTurn": 2.0,
+                    "avgOwnerTurnsPerCase": 2.0,
+                    "avgToolCallsPerCase": 0.0,
+                    "agentSeconds": 31.5,
+                    "avgAgentSecondsPerCase": 31.5,
+                    "medianAgentSecondsPerCase": 31.5,
+                    "p90AgentSecondsPerCase": 31.5,
+                    "avgSecondsPerOwnerTurn": 15.8,
+                    "medianSecondsPerOwnerTurn": 12.0,
+                    "p90SecondsPerOwnerTurn": 19.5,
+                    "maxSecondsPerOwnerTurn": 19.5,
+                    "totalTokens": 0,
+                    "avgTotalTokensPerCase": 0.0,
+                    "cachedInputShare": null,
+                    "costUsd": 0.0,
+                    "avgCostPerCaseUsd": 0.0,
+                    "avgCostPerOwnerTurnUsd": 0.0,
+                    "decisionModelMs": 0,
+                    "avgDecisionModelMsPerOwnerTurn": 0,
+                    "medianFirstModelOutputSeconds": null,
+                    "p90FirstModelOutputSeconds": null,
+                    "medianFirstAnswerSeconds": null,
+                    "p90FirstAnswerSeconds": null,
+                    "uncachedInputTokens": 0,
+                    "avgUncachedInputTokensPerOwnerTurn": 0,
+                    "medianUncachedInputTokensPerOwnerTurn": null,
+                    "avgUncachedInputTokensPerCase": 0,
+                    "medianUncachedInputTokensPerCase": 0.0,
+                    "medianConversationWallSeconds": null,
+                    "p90ConversationWallSeconds": null
+                },
+                "costPerPassUsd": 0.0123,
+                "baselineComparison": null
+            }
+        }
+    }
+}

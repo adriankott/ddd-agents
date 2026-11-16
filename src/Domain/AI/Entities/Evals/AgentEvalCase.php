@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DDD\Domain\AI\Entities\Evals;
 
+use DDD\Domain\AI\Entities\MCPPackages\MCPToolEffectCatalog;
 use DDD\Domain\Base\Entities\ValueObject;
 
 /**
@@ -13,7 +14,8 @@ use DDD\Domain\Base\Entities\ValueObject;
  * `followUpIdleMinutes`, `turns`, `maxTurns`, `maxStepsPerTurn`, `timeoutSeconds`, `purposeName`, `reportChannel`,
  * `scheduledRun`, `agentSpaceId`, `blockedTools`, `blockedToolSimulatedErrors`, `allowExternalWrites`, `sequential`,
  * `executionMode`, `requiresVision`, `requires`, `runsOnIneligibleScope`, `runsWithoutCapability`, the `expect` block
- * (with its state check `expect.stateAfterRun`) and the `restore` block. Every other key is an application's own: it is
+ * (with its state check `expect.stateAfterRun`), the `restore` block, and the keys a suite plans a case by: `access`,
+ * `exclusive`, `lane` and the `expectedSkill` of a selection case. Every other key is an application's own: it is
  * kept unchanged and read with {@see getApplicationValue()}; {@see toArray()} gives back the case exactly as it was
  * built.
  *
@@ -32,6 +34,18 @@ class AgentEvalCase extends ValueObject
 
     /** @var string The key that names the stored agent space the case runs in */
     public const string KEY_AGENT_SPACE_ID = 'agentSpaceId';
+
+    /** @var string The key that declares how a case touches its agent space in a suite (`read`, `write`, `exclusive`) */
+    public const string KEY_ACCESS = 'access';
+
+    /** @var string The key that makes a writing case run alone on its agent space in a suite */
+    public const string KEY_EXCLUSIVE = 'exclusive';
+
+    /** @var string The key that names the resource group of a case in a suite */
+    public const string KEY_LANE = 'lane';
+
+    /** @var string The key that names the skill a selection case expects */
+    public const string KEY_EXPECTED_SKILL = 'expectedSkill';
 
     /** @var string The execution mode of a case whose flow exists only on the job queue */
     public const string EXECUTION_MODE_ASYNC = 'async';
@@ -333,6 +347,130 @@ class AgentEvalCase extends ValueObject
             return [];
         }
         return is_array($expect['requiredTools']) ? array_values(array_map('strval', $expect['requiredTools'])) : [(string)$expect['requiredTools']];
+    }
+
+    /**
+     * The label of the expected tool a case row carries under `tool`: the name of `expect.tool`, the names of an
+     * any-of list joined by `|`, `?` when the case expects no tool.
+     */
+    public function getExpectedToolLabel(): string
+    {
+        $expectedTool = $this->getExpect()['tool'] ?? '?';
+        if (is_array($expectedTool)) {
+            return implode('|', array_map('strval', $expectedTool));
+        }
+        return (string)$expectedTool;
+    }
+
+    /**
+     * The skill a decision model is expected to preload per owner turn: `expect.preloadSkills` (one entry per owner
+     * turn, empty = no expectation, `none` = the turn is to preload nothing), else `expect.skill` for the first turn
+     * only.
+     *
+     * @return string[]
+     */
+    public function getExpectedPreloadSkillNamesByTurn(): array
+    {
+        $expect = $this->getExpect();
+        if (isset($expect['preloadSkills']) && is_array($expect['preloadSkills'])) {
+            return array_values(array_map('strval', $expect['preloadSkills']));
+        }
+        return isset($expect['skill']) ? [(string)$expect['skill']] : [];
+    }
+
+    /** `expectedSkill`: the skill a selection case expects the agent to pick; null when the case names none. */
+    public function getExpectedSkillName(): ?string
+    {
+        $expectedSkillName = $this->caseFields[static::KEY_EXPECTED_SKILL] ?? null;
+        return $expectedSkillName !== null ? (string)$expectedSkillName : null;
+    }
+
+    /**
+     * `access`: how the case declares it touches its agent space in a suite — `read`, `write` or `exclusive`, lower
+     * case and trimmed; empty when the case declares nothing (or something else).
+     */
+    public function getDeclaredSuiteAccess(): string
+    {
+        $declaredAccess = strtolower(trim((string)($this->caseFields[static::KEY_ACCESS] ?? '')));
+        $declarableAccesses = [AgentEvalSuiteTask::ACCESS_READ, AgentEvalSuiteTask::ACCESS_WRITE, AgentEvalSuiteTask::ACCESS_EXCLUSIVE];
+        return in_array($declaredAccess, $declarableAccesses, true) ? $declaredAccess : '';
+    }
+
+    /** `exclusive`: true = a writing case runs alone on its agent space. */
+    public function isDeclaredExclusive(): bool
+    {
+        return ($this->caseFields[static::KEY_EXCLUSIVE] ?? false) === true;
+    }
+
+    /** `lane`: the resource group the case names itself, trimmed; empty when it names none. */
+    public function getDeclaredLane(): string
+    {
+        return trim((string)($this->caseFields[static::KEY_LANE] ?? ''));
+    }
+
+    /**
+     * Whether the case expects a tool that may change something (any-of `expect.tool`, all-of `expect.requiredTools`):
+     * a name that is neither one of the loop's own tools (`$loopToolNames`, they change the conversation only) nor a
+     * tool that declares itself read-only.
+     *
+     * @param string[] $loopToolNames the loop's own tools
+     */
+    public function expectsChangingTool(array $loopToolNames): bool
+    {
+        $expectedToolNames = array_merge($this->getExpectedAnyOfToolNames(), $this->getExpectedRequiredToolNames());
+        foreach ($expectedToolNames as $expectedToolName) {
+            if ($expectedToolName !== '' && !in_array($expectedToolName, $loopToolNames, true) && !MCPToolEffectCatalog::isReadOnlyToolName($expectedToolName)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * How the case touches its live agent space in a suite ({@see AgentEvalSuiteTask}'s `ACCESS_*`). The case's own
+     * `access` decides when it is given. Else a case WRITES when it carries a `restore` block, is a scripted flow
+     * (`turns`), checks a state after the run, is flagged `sequential`, or expects a tool that may change something
+     * ({@see expectsChangingTool()}) — a case that cleans up after itself writes without a restore block. A writing case
+     * is EXCLUSIVE when it is a scripted flow, declares `exclusive: true`, or its fixture is exclusive. Every other case
+     * READS (and runs with every write tool refused: a judged case whose rubric needs a write declares `access: write`).
+     *
+     * @param bool $fixtureIsExclusive whether the case's fixture runs its writing cases alone on their agent space
+     * @param string[] $loopToolNames the loop's own tools
+     */
+    public function resolveSuiteAccess(bool $fixtureIsExclusive, array $loopToolNames): string
+    {
+        $declaredAccess = $this->getDeclaredSuiteAccess();
+        if ($declaredAccess !== '') {
+            return $declaredAccess;
+        }
+        $writes = $this->getRestore() !== null
+            || $this->hasTurns()
+            || $this->getStateAfterRun() !== null
+            || $this->isSequential()
+            || $this->expectsChangingTool($loopToolNames);
+        if (!$writes) {
+            return AgentEvalSuiteTask::ACCESS_READ;
+        }
+        if ($this->hasTurns() || $this->isDeclaredExclusive() || $fixtureIsExclusive) {
+            return AgentEvalSuiteTask::ACCESS_EXCLUSIVE;
+        }
+        return AgentEvalSuiteTask::ACCESS_WRITE;
+    }
+
+    /**
+     * The resource group of the case: its own `lane` when it names one, else the group of its fixture
+     * (`$resourceGroupByFixture`, fixture name → group), else the fixture itself.
+     *
+     * @param string $fixtureName the file name of the case's fixture without `.json`
+     * @param string[] $resourceGroupByFixture fixture name → resource group
+     */
+    public function resolveResourceKey(string $fixtureName, array $resourceGroupByFixture): string
+    {
+        $declaredLane = $this->getDeclaredLane();
+        if ($declaredLane !== '') {
+            return $declaredLane;
+        }
+        return (string)($resourceGroupByFixture[$fixtureName] ?? $fixtureName);
     }
 
     /**

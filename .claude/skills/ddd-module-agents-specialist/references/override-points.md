@@ -105,6 +105,10 @@ Each is a public service with a working default. The owning topic skill explains
 | `DDD\Domain\AI\Services\Conversations\AIConversationRealtimeSignalService` | no realtime transport, no push | push change signals to the client | `ddd-module-agents-widgets-specialist` |
 | `DDD\Domain\AI\Services\Conversations\Quality\AgentConversationScorecardsService` | writes nothing | score a finished conversation | `ddd-module-agents-observability-specialist` |
 | `DDD\Domain\AI\Services\Conversations\Agent\AgentEvalAccountsService`, `DDD\Domain\AI\Services\Eval\AgentEvalOutboundGuardHooksService` | no eval account, no scope owner | mark eval accounts and test sinks | `ddd-module-agents-observability-specialist` |
+| `DDD\Domain\AI\Services\Eval\AgentEvalSuitePlanService` | plans the module's task kinds (tools, selection, recall cases) on the agent space a case names | plan the host's own task kinds (`buildTasksOfApplicationKind()`), name the scope of a case (`assignScopeOfCaseToTask()`), add duration priors (`getDurationPriors()`) | `ddd-module-agents-observability-specialist` |
+| `DDD\Domain\AI\Services\Eval\AgentEvalResultFilesService` | the results folder `AI.evalSuite.resultsDirectory` (default `var/agent-evals`); the sweep deletes the dated run entries older than 28 days | add the name patterns of the host's own dated folders (`getRetainedFolderNamePatterns()`), change the retention (`getRetentionDays()`) | `ddd-module-agents-observability-specialist` |
+| `DDD\Domain\AI\Services\Eval\AgentEvalSuiteRunsService`, `DDD\Domain\AI\Services\Eval\AgentEvalSuiteCasesService` (with their entities and repositories) | stored evaluation runs and cases; an admin with access to all resources reads every row, every other account none | store the rows through the host's entity; decide who reads every row (`isAuthenticatedAccountReaderOfEveryRow()` of the same-path repositories) | `ddd-module-agents-observability-specialist` |
+| `DDD\Domain\AI\Services\Conversations\RunReports\AIConversationRunReportService` | no decision-model cost (no usage-log id), no skill section prefix dropped | name the usage-log id of a conversation (`findUsageLogScopeIdOfConversation()`), read the cost (`findModelCostInUsageLog()`), drop the host's prefix of skill section ids (`getSkillSectionIdPrefixToDrop()`) | `ddd-module-agents-observability-specialist` |
 | `DDD\Domain\AI\Services\Texts\Embeddings\AITextEmbeddingsService` | no provider (throws `TextEmbeddingNotGeneratedException`) | generate embeddings | `ddd-module-agents-context-specialist` |
 | `DDD\Presentation\Mcp\Services\MCPToolExecutorService` | no admin audit; a failed tool answers the framework's client error text, anything else an issue id only | record admin tool calls (`recordAdminAudienceToolCall()`), change the failure text (`buildToolFailureText()`) | `ddd-module-agents-tools-specialist` |
 
@@ -158,6 +162,9 @@ A host keeps an application-only field, constant or method in its own class at t
 with `X::newInstance()` or asks the container for the class name:
 
 - `RunSettings`, `TaskPlanItem`, `TaskPlanItems`, `AgentModelInput`, `AIConversationMetrics`;
+- the evaluation suite's `AgentEvalSuiteTask` (the host's scope in `getScopeId()`, its own kinds),
+  `AgentEvalSuitePlanOptions` (the host's own planning options) and `AgentEvalSuiteRecordSettings` (the host's key of
+  the whole-scope isolation, `ISOLATE_WHOLE_SCOPE_KEY`, and its own recorded settings);
 - the purpose class: `AIConversationPurpose::getPurposeClassOfTheApplication()` reads the host's same-path class for
   its purpose names and lists;
 - the automation state reasons: `AgentAutomationStateReason::getReasonClassOfTheApplication()`;

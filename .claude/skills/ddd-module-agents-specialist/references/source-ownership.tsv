@@ -14,6 +14,7 @@ src/Domain/AI/Entities/MCPPackages/ToolResultRecording*	observability
 src/Domain/AI/Entities/Conversations/Diagnostics/**	observability
 src/Domain/AI/Entities/Conversations/ControlPanel/**	observability
 src/Domain/AI/**/Metrics/**	observability
+src/Domain/AI/**/RunReports/**	observability
 src/Domain/AI/**/TraceEvents/**	observability
 src/Domain/AI/**/TurnEvents/**	observability
 src/Domain/AI/**/Evals/**	observability
@@ -31,6 +32,7 @@ src/Presentation/Mcp/Agent/**	observability
 src/Symfony/Commands/Agents/**	observability
 src/Presentation/Api/Agents/Conversations/Dtos/AIConversationMessageSentPayload*	observability
 config/app/AI/evalOutboundRecipients.php	observability
+config/app/AI/evalSuite.php	observability
 # decisions-and-guards (ddd-module-agents-decisions-and-guards-specialist): decision layer, owner consent, injection screening
 src/Domain/AI/Entities/Conversations/Agent/Decisions/**	decisions-and-guards
 src/Domain/AI/Entities/Conversations/Messages/ToolCallInjectionScreening*	decisions-and-guards

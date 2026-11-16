@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.0-alpha.58
+
+- The evaluation suite's parts ship in the module: the suite objects (`AgentEvalSuiteTask(s)`,
+  `AgentEvalSuiteSchedule`, `AgentEvalCaseRow(s)`, `AgentEvalRunSummary`, `AgentEvalBaselineChoice` /
+  `AgentEvalBaselineComparison`, `AgentEvalSuiteRecord`, …) with the planning service `AgentEvalSuitePlanService`,
+  the result files `AgentEvalResultFilesService` (results folder `AI.evalSuite.resultsDirectory`, default
+  `var/agent-evals`; baseline read; retention sweep), the run report `AIConversationRunReportService` and the command
+  `app:ai-agent:run-report`. New config file `config/app/AI/evalSuite.php`.
+- Two new tables: `AgentEvalSuiteRuns` and `AgentEvalSuiteCases` (entities `AgentEvalSuiteRun`, `AgentEvalSuiteCase`;
+  with a table prefix e.g. `EntityAgentEvalSuiteRuns`). An admin with access to all resources reads every row, every
+  other account none. A host that already has these tables keeps them: the columns are the same.
+- Two new tables need their DDL in a host (schema diff): `AgentEvalSuiteRuns`, `AgentEvalSuiteCases`.
+
 ## 0.1.0-alpha.57
 
 - The task of a sub-agent (`DelegationSubAgentRecord::$task`, `DelegateToolArguments::$task`,

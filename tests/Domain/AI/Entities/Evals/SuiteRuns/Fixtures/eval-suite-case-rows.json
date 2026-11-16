@@ -1,0 +1,42 @@
+{
+  "_comment": "Case rows in the shapes the evaluation commands aggregate (the cases of a suite run's _summary.json, the results of a purposed run's summary.json): a passed call case, a deterministic failure, a judged failure, an errored case, a not-applicable case and a case failing by design.",
+  "cases": [
+    {
+      "skill": "Reports.Rankings", "case": "rankings.last-7-days", "suite": "tools", "fixture": "Reports.Rankings", "model": "VENDOR.MODEL_A", "flavor": "call",
+      "passed": true, "conversationId": 855901, "failures": [], "toolCallCount": 3, "costUsd": 0.0041, "durationMs": 21500, "processSeconds": 38.4,
+      "performance": {"ownerTurns": 1, "modelCalls": 3, "toolCalls": 3, "agentSeconds": 19, "costUsd": 0.0041}
+    },
+    {
+      "skill": "TaskPlanDelivery", "case": "taskplandelivery.carry-across-turns", "suite": "taskplandelivery", "fixture": "TaskPlanDelivery", "model": "VENDOR.MODEL_A", "flavor": "call",
+      "passed": false, "conversationId": 855998, "error": null,
+      "failures": ["forbidden tool called: 'sendMessage' must NOT be called, but it was (called [update_task_plan, load_skills, sendMessage])"],
+      "durationMs": 45848, "processSeconds": 145.8,
+      "performance": {"ownerTurns": 2, "modelCalls": 14, "toolCalls": 13, "agentSeconds": 42, "costUsd": 0.050317}
+    },
+    {
+      "skill": "MultiStep", "case": "multistep.nesteddone", "suite": "multistep", "fixture": "MultiStep", "model": "VENDOR.MODEL_A", "flavor": "judge",
+      "passed": false, "conversationId": 855954, "failures": [], "processSeconds": 83.5, "durationMs": 43480,
+      "verdict": {"verdict": "FAIL", "scorePercent": 70, "reasons": "The plan stayed flat: no subtasks for the six variants.",
+        "criteria": [
+          {"name": "Task plan has a real two-level structure", "status": "violated", "note": "update_task_plan created only 3 flat items."},
+          {"name": "A task plan exists", "status": "met", "note": "A plan with 3 items was created at [1]."}
+        ],
+        "ungroundedClaims": ["claims variant C was published"]},
+      "performance": {"ownerTurns": 1, "modelCalls": 5, "toolCalls": 5, "agentSeconds": 19, "costUsd": 0.007699}
+    },
+    {
+      "passed": false, "case": "reply.edit", "suite": "tools", "fixture": "Messages.Overview", "model": "VENDOR.MODEL_A", "flavor": "judge",
+      "error": "the case's child process exceeded its 600s ceiling and was ended", "processSeconds": 600.2, "retriedAfter": "cURL error 28", "restoreFailed": true
+    },
+    {
+      "skill": "Campaigns.Overview", "case": "campaigns.overview", "tool": "getCampaigns", "flavor": "call", "agentSpaceId": 412553,
+      "passed": null, "outcome": "notApplicable", "notApplicableReason": "skillNotAvailable", "notApplicableDetail": "the workspace does not offer Campaigns.Overview",
+      "suite": "tools", "model": "VENDOR.MODEL_A", "processSeconds": 4.1
+    },
+    {
+      "case": "purposed.opening-hours.timezone", "passed": false, "expectedFail": true, "scorePercent": 61, "conversationId": 856120, "turns": 9, "stopReason": "goalReached",
+      "verdict": {"verdict": "FAIL", "reasons": "Known gap: the opening hours are asked twice."},
+      "performance": {"ownerTurns": 9, "modelCalls": 31, "toolCalls": 22, "agentSeconds": 210.4, "costUsd": 0.12, "conversationWallSeconds": 402.6}
+    }
+  ]
+}

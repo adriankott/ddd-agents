@@ -22,7 +22,7 @@ use DDD\Infrastructure\Modules\DDDModule;
  * - `DDD\Domain\AI\Libs\RecordedRuns\`, `DDD\Domain\AI\Listeners\Conversations\`,
  *   `DDD\Domain\AI\Messenger\Conversations\`, `DDD\Domain\AI\Traits\Conversations\`;
  * - `DDD\Domain\AI\Repo\Argus\Conversations\`, `…\Repo\Argus\Guard\`, `…\Repo\Argus\Mandates\`,
- *   `…\Repo\DB\AgentSpaces\`, `…\Repo\DB\Conversations\`, `…\Repo\DB\Mandates\`;
+ *   `…\Repo\DB\AgentSpaces\`, `…\Repo\DB\Conversations\`, `…\Repo\DB\Evals\`, `…\Repo\DB\Mandates\`;
  * - `DDD\Domain\AI\Services\AgentSpaces\`, `…\Services\Conversations\`, `…\Services\Decisions\`,
  *   `…\Services\Eval\`, `…\Services\Mandates\`,
  *   `…\Services\Skills\`, `…\Services\SystemPrompts\`, `…\Services\Texts\Embeddings\`;
@@ -69,6 +69,7 @@ class AgentsModule extends DDDModule
         'DDD\\Domain\\AI\\Repo\\Argus\\Mandates\\',
         'DDD\\Domain\\AI\\Repo\\DB\\AgentSpaces\\',
         'DDD\\Domain\\AI\\Repo\\DB\\Conversations\\',
+        'DDD\\Domain\\AI\\Repo\\DB\\Evals\\',
         'DDD\\Domain\\AI\\Repo\\DB\\Mandates\\',
         'DDD\\Domain\\AI\\Services\\AgentSpaces\\',
         'DDD\\Domain\\AI\\Services\\Conversations\\',

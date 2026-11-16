@@ -6,8 +6,9 @@ Contents: what ships, what does not · the parts of a runner · driving one case
 
 The package ships the safety layers, the recorded runs, the read models an evaluation needs, the run of ONE case
 (`AgentEvalRunnerService` with the application's `AgentEvalRunHooksService`) and the judged run of one case
-(`AgentEvalJudgedRunService`: a simulated owner and a judge) — no suite, no lanes. A host
-that evaluates its agent builds those as console commands of its own around the runner. This reference names what each
+(`AgentEvalJudgedRunService`: a simulated owner and a judge), and the parts a suite is built from: its objects,
+its stored runs, its result files and the run report ([the suite](#the-suite)). The suite command itself is the
+host's: a host that evaluates its agent builds it as a console command of its own around the runner. This reference names what each
 part calls in the package.
 
 ## What ships, what does not
@@ -15,12 +16,13 @@ part calls in the package.
 | Ships | Does not ship |
 |---|---|
 | the eval marker and the eval switches on `RunSettings` | a case file loader (the case object `AgentEvalCase` reads a decoded case) |
-| the eval tool block and the outbound recipient guard ([eval-safety](eval-safety.md)) | a suite command, parallel lanes, retries |
+| the eval tool block and the outbound recipient guard ([eval-safety](eval-safety.md)) | a suite command, its child processes and retries |
 | `AgentEvalResult` (a verdict value object) and the assertions over a run (`AgentEvalExpectation`: expected tool, skill, status, arguments, plan, state after the run) | |
 | the run of one case: `AgentEvalRunnerService::runCase()` / `run()` / `runWithRestore()` — the tool block applied and lifted, follow-up turns, purpose, reload, restore (`AgentEvalRestorePlan`, `AgentEvalHarnessToolCalls`), the state check, the teardown, applicability (`AgentEvalApplicabilityFacts`), the eviction trajectory, the recall seed, the figures (`AgentEvalRunFigures`) | the application's part of a run: the 13 hooks of `AgentEvalRunHooksService` (scope, ineligible scope, withheld skills, harness arguments, …), overridden in a same-path subclass |
 | `AIConversationAuditRenderService` (the deterministic audit blocks a judge reads); the judged run with its driver and verdict prompts and its model calls ([the judged run](#the-judged-run)) | the application's override points of the judged run |
 | request snapshots, turn events, metrics, the integrity report | |
-| record and replay with the comparison ([record-and-replay](record-and-replay.md)) | a results folder, a summary, a baseline comparison |
+| record and replay with the comparison ([record-and-replay](record-and-replay.md)) | |
+| the suite's objects, its planning service, its stored runs, its result files and the run report ([the suite](#the-suite)) | the suite command, the application's task kinds and their planning, the application's own dated folders in the results folder |
 | `AgentEvalOutboundGuardHooksService`, `AgentEvalAccountsService` as override points | test accounts, test spaces and their cleanup |
 
 ## The parts of a runner
@@ -114,6 +116,27 @@ process state). Cases that write to the same space run in one lane. Keep every o
 skills, called tools, metrics, cost) so a run can be compared with the last one. Exclude the eval accounts from the
 host's own statistics through `AgentEvalAccountsService`.
 
+What the package ships for it:
+
+- **Suite objects** (`Entities/Evals/`): the task (`AgentEvalSuiteTask`, an open `kind`, scoped to an agent space) and
+  its set, the schedule (`AgentEvalSuiteSchedule`: which tasks may run at the same time), the plan summary, the case
+  rows (`AgentEvalCaseRow(s)`), the run summary (`AgentEvalRunSummary`), the performance roll-up, the baseline choice
+  and comparison, and the suite record (`AgentEvalSuiteRecord`). `toArray()` of each gives the document a suite
+  writes. `AgentEvalSuitePlanService` plans the module's task kinds; an application plans its own kinds in a
+  same-path subclass. `AI.evalSuite.resourceGroupByFixture` and `AI.evalSuite.exclusiveFixtures` say which write
+  cases share a resource or run alone.
+- **Stored runs** (`AgentEvalSuiteRun(s)`, `AgentEvalSuiteCase(s)` with their repositories and
+  `AgentEvalSuiteRunsService` / `AgentEvalSuiteCasesService`): one row per suite run and one per case. An admin reads
+  every row, every other account none; an application's same-path repository decides who reads every row in
+  `isAuthenticatedAccountReaderOfEveryRow()`.
+- **Result files** (`AgentEvalResultFilesService`): the results folder (`AI.evalSuite.resultsDirectory`, default
+  `var/agent-evals`), the files of a run, the baseline read and the retention sweep; an application adds the name
+  patterns of its own dated folders through `getRetainedFolderNamePatterns()`.
+- **Run report** (`AIConversationRunReportService`, the base command `app:ai-agent:run-report`): the per-run figures
+  of stored conversations. An application's same-path subclass of the service names the id its usage log files a
+  conversation's cost under (`findUsageLogScopeIdOfConversation()`), reads the decision model's cost from its usage
+  log (`findModelCostInUsageLog()`) and drops its prefix of skill section ids (`getSkillSectionIdPrefixToDrop()`).
+
 ## Throwaway spaces and cleanup
 
 A throwaway space is the host's entity: create it per case or per lane, mark it for deletion, and delete it with its
@@ -142,4 +165,10 @@ The classes this reference names, with their namespace (for the `use` lines of a
 `DDD\Domain\AI\Services\Eval\AgentEvalJudgedRunService` ·
 `DDD\Domain\AI\Entities\Evals\{AgentEvalSimCase, AgentEvalJudgedRunOptions, AgentEvalSimRunResult, AgentEvalCompactionTreeRunResult, AgentEvalJudgeVerdict, AgentEvalRunCounts, AgentEvalJudgeTraceMessageLines}` ·
 `DDD\Domain\AI\Services\Eval\EvalOutboundRecipientsService` ·
+`DDD\Domain\AI\Entities\Evals\{AgentEvalSuiteTask, AgentEvalSuiteTasks, AgentEvalSuiteSchedule, AgentEvalSuitePlanSummary, AgentEvalCaseRow, AgentEvalCaseRows, AgentEvalRunSummary, AgentEvalPerformanceRollUp, AgentEvalBaselineChoice, AgentEvalBaselineComparison, AgentEvalSuiteRecord}` ·
+`DDD\Domain\AI\Services\Eval\{AgentEvalSuitePlanService, AgentEvalResultFilesService, AgentEvalSuiteRunsService, AgentEvalSuiteCasesService}` ·
+`DDD\Domain\AI\Entities\Evals\SuiteRuns\{AgentEvalSuiteRun, AgentEvalSuiteRuns}` ·
+`DDD\Domain\AI\Entities\Evals\SuiteRuns\AgentEvalSuiteCases\{AgentEvalSuiteCase, AgentEvalSuiteCases}` ·
+`DDD\Domain\AI\Services\Conversations\RunReports\AIConversationRunReportService` ·
+`DDD\Symfony\Commands\Agents\AgentRunReportCommand` ·
 `DDD\Domain\AI\Entities\Conversations\Messages\RunSettings`

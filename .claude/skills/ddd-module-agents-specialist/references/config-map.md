@@ -1,4 +1,4 @@
-# Config map: the fourteen config files and who explains them
+# Config map: the fifteen config files and who explains them
 
 **Reader:** host developer
 
@@ -14,7 +14,7 @@ Readers that fall back per key to their class default: `AgentApplicationWording:
 file does not list is off, except `AgentDecisionModelSettings::DEFAULT_ON_SITES`). The other readers take the file as
 it is.
 
-Besides the fourteen PHP files the package ships prompts (`config/app/AI/Prompts/`), purposes
+Besides the fifteen PHP files the package ships prompts (`config/app/AI/Prompts/`), purposes
 (`config/app/AI/Purposes/`) and two agent skill files (`config/app/AI/Skills/`); a host's file at the same path
 replaces each of them the same way. Prompts: `ddd-module-agents-context-specialist` and
 `ddd-module-agents-decisions-and-guards-specialist`; purposes and skills: `ddd-module-agents-skills-and-purposes-specialist`
@@ -32,6 +32,7 @@ and `ddd-module-agents-autonomy-specialist`.
 | `contextRetention.php` | `AI.contextRetention` | `ContextRetentionSettings` | skill unloading, skill loading strategy, state delivery | skill granularity, append loading | `ddd-module-agents-context-specialist` |
 | `decisionModel.php` | `AI.decisionModel` | `AgentDecisionModelSettings::current()` | the decision layer's mode and sites | mode `off` | `ddd-module-agents-decisions-and-guards-specialist` |
 | `evalOutboundRecipients.php` | `AI.evalOutboundRecipients` | `EvalOutboundRecipientsService` | the test sinks an eval run may send to | none | `ddd-module-agents-observability-specialist` |
+| `evalSuite.php` | `AI.evalSuite` | `AgentEvalResultFilesService::getResultsDirectory()`; the suite planning (`AgentEvalSuitePlanService`) | the results folder of the evaluation runs; the resource group per fixture and the fixtures whose write cases run alone on their agent space | `var/agent-evals`, no groups, no exclusive fixtures | `ddd-module-agents-observability-specialist` |
 | `purposeRequirements.php` | `AI.purposeRequirements` | `AIConversationPurposesService::getPurposeByName()` | feature flags a purpose requires | none | `ddd-module-agents-skills-and-purposes-specialist` |
 | `skillNamespaceGroups.php` | `AI.skillNamespaceGroups` | `AISkillCatalogDocService` | the groups of the admin skill screen | the package's groups | `ddd-module-agents-skills-and-purposes-specialist` |
 | `skillPackages.php` | `AI.skillPackages` | `AISkillsService`, `AISkill::getPackageClassesBySkillName()` | which MCP packages each skill brings | the package's own skills | `ddd-module-agents-skills-and-purposes-specialist` |

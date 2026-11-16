@@ -1,0 +1,62 @@
+{
+    "skill": "Catalog.Search",
+    "case": "catalog.last-7-days/über",
+    "tool": "searchCatalog",
+    "passed": true,
+    "flavor": "judge",
+    "compactionFired": false,
+    "conversationId": 81234,
+    "failures": [],
+    "performance": {
+        "modelCalls": 4,
+        "ownerTurns": 2,
+        "agentSeconds": 31.5,
+        "secondsPerOwnerTurn": [
+            12,
+            19.5
+        ],
+        "decisionModelMs": 0
+    },
+    "verdict": {
+        "verdict": "PASS",
+        "goalMet": true,
+        "grounded": null,
+        "reasons": "Answered with the results of https://example.org/a/b — «Café»."
+    },
+    "turns": 2,
+    "stopReason": "goal met",
+    "loadedSkills": [
+        "Catalog.Search"
+    ],
+    "calledTools": [
+        "load_skills",
+        "searchCatalog"
+    ],
+    "finalText": "Your results: 1. café über alles\n2. \"quoted\" / slashed",
+    "toolCallCount": 2,
+    "inputTokens": 12000,
+    "outputTokens": 800,
+    "totalTokens": 12800,
+    "costUsd": 0.0123,
+    "durationMs": 31512,
+    "messages": {
+        "elements": [
+            {
+                "messageType": "TOOL_CALL",
+                "toolName": "searchCatalog",
+                "status": "COMPLETED",
+                "toolArguments": "{\"days\":7}"
+            },
+            {
+                "messageType": "ASSISTANT",
+                "content": "Done ✓"
+            }
+        ]
+    },
+    "suite": "tools",
+    "fixture": "Catalog.Search",
+    "model": "OPENAI.GPT6_LUNA",
+    "access": "read",
+    "lane": "7:Catalog.Search",
+    "processSeconds": 41.3
+}

@@ -1,0 +1,151 @@
+{
+    "startedAt": "2026-11-16 10:00:00",
+    "wallSeconds": 95,
+    "processSeconds": 41,
+    "speedUp": 0.4,
+    "stopped": false,
+    "settings": {
+        "models": [
+            "OPENAI.GPT6_LUNA"
+        ],
+        "flavors": [
+            "judge"
+        ],
+        "suites": [
+            "tools"
+        ],
+        "arms": {
+            "label": "nightly — café"
+        },
+        "persistedConversations": true,
+        "maxProcesses": 4,
+        "isolateWholeScope": false,
+        "configuredReasoningEffortByModel": {
+            "OPENAI.GPT6_LUNA": "medium"
+        },
+        "platformDecisionLayer": {
+            "mode": "shadow",
+            "sites": {
+                "turnClose": "shadow",
+                "skillPreload": "off"
+            },
+            "turnClosingMode": "deterministicCounter"
+        }
+    },
+    "plan": {
+        "tasks": 3,
+        "bySuite": [],
+        "byAccess": [],
+        "byRun": [],
+        "lanes": [],
+        "waves": [],
+        "sequentialWallSeconds": 0,
+        "estimatedWallSeconds": 0,
+        "boundBy": "",
+        "unschedulableTasks": 0
+    },
+    "baseline": null,
+    "baselineChoice": null,
+    "verdict": {
+        "correctness": "PASSED",
+        "performance": "NOT_COMPARED"
+    },
+    "total": 1,
+    "passed": 1,
+    "notApplicable": 0,
+    "runs": {
+        "OPENAI.GPT6_LUNA|judge": {
+            "model": "OPENAI.GPT6_LUNA",
+            "flavor": "judge",
+            "total": 1,
+            "passed": 1,
+            "errors": 0,
+            "notApplicable": 0,
+            "notApplicableCases": [],
+            "restoreFailedCases": [],
+            "retriedCases": [],
+            "failedCases": [],
+            "bySuite": {
+                "tools": {
+                    "total": 1,
+                    "notApplicable": 0,
+                    "passed": 1,
+                    "performance": {
+                        "measuredCases": 1,
+                        "ownerTurns": 2,
+                        "modelCalls": 4,
+                        "avgModelCallsPerCase": 4,
+                        "avgModelCallsPerOwnerTurn": 2,
+                        "avgOwnerTurnsPerCase": 2,
+                        "avgToolCallsPerCase": 0,
+                        "agentSeconds": 31.5,
+                        "avgAgentSecondsPerCase": 31.5,
+                        "medianAgentSecondsPerCase": 31.5,
+                        "p90AgentSecondsPerCase": 31.5,
+                        "avgSecondsPerOwnerTurn": 15.8,
+                        "medianSecondsPerOwnerTurn": 12,
+                        "p90SecondsPerOwnerTurn": 19.5,
+                        "maxSecondsPerOwnerTurn": 19.5,
+                        "totalTokens": 0,
+                        "avgTotalTokensPerCase": 0,
+                        "cachedInputShare": null,
+                        "costUsd": 0,
+                        "avgCostPerCaseUsd": 0,
+                        "avgCostPerOwnerTurnUsd": 0,
+                        "decisionModelMs": 0,
+                        "avgDecisionModelMsPerOwnerTurn": 0,
+                        "medianFirstModelOutputSeconds": null,
+                        "p90FirstModelOutputSeconds": null,
+                        "medianFirstAnswerSeconds": null,
+                        "p90FirstAnswerSeconds": null,
+                        "uncachedInputTokens": 0,
+                        "avgUncachedInputTokensPerOwnerTurn": 0,
+                        "medianUncachedInputTokensPerOwnerTurn": null,
+                        "avgUncachedInputTokensPerCase": 0,
+                        "medianUncachedInputTokensPerCase": 0,
+                        "medianConversationWallSeconds": null,
+                        "p90ConversationWallSeconds": null
+                    }
+                }
+            },
+            "performance": {
+                "measuredCases": 1,
+                "ownerTurns": 2,
+                "modelCalls": 4,
+                "avgModelCallsPerCase": 4,
+                "avgModelCallsPerOwnerTurn": 2,
+                "avgOwnerTurnsPerCase": 2,
+                "avgToolCallsPerCase": 0,
+                "agentSeconds": 31.5,
+                "avgAgentSecondsPerCase": 31.5,
+                "medianAgentSecondsPerCase": 31.5,
+                "p90AgentSecondsPerCase": 31.5,
+                "avgSecondsPerOwnerTurn": 15.8,
+                "medianSecondsPerOwnerTurn": 12,
+                "p90SecondsPerOwnerTurn": 19.5,
+                "maxSecondsPerOwnerTurn": 19.5,
+                "totalTokens": 0,
+                "avgTotalTokensPerCase": 0,
+                "cachedInputShare": null,
+                "costUsd": 0,
+                "avgCostPerCaseUsd": 0,
+                "avgCostPerOwnerTurnUsd": 0,
+                "decisionModelMs": 0,
+                "avgDecisionModelMsPerOwnerTurn": 0,
+                "medianFirstModelOutputSeconds": null,
+                "p90FirstModelOutputSeconds": null,
+                "medianFirstAnswerSeconds": null,
+                "p90FirstAnswerSeconds": null,
+                "uncachedInputTokens": 0,
+                "avgUncachedInputTokensPerOwnerTurn": 0,
+                "medianUncachedInputTokensPerOwnerTurn": null,
+                "avgUncachedInputTokensPerCase": 0,
+                "medianUncachedInputTokensPerCase": 0,
+                "medianConversationWallSeconds": null,
+                "p90ConversationWallSeconds": null
+            },
+            "costPerPassUsd": 0.0123,
+            "baselineComparison": null
+        }
+    }
+}

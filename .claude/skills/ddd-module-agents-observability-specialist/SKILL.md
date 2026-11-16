@@ -1,9 +1,9 @@
 ---
 name: ddd-module-agents-observability-specialist
-description: "Watches, debugs, records, replays and evaluates runs of the mgamadeus/ddd-agents loop. Covers the symptom table of a turn that never answers (run states, read-only resume diagnosis, recovery pass), request snapshots, the reconstructed sent payload, context composition, prompt-cache diff, integrity and delegation reports, turn and trace events, AGENT_TRACE lines, the console printer, HTML transcript and TUI view model of a host chat, record and replay, eval safety (evalRun marker, eval tool blocks, outbound recipient guard), conversation metrics, costs, scorecards, the eval runner and the judged run (simulated owner, judge verdict, compaction-tree run, override points, prompt files), control panel statistics, the admin drive with truncate. Use when a turn never answers, a run stays RUNNING, IDLE, FAILED or AWAITING_DELEGATES, what the model saw is needed, a console chat is built, a run is replayed to prove a refactor, a test run must not send mail, agent cost is measured, or an eval runner or judge is built."
+description: "Watches, debugs, records, replays and evaluates runs of the mgamadeus/ddd-agents loop. Covers the turn that never answers (run states, resume diagnosis, recovery), request snapshots, the sent payload, context composition, prompt-cache diff, integrity and delegation reports, turn and trace events, AGENT_TRACE, the console printer, transcript and TUI view, record and replay, eval safety (evalRun, tool blocks, outbound guard), metrics, costs, scorecards, the eval runner and judged run, the evaluation suite (planning, schedule, stored suite runs, result files, baseline read, retention sweep), run report app:ai-agent:run-report, control panel, admin drive. Use when a turn never answers, a run stays RUNNING, IDLE, FAILED or AWAITING_DELEGATES, what the model saw is needed, a console chat is built, a run is replayed, a test run must not send mail, agent cost is measured, an eval runner or judge is built, to plan a parallel eval suite, compare a run with a baseline, store or read suite runs, or print a run report."
 metadata:
   author: mgamadeus
-  version: "0.1.0"
+  version: "0.2.0"
   module: mgamadeus/ddd-agents
 ---
 
@@ -17,7 +17,7 @@ progress reporter `AgentConsoleProgressReporter`, the space options), the option
 recording-session contract `AgentRecordedRunSessionInterface`, the diagnosis and measurement commands
 (`app:ai-agent:diagnose`, `app:ai-agent:validate-conversation`, `app:ai-agent:cache-diff`,
 `app:ai-agent:activity-lines`, `app:ai-agent:tool-response-stats`, `app:ai-agent:skill-token-map`,
-`app:ai-agent:context-eviction-sim`, `app:ai-conversation:search-inspect`; the full list with the maintenance
+`app:ai-agent:context-eviction-sim`, `app:ai-conversation:search-inspect`, `app:ai-agent:run-report`; the full list with the maintenance
 commands is in `ddd-module-agents-specialist`) and the line editor a console chat reads its input with
 (`src/Symfony/Commands/Agents/Chat/`), but **no chat, replay or evaluation command**: those are console commands of
 the host, built on the contracts below.

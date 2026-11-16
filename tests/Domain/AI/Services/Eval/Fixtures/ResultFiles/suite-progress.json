@@ -1,0 +1,19 @@
+{
+    "at": "2026-11-16 10:00:05",
+    "total": 3,
+    "finished": 1,
+    "passed": 1,
+    "notApplicable": 0,
+    "queued": 1,
+    "running": [
+        {
+            "case": "catalog.caf\u00e9",
+            "suite": "tools",
+            "run": "OPENAI.GPT6_LUNA|judge",
+            "lane": "7:Catalog.Search",
+            "access": "read",
+            "pid": 4242,
+            "seconds": 12
+        }
+    ]
+}
