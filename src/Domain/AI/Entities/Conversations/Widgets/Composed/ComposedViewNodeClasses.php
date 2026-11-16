@@ -25,13 +25,48 @@ class ComposedViewNodeClasses
     /** @var array<string, class-string<ComposedViewNode>>|null The registry, built on first use. */
     protected static ?array $nodeClassesByNodeType = null;
 
+    /** @var array<string, class-string<ComposedViewNode>>|null Former node types → class, built from the registry on first use. */
+    protected static ?array $nodeClassesByLegacyNodeType = null;
+
     /** @var bool A build error throws instead of being logged (tests throw regardless). */
     public static bool $throwErrors = false;
 
-    /** @return class-string<ComposedViewNode>|null the class of `$nodeType`, null for an unknown type */
+    /**
+     * @return class-string<ComposedViewNode>|null the class of `$nodeType`, or of the class that names it among its
+     *     {@see ComposedViewNode::LEGACY_NODE_TYPES}; null for an unknown type
+     */
     public static function getNodeClassForNodeType(string $nodeType): ?string
     {
-        return static::getNodeClassesByNodeType()[$nodeType] ?? null;
+        return static::getNodeClassesByNodeType()[$nodeType] ?? static::getNodeClassesByLegacyNodeType()[$nodeType] ?? null;
+    }
+
+    /**
+     * The former node types of the registered classes (read only, never offered), keyed to their class. A former type
+     * that is a current `NODE_TYPE` stays the current class's; one former type named by two classes is a build error.
+     *
+     * @return array<string, class-string<ComposedViewNode>>
+     * @throws LogicException only under tests or {@see $throwErrors}
+     */
+    public static function getNodeClassesByLegacyNodeType(): array
+    {
+        if (static::$nodeClassesByLegacyNodeType !== null) {
+            return static::$nodeClassesByLegacyNodeType;
+        }
+        $nodeClassesByNodeType = static::getNodeClassesByNodeType();
+        $nodeClassesByLegacyNodeType = [];
+        foreach ($nodeClassesByNodeType as $nodeClass) {
+            foreach ($nodeClass::LEGACY_NODE_TYPES as $legacyNodeType) {
+                if ($legacyNodeType === '' || isset($nodeClassesByNodeType[$legacyNodeType])) {
+                    continue;
+                }
+                if (isset($nodeClassesByLegacyNodeType[$legacyNodeType]) && $nodeClassesByLegacyNodeType[$legacyNodeType] !== $nodeClass) {
+                    static::handleBuildError(sprintf('Two node classes declare the former node type "%s": %s and %s.', $legacyNodeType, $nodeClassesByLegacyNodeType[$legacyNodeType], $nodeClass));
+                    continue;
+                }
+                $nodeClassesByLegacyNodeType[$legacyNodeType] = $nodeClass;
+            }
+        }
+        return static::$nodeClassesByLegacyNodeType = $nodeClassesByLegacyNodeType;
     }
 
     /**
@@ -59,6 +94,7 @@ class ComposedViewNodeClasses
     public static function replaceNodeClasses(?array $nodeClassesByNodeType): void
     {
         static::$nodeClassesByNodeType = $nodeClassesByNodeType;
+        static::$nodeClassesByLegacyNodeType = null;
     }
 
     /**

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.0-alpha.60
+
+- A node class names former node types that stored trees still carry in `ComposedViewNode::LEGACY_NODE_TYPES`
+  (default none): `ComposedViewNodeClasses::getNodeClassForNodeType()` resolves them to the class, so the tree
+  reader no longer drops a stored node of a renamed type (`unknown node type`). They are no registered node type:
+  the kit spec, the node schema export and `getNodeTypes()` name `NODE_TYPE` only. One former type named by two
+  classes is a build error; a former type that is a current `NODE_TYPE` stays the current class's. An application
+  that renamed `VideoCard` to `VideoWidget` declares `LEGACY_NODE_TYPES = ['VideoCard']` on its node class.
+
 ## 0.1.0-alpha.59
 
 - The video and map tiles carry widget names: the node type `VideoCard` is `VideoWidget` (folder

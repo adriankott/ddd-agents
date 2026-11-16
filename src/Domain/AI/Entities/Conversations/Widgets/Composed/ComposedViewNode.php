@@ -23,6 +23,12 @@ abstract class ComposedViewNode extends ValueObject
     /** @var string The wire type (`Surface`, `Chart`, …). */
     public const string NODE_TYPE = '';
 
+    /**
+     * @var string[] Former wire types of the class that stored trees still carry: read as this class, never offered to
+     * the model (the kit spec, the schema export and every list of node types name {@see NODE_TYPE} only).
+     */
+    public const array LEGACY_NODE_TYPES = [];
+
     /** @var string[] The {@see ComposedViewNodeCategory} values of the type. */
     public const array CATEGORIES = [];
 

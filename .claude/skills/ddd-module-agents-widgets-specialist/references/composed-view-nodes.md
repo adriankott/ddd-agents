@@ -94,6 +94,7 @@ class NoteChipComposedViewNode extends ComposedViewNode
 | Declaration | Meaning |
 |---|---|
 | `NODE_TYPE`, `CATEGORIES`, `SUMMARY` | wire type, the categories slots test, one line for the model |
+| `LEGACY_NODE_TYPES` | former wire types stored trees still carry: read as this class (and written back with `NODE_TYPE`), never offered to the model — the kit spec, the schema export and `getNodeTypes()` name `NODE_TYPE` only. A renamed node type keeps its old name here; the frontend registers the old name for the same component (`LegacyVideoCard.composed.tsx`) |
 | `ComposedViewNodeProp` (repeatable attribute) | `name`, `types` (`TYPE_STRING`, `TYPE_NUMBER`, `TYPE_BOOLEAN`, `TYPE_ARRAY`, `TYPE_OBJECT`, `TYPE_EVENT`), `isRequired`, `isBindable` (default true), `allowedValues`, `description` |
 | `ComposedViewNodeSlot` (repeatable attribute) | `name` (default `children`), `acceptsCategories`, `acceptsNodeTypes`, `minChildren`, `maxChildren`, `sizeClass`, `sizeClassFromProp` with `sizeClassesByPropValue`, `acceptsHeavyWhenCompact` |
 | `PROVIDES_ITEM_SCOPE`, `ITEMS_PROP_NAME` | the node repeats its children over rows; `{"$item":…}` reads their fields (`Repeat`) |
