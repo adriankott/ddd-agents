@@ -30,7 +30,8 @@ class AgentSubAgentRequest extends ValueObject
     public const string REQUESTED_BY_PURPOSE_STEP = 'PURPOSE_STEP';
 
     /** The one task of the sub-agent. */
-    public AgentDelegationTask $task;
+    // typed as its three concrete classes (not the abstract base), so the API documents carry each shape (`oneOf`); `objectType` picks the class
+    public AgentDelegationAgentTask|AgentDelegationToolRunTask|AgentDelegationAwaitedRunTask $task;
 
     /** The label the model or the requester gave; null = the fallbacks of {@see buildRecordLabel()}. */
     public ?string $label = null;
@@ -79,7 +80,7 @@ class AgentSubAgentRequest extends ValueObject
      * {@see buildRecordLabel()}) and the profile, next step and flag the result declared.
      */
     public static function forToolResultTask(
-        AgentDelegationTask $task,
+        AgentDelegationAgentTask|AgentDelegationToolRunTask|AgentDelegationAwaitedRunTask $task,
         string $label,
         AgentDelegationRequestFromToolResult $agentDelegationRequestFromToolResult,
         ToolCall $producingToolCall
@@ -101,7 +102,7 @@ class AgentSubAgentRequest extends ValueObject
      * One item of a COMPLETED tool's `backgroundOperations` (platform work the tool decided): its run
      * end never resumes the parent.
      */
-    public static function forToolResultBackgroundOperation(AgentDelegationTask $task, ToolCall $producingToolCall): static
+    public static function forToolResultBackgroundOperation(AgentDelegationAgentTask|AgentDelegationToolRunTask|AgentDelegationAwaitedRunTask $task, ToolCall $producingToolCall): static
     {
         $agentSubAgentRequest = new static();
         $agentSubAgentRequest->task = $task;
@@ -113,7 +114,7 @@ class AgentSubAgentRequest extends ValueObject
     }
 
     /** A purpose step's platform work: its run end never resumes the parent. */
-    public static function forPurposeStep(AgentDelegationTask $task): static
+    public static function forPurposeStep(AgentDelegationAgentTask|AgentDelegationToolRunTask|AgentDelegationAwaitedRunTask $task): static
     {
         $agentSubAgentRequest = new static();
         $agentSubAgentRequest->task = $task;

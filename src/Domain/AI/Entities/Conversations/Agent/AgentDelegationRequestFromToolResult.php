@@ -7,6 +7,7 @@ namespace DDD\Domain\AI\Entities\Conversations\Agent;
 use DDD\Domain\AI\Entities\Conversations\Agent\Delegation\AgentDelegationAgentTask;
 use DDD\Domain\AI\Entities\Conversations\Agent\Delegation\AgentDelegationAwaitedRunTask;
 use DDD\Domain\AI\Entities\Conversations\Agent\Delegation\AgentDelegationTask;
+use DDD\Domain\AI\Entities\Conversations\Agent\Delegation\AgentDelegationToolRunTask;
 use DDD\Domain\AI\Entities\Conversations\Agent\Delegation\AgentSubAgentRequest;
 use DDD\Domain\AI\Entities\Conversations\Agent\Delegation\AgentSubAgentRequests;
 use DDD\Domain\AI\Entities\Conversations\Messages\RunSettings;
@@ -108,7 +109,7 @@ class AgentDelegationRequestFromToolResult extends ValueObject
      *
      * @param string[] $delegationSkillNames
      */
-    protected static function readTask(mixed $declaredTask, array $delegationSkillNames): ?AgentDelegationTask
+    protected static function readTask(mixed $declaredTask, array $delegationSkillNames): AgentDelegationAgentTask|AgentDelegationToolRunTask|AgentDelegationAwaitedRunTask|null
     {
         if (is_string($declaredTask)) {
             return trim($declaredTask) !== '' ? AgentDelegationAgentTask::forTask($declaredTask, $delegationSkillNames) : null;

@@ -34,7 +34,8 @@ class DelegationSubAgentRecord extends ValueObject
     public string $label = '';
 
     /** The one task; null for a call refused because it named no task shape. */
-    public ?AgentDelegationTask $task = null;
+    // typed as its three concrete classes (not the abstract base), so the API documents carry each shape (`oneOf`); `objectType` picks the class
+    public AgentDelegationAgentTask|AgentDelegationToolRunTask|AgentDelegationAwaitedRunTask|null $task = null;
 
     /** The child conversation; null when the run never started (NOT_RUN) or on a legacy sync row (no child id stored). */
     public ?int $childConversationId = null;
@@ -102,7 +103,7 @@ class DelegationSubAgentRecord extends ValueObject
     }
 
     /** A read-only record of an old multi-task call: one run, COMPLETED with the stored answer or NO_RESULT_RECORDED. */
-    public static function legacy(AgentDelegationTask $task, ?int $childConversationId, ?string $verdict, ?float $costInUsd): static
+    public static function legacy(AgentDelegationAgentTask|AgentDelegationToolRunTask|AgentDelegationAwaitedRunTask $task, ?int $childConversationId, ?string $verdict, ?float $costInUsd): static
     {
         $delegationSubAgentRecord = new static();
         $delegationSubAgentRecord->label = $task->buildDefaultLabel();

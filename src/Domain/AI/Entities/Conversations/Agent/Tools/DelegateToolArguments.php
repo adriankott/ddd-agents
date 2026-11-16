@@ -6,6 +6,7 @@ namespace DDD\Domain\AI\Entities\Conversations\Agent\Tools;
 
 use DDD\Domain\AI\Entities\Conversations\Agent\Delegation\AgentDelegationAgentTask;
 use DDD\Domain\AI\Entities\Conversations\Agent\Delegation\AgentDelegationTask;
+use DDD\Domain\AI\Entities\Conversations\Agent\Delegation\AgentDelegationAwaitedRunTask;
 use DDD\Domain\AI\Entities\Conversations\Agent\Delegation\AgentDelegationToolRunTask;
 use DDD\Domain\Base\Entities\ValueObject;
 
@@ -35,7 +36,8 @@ class DelegateToolArguments extends ValueObject
     public ?string $label = null;
 
     /** The one task; null when the call names neither task shape. */
-    public ?AgentDelegationTask $task = null;
+    // typed as its three concrete classes (not the abstract base), so the API documents carry each shape (`oneOf`); `objectType` picks the class
+    public AgentDelegationAgentTask|AgentDelegationToolRunTask|AgentDelegationAwaitedRunTask|null $task = null;
 
     /** The call names an agent task AND a tool run: the tool run is its task, the `task` text is not read. */
     public bool $namesBothTaskShapes = false;

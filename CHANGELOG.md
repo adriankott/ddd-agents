@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.0-alpha.57
+
+- The task of a sub-agent (`DelegationSubAgentRecord::$task`, `DelegateToolArguments::$task`,
+  `AgentSubAgentRequest::$task`) is typed as its three concrete classes
+  (`AgentDelegationAgentTask|AgentDelegationToolRunTask|AgentDelegationAwaitedRunTask`) instead of the abstract
+  `AgentDelegationTask`: the API documents describe each shape (`oneOf`), so generated client models have their
+  fields. `objectType` picks the class, as before; the task factories return the same union.
+
 ## 0.1.0-alpha.56
 
 - Append-only loading: the decision model's preload on a conversation's first row is no part of the first epoch's

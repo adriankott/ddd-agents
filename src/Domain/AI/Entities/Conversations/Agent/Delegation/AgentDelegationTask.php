@@ -12,7 +12,8 @@ use DDD\Domain\Base\Entities\ValueObject;
  * a model loop works on a task text with preloaded skills) or a tool run ({@see AgentDelegationToolRunTask} — one call
  * of one tool, no model) or an awaited run ({@see AgentDelegationAwaitedRunTask} — a conversation that runs on its
  * own). The task describes itself: the child's seed text, the item stored in the `delegate` call's
- * arguments, the child's purpose, and the skills its seed preloads. Pure value object, no repo contact.
+ * arguments, the child's purpose, and the skills its seed preloads. Pure value object, no repo contact. A property
+ * that holds a task is typed with the three classes, so the API documents carry each shape.
  */
 abstract class AgentDelegationTask extends ValueObject
 {
@@ -33,7 +34,7 @@ abstract class AgentDelegationTask extends ValueObject
      *
      * @param array<string, mixed> $argumentItem
      */
-    public static function fromArgumentItem(array $argumentItem): ?self
+    public static function fromArgumentItem(array $argumentItem): AgentDelegationAgentTask|AgentDelegationToolRunTask|AgentDelegationAwaitedRunTask|null
     {
         $toolName = AgentDelegationToolRunTask::readToolNameFromArgumentItem($argumentItem);
         if ($toolName !== null) {
@@ -67,7 +68,7 @@ abstract class AgentDelegationTask extends ValueObject
      *
      * @param array<string, mixed> $storedTask
      */
-    public static function fromStoredTaskArray(array $storedTask): ?self
+    public static function fromStoredTaskArray(array $storedTask): AgentDelegationAgentTask|AgentDelegationToolRunTask|AgentDelegationAwaitedRunTask|null
     {
         $kind = $storedTask['kind'] ?? null;
         if ($kind === self::KIND_AGENT && is_string($storedTask['taskText'] ?? null) && $storedTask['taskText'] !== '') {
