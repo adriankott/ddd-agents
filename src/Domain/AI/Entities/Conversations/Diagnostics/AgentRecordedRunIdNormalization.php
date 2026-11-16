@@ -45,6 +45,14 @@ class AgentRecordedRunIdNormalization
     public const string FAMILY_SCHEDULE = 'schedule';
 
     /**
+     * The agent space a run works in. A space the harness names as a scope reads as its scope placeholder
+     * (`<agentSpace>`); a space the run created without naming it reads as its creation ordinal (`<agentSpace#1>`); a
+     * space that existed before the run stays raw. Declared so `agentSpaceId` never falls to the free-number path,
+     * which skips ids shorter than {@see MIN_TEXT_WIDE_ID_DIGITS} digits.
+     */
+    public const string FAMILY_AGENT_SPACE = 'agentSpace';
+
+    /**
      * The declared id-bearing columns and JSON keys → the family whose ids they carry. `supervisedConversationId`
      * points at a supervisor conversation OUTSIDE the tree (the snapshot holds the tree only; a supervised run is not
      * supported by the comparison yet — record with `--no-supervisor`).
@@ -65,6 +73,7 @@ class AgentRecordedRunIdNormalization
         'toolCallOriginMessageId' => self::FAMILY_MESSAGE,
         'delegationBatchId' => self::FAMILY_DELEGATION_BATCH,
         'scheduleId' => self::FAMILY_SCHEDULE,
+        'agentSpaceId' => self::FAMILY_AGENT_SPACE,
     ];
 
     /** Keys that only carry how long or when something ran: dropped before the comparison, at any depth. */

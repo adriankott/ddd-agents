@@ -31,7 +31,7 @@ class AIConversationFinalizeHandler extends AIDomainMessageHandler
     public function __invoke(AIConversationFinalizeMessage $message): void
     {
         set_time_limit(1800); // a completion pass over a long-idle backlog can span several model calls
-        ini_set('memory_limit', '512M');
+        DDDService::instance()->raiseMemoryLimitToAtLeast('512M');
 
         $this->setAuthAccountFromMessage($message);
 

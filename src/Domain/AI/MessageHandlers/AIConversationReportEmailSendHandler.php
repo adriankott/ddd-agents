@@ -34,7 +34,7 @@ class AIConversationReportEmailSendHandler extends AIDomainMessageHandler
     public function __invoke(AIConversationReportEmailSendMessage $message): void
     {
         set_time_limit(300);
-        ini_set('memory_limit', '512M');
+        DDDService::instance()->raiseMemoryLimitToAtLeast('512M');
 
         $this->setAuthAccountFromMessage($message);
 

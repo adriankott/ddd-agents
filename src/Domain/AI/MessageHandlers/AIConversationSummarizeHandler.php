@@ -27,7 +27,7 @@ class AIConversationSummarizeHandler extends AIDomainMessageHandler
     public function __invoke(AIConversationSummarizeMessage $message): void
     {
         set_time_limit(600); // headroom for a slow summarizer model under load
-        ini_set('memory_limit', '512M');
+        DDDService::instance()->raiseMemoryLimitToAtLeast('512M');
 
         $this->setAuthAccountFromMessage($message);
 

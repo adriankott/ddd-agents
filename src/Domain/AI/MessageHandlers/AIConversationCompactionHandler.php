@@ -29,7 +29,7 @@ class AIConversationCompactionHandler extends AIDomainMessageHandler
     public function __invoke(AIConversationCompactionMessage $message): void
     {
         set_time_limit(1800); // a roll-up round can span several model calls across tree levels
-        ini_set('memory_limit', '512M');
+        DDDService::instance()->raiseMemoryLimitToAtLeast('512M');
 
         $this->setAuthAccountFromMessage($message);
 

@@ -29,7 +29,7 @@ class AIConversationMessageEmbeddingHandler extends AIDomainMessageHandler
     public function __invoke(AIConversationMessageEmbeddingMessage $message): void
     {
         set_time_limit(600); // headroom for the embedding endpoint under load
-        ini_set('memory_limit', '512M');
+        DDDService::instance()->raiseMemoryLimitToAtLeast('512M');
 
         $this->aiTrace('embedding.received', ['messageId' => $message->aiConversationMessageId]);
 

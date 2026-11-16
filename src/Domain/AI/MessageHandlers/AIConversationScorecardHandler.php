@@ -29,7 +29,7 @@ class AIConversationScorecardHandler extends AIDomainMessageHandler
     public function __invoke(AIConversationScorecardMessage $message): void
     {
         set_time_limit(900); // a long conversation's segments run concurrently, the final call after them
-        ini_set('memory_limit', '512M');
+        DDDService::instance()->raiseMemoryLimitToAtLeast('512M');
 
         $this->setAuthAccountFromMessage($message);
         try {

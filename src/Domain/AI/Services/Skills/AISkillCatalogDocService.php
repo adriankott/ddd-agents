@@ -53,7 +53,7 @@ class AISkillCatalogDocService extends Service
      */
     public function buildSkillCatalog(): AISkillCatalog
     {
-        ini_set('memory_limit', '1024M'); // container + reflection over every package
+        DDDService::instance()->raiseMemoryLimitToAtLeast('1024M'); // container + reflection over every package
 
         /** @var AISkillsService $aiSkillsService */
         $aiSkillsService = AISkill::getService();
@@ -201,7 +201,7 @@ class AISkillCatalogDocService extends Service
      */
     public function buildToolDocumentation(string $toolName): ?AISkillToolDocumentation
     {
-        ini_set('memory_limit', '1024M');
+        DDDService::instance()->raiseMemoryLimitToAtLeast('1024M');
 
         foreach (AISkill::getAllSkillNames() as $skillName) {
             foreach (AISkill::getPackagesForSkill($skillName) as $packageClass) {

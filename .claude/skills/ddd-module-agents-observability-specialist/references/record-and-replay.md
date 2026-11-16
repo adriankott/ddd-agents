@@ -139,6 +139,10 @@ timing keys (`AgentRecordedRunIdNormalization::TIMING_KEYS`) and the screening v
 (`ASYNC_VERDICT_KEYS`) are dropped, and the volatile columns (`AgentRecordedRunComparison::VOLATILE_ROW_COLUMNS`) are
 never compared.
 
+A row's `agentSpaceId` is a declared id key of the family `agentSpace`: a space the harness names as a scope reads as
+`<agentSpace>`, a space the run created without naming it as `<agentSpace#1>`, a space that existed before the run
+stays raw (a different existing space is a difference).
+
 ## The tool-call comparison
 
 `app:mcp:compare-tool-calls` (options, the script format, the files and the exit codes:

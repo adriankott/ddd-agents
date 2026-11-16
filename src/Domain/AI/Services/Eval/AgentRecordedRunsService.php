@@ -10,6 +10,7 @@ use DDD\Domain\AI\Entities\RecordedRuns\AgentRecordedRunRecording;
 use DDD\Domain\AI\Entities\RecordedRuns\AgentRecordedRunScope;
 use DDD\Domain\AI\Entities\RecordedRuns\AgentRecordedRunScopeColumns;
 use DDD\Domain\AI\Entities\RecordedRuns\AgentRecordedRunSession;
+use DDD\Domain\AI\Repo\DB\AgentSpaces\DBAgentSpace;
 use DDD\Domain\AI\Repo\DB\Conversations\Agent\DBAIConversationDelegationBatchModel;
 use DDD\Domain\AI\Repo\DB\Conversations\Compaction\DBAIConversationCompactionNodeModel;
 use DDD\Domain\AI\Repo\DB\Conversations\DBAIConversationModel;
@@ -133,6 +134,7 @@ class AgentRecordedRunsService extends Service
             AgentRecordedRunIdNormalization::FAMILY_DELEGATION_BATCH => DBAIConversationDelegationBatchModel::getTableName(),
             AgentRecordedRunIdNormalization::FAMILY_COMPACTION_NODE => DBAIConversationCompactionNodeModel::getTableName(),
             AgentRecordedRunIdNormalization::FAMILY_SCHEDULE => DBAIConversationScheduleModel::getTableName(),
+            AgentRecordedRunIdNormalization::FAMILY_AGENT_SPACE => (DBAgentSpace::BASE_ORM_MODEL)::getTableName(),
         ];
     }
 }

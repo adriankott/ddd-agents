@@ -123,6 +123,7 @@ class AgentRecordedRunsServiceTest extends UnitTestCase
             AgentRecordedRunIdNormalization::FAMILY_DELEGATION_BATCH,
             AgentRecordedRunIdNormalization::FAMILY_COMPACTION_NODE,
             AgentRecordedRunIdNormalization::FAMILY_SCHEDULE,
+            AgentRecordedRunIdNormalization::FAMILY_AGENT_SPACE,
         ], array_keys($tableByFamily));
         self::assertSame(DBAIConversationModel::getTableName(), $tableByFamily[AgentRecordedRunIdNormalization::FAMILY_CONVERSATION]);
     }

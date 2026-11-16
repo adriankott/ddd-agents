@@ -32,7 +32,7 @@ class AIConversationResumeHandler extends AIDomainMessageHandler
     public function __invoke(AIConversationResumeMessage $message): void
     {
         set_time_limit(1800); // a single agentic turn can be a long multi-step LLM run (tool calls, fan-out spawn)
-        ini_set('memory_limit', '1024M');
+        DDDService::instance()->raiseMemoryLimitToAtLeast('1024M');
 
         // the origin of the turn-start stamps: what happens between the owner's message and
         // the first model call is measured from HERE — before auth, envelope and the conversation load

@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.1.0-alpha.65
+
+- Fixed: the message handlers raise the memory limit instead of setting it
+  (`DDDService::raiseMemoryLimitToAtLeast()`, `mgamadeus/ddd` 3.34.3). Before, `ini_set('memory_limit', '512M')` as the
+  first line of a job lowered the limit of a console command that ran the handler in-process with a higher one, and
+  with the usage already above 512M PHP warned "Failed to set memory limit", which the dev kernel turned into an
+  exception and the job failed. Changed: embedding, summarize, finalize, report email, scorecard and compaction (512M),
+  resume (1024M), and `AISkillCatalogDocService` (1024M, also runs inside a job). The console commands keep `ini_set`
+  (their own process), the fork-join child its `-d memory_limit`.
+- Fixed: the recorded-run comparison reads a row's `agentSpaceId` as an id of its own family
+  (`AgentRecordedRunIdNormalization::FAMILY_AGENT_SPACE`, table from the agent space repository in
+  `AgentRecordedRunsService::buildTableByFamily()`). Before, it went through the free-number path, which reads only
+  numbers of at least six digits, so a five-digit space the run created (69490 recorded, 69494 replayed) stayed raw and
+  the runs differed. A space the harness names reads as `<agentSpace>`, one the run created without naming it as
+  `<agentSpace#1>`, one that existed before the run stays raw.
+- Changed: requires `mgamadeus/ddd` ^3.34.3.
+
 ## 0.1.0-alpha.64
 
 - Fixed: a judge or driver model name the model catalog does not know is refused before any call. Before, the call ran
