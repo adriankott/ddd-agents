@@ -11,9 +11,13 @@ use DDD\Symfony\Commands\Agents\AgentChatTuiCommand;
 use DDD\Symfony\Commands\Agents\AgentCloseSchedulesForInactiveAgentSpacesCommand;
 use DDD\Symfony\Commands\Agents\AgentCompactConversationCommand;
 use DDD\Symfony\Commands\Agents\AgentCompactFinalizedConversationsCommand;
+use DDD\Symfony\Commands\Agents\AgentDecisionFixturesCommand;
+use DDD\Symfony\Commands\Agents\AgentDecisionStatsCommand;
 use DDD\Symfony\Commands\Agents\AgentDeliverOwedReportsAndResumeOwedTurnsCommand;
 use DDD\Symfony\Commands\Agents\AgentDiagnoseResumeCommand;
 use DDD\Symfony\Commands\Agents\AgentEvalAnalyzeCommand;
+use DDD\Symfony\Commands\Agents\AgentEvalCompactionTreeCommand;
+use DDD\Symfony\Commands\Agents\AgentEvalConversationsPurgeCommand;
 use DDD\Symfony\Commands\Agents\AgentEvalEvictionCommand;
 use DDD\Symfony\Commands\Agents\AgentEvalGuardCommand;
 use DDD\Symfony\Commands\Agents\AgentEvalRecallCommand;
@@ -102,6 +106,10 @@ class PackageAgentCommandsRegistrationTest extends IntegrationTestCase
         'app:ai-agent:eval-eviction' => AgentEvalEvictionCommand::class,
         'app:ai-agent:eval-guard' => AgentEvalGuardCommand::class,
         'app:ai-agent:eval-schedule-runs' => AgentEvalScheduleRunsCommand::class,
+        'app:ai-agent:eval-conversations-purge' => AgentEvalConversationsPurgeCommand::class,
+        'app:ai-agent:decision-stats' => AgentDecisionStatsCommand::class,
+        'app:ai-agent:decision-fixtures' => AgentDecisionFixturesCommand::class,
+        'app:ai-agent:eval-compaction-tree' => AgentEvalCompactionTreeCommand::class,
     ];
 
     /** @var string The tool-call child: run by name, never listed */
@@ -145,12 +153,12 @@ class PackageAgentCommandsRegistrationTest extends IntegrationTestCase
 
         $visibleCommandNames = array_keys(self::COMMAND_CLASSES_BY_NAME);
         $visibleCommandNames = array_values(array_diff($visibleCommandNames, [self::HIDDEN_COMMAND_NAME]));
-        self::assertCount(40, $visibleCommandNames);
+        self::assertCount(44, $visibleCommandNames);
         self::assertSame([], array_values(array_diff($visibleCommandNames, $listedCommandNames)), 'every visible command is listed');
         self::assertNotContains(self::HIDDEN_COMMAND_NAME, $listedCommandNames);
         self::assertContains(self::HIDDEN_COMMAND_NAME, $hiddenCommandNames);
         $textListProcess = $this->runConsoleScript('list', '--raw');
-        self::assertSame(40, preg_match_all('/^app:(ai-(agent|conversation|schedule)|mcp|ai:composed-view):\S+/m', $textListProcess->getOutput()), 'the text listing names the 40 visible commands');
+        self::assertSame(44, preg_match_all('/^app:(ai-(agent|conversation|schedule)|mcp|ai:composed-view):\S+/m', $textListProcess->getOutput()), 'the text listing names the 44 visible commands');
 
         $helpProcess = $this->runConsoleScript('help', self::HIDDEN_COMMAND_NAME);
         self::assertSame(0, $helpProcess->getExitCode(), $helpProcess->getErrorOutput());

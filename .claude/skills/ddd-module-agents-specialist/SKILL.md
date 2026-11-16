@@ -208,8 +208,13 @@ with the same name.
 | `app:ai-agent:compact` | runs one compaction round of a conversation in the console and prints the tree and the cover; `--show-only` renders only | no | yes, unless `--show-only` (makes model calls) |
 | `app:ai-conversation:search-inspect` | runs the conversation search stage by stage, rights off and on, inside the search envelope | no | no (makes model calls; `--embed` writes embeddings) |
 | `app:ai-agent:eval-tools`, `eval-suite`, `eval-selection`, `eval-recall`, `eval-tiers`, `eval-analyze`, `eval-eviction`, `eval-guard`, `eval-schedule-runs` | the evaluation commands on the base `AgentEvalConsoleCommand`: they run the host's fixtures (`AI.evalSuite.fixturePaths`, `AI.evalSuite.suites`), store result files and suite runs; `eval-analyze` reads a stored run offline (`ddd-module-agents-observability-specialist`) | no | yes (make model calls; `eval-analyze` does not) |
+| `app:ai-agent:eval-compaction-tree` | a judged long run with frequent compaction from a case file (`--case-file`); judges the compaction tree per turn and at the end | no | yes (makes model calls; stores the conversation only with `--persist`) |
+| `app:ai-agent:eval-conversations-purge` | deletes the conversation trees of the configured evaluation accounts older than `--older-than-hours` (default 48) with every dependent row, in bounded chunks under a time budget below 360 s; refuses any other account | optional, e.g. hourly | only with `--apply` (dry run counts) |
+| `app:ai-agent:decision-fixtures` | sends the cases of a JSON decision fixture to the decision model and scores the picks | no | no (makes model calls) |
+| `app:ai-agent:decision-stats` | decision statistics over the turn events: per site, mode, arm, day; shadow agreement | no | no |
 
-The host still writes its own replay command and its evaluation fixtures (`ddd-module-agents-observability-specialist`);
+The host still writes its own replay commands (a decision replay on the abstract `AgentDecisionReplayCommand`) and its
+evaluation fixtures (`ddd-module-agents-observability-specialist`);
 for the commands above it writes subclasses only where it needs an override point ([references/host-duties.md](references/host-duties.md)).
 
 ## Templates

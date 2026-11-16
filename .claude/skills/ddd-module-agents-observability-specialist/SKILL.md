@@ -1,6 +1,6 @@
 ---
 name: ddd-module-agents-observability-specialist
-description: "Watches, debugs, records, replays and evaluates mgamadeus/ddd-agents runs. Covers the turn that never answers (run states, resume diagnosis, recovery), request snapshots, the sent payload, context composition, prompt-cache diff, integrity and delegation reports, turn and trace events, AGENT_TRACE, console printer, transcript, TUI, record and replay, eval safety (evalRun, outbound guard), metrics, costs, scorecards, eval runner, judged run, the eval suite (planning, schedule, stored runs, result files, baseline, retention sweep), run report, the eval commands app:ai-agent:eval-* (tools, suite, selection, recall, tiers, analyze, eviction, guard, schedule-runs), control panel. Use when a turn never answers, a run stays RUNNING, FAILED or AWAITING_DELEGATES, what the model saw is needed, a run is replayed, a test run must not send mail, cost is measured, an eval runner or judge is built, to plan a parallel eval suite, compare with a baseline, store suite runs, print a run report or run an eval command."
+description: "Watches, debugs, records, replays and evaluates mgamadeus/ddd-agents runs. Covers the turn that never answers (run states, resume diagnosis, recovery), request snapshots, sent payload, prompt-cache diff, integrity and delegation reports, turn and trace events, AGENT_TRACE, console printer, transcript, TUI, record and replay, eval safety (evalRun, outbound guard), metrics, costs, scorecards, eval runner, judged run, eval suite, baseline, run report, the app:ai-agent:eval-* commands (tools, suite, selection, recall, tiers, analyze, eviction, guard, schedule-runs, compaction-tree, conversations-purge), decision-fixtures, decision-stats, decision replay, seed-account lease and clean start, control panel. Use when a turn never answers, a run stays RUNNING, FAILED or AWAITING_DELEGATES, what the model saw is needed, a run is replayed, a test run must not send mail, cost is measured, a runner, judge or suite is built, an eval command runs or old eval conversations are purged."
 metadata:
   author: mgamadeus
   version: "0.2.0"
@@ -18,10 +18,13 @@ recording-session contract `AgentRecordedRunSessionInterface`, the diagnosis and
 (`app:ai-agent:diagnose`, `app:ai-agent:validate-conversation`, `app:ai-agent:cache-diff`,
 `app:ai-agent:activity-lines`, `app:ai-agent:tool-response-stats`, `app:ai-agent:skill-token-map`,
 `app:ai-agent:context-eviction-sim`, `app:ai-conversation:search-inspect`, `app:ai-agent:run-report`; the full list with the maintenance
-commands is in `ddd-module-agents-specialist`), the nine evaluation commands on the base `AgentEvalConsoleCommand`
+commands is in `ddd-module-agents-specialist`), the ten evaluation commands on the base `AgentEvalConsoleCommand`
 (`app:ai-agent:eval-tools`, `eval-suite`, `eval-selection`, `eval-recall`, `eval-tiers`, `eval-analyze`,
-`eval-eviction`, `eval-guard`, `eval-schedule-runs`; [building-evaluation-in-the-host](references/building-evaluation-in-the-host.md)
-§ The evaluation commands) and the line editor a console chat reads its input with
+`eval-eviction`, `eval-guard`, `eval-schedule-runs`, `eval-compaction-tree`; [building-evaluation-in-the-host](references/building-evaluation-in-the-host.md)
+§ The evaluation commands), the decision commands (`app:ai-agent:decision-fixtures`, `app:ai-agent:decision-stats`,
+the abstract replay base `AgentDecisionReplayCommand`), the evaluation purge (`app:ai-agent:eval-conversations-purge`
+on `AIConversationEvalPurgeService`), the seed-account lease and clean start (`AgentEvalSeedAccountLeasesService`,
+`AgentEvalSeedAccountResetService`; § Seed accounts, clean start and the purge) and the line editor a console chat reads its input with
 (`src/Symfony/Commands/Agents/Chat/`), but **no chat or replay command and no fixtures**: those are the host's, built
 on the contracts below.
 
@@ -194,7 +197,9 @@ stuck-run list with `AIConversationStuckRunsReadService::findStuckRuns()` the sa
 | Agent time, owner time, tool failures, cost per conversation, scorecards | [metrics-and-cost](references/metrics-and-cost.md) |
 | Build an evaluation runner, judge and suite | [building-evaluation-in-the-host](references/building-evaluation-in-the-host.md) |
 | Run a judged case (a simulated owner and a judge verdict) or a compaction-tree run; adapt its prompt files or override points | [building-evaluation-in-the-host](references/building-evaluation-in-the-host.md) § The judged run |
-| Run or adapt an evaluation command (`eval-tools`, `eval-suite`, `eval-selection`, `eval-recall`, `eval-tiers`, `eval-analyze`, `eval-eviction`, `eval-guard`, `eval-schedule-runs`); configure its fixtures and suites; stop a running suite | [building-evaluation-in-the-host](references/building-evaluation-in-the-host.md) § The evaluation commands |
+| Run or adapt an evaluation command (`eval-tools`, `eval-suite`, `eval-selection`, `eval-recall`, `eval-tiers`, `eval-analyze`, `eval-eviction`, `eval-guard`, `eval-schedule-runs`, `eval-compaction-tree`); configure its fixtures and suites; stop a running suite | [building-evaluation-in-the-host](references/building-evaluation-in-the-host.md) § The evaluation commands |
+| Score a decision site against a fixture, read decision statistics, replay stored tool calls against a decision (`decision-fixtures`, `decision-stats`, `AgentDecisionReplayCommand`) | [building-evaluation-in-the-host](references/building-evaluation-in-the-host.md) § The evaluation commands |
+| Delete old evaluation conversations; give each parallel case its own seed account and a clean start; add the host's tables to the purge | [building-evaluation-in-the-host](references/building-evaluation-in-the-host.md) § Seed accounts, clean start and the purge |
 | Build an admin control panel; drive, edit or branch a conversation as an admin | [control-panel-and-admin-drive](references/control-panel-and-admin-drive.md) |
 | Read the turn events and the trace events of a conversation | [trace-and-turn-events](references/trace-and-turn-events.md) |
 

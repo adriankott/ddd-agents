@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.1.0-alpha.62
+
+- Added: `app:ai-agent:eval-conversations-purge` on `AIConversationEvalPurgeService`: deletes the conversation trees
+  of the configured evaluation accounts whose last activity is older than an age limit, with every dependent row, in
+  bounded chunks (each write chunk in its own transaction with a 2 s lock wait and a 20 s statement limit, each read
+  with the 20 s statement limit), with a time budget, a dry run with counts (the default; `--apply` writes), kept agent
+  spaces, and steps an application extends through `buildHostDependantPurgeSteps()`. An account that is no configured
+  evaluation account is refused; on MariaDB and PostgreSQL.
+- Added: `AIConversationEvalPurgeService::beginStatementLimitedRead()` / `endStatementLimitedRead()` — a pair an
+  application puts around its own reads of a purge run; every read of the purge itself runs between them.
+- Deprecated: `AIConversationEvalPurgeService::preparePoliteWriteSession()` does nothing (the limits sit on each write
+  chunk and each read) and is no longer called by the purge; it will be removed in a later release.
+- Added: `AgentEvalSeedAccountLeasesService` (one evaluation process per seed account, a lock file per account on the
+  host) with `AgentEvalSeedAccountLease` and `AgentEvalSeedPool`, and
+  `AgentEvalSeedAccountResetService::resetAccountForCleanStart(Account, ?AgentSpace)` with
+  `AgentEvalSeedAccountResetReport`.
+- Added: `app:ai-agent:decision-fixtures` (synthetic decision cases from a JSON fixture, scored against their
+  expectations), `app:ai-agent:decision-stats` (read-only decision statistics over the turn events) and the abstract
+  `AgentDecisionReplayCommand` (an application's replay of stored tool calls against one decision site). Each
+  decision call of `decision-fixtures` and of a replay is booked under an evaluation envelope of its own.
+- Added: `app:ai-agent:eval-compaction-tree` (a judged long run with frequent compaction; the case comes from a case
+  file, `--case-file`; the space from the case file first, the scope options such as `--agentSpaceId` are the
+  fallback).
+
 ## 0.1.0-alpha.61
 
 - Added: the evaluation commands `app:ai-agent:eval-tools`, `eval-suite`, `eval-selection`, `eval-recall`,

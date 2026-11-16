@@ -2,13 +2,14 @@
 
 **Reader:** host developer
 
-Contents: what ships, what does not · the parts of a runner · driving one case · reading the outcome · the judge · the judged run · the suite · the evaluation commands · throwaway spaces and cleanup · checklist · full class names
+Contents: what ships, what does not · the parts of a runner · driving one case · reading the outcome · the judge · the judged run · the suite · the evaluation commands · seed accounts, clean start and the purge · throwaway spaces and cleanup · checklist · full class names
 
 The package ships the safety layers, the recorded runs, the read models an evaluation needs, the run of ONE case
 (`AgentEvalRunnerService` with the application's `AgentEvalRunHooksService`) and the judged run of one case
 (`AgentEvalJudgedRunService`: a simulated owner and a judge), the parts a suite is built from: its objects, its
-stored runs, its result files and the run report ([the suite](#the-suite)), and nine evaluation commands on them
-([the evaluation commands](#the-evaluation-commands)). The fixtures are the host's: without them the commands find
+stored runs, its result files and the run report ([the suite](#the-suite)), the evaluation and decision commands on
+them ([the evaluation commands](#the-evaluation-commands)), and the seed-account lease, the clean start and the purge
+of old evaluation conversations ([seed accounts](#seed-accounts-clean-start-and-the-purge)). The fixtures are the host's: without them the commands find
 no case. This reference names what each part calls in the package.
 
 ## What ships, what does not
@@ -17,7 +18,8 @@ no case. This reference names what each part calls in the package.
 |---|---|
 | the eval marker and the eval switches on `RunSettings` | a case file loader (the case object `AgentEvalCase` reads a decoded case) |
 | the eval tool block and the outbound recipient guard ([eval-safety](eval-safety.md)) | the fixtures (case files, suites) and the configuration that names them (`AI.evalSuite.fixturePaths`, `AI.evalSuite.suites`) |
-| the nine evaluation commands with child processes, retries and stop handling ([the evaluation commands](#the-evaluation-commands)) | the host's subclasses where it names its own scope, case shape or texts |
+| the evaluation commands with child processes, retries and stop handling, the decision commands and the abstract decision replay ([the evaluation commands](#the-evaluation-commands)) | the host's subclasses where it names its own scope, case shape or texts; its decision replay commands |
+| the seed-account lease, the clean start of a seed account and the evaluation purge ([seed accounts](#seed-accounts-clean-start-and-the-purge)) | the host's seed pool keys, its own account state and the purge steps of its own tables |
 | `AgentEvalResult` (a verdict value object) and the assertions over a run (`AgentEvalExpectation`: expected tool, skill, status, arguments, plan, state after the run) | |
 | the run of one case: `AgentEvalRunnerService::runCase()` / `run()` / `runWithRestore()` — the tool block applied and lifted, follow-up turns, purpose, reload, restore (`AgentEvalRestorePlan`, `AgentEvalHarnessToolCalls`), the state check, the teardown, applicability (`AgentEvalApplicabilityFacts`), the eviction trajectory, the recall seed, the figures (`AgentEvalRunFigures`) | the application's part of a run: the 13 hooks of `AgentEvalRunHooksService` (scope, ineligible scope, withheld skills, harness arguments, …), overridden in a same-path subclass |
 | `AIConversationAuditRenderService` (the deterministic audit blocks a judge reads); the judged run with its driver and verdict prompts and its model calls ([the judged run](#the-judged-run)) | the application's override points of the judged run |
@@ -162,6 +164,15 @@ All on the base `AgentEvalConsoleCommand` (`src/Symfony/Commands/Agents/`), live
 | `app:ai-agent:eval-eviction` | multi-skill trajectories on one conversation; the load curve and whether eviction fired | `eviction` (one file) | `trajectoryNamesItsScope()`, `getScopeWordOfSkipLine()` |
 | `app:ai-agent:eval-guard` | the injection guard probe: variants × inputs × `--runs`, false-block and bypass rate; `--parallel` children, each ended at its 1,200 s ceiling; each probe under its own evaluation envelope | `guard` | the guard class by same-path subclass (`ArgusAgentSentinelCanaryGuard::newInstance()`) |
 | `app:ai-agent:eval-schedule-runs` | fires one evaluation schedule `--runs` times and compares the structure of its reports; needs the workers | — | `configureReportOptions()`, `validateReportOptions()`, `runInsteadOfFiring()`, `afterRunEnded()`, `describeScope()`, `describeEvalAccountsSource()`, `describeRequiredOptions()` |
+| `app:ai-agent:eval-compaction-tree` | drives a long judged run with frequent compaction and judges the compaction tree after every turn and at the end; `--json`, `--persist` (stores the conversation and validates the stored build) | the case file (`--case-file`); the space comes from the case file first, the scope options are the fallback | `getDefaultCaseFile()`, `getDefaultCompactionParamsTemplate()`, `buildCompactionTreeParameters()`, `resolveTreeEvalScope()`, `buildJudgedRunOptions()`, the headings |
+
+The decision commands sit on the base `AgentConsoleCommand` (not on `AgentEvalConsoleCommand`):
+
+| Command | What it does | Override points |
+|---|---|---|
+| `app:ai-agent:decision-fixtures <fixture>` | sends the cases of a JSON fixture (sub-skill preload or reply language) to the decision model, `--repeat` times, and scores the picks against the expectations; each call under an evaluation envelope of its own, billed to the fixture's space | `getFixtureScopeKey()`, `getAgentSpaceFactsKey()`, `resolveBillingScope()`, `getDefaultSupportedLanguageCodes()`, `getDefaultReplyLanguageCode()` |
+| `app:ai-agent:decision-stats` | read-only statistics over the turn events of one decision site (`--site`, `--from`, `--to`, `--mode`): per mode, arm and day, shadow agreement; eval traffic excluded unless `--includeEval` | `buildStatisticsRequest()`, `renderSection()` |
+| `AgentDecisionReplayCommand` (abstract) | the host's replay of stored tool calls against one decision: per conversation of `--conversations` it reads the messages with rights lifted, then replays each picked call as the conversation's account under an evaluation envelope; `--resultFile` writes the rows as JSON | the host names the command (`#[AsCommand]`) and implements `isToolCallReplayed()` and `replayToolCall()`; `configureReplayOptions()`, `executeReplayWork()`, `getRowTableHeaders()` |
 
 What every command shares (the base):
 
@@ -183,6 +194,36 @@ What every command shares (the base):
   the space's billing entity); a schedule the command creates is attached by `attachNewScheduleToScope()` (default:
   the stored space). Every task and options object of a plan comes from `AgentEvalSuitePlanService::createTask()` /
   `createPlanOptions()`, so a host's same-path class is used everywhere.
+
+## Seed accounts, clean start and the purge
+
+Cases that run in parallel must not share an account: every case resets its account at its start.
+
+- **Lease:** `AgentEvalSeedAccountLeasesService::acquireLeaseFromPool(AgentEvalSeedPool)` hands one seed of the pool to
+  this process: an exclusive, non-blocking `flock()` on a lock file per account in the project's var folder (`LEASE_FILE_FOLDER_NAME`),
+  released by the operating system when the process ends. Per host only. `keepLeaseAlive()` once per owner turn (false
+  = the lease is lost, abort the case), `releaseLease()` at the end. A seed is an agent space by default; a host maps
+  its own kind in `findAccountIdOfSeed()` and builds the pool from its fixture keys (`AgentEvalSeedPool::fromSeedIds()`).
+- **Clean start:** `AgentEvalSeedAccountResetService::resetAccountForCleanStart(Account, ?AgentSpace)` refuses an
+  account that is no configured evaluation account, waits up to 60 s for the account's runs in flight, then runs
+  `resetHostAccountStateBeforePurge()`, the purge of every tree of the account created before now, and
+  `resetHostAccountStateAfterPurge()`; the outcome is an `AgentEvalSeedAccountResetReport` (a host's subclass from
+  `newResetReport()` carries its own lines). `findKeptAgentSpaceIds()` names spaces whose conversations stay.
+- **Purge:** `app:ai-agent:eval-conversations-purge` on `AIConversationEvalPurgeService` deletes the trees (root,
+  delegation children, supervisor tandems) of the configured evaluation accounts whose newest activity is older than
+  `--older-than-hours`, with every dependent row; a tree with a run in flight or a fresh heartbeat stays. A dry run is
+  the default, `--apply` writes. `--accounts` names accounts; one outside the configured evaluation accounts is refused
+  unless `--evalOnly` restricts the run to trees with an evaluation marker and the host allows the account
+  (`findAccountIdsAllowedForEvalOnlyPurge()`). The statements run on the connection, not through repositories, so no
+  read rights apply: the account check above is the scope. Every write chunk runs in its own transaction with a 2 s
+  lock wait and a 20 s statement limit, every read with the 20 s limit; the budget is capped at 240 s for a cron line
+  under a 360 s ticker.
+- **The host's tables:** a same-path subclass of the purge service adds its steps (`buildHostDependantPurgeSteps()`,
+  `AIConversationEvalPurgeStep::deleteRows()` / `nullifyColumn()`), the ids they match (`collectHostPurgeKeys()`), their
+  order (`getPurgeStepKeysInOrder()`), its evaluation markers (`buildHostEvalMarkerConditionsByMarker()`) and its columns
+  that are deliberately no step (`getColumnsNotPurged()`). Its own reads during a run go between
+  `beginStatementLimitedRead()` and `endStatementLimitedRead()` (in a `finally`). `preparePoliteWriteSession()` is
+  deprecated and does nothing.
 
 ## Throwaway spaces and cleanup
 
@@ -218,6 +259,9 @@ The classes this reference names, with their namespace (for the `use` lines of a
 `DDD\Domain\AI\Entities\Evals\SuiteRuns\AgentEvalSuiteCases\{AgentEvalSuiteCase, AgentEvalSuiteCases}` ·
 `DDD\Domain\AI\Services\Conversations\RunReports\AIConversationRunReportService` ·
 `DDD\Symfony\Commands\Agents\AgentRunReportCommand` ·
-`DDD\Symfony\Commands\Agents\{AgentEvalConsoleCommand, AgentEvalToolsCommand, AgentEvalSuiteCommand, AgentEvalSelectionCommand, AgentEvalRecallCommand, AgentEvalTiersCommand, AgentEvalAnalyzeCommand, AgentEvalEvictionCommand, AgentEvalGuardCommand, AgentEvalScheduleRunsCommand}` ·
+`DDD\Symfony\Commands\Agents\{AgentEvalConsoleCommand, AgentEvalToolsCommand, AgentEvalSuiteCommand, AgentEvalSelectionCommand, AgentEvalRecallCommand, AgentEvalTiersCommand, AgentEvalAnalyzeCommand, AgentEvalEvictionCommand, AgentEvalGuardCommand, AgentEvalScheduleRunsCommand, AgentEvalCompactionTreeCommand, AgentEvalConversationsPurgeCommand, AgentDecisionFixturesCommand, AgentDecisionStatsCommand, AgentDecisionReplayCommand}` ·
+`DDD\Domain\AI\Services\Eval\{AIConversationEvalPurgeService, AgentEvalSeedAccountLeasesService, AgentEvalSeedAccountResetService}` ·
+`DDD\Domain\AI\Entities\Evals\ConversationPurge\{AIConversationEvalPurgeSettings, AIConversationEvalPurgeReport, AIConversationEvalPurgeStep, AIConversationEvalPurgeSteps, AIConversationEvalPurgeKeys}` ·
+`DDD\Domain\AI\Entities\Evals\SeedAccounts\{AgentEvalSeedAccountLease, AgentEvalSeedAccountResetReport, AgentEvalSeedPool}` ·
 `DDD\Domain\AI\Entities\Evals\{AgentEvalStoredRunOptions, AgentEvalSuiteDefinition, AgentEvalSuiteDefinitions, AgentEvalEvictionTurn, AgentEvalEvictionTurns}` ·
 `DDD\Domain\AI\Entities\Conversations\Messages\RunSettings`
