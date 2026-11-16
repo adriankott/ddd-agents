@@ -6,7 +6,7 @@ import { COMPOSED_VIEW_TONE_TEXT_COLOR } from "../../composed-view-tones";
 import { formatMapRating, type MapPoint } from "./map-points";
 import styles from "./Map.module.scss";
 
-export interface MapPointCardProps {
+export interface MapPointWidgetProps {
   point: MapPoint;
   /** `carousel`: a card along the map's bottom edge (inline); `row`: a row of the full-screen list. */
   variant: "carousel" | "row";
@@ -23,7 +23,7 @@ export interface MapPointCardProps {
  * status line. Clickable through the GlobalStateComponent hover layer around a native button; selected = the inner CTA
  * ring. A point without an image shows the pin glyph on a flat tile, never an empty box.
  */
-export const MapPointCard = (props: MapPointCardProps) => {
+export const MapPointWidget = (props: MapPointWidgetProps) => {
   const { point, variant, isSelected, languageCode, routeStopNumber, onClick } = props;
   const [isImageBroken, setIsImageBroken] = useState(false);
   const showImage = point.image !== undefined && !isImageBroken;
@@ -96,7 +96,7 @@ export const MapPointCard = (props: MapPointCardProps) => {
         onClick={onClick}
         aria-pressed={isSelected}
         data-point-key={point.key}
-        data-testid="map-point-card"
+        data-testid="map-point-widget"
       >
         {content}
       </button>

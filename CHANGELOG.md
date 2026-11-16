@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.0-alpha.59
+
+- The video and map tiles carry widget names: the node type `VideoCard` is `VideoWidget` (folder
+  `kit/components/media/video-widget/`, `video-widget-values.ts`, preview fixtures `youtube-video-widget*` in
+  `video-widget.preview-fixtures.json`), `MapPointCard` is `MapPointWidget`. Stored trees with the node type
+  `VideoCard` still render (as `VideoWidget`); the old fixtures export path stays for one release.
+- Test ids: `video-card…` → `video-widget…`, `map-point-card…` → `map-point-widget…`.
+
 ## 0.1.0-alpha.58
 
 - The evaluation suite's parts ship in the module: the suite objects (`AgentEvalSuiteTask(s)`,

@@ -5,7 +5,7 @@ import { SkeletonLine } from "../../../widgets/_shared/skeleton-primitives";
 import type { MapPoint, MapView } from "./map-points";
 import type { MapPresentation } from "./map-presentation-context";
 import { MapGoogleMap } from "./MapGoogleMap";
-import { MapPointCard } from "./MapPointCard";
+import { MapPointWidget } from "./MapPointWidget";
 import { MapPointCarousel } from "./MapPointCarousel";
 import styles from "./Map.module.scss";
 
@@ -127,7 +127,7 @@ export const ComposedMapView = (props: ComposedMapViewProps) => {
           <div className={styles.fullScreenRows} role="list" data-testid="map-full-screen-list">
             {mapView.points.map((point, pointIndex) => (
               <div role="listitem" key={point.key} data-testid={`map-full-screen-row-${point.key}`}>
-                <MapPointCard
+                <MapPointWidget
                   point={point}
                   variant="row"
                   isSelected={point.key === selectedPointKey}

@@ -2,7 +2,7 @@
   "wireName": "ComposedView",
   "fixtures": [
     {
-      "name": "video-card",
+      "name": "video-widget",
       "description": "One stub component: a single Video node (the core declares its schema, lane L4 builds its component) — the ChatGPT video reference.",
       "payload": {
         "view": {

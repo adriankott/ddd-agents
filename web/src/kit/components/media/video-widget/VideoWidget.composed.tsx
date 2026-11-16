@@ -17,22 +17,22 @@ import {
 } from "../media-values";
 import { useNumberLocale } from "../../data/use-number-locale";
 import { useLayoutNesting } from "../../layout/layout-nesting-context";
-import { formatPublishedDay, formatViewCount, readViewCount } from "./video-card-values";
-import styles from "./VideoCard.module.scss";
+import { formatPublishedDay, formatViewCount, readViewCount } from "./video-widget-values";
+import styles from "./VideoWidget.module.scss";
 import { useImageLoadState } from "../use-image-load-state";
 
 const readTitle = (value: unknown): string | undefined =>
   typeof value === "string" && value.trim() !== "" ? value.trim() : undefined;
 
 /**
- * The `VideoCard` node (backend `VideoCardComposedViewNode.php`): one YouTube
+ * The `VideoWidget` node (backend `VideoWidgetComposedViewNode.php`): one YouTube
  * search result as a card — the 16:9 thumbnail with the length on a dark chip and the play glyph, the title, and
  * "channel · views · date" under it. Play swaps the thumbnail for the privacy-enhanced embed in place; "Open on YouTube"
  * opens the watch page in a new tab. A thumbnail that does not load leaves the play glyph on the empty frame. The
  * e-mail capture shows the card without play button and link. Without a title or a valid videoId the node reports
  * `failed` and shows its title only.
  */
-const VideoCardNode = (props: ComposedViewComponentProps) => {
+export const VideoWidgetNode = (props: ComposedViewComponentProps) => {
   const { props: nodeProps, isPending, sizeClass, runtime, testId } = props;
   const { reportNodeStatus, isEmailRender } = runtime;
   const { isInsideSurface, isInsidePressable } = useLayoutNesting();
@@ -56,11 +56,11 @@ const VideoCardNode = (props: ComposedViewComponentProps) => {
   useEffect(() => {
     if (isPending) return;
     if (!title) {
-      reportNodeStatus("failed", "INVALID_PROP", "the VideoCard has no title");
+      reportNodeStatus("failed", "INVALID_PROP", "the VideoWidget has no title");
       return;
     }
     if (!videoId) {
-      reportNodeStatus("failed", "INVALID_PROP", `the VideoCard "${title}" has no valid YouTube videoId`);
+      reportNodeStatus("failed", "INVALID_PROP", `the VideoWidget "${title}" has no valid YouTube videoId`);
       return;
     }
     reportNodeStatus("mounted");
@@ -237,6 +237,6 @@ const VideoCardNode = (props: ComposedViewComponentProps) => {
 };
 
 export const composedViewComponent: ComposedViewComponentDefinition = {
-  nodeType: "VideoCard",
-  component: VideoCardNode,
+  nodeType: "VideoWidget",
+  component: VideoWidgetNode,
 };

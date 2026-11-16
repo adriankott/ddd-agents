@@ -1,6 +1,6 @@
 {
   "name": "@mgamadeus/ddd-agents",
-  "version": "0.1.0-alpha.58",
+  "version": "0.1.0-alpha.59",
   "description": "The web frontend of the ddd-agents module: the agent chat, the widget renderer and the composed-view kit.",
   "keywords": [
     "ddd",
@@ -108,7 +108,8 @@
     "./kit/components/map/map.preview-fixtures.json": "./dist/files/kit/components/map/map.preview-fixtures.json",
     "./kit/components/media/image-group.preview-fixtures.json": "./dist/files/kit/components/media/image-group.preview-fixtures.json",
     "./kit/components/media/image.preview-fixtures.json": "./dist/files/kit/components/media/image.preview-fixtures.json",
-    "./kit/components/media/video-card/video-card.preview-fixtures.json": "./dist/files/kit/components/media/video-card/video-card.preview-fixtures.json",
+    "./kit/components/media/video-widget/video-widget.preview-fixtures.json": "./dist/files/kit/components/media/video-widget/video-widget.preview-fixtures.json",
+    "./kit/components/media/video-card/video-card.preview-fixtures.json": "./dist/files/kit/components/media/video-widget/video-widget.preview-fixtures.json",
     "./kit/components/media/video.preview-fixtures.json": "./dist/files/kit/components/media/video.preview-fixtures.json",
     "./kit/components/rich/code.preview-fixtures.json": "./dist/files/kit/components/rich/code.preview-fixtures.json",
     "./kit/components/rich/diagram.preview-fixtures.json": "./dist/files/kit/components/rich/diagram.preview-fixtures.json",

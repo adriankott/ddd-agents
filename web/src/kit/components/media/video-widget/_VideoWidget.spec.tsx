@@ -7,15 +7,15 @@ import type {
   ComposedNodeSchemaApplicationPart,
 } from "../../../../renderer/widget-tree/composed-node-schema";
 import { renderMediaTree } from "../media-spec-render";
-import { formatPublishedDay, formatViewCount, readViewCount } from "./video-card-values";
+import { formatPublishedDay, formatViewCount, readViewCount } from "./video-widget-values";
 
 /**
- * The `VideoCard` node (one YouTube search result) through the renderer: thumbnail with the length
+ * The `VideoWidget` node (one YouTube search result) through the renderer: thumbnail with the length
  * chip, title, channel · views · date and the watch link; play in place; a grid of cards; the thumbnail from the id;
  * the e-mail capture without controls; the pending skeleton; a card without a playable id reported failed.
  */
 const MUENSTER_TOUR = {
-  type: "VideoCard",
+  type: "VideoWidget",
   title: "Münster, Germany 4k Walking Tour",
   videoId: "x5-yoDUoz5k",
   thumbnail: "https://i.ytimg.com/vi/x5-yoDUoz5k/hqdefault.jpg",
@@ -25,7 +25,7 @@ const MUENSTER_TOUR = {
   publishedAt: "2025-02-08",
 };
 
-/** The package's schema declares no `VideoCard` node type: an app declares it in its part, as this example does. */
+/** The package's schema declares no `VideoWidget` node type: an app declares it in its part, as this example does. */
 const bindableProp = (name: string, type: "string" | "number", isRequired = false): ComposedNodePropSchema => ({
   name,
   types: [type],
@@ -35,9 +35,27 @@ const bindableProp = (name: string, type: "string" | "number", isRequired = fals
   description: "",
 });
 
-const VIDEO_CARD_APPLICATION_PART: ComposedNodeSchemaApplicationPart = {
+const VIDEO_WIDGET_PROPS = [
+  bindableProp("title", "string", true),
+  bindableProp("videoId", "string", true),
+  bindableProp("thumbnail", "string"),
+  bindableProp("durationSeconds", "number"),
+  bindableProp("channel", "string"),
+  bindableProp("viewCount", "number"),
+  bindableProp("publishedAt", "string"),
+];
+
+/** `VideoCard` is the node type's name before 0.1.0-alpha.59, still declared by an app that has not renamed it. */
+const VIDEO_WIDGET_APPLICATION_PART: ComposedNodeSchemaApplicationPart = {
   nodeTypes: {
     VideoCard: {
+      categories: ["media"],
+      providesItemScope: false,
+      summary: "one video as a card",
+      props: VIDEO_WIDGET_PROPS,
+      slots: [],
+    },
+    VideoWidget: {
       categories: ["media"],
       providesItemScope: false,
       summary: "one video as a card",
@@ -59,7 +77,7 @@ let environmentBefore: AgentsEnvironment;
 
 beforeEach(() => {
   environmentBefore = getAgentsEnvironment();
-  setAgentsEnvironment({ ...environmentBefore, composedNodeSchemaApplicationPart: VIDEO_CARD_APPLICATION_PART });
+  setAgentsEnvironment({ ...environmentBefore, composedNodeSchemaApplicationPart: VIDEO_WIDGET_APPLICATION_PART });
 });
 
 afterEach(() => {
@@ -68,7 +86,14 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("the VideoCard node", () => {
+describe("the VideoWidget node", () => {
+  test("the legacy node type VideoCard renders as a VideoWidget", () => {
+    const { lastReport } = renderMediaTree({ view: { ...MUENSTER_TOUR, type: "VideoCard" } });
+
+    expect(screen.getByText("Münster, Germany 4k Walking Tour")).toBeTruthy();
+    expect(lastReport()).toEqual({ status: "mounted" });
+  });
+
   test("shows thumbnail, length, title, channel, views and date with the watch link, and reports mounted", () => {
     const { container, lastReport } = renderMediaTree({ view: MUENSTER_TOUR });
 
@@ -100,7 +125,7 @@ describe("the VideoCard node", () => {
         type: "Grid",
         columns: 2,
         minColumnWidth: "regular",
-        children: [MUENSTER_TOUR, { type: "VideoCard", title: "Prinzipalmarkt at night", videoId: "QZRHqiz_oH4" }],
+        children: [MUENSTER_TOUR, { type: "VideoWidget", title: "Prinzipalmarkt at night", videoId: "QZRHqiz_oH4" }],
       },
     });
 
@@ -112,7 +137,7 @@ describe("the VideoCard node", () => {
   });
 
   test("without a thumbnail and details the card takes the id's thumbnail and shows no length or views", () => {
-    const { container } = renderMediaTree({ view: { type: "VideoCard", title: "A tour", videoId: "x5-yoDUoz5k" } });
+    const { container } = renderMediaTree({ view: { type: "VideoWidget", title: "A tour", videoId: "x5-yoDUoz5k" } });
 
     expect(container.querySelector("img")?.getAttribute("src")).toBe(
       "https://i.ytimg.com/vi/x5-yoDUoz5k/hqdefault.jpg",
@@ -132,7 +157,7 @@ describe("the VideoCard node", () => {
   test("a pending videoId renders the card-shaped skeleton", () => {
     const { container } = renderMediaTree({
       view: {
-        type: "VideoCard",
+        type: "VideoWidget",
         title: "Pending",
         videoId: { $from: { toolCall: "call_1", path: "$.videos[0].videoId", state: "pending" } },
       },
@@ -144,7 +169,7 @@ describe("the VideoCard node", () => {
 
   test("a card whose videoId is no YouTube id shows its title and reports failed", () => {
     const { container, lastReport } = renderMediaTree({
-      view: { type: "VideoCard", title: "A tour", videoId: "bad id!" },
+      view: { type: "VideoWidget", title: "A tour", videoId: "bad id!" },
     });
 
     expect(screen.getByText("A tour")).toBeTruthy();

@@ -3,7 +3,7 @@ import { classNames } from "../../../provider/class-names";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { translateText } from "../../../provider/environment";
 import type { MapPoint } from "./map-points";
-import { MapPointCard } from "./MapPointCard";
+import { MapPointWidget } from "./MapPointWidget";
 import styles from "./Map.module.scss";
 
 export interface MapPointCarouselProps {
@@ -89,7 +89,7 @@ export const MapPointCarousel = (props: MapPointCarouselProps) => {
             className={styles.carouselItem}
             data-testid={`map-carousel-item-${point.key}`}
           >
-            <MapPointCard
+            <MapPointWidget
               point={point}
               variant="carousel"
               isSelected={point.key === selectedPointKey}

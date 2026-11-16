@@ -1,5 +1,5 @@
 /**
- * The values the `VideoCard` node reads from its resolved props, each reader total: a value that
+ * The values the `VideoWidget` node reads from its resolved props, each reader total: a value that
  * does not fit is `undefined`, never a throw.
  */
 

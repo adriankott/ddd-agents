@@ -174,7 +174,7 @@
         {
           "name": "select-first-card",
           "click": {
-            "selector": "[data-testid=map-point-card]"
+            "selector": "[data-testid=map-point-widget]"
           }
         },
         {
@@ -300,7 +300,7 @@
         {
           "name": "select-destination",
           "click": {
-            "selector": "[data-testid=map-point-card][data-point-key=point-1]"
+            "selector": "[data-testid=map-point-widget][data-point-key=point-1]"
           }
         }
       ]

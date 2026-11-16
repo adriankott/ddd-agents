@@ -2,8 +2,8 @@
   "wireName": "ComposedView",
   "fixtures": [
     {
-      "name": "youtube-video-cards",
-      "description": "What searchYouTubeVideos dictates for two results (ChatGPT 45, the Münster walking tour): a two-column grid of VideoCards with thumbnail, length chip, title, channel · views · date and the watch link; play swaps in the embed.",
+      "name": "youtube-video-widgets",
+      "description": "What searchYouTubeVideos dictates for two results (ChatGPT 45, the Münster walking tour): a two-column grid of VideoWidgets with thumbnail, length chip, title, channel · views · date and the watch link; play swaps in the embed.",
       "payload": {
         "view": {
           "type": "Grid",
@@ -11,7 +11,7 @@
           "minColumnWidth": "regular",
           "children": [
             {
-              "type": "VideoCard",
+              "type": "VideoWidget",
               "title": "Münster, Germany 4k Walking Tour | Explore the Charming Streets & Landmarks",
               "videoId": "x5-yoDUoz5k",
               "thumbnail": "https://i.ytimg.com/vi/x5-yoDUoz5k/hqdefault.jpg",
@@ -21,7 +21,7 @@
               "publishedAt": "2025-02-08"
             },
             {
-              "type": "VideoCard",
+              "type": "VideoWidget",
               "title": "Münster Walking Tour Germany | Spring Sunny day Walk in Münster | 4K HDR 60fps",
               "videoId": "QZRHqiz_oH4",
               "thumbnail": "https://i.ytimg.com/vi/QZRHqiz_oH4/hqdefault.jpg",
@@ -45,11 +45,11 @@
       ]
     },
     {
-      "name": "youtube-video-card-single",
-      "description": "One search result: the VideoCard at the root of the tree — the shape of a one-video answer.",
+      "name": "youtube-video-widget-single",
+      "description": "One search result: the VideoWidget at the root of the tree — the shape of a one-video answer.",
       "payload": {
         "view": {
-          "type": "VideoCard",
+          "type": "VideoWidget",
           "title": "Münster, Germany 4k Walking Tour | Explore the Charming Streets & Landmarks",
           "videoId": "x5-yoDUoz5k",
           "thumbnail": "https://i.ytimg.com/vi/x5-yoDUoz5k/hqdefault.jpg",
@@ -71,11 +71,11 @@
       ]
     },
     {
-      "name": "youtube-video-card-without-details",
+      "name": "youtube-video-widget-without-details",
       "description": "A result whose detail read failed: no length and no views, the thumbnail taken from the videoId — the card still plays.",
       "payload": {
         "view": {
-          "type": "VideoCard",
+          "type": "VideoWidget",
           "title": "Münster, Germany 4k Walking Tour",
           "videoId": "x5-yoDUoz5k",
           "channel": "Duslin Travels",
@@ -86,11 +86,11 @@
       "width": 528
     },
     {
-      "name": "youtube-video-card-loading",
+      "name": "youtube-video-widget-loading",
       "description": "The card bound to a pending tool result: the card-shaped skeleton.",
       "payload": {
         "view": {
-          "type": "VideoCard",
+          "type": "VideoWidget",
           "title": "Pending video",
           "videoId": {
             "$from": {
@@ -105,11 +105,11 @@
       "width": 528
     },
     {
-      "name": "youtube-video-card-unplayable",
+      "name": "youtube-video-widget-unplayable",
       "description": "A card whose videoId is no YouTube id: it shows its title only and reports failed.",
       "payload": {
         "view": {
-          "type": "VideoCard",
+          "type": "VideoWidget",
           "title": "A tour without a playable video",
           "videoId": "not a video id!"
         }

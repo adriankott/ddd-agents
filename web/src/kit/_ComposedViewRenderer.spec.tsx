@@ -355,10 +355,10 @@ describe("ComposedViewRenderer — the kit tree, rendered", () => {
     expect(nodeTypesWithoutComponent).toEqual([]);
   });
 
-  test("the one registered component without a node type of the package's schema is VideoCard, whose type an app declares", () => {
+  test("the registered components without a node type of the package's schema are VideoWidget and its legacy name VideoCard, whose type an app declares", () => {
     const componentsWithoutPackageNodeType = Object.keys(composedViewComponents).filter(
       (nodeType) => !Object.prototype.hasOwnProperty.call(composedNodeSchema.nodeTypes, nodeType),
     );
-    expect(componentsWithoutPackageNodeType).toEqual(["VideoCard"]);
+    expect([...componentsWithoutPackageNodeType].sort()).toEqual(["VideoCard", "VideoWidget"]);
   });
 });
