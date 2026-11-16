@@ -20,6 +20,8 @@ use DDD\Domain\AI\Entities\Conversations\Purposes\DoneCriteria\TaskPlanDoneCrite
 use DDD\Domain\AI\Entities\Conversations\TurnEvents\AIConversationTurnEvent;
 use DDD\Domain\AI\Exceptions\Conversations\AgentRunClaimLostException;
 use DDD\Domain\AI\Services\Conversations\Purposes\AIConversationPurposesService;
+use DDD\Domain\AI\Services\Conversations\AIConversationTransactionsService;
+use DDD\Domain\Base\Repo\DB\Doctrine\EntityManagerFactory;
 use DDD\Domain\AI\Services\Conversations\TurnEvents\AIConversationTurnEventsService;
 use DDD\Domain\AI\Traits\Conversations\AITraceLogTrait;
 use DDD\Infrastructure\Services\DDDService;
@@ -121,6 +123,108 @@ class AIConversationTaskPlanRecordService extends Service
         ?array $onlyDoneCriterionKeys = null
     ): int {
         return $aIConversationPurpose->preResolveSeedTaskPlanItems($taskPlanItems, $conversation->agentSpace ?? null, $conversation->messages, $conversation->getTimezone(), isset($conversation->id) ? (int)$conversation->id : null, $onlyDoneCriterionKeys, $conversation);
+    }
+
+    /**
+     * The re-check of the open criterion leaves after a completed tool ({@see preResolveSeededLeavesForPurpose()}) with
+     * its reads on the latest commits: on MariaDB, outside an open transaction, the walk runs in a READ COMMITTED
+     * transaction of its own. Behind a pooler that splits reads from writes (ProxySQL in front of a Galera cluster with
+     * `wsrep_sync_wait = 0`) a lone read can reach a node that has not applied the tool's write of a moment ago; a
+     * transaction stays on the writer. The transaction holds reads only and is committed after the walk; the plan slice
+     * is persisted afterwards, outside it. PostgreSQL, a transient conversation and a walk inside an open transaction
+     * read as before.
+     *
+     * @param string[]|null $onlyDoneCriterionKeys
+     * @throws Throwable
+     */
+    protected function preResolveSeededLeavesReadingLatestCommits(
+        AIConversation $conversation,
+        AIConversationPurpose $aIConversationPurpose,
+        TaskPlanItems $taskPlanItems,
+        ?array $onlyDoneCriterionKeys
+    ): int {
+        $connection = EntityManagerFactory::getInstance()->getConnection();
+        if (!isset($conversation->id) || $connection->isTransactionActive() || !EntityManagerFactory::getDialect()->capabilities()->isMariaDb()) {
+            return $this->preResolveSeededLeavesForPurpose($conversation, $aIConversationPurpose, $taskPlanItems, $onlyDoneCriterionKeys);
+        }
+        /** @var AIConversationTransactionsService $aIConversationTransactionsService */
+        $aIConversationTransactionsService = DDDService::instance()->getService(AIConversationTransactionsService::class);
+        $aIConversationTransactionsService->beginReadCommittedTransaction($connection);
+        try {
+            $resolvedLeafCount = $this->preResolveSeededLeavesForPurpose($conversation, $aIConversationPurpose, $taskPlanItems, $onlyDoneCriterionKeys);
+            $connection->commit();
+            return $resolvedLeafCount;
+        } catch (Throwable $walkError) {
+            try {
+                $connection->rollBack();
+            } catch (Throwable) {
+                // the session is gone; the server ended the transaction
+            }
+            throw $walkError;
+        }
+    }
+
+    /**
+     * The status of every leaf with a done criterion the re-check reads (`$onlyDoneCriterionKeys`, null = every
+     * criterion), by item key — the before and after of {@see recordDoneCriterionRecheckTurnEvent()}.
+     *
+     * @param string[]|null $onlyDoneCriterionKeys
+     * @return string[] item key => status
+     */
+    protected function findDoneCriterionLeafStatusesByItemKey(TaskPlanItems $taskPlanItems, ?array $onlyDoneCriterionKeys): array
+    {
+        $statusesByItemKey = [];
+        foreach ($taskPlanItems->buildItemAddresses()->getElements() as $taskPlanItemAddress) {
+            $doneCriterion = $taskPlanItemAddress->item->doneCriterion;
+            if ($doneCriterion === null || ($onlyDoneCriterionKeys !== null && !in_array($doneCriterion, $onlyDoneCriterionKeys, true))) {
+                continue;
+            }
+            $statusesByItemKey[$taskPlanItemAddress->key] = $taskPlanItemAddress->item->status;
+        }
+        return $statusesByItemKey;
+    }
+
+    /**
+     * The turn event `doneCriterionRecheck` of a re-check: per criterion leaf the key, the criterion, the status before
+     * and after (a leaf still open after the re-check is a verdict that left it open), the tool that triggered it.
+     * Fail-open, claim-fenced like every turn event.
+     *
+     * @param string[] $criterionLeafStatusesBefore item key => status
+     * @throws \Doctrine\DBAL\Exception a database error inside an open claim-fenced write
+     */
+    protected function recordDoneCriterionRecheckTurnEvent(
+        AgentRun $agentRun,
+        AIConversation $conversation,
+        TaskPlanItems $taskPlanItems,
+        array $criterionLeafStatusesBefore,
+        ?string $completedToolName,
+        int $resolvedLeafCount
+    ): void {
+        if (!isset($conversation->id) || $criterionLeafStatusesBefore === []) {
+            return;
+        }
+        $criterionVerdicts = [];
+        foreach ($taskPlanItems->buildItemAddresses()->getElements() as $taskPlanItemAddress) {
+            if (!array_key_exists($taskPlanItemAddress->key, $criterionLeafStatusesBefore)) {
+                continue;
+            }
+            $criterionVerdicts[] = [
+                'itemKey' => $taskPlanItemAddress->key,
+                'doneCriterion' => $taskPlanItemAddress->item->doneCriterion,
+                'statusBefore' => $criterionLeafStatusesBefore[$taskPlanItemAddress->key],
+                'statusAfter' => $taskPlanItemAddress->item->status,
+            ];
+        }
+        $this->turnEventsService()->recordEventOfConversation(
+            $conversation,
+            AIConversationTurnEvent::KIND_DONE_CRITERION_RECHECK,
+            null,
+            isset($conversation->messages) ? $conversation->messages->getNewestInitiatorMessageIndex() : null,
+            mb_substr('after:' . ($completedToolName ?? 'turnStart'), 0, 191),
+            null,
+            ['completedToolName' => $completedToolName, 'resolvedLeafCount' => $resolvedLeafCount, 'criteria' => $criterionVerdicts],
+            $agentRun->findRunTokenClaimedInThisProcess($conversation)
+        );
     }
 
     protected function turnEventsService(): AIConversationTurnEventsService
@@ -496,7 +600,9 @@ class AIConversationTaskPlanRecordService extends Service
         if ($onlyDoneCriterionKeys === []) {
             return;
         }
-        $resolvedLeafCount = $this->preResolveSeededLeavesForPurpose($conversation, $aIConversationPurpose, $currentTaskPlan->items, $onlyDoneCriterionKeys);
+        $criterionLeafStatusesBefore = $this->findDoneCriterionLeafStatusesByItemKey($currentTaskPlan->items, $onlyDoneCriterionKeys);
+        $resolvedLeafCount = $this->preResolveSeededLeavesReadingLatestCommits($conversation, $aIConversationPurpose, $currentTaskPlan->items, $onlyDoneCriterionKeys);
+        $this->recordDoneCriterionRecheckTurnEvent($agentRun, $conversation, $currentTaskPlan->items, $criterionLeafStatusesBefore, $completedToolName, $resolvedLeafCount);
         // A rendered non-blocking offer widget moves its item to AWAITING the owner — a platform stamp
         // persisted with the slice, but NOT a resolution (observing a widget grants no progress exemption).
         $stampedOfferCount = $currentTaskPlan->items->stampRenderedNonBlockingOffers($conversation->messages);

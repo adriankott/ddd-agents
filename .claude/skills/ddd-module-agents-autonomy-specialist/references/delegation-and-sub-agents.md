@@ -145,7 +145,21 @@ is plain facts. A host replaces the prompt file to change it.
 
 `AIConversationRunClaimsService::admitQueuedDelegationChildren()` admits QUEUED children of one tree under a named lock
 (`DELEGATION_CAPACITY_LOCK_PREFIX` + root id) until `DELEGATION_CONCURRENCY_CAP` slots are occupied. There is no limit
-on how many sub-agents wait; the bound is the queue wait of the deadline. How the child's run is claimed and released
+on how many sub-agents wait; the bound is the queue wait of the deadline.
+
+- **One READ COMMITTED transaction** holds the lock, the count, the queued read and the `QUEUED → IDLE` stamps; the
+  lock is released after the commit. Behind a pooler that splits reads from writes (ProxySQL over Galera) a transaction
+  stays on the writer, so the admission sees the child row the spawn wrote a moment before. Inside an open transaction
+  it nests.
+- **Lock outcome** (`AgentDelegationAdmission::LOCK_*`): an attempt that answers at once without the lock (`GET_LOCK`
+  NULL, or 0 without waiting) is repeated within `DELEGATION_CAPACITY_LOCK_TIMEOUT_SECONDS`; `LOCK_TIMED_OUT` means
+  another admission held it the whole wait. Without the lock nothing is admitted.
+- **The spawn's answer** comes from the admission (`admitQueuedDelegationChildrenAndDescribeAdmission()`): started, or
+  queued with the real taken count of the cap and the reason (no free slot, lock not obtained, next admission). A
+  spawned child left queued while it could have run (lock not obtained, or a slot still free) is admitted once more
+  before the answer (`AIConversationDelegationSpawnService::admitSpawnedChildrenAndRecordAdmission()`).
+- **Diagnosis:** each spawn's admission is the turn event `delegationAdmission` of the parent (observability skill,
+  trace and turn events): lock outcome and attempts, occupied count, queued ids read, admitted ids, retried. How the child's run is claimed and released
 belongs to the loop skill `ddd-module-agents-loop-specialist`.
 
 ## The run end

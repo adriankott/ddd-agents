@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DDD\Domain\AI\Entities\Conversations\Messages\Delegation;
 
+use DDD\Domain\AI\Entities\Conversations\Agent\Delegation\AgentDelegationAdmission;
 use DDD\Domain\AI\Entities\Conversations\Agent\Delegation\AgentDelegationAgentTask;
 use DDD\Domain\AI\Entities\Conversations\Agent\Delegation\AgentDelegationAwaitedRunTask;
 use DDD\Domain\AI\Entities\Conversations\Agent\Delegation\AgentDelegationTask;
@@ -288,16 +289,17 @@ class DelegationSubAgentRecord extends ValueObject
      * The `delegate` call's result, fixed at the spawn: started, queued behind the capacity
      * cap, or the refusal corrective.
      *
-     * @param int|null $occupiedSlotCountWhenQueued null = a slot was free at the spawn; else the sub-agents already running
+     * @param AgentDelegationAdmission|null $admissionThatLeftItQueued null = the admission admitted it; else the admission
+     *        that left it queued, which names why (no free slot with the real count, the lock not obtained)
      */
-    public function buildSpawnAnswerText(?int $occupiedSlotCountWhenQueued): string
+    public function buildSpawnAnswerText(?AgentDelegationAdmission $admissionThatLeftItQueued): string
     {
         if ($this->isNotRun()) {
             return (string)$this->getCurrentRun()?->failureDetail;
         }
-        $spawnState = $occupiedSlotCountWhenQueued === null
+        $spawnState = $admissionThatLeftItQueued === null
             ? 'started (running)'
-            : 'queued (' . $occupiedSlotCountWhenQueued . ' sub-agents already run in this conversation)';
+            : 'queued (' . $admissionThatLeftItQueued->buildQueuedReasonText() . ')';
         return 'Sub-agent ' . $this->buildName() . ' ' . $spawnState . '. Its result arrives as a notification when it ends.';
     }
 

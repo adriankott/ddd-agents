@@ -54,13 +54,22 @@ class AIConversationTurnEvent extends Entity
     public const string KIND_CHUNK = 'chunk';
     public const string KIND_REQUEST = 'request';
 
+    /** A spawn's admission of its queued sub-agents: lock outcome, occupied count, queued and admitted ids. */
+    public const string KIND_DELEGATION_ADMISSION = 'delegationAdmission';
+
+    /** The re-check of the open done criteria after a completed tool: the verdict per key. */
+    public const string KIND_DONE_CRITERION_RECHECK = 'doneCriterionRecheck';
+
     public const array KINDS = [
         self::KIND_DECISION, self::KIND_PRELOAD_OUTCOME, self::KIND_EVICTION, self::KIND_FORCED_RE_DRIVE,
-        self::KIND_TURN_END, self::KIND_CHUNK, self::KIND_REQUEST,
+        self::KIND_TURN_END, self::KIND_CHUNK, self::KIND_REQUEST, self::KIND_DELEGATION_ADMISSION, self::KIND_DONE_CRITERION_RECHECK,
     ];
 
     /** The always-on telemetry kinds — written with every decision site off, exempt from the byte-identical gate. */
-    public const array ALWAYS_ON_KINDS = [self::KIND_EVICTION, self::KIND_FORCED_RE_DRIVE, self::KIND_TURN_END, self::KIND_CHUNK];
+    public const array ALWAYS_ON_KINDS = [
+        self::KIND_EVICTION, self::KIND_FORCED_RE_DRIVE, self::KIND_TURN_END, self::KIND_CHUNK,
+        self::KIND_DELEGATION_ADMISSION, self::KIND_DONE_CRITERION_RECHECK,
+    ];
 
     public const string OUTCOME_ANSWERED = 'answered';
     public const string OUTCOME_FAILED = 'failed';

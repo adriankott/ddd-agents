@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DDD\Tests\Agents\Domain\AI\Entities\Conversations\Messages\Delegation;
 
+use DDD\Domain\AI\Entities\Conversations\Agent\Delegation\AgentDelegationAdmission;
 use DDD\Domain\AI\Entities\Conversations\Agent\Delegation\AgentDelegationAgentTask;
 use DDD\Domain\AI\Entities\Conversations\Agent\Delegation\AgentDelegationToolRunTask;
 use DDD\Domain\AI\Entities\Conversations\Agent\Delegation\AgentSubAgentRequest;
@@ -49,9 +50,17 @@ class DelegationSubAgentRecordTest extends UnitTestCase
             'Sub-agent #3 «Services page» started (running). Its result arrives as a notification when it ends.',
             $delegationSubAgentRecord->buildSpawnAnswerText(null)
         );
+        $fullAdmission = AgentDelegationAdmission::forTree(900, 5);
+        $fullAdmission->occupiedSlotCount = 5;
         self::assertSame(
-            'Sub-agent #3 «Services page» queued (5 sub-agents already run in this conversation). Its result arrives as a notification when it ends.',
-            $delegationSubAgentRecord->buildSpawnAnswerText(5)
+            'Sub-agent #3 «Services page» queued (no slot is free: 5 of 5 sub-agent slots of this conversation are taken; it starts when one of them ends). Its result arrives as a notification when it ends.',
+            $delegationSubAgentRecord->buildSpawnAnswerText($fullAdmission)
+        );
+        $admissionWithoutTheLock = AgentDelegationAdmission::forTree(900, 5);
+        $admissionWithoutTheLock->lockOutcome = AgentDelegationAdmission::LOCK_REFUSED;
+        self::assertSame(
+            'Sub-agent #3 «Services page» queued (the admission could not run now, its lock was not obtained; 0 of 5 sub-agent slots of this conversation are taken; it starts at the next admission). Its result arrives as a notification when it ends.',
+            $delegationSubAgentRecord->buildSpawnAnswerText($admissionWithoutTheLock)
         );
         self::assertSame('delegate REJECTED — name the skills the sub-agent needs.', $refusedRecord->buildSpawnAnswerText(null));
         self::assertTrue($refusedRecord->isNotRun());

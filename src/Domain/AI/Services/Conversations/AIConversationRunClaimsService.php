@@ -7,6 +7,7 @@ namespace DDD\Domain\AI\Services\Conversations;
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Entities\Conversations\AIConversationRunState;
 use DDD\Domain\AI\Entities\Conversations\Agent\AIConversationDelegationBatch;
+use DDD\Domain\AI\Entities\Conversations\Agent\Delegation\AgentDelegationAdmission;
 use DDD\Domain\AI\Entities\Conversations\Agent\AIConversationDelegationResumeCondition;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
 use DDD\Domain\AI\Entities\Conversations\Messages\Delegation\AgentSubAgentLiveActivities;
@@ -826,47 +827,163 @@ class AIConversationRunClaimsService extends Service
 
     /**
      * Admit QUEUED delegation children of a tree into the free capacity — the ONE admission path of a
-     * fresh spawn, a promotion after a sibling settled and a continuation. Under the tree's named lock
-     * (`delegation-capacity-<root>`), the free slots are counted and the oldest queued children moved
-     * `QUEUED → IDLE` stamping `agentTurnOwedAt` in the same statement: the stamp IS the reservation (it counts as
-     * occupied until the child's claim clears it) and the recovery hook (the owed-turn pass re-dispatches a lost
-     * dispatch). Returns the ids admitted now; the caller dispatches them. A lock not obtained admits nothing — the
-     * next settle, spawn or recovery pass admits.
+     * fresh spawn, a promotion after a sibling settled and a continuation. Returns the ids admitted now; the caller
+     * dispatches them. {@see admitQueuedDelegationChildrenAndDescribeAdmission()} says what happened.
      *
      * @return int[]
      * @throws \Doctrine\DBAL\Exception
+     * @throws Throwable
      */
     public function admitQueuedDelegationChildren(int $rootConversationId): array
     {
+        return $this->admitQueuedDelegationChildrenAndDescribeAdmission($rootConversationId)->admittedChildIds;
+    }
+
+    /**
+     * The admission of {@see admitQueuedDelegationChildren()}, described. ONE transaction at READ COMMITTED: behind a
+     * pooler that splits reads from writes (ProxySQL in front of a Galera cluster) a transaction stays on the writer, so
+     * the count and the queued rows are read where the spawn just wrote them, never on a replica that has not applied
+     * that write yet. In it the tree's named lock (`delegation-capacity-<root>`, the transaction lock of the dialect on
+     * the transaction's own connection) is taken — an attempt that answers at once without the lock (GET_LOCK NULL, or
+     * 0 without waiting) is repeated within the wait ({@see DELEGATION_CAPACITY_LOCK_TIMEOUT_SECONDS}) —, the free
+     * slots are counted and the oldest queued children moved `QUEUED → IDLE` stamping `agentTurnOwedAt` in the same
+     * statement: the stamp IS the reservation (it counts as occupied until the child's claim clears it) and the
+     * recovery hook (the owed-turn pass re-dispatches a lost dispatch). The lock is released after the commit, so no
+     * other admission counts before the stamps are visible. A lock not obtained admits nothing; the count and the queued
+     * rows are still read for the description (the spawn's answer, the turn event).
+     *
+     * @throws \Doctrine\DBAL\Exception
+     * @throws Throwable
+     */
+    public function admitQueuedDelegationChildrenAndDescribeAdmission(int $rootConversationId): AgentDelegationAdmission
+    {
         $connection = EntityManagerFactory::getInstance()->getConnection();
         $lockName = self::DELEGATION_CAPACITY_LOCK_PREFIX . $rootConversationId;
-        // a named lock outside a transaction: MariaDB holds it on this connection, PostgreSQL on the framework's own
-        // direct connection for named locks
-        $namedLocks = EntityManagerFactory::getDialect()->locks($connection);
-        if (!$namedLocks->acquire($lockName, self::DELEGATION_CAPACITY_LOCK_TIMEOUT_SECONDS)) {
-            return [];
-        }
+        $agentDelegationAdmission = AgentDelegationAdmission::forTree($rootConversationId, self::DELEGATION_CONCURRENCY_CAP);
+        /** @var AIConversationTransactionsService $aIConversationTransactionsService */
+        $aIConversationTransactionsService = DDDService::instance()->getService(AIConversationTransactionsService::class);
+        $nestsInOpenTransaction = $connection->isTransactionActive();
+        $aIConversationTransactionsService->beginReadCommittedTransactionOrNestInOpenTransaction($connection);
+        $lockObtained = false;
         try {
-            $freeSlots = self::DELEGATION_CONCURRENCY_CAP - $this->countOccupiedDelegationSlotsUnderRoot($rootConversationId);
-            $admittedChildIds = [];
-            foreach ($this->findQueuedDelegationChildIds($rootConversationId, max(0, $freeSlots)) as $queuedChildId) {
-                $admitted = (int)$connection->executeStatement(
-                    'UPDATE `' . DBAIConversationModel::getTableName() . '` SET `runState` = :idle, `agentTurnOwedAt` = :admittedAt WHERE `id` = :id AND `runState` = :queued',
-                    ['idle' => AIConversationRunState::IDLE, 'admittedAt' => (new DateTime())->format('Y-m-d H:i:s'), 'id' => $queuedChildId, 'queued' => AIConversationRunState::QUEUED]
-                ) === 1;
-                if ($admitted) {
-                    $admittedChildIds[] = $queuedChildId;
-                    $this->extendDeadlineOfAdmittedChild($queuedChildId);
+            $this->acquireDelegationCapacityLockWithinTheWait($connection, $lockName, $agentDelegationAdmission);
+            $lockObtained = $agentDelegationAdmission->isLockObtained();
+            $agentDelegationAdmission->occupiedSlotCount = $this->countOccupiedDelegationSlotsUnderRoot($rootConversationId);
+            $freeSlots = max(0, self::DELEGATION_CONCURRENCY_CAP - $agentDelegationAdmission->occupiedSlotCount);
+            // without the lock every queued row is read (the description), with it the oldest up to the free slots
+            $agentDelegationAdmission->queuedChildIds = $this->findQueuedDelegationChildIds($rootConversationId, $lockObtained ? $freeSlots : self::DELEGATION_CONCURRENCY_CAP);
+            if ($lockObtained) {
+                foreach ($agentDelegationAdmission->queuedChildIds as $queuedChildId) {
+                    $admitted = (int)$connection->executeStatement(
+                        'UPDATE `' . DBAIConversationModel::getTableName() . '` SET `runState` = :idle, `agentTurnOwedAt` = :admittedAt WHERE `id` = :id AND `runState` = :queued',
+                        ['idle' => AIConversationRunState::IDLE, 'admittedAt' => (new DateTime())->format('Y-m-d H:i:s'), 'id' => $queuedChildId, 'queued' => AIConversationRunState::QUEUED]
+                    ) === 1;
+                    if ($admitted) {
+                        $agentDelegationAdmission->admittedChildIds[] = $queuedChildId;
+                        $this->extendDeadlineOfAdmittedChild($queuedChildId);
+                    }
                 }
             }
-            return $admittedChildIds;
-        } finally {
+            $connection->commit();
+        } catch (Throwable $admissionError) {
             try {
-                $namedLocks->release($lockName);
-            } catch (\Throwable) {
-                // the lock ends with the session
+                $connection->rollBack();
+            } catch (Throwable) {
+                // the session is gone; the server ended the transaction
             }
+            if ($lockObtained) {
+                $this->releaseDelegationCapacityLock($connection, $lockName, $nestsInOpenTransaction);
+            }
+            throw $admissionError;
         }
+        if ($lockObtained) {
+            $this->releaseDelegationCapacityLock($connection, $lockName, $nestsInOpenTransaction);
+        }
+        $this->aiTrace('delegation.admission', $agentDelegationAdmission->buildTurnEventPayload());
+        return $agentDelegationAdmission;
+    }
+
+    /**
+     * Takes the tree's capacity lock in the open transaction within {@see DELEGATION_CAPACITY_LOCK_TIMEOUT_SECONDS} and
+     * writes the outcome onto the admission: an attempt that waited the remaining wait without the lock is a timeout (another
+     * admission holds it); an attempt that answered at once without it (GET_LOCK NULL on an error, 0 without waiting)
+     * is repeated after {@see DELEGATION_CAPACITY_LOCK_RETRY_PAUSE_MICROSECONDS} until the wait has passed.
+     *
+     * @throws \Doctrine\DBAL\Exception
+     */
+    protected function acquireDelegationCapacityLockWithinTheWait(\Doctrine\DBAL\Connection $connection, string $lockName, AgentDelegationAdmission $agentDelegationAdmission): void
+    {
+        $waitEndsAtSeconds = $this->readMonotonicSeconds() + self::DELEGATION_CAPACITY_LOCK_TIMEOUT_SECONDS;
+        $attempts = 0;
+        do {
+            $attempts++;
+            $remainingSeconds = max(0, (int)ceil($waitEndsAtSeconds - $this->readMonotonicSeconds()));
+            $attemptStartedAtSeconds = $this->readMonotonicSeconds();
+            if ($this->acquireDelegationCapacityLockOnce($connection, $lockName, $remainingSeconds)) {
+                $agentDelegationAdmission->lockAttempts = $attempts;
+                $agentDelegationAdmission->lockOutcome = $attempts === 1 ? AgentDelegationAdmission::LOCK_OBTAINED : AgentDelegationAdmission::LOCK_OBTAINED_AFTER_RETRY;
+                return;
+            }
+            $attemptWaitedSeconds = $this->readMonotonicSeconds() - $attemptStartedAtSeconds;
+            if ($remainingSeconds > 0 && $attemptWaitedSeconds >= $remainingSeconds - self::DELEGATION_CAPACITY_LOCK_ANSWERED_AT_ONCE_SECONDS) {
+                $agentDelegationAdmission->lockAttempts = $attempts;
+                $agentDelegationAdmission->lockOutcome = AgentDelegationAdmission::LOCK_TIMED_OUT;
+                return;
+            }
+            $this->pauseBeforeDelegationCapacityLockRetry();
+        } while ($this->readMonotonicSeconds() < $waitEndsAtSeconds);
+        $agentDelegationAdmission->lockAttempts = $attempts;
+        $agentDelegationAdmission->lockOutcome = AgentDelegationAdmission::LOCK_REFUSED;
+    }
+
+    /**
+     * One attempt at the tree's capacity lock in the open transaction (the method the tests override): MariaDB
+     * `GET_LOCK` on the transaction's connection, PostgreSQL the transaction's advisory lock.
+     *
+     * @throws \Doctrine\DBAL\Exception
+     */
+    protected function acquireDelegationCapacityLockOnce(\Doctrine\DBAL\Connection $connection, string $lockName, int $timeoutSeconds): bool
+    {
+        return EntityManagerFactory::getDialect()->acquireTransactionLock($connection, $lockName, $timeoutSeconds);
+    }
+
+    /**
+     * Releases the tree's capacity lock after the admission's commit; a failure is swallowed (the lock ends with the
+     * session). On MariaDB outside another transaction the release runs in a transaction of its own: behind a pooler
+     * that routes a lone SELECT to a replica, `RELEASE_LOCK` must reach the writer connection that holds the lock.
+     * PostgreSQL released it with the transaction.
+     */
+    protected function releaseDelegationCapacityLock(\Doctrine\DBAL\Connection $connection, string $lockName, bool $nestedInOpenTransaction): void
+    {
+        $sqlDialect = EntityManagerFactory::getDialect();
+        try {
+            if (!$sqlDialect->capabilities()->isMariaDb()) {
+                $sqlDialect->releaseTransactionLock($connection, $lockName);
+                return;
+            }
+            $opensOwnTransaction = !$nestedInOpenTransaction && !$connection->isTransactionActive();
+            if ($opensOwnTransaction) {
+                $connection->beginTransaction();
+            }
+            $sqlDialect->releaseTransactionLock($connection, $lockName);
+            if ($opensOwnTransaction) {
+                $connection->commit();
+            }
+        } catch (Throwable) {
+            // the lock ends with the session
+        }
+    }
+
+    /** The clock of the lock wait, in seconds (the method the tests override). */
+    protected function readMonotonicSeconds(): float
+    {
+        return hrtime(true) / 1e9;
+    }
+
+    /** The pause before the next lock attempt after one that answered at once (the method the tests override). */
+    protected function pauseBeforeDelegationCapacityLockRetry(): void
+    {
+        usleep(self::DELEGATION_CAPACITY_LOCK_RETRY_PAUSE_MICROSECONDS);
     }
 
     /**
@@ -896,6 +1013,12 @@ class AIConversationRunClaimsService extends Service
 
     /** How long an admission waits for its tree's capacity lock. */
     public const int DELEGATION_CAPACITY_LOCK_TIMEOUT_SECONDS = 5;
+
+    /** The pause before the next lock attempt after one that answered at once without the lock. */
+    public const int DELEGATION_CAPACITY_LOCK_RETRY_PAUSE_MICROSECONDS = 100_000;
+
+    /** A lock attempt that ended this much earlier than its wait answered at once (it did not wait for the lock). */
+    public const float DELEGATION_CAPACITY_LOCK_ANSWERED_AT_ONCE_SECONDS = 0.5;
 
     /**
      * The ids of QUEUED delegation children under a tree (delegation scheduler), oldest first, capped at $limit — the

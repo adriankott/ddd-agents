@@ -8,6 +8,9 @@ use DDD\Domain\AI\Entities\Conversations\Agent\AgentRun;
 use DDD\Domain\AI\Entities\Conversations\Agent\AgentDelegationRequestFromToolResult;
 use DDD\Domain\AI\Entities\Conversations\Agent\AgentDelegationChildProfile;
 use DDD\Domain\AI\Entities\Conversations\Agent\Delegation\AgentSubAgentRequests;
+use DDD\Domain\AI\Entities\Conversations\Agent\Delegation\AgentDelegationAdmission;
+use DDD\Domain\AI\Entities\Conversations\TurnEvents\AIConversationTurnEvent;
+use DDD\Domain\AI\Services\Conversations\TurnEvents\AIConversationTurnEventsService;
 use DDD\Domain\AI\Entities\Conversations\Agent\Delegation\AgentDelegationAgentTask;
 use DDD\Domain\AI\Entities\Conversations\Agent\Delegation\AgentDelegationAwaitedRunTask;
 use DDD\Domain\AI\Entities\Conversations\Agent\Delegation\AgentDelegationToolRunTask;
@@ -275,19 +278,28 @@ class AIConversationDelegationSpawnService extends Service
         if ($delegateCallRows === []) {
             return;
         }
-        $admittedChildIds = $this->promoteQueuedDelegations($parentConversation->getTreeRootConversationId());
-        foreach ($delegateCallRows as $delegateCallRow) {
+        /** @var DelegationSubAgentRecord[] $delegationSubAgentRecordsByRowKey */
+        $delegationSubAgentRecordsByRowKey = [];
+        $spawnedChildIds = [];
+        foreach ($delegateCallRows as $rowKey => $delegateCallRow) {
             $delegationSubAgentRecord = isset($delegateCallRow->delegationResults) && !$delegateCallRow->delegationResults->isLegacyMap()
                 ? $delegateCallRow->delegationResults->subAgent
                 : null;
             if (!$delegationSubAgentRecord instanceof DelegationSubAgentRecord || !isset($delegateCallRow->toolCall)) {
                 continue;
             }
-            $isAdmitted = in_array((int)$delegationSubAgentRecord->childConversationId, $admittedChildIds, true);
+            $delegationSubAgentRecordsByRowKey[$rowKey] = $delegationSubAgentRecord;
+            if ($delegationSubAgentRecord->childConversationId !== null) {
+                $spawnedChildIds[] = (int)$delegationSubAgentRecord->childConversationId;
+            }
+        }
+        $agentDelegationAdmission = $this->admitSpawnedChildrenAndRecordAdmission($agentRun, $parentConversation, $spawnedChildIds);
+        foreach ($delegationSubAgentRecordsByRowKey as $rowKey => $delegationSubAgentRecord) {
+            $isAdmitted = $agentDelegationAdmission->hasAdmittedChild((int)$delegationSubAgentRecord->childConversationId);
             $this->answerPlatformDelegateRow(
                 $agentRun,
-                $delegateCallRow,
-                $delegationSubAgentRecord->buildSpawnAnswerText($isAdmitted ? null : AIConversationRunClaimsService::DELEGATION_CONCURRENCY_CAP),
+                $delegateCallRows[$rowKey],
+                $delegationSubAgentRecord->buildSpawnAnswerText($isAdmitted ? null : $agentDelegationAdmission),
                 $consoleStream
             );
         }
@@ -616,12 +628,19 @@ class AIConversationDelegationSpawnService extends Service
             $itemRows[] = $itemRow;
         }
         if ($runsAsync) {
-            $admittedChildIds = $this->promoteQueuedDelegations($parentConversation->getTreeRootConversationId());
+            $spawnedChildIds = [];
+            foreach ($itemRows as $itemRow) {
+                $itemRecord = $itemRow->delegationResults->subAgent;
+                if (!$itemRecord->isNotRun() && $itemRecord->childConversationId !== null) {
+                    $spawnedChildIds[] = (int)$itemRecord->childConversationId;
+                }
+            }
+            $agentDelegationAdmission = $this->admitSpawnedChildrenAndRecordAdmission($agentRun, $parentConversation, $spawnedChildIds);
             foreach ($itemRows as $itemIndex => $itemRow) {
                 $itemRecord = $itemRow->delegationResults->subAgent;
                 if (!$itemRecord->isNotRun()) {
-                    $isAdmitted = in_array((int)$itemRecord->childConversationId, $admittedChildIds, true);
-                    $itemAnswers[$itemIndex] = $itemRecord->buildSpawnAnswerText($isAdmitted ? null : AIConversationRunClaimsService::DELEGATION_CONCURRENCY_CAP);
+                    $isAdmitted = $agentDelegationAdmission->hasAdmittedChild((int)$itemRecord->childConversationId);
+                    $itemAnswers[$itemIndex] = $itemRecord->buildSpawnAnswerText($isAdmitted ? null : $agentDelegationAdmission);
                 }
             }
         }
@@ -749,12 +768,13 @@ class AIConversationDelegationSpawnService extends Service
             $this->runSubAgentInline($agentRun, $agentChildTurnRunner, $childConversation, $delegateCallMessage, $transientMessageIds, $modelNameOverride, $consoleStream);
             return $delegateCallMessage->delegationResults->subAgent->buildInlineRunAnswerText();
         }
-        $admittedChildIds = [];
-        if (isset($childConversation->id) && $this->runClaimsService()->transitionRunState($childConversation, AIConversationRunState::IDLE, AIConversationRunState::QUEUED) && $admitsAtOnce) {
-            $admittedChildIds = $this->promoteQueuedDelegations($parentConversation->getTreeRootConversationId());
+        $isQueued = isset($childConversation->id) && $this->runClaimsService()->transitionRunState($childConversation, AIConversationRunState::IDLE, AIConversationRunState::QUEUED);
+        if (!$isQueued || !$admitsAtOnce) {
+            // admitted later by the caller (a request of several rows), or the child row is not IDLE: queued, no admission yet
+            return $delegationSubAgentRecord->buildAnswerTextBeforeAdmission();
         }
-        $isAdmitted = in_array((int)($childConversation->id ?? 0), $admittedChildIds, true);
-        return $delegationSubAgentRecord->buildSpawnAnswerText($isAdmitted ? null : AIConversationRunClaimsService::DELEGATION_CONCURRENCY_CAP);
+        $agentDelegationAdmission = $this->admitSpawnedChildrenAndRecordAdmission($agentRun, $parentConversation, [(int)$childConversation->id]);
+        return $delegationSubAgentRecord->buildSpawnAnswerText($agentDelegationAdmission->hasAdmittedChild((int)$childConversation->id) ? null : $agentDelegationAdmission);
     }
 
     /** The deadline of an agent sub-agent's run. */
@@ -1071,10 +1091,21 @@ class AIConversationDelegationSpawnService extends Service
      */
     public function promoteQueuedDelegations(int $rootConversationId): array
     {
+        return $this->promoteQueuedDelegationsAndDescribeAdmission($rootConversationId)->admittedChildIds;
+    }
+
+    /**
+     * {@see promoteQueuedDelegations()} with the admission described ({@see AgentDelegationAdmission}: the lock outcome,
+     * the occupied count, the queued rows read, the ids admitted); each admitted child's resume is dispatched.
+     *
+     * @throws Throwable
+     */
+    public function promoteQueuedDelegationsAndDescribeAdmission(int $rootConversationId): AgentDelegationAdmission
+    {
         /** @var AIConversationRunClaimsService $aIConversationRunClaimsService */
         $aIConversationRunClaimsService = DDDService::instance()->getService(AIConversationRunClaimsService::class);
-        $admittedChildIds = $aIConversationRunClaimsService->admitQueuedDelegationChildren($rootConversationId);
-        foreach ($admittedChildIds as $admittedChildId) {
+        $agentDelegationAdmission = $aIConversationRunClaimsService->admitQueuedDelegationChildrenAndDescribeAdmission($rootConversationId);
+        foreach ($agentDelegationAdmission->admittedChildIds as $admittedChildId) {
             // The delegate call is addressed by the child's column, one scalar read; the
             // compare-and-set never re-opens a call that already resolved (a late promotion racing the settle).
             $delegateMessageId = $aIConversationRunClaimsService->findDelegatedFromMessageIdById($admittedChildId);
@@ -1085,7 +1116,55 @@ class AIConversationDelegationSpawnService extends Service
             }
             (new AIConversationResumeMessage($admittedChildId))->dispatch();
         }
-        return $admittedChildIds;
+        return $agentDelegationAdmission;
+    }
+
+    /**
+     * The admission of the children a spawn just queued, before their `delegate` calls are answered: the tree's queue is
+     * admitted ({@see promoteQueuedDelegationsAndDescribeAdmission()}); when it left one of them queued although it could
+     * have run (the lock was not obtained, or a slot is still free), the admission runs once more — a child queued at its
+     * spawn otherwise waits for a sibling's end or the recovery pass. The admission is written as the turn event
+     * `delegationAdmission` of the parent (fail-open).
+     *
+     * @param int[] $spawnedChildIds
+     * @throws AgentRunClaimLostException the run claim was lost while a claim-fenced write ran
+     * @throws Throwable
+     */
+    protected function admitSpawnedChildrenAndRecordAdmission(AgentRun $agentRun, AIConversation $parentConversation, array $spawnedChildIds): AgentDelegationAdmission
+    {
+        $rootConversationId = $parentConversation->getTreeRootConversationId();
+        $agentDelegationAdmission = $this->promoteQueuedDelegationsAndDescribeAdmission($rootConversationId);
+        if ($spawnedChildIds !== [] && $agentDelegationAdmission->leavesChildQueuedWhileSlotCouldBeFree($spawnedChildIds)) {
+            $agentDelegationAdmission = $agentDelegationAdmission->withRetry($this->promoteQueuedDelegationsAndDescribeAdmission($rootConversationId));
+        }
+        $this->recordDelegationAdmissionTurnEvent($agentRun, $parentConversation, $agentDelegationAdmission, $spawnedChildIds);
+        return $agentDelegationAdmission;
+    }
+
+    /**
+     * The turn event `delegationAdmission` of a spawn's admission on the parent: the lock outcome, the occupied count,
+     * the queued ids read, the admitted ids, whether it was retried, and the children the spawn queued (the subject).
+     *
+     * @param int[] $spawnedChildIds
+     * @throws \Doctrine\DBAL\Exception a database error inside an open claim-fenced write
+     */
+    protected function recordDelegationAdmissionTurnEvent(AgentRun $agentRun, AIConversation $parentConversation, AgentDelegationAdmission $agentDelegationAdmission, array $spawnedChildIds): void
+    {
+        if (!isset($parentConversation->id)) {
+            return;
+        }
+        /** @var AIConversationTurnEventsService $aIConversationTurnEventsService */
+        $aIConversationTurnEventsService = DDDService::instance()->getService(AIConversationTurnEventsService::class);
+        $aIConversationTurnEventsService->recordEventOfConversation(
+            $parentConversation,
+            AIConversationTurnEvent::KIND_DELEGATION_ADMISSION,
+            null,
+            isset($parentConversation->messages) ? $parentConversation->messages->getNewestInitiatorMessageIndex() : null,
+            mb_substr('children:' . implode(',', $spawnedChildIds), 0, 191),
+            null,
+            $agentDelegationAdmission->buildTurnEventPayload() + ['spawnedChildIds' => $spawnedChildIds],
+            $agentRun->findRunTokenClaimedInThisProcess($parentConversation)
+        );
     }
 
     /**

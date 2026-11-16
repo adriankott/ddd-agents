@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.1.0-alpha.66
+
+- Fixed: the admission of queued sub-agents reads where the spawn wrote. `admitQueuedDelegationChildren()` counted the
+  occupied slots and read the queued rows with autocommit SELECTs; behind a pooler that routes a lone SELECT to a
+  replica (ProxySQL in front of Galera with `wsrep_sync_wait = 0`) they could reach a node that had not applied the
+  child's `IDLE → QUEUED` of a moment before, so the child stayed QUEUED with every slot free. The admission now runs in
+  one READ COMMITTED transaction (it stays on the writer) with the tree's lock taken in it
+  (`SqlDialect::acquireTransactionLock()`) and released after the commit (on MariaDB in a short transaction of its own,
+  so `RELEASE_LOCK` reaches the connection that holds the lock). Inside a caller's open transaction it nests.
+- Fixed: a capacity-lock attempt that answers at once without the lock (`GET_LOCK` NULL, or 0 without waiting) is
+  repeated within the 5 s wait (`DELEGATION_CAPACITY_LOCK_RETRY_PAUSE_MICROSECONDS`); before, it admitted nothing and the
+  child was answered as queued. The outcome is named: `AgentDelegationAdmission::LOCK_OBTAINED`,
+  `LOCK_OBTAINED_AFTER_RETRY`, `LOCK_TIMED_OUT` (another admission held it the whole wait), `LOCK_REFUSED`.
+- Fixed: a `delegate` call answered "queued" states the real count and the reason. Before, it printed the cap
+  (`queued (5 sub-agents already run in this conversation)`) whatever ran. Now: `queued (no slot is free: 5 of 5 sub-agent
+  slots of this conversation are taken; …)`, `queued (the admission could not run now, its lock was not obtained; 0 of 5
+  …)` or `queued (2 of 5 … are taken; it starts at the next admission)`. Changed:
+  `DelegationSubAgentRecord::buildSpawnAnswerText()` takes the `AgentDelegationAdmission` that left the child queued
+  (null = started) instead of an int. A recording made before this version differs in this answer text.
+- Fixed: a spawned child left queued although it could have run (the lock not obtained, or a slot still free) is
+  admitted once more before its `delegate` call is answered
+  (`AIConversationDelegationSpawnService::admitSpawnedChildrenAndRecordAdmission()`); before, it waited for a sibling's
+  end or the recovery pass, which a recorded run never reaches.
+- Fixed: the re-check of the open done criteria after a completed tool runs, on MariaDB outside an open transaction, in
+  a READ COMMITTED transaction of its own
+  (`AIConversationTaskPlanRecordService::preResolveSeededLeavesReadingLatestCommits()`), so the criteria's reads reach the
+  writer that holds the tool's write. The plan slice is persisted after it, outside it.
+- Added: two always-on turn events. `delegationAdmission` (subject `children:<ids>`): the lock outcome and attempts,
+  the occupied count, the queued ids read, the admitted ids, whether the admission was retried, the spawned ids.
+  `doneCriterionRecheck` (subject `after:<tool>`): per re-read criterion leaf its key, criterion, status before and
+  after, and the number of leaves resolved. Both are also in `AIConversationTurnEvent::KINDS`.
+- Added: `AIConversationRunClaimsService::admitQueuedDelegationChildrenAndDescribeAdmission()` and
+  `AIConversationDelegationSpawnService::promoteQueuedDelegationsAndDescribeAdmission()` (the admission with its
+  `AgentDelegationAdmission`); `admitQueuedDelegationChildren()` and `promoteQueuedDelegations()` keep their int[]
+  return. The cap (`DELEGATION_CONCURRENCY_CAP`) is unchanged.
+
 ## 0.1.0-alpha.65
 
 - Fixed: the message handlers raise the memory limit instead of setting it

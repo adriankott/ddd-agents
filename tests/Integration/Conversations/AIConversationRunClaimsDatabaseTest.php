@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DDD\Tests\Agents\Integration\Conversations;
 
 use DDD\Domain\AI\Entities\Conversations\Agent\AIConversationDelegationBatch;
+use DDD\Domain\AI\Entities\Conversations\Agent\Delegation\AgentDelegationAdmission;
 use DDD\Domain\AI\Entities\Conversations\Agent\AIConversationDelegationResumeCondition;
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Entities\Conversations\AIConversationRunState;
@@ -286,6 +287,51 @@ class AIConversationRunClaimsDatabaseTest extends DatabaseTestCase
 
         $this->writeConversationColumns(201, ['runState' => AIConversationRunState::COMPLETED, 'agentTurnOwedAt' => null]);
         self::assertSame([206], $runClaimsService->admitQueuedDelegationChildren(self::ROOT_CONVERSATION_ID), 'the lock is free again and one slot is');
+    }
+
+    public function testTheAdmissionDescribesTheLockTheRealCountAndTheQueuedRowsAndReleasesTheLock(): void
+    {
+        $this->insertConversation(['id' => self::ROOT_CONVERSATION_ID, 'runState' => AIConversationRunState::AWAITING_DELEGATES]);
+        $this->insertConversation(['id' => 201, 'rootConversationId' => self::ROOT_CONVERSATION_ID, 'runState' => AIConversationRunState::COMPLETED]);
+        $this->insertConversation(['id' => 202, 'rootConversationId' => self::ROOT_CONVERSATION_ID, 'runState' => AIConversationRunState::RUNNING]);
+        $this->insertConversation(['id' => 203, 'rootConversationId' => self::ROOT_CONVERSATION_ID, 'runState' => AIConversationRunState::QUEUED]);
+        $runClaimsService = $this->getRunClaimsService();
+
+        $agentDelegationAdmission = $runClaimsService->admitQueuedDelegationChildrenAndDescribeAdmission(self::ROOT_CONVERSATION_ID);
+
+        self::assertSame(AgentDelegationAdmission::LOCK_OBTAINED, $agentDelegationAdmission->lockOutcome);
+        self::assertSame(1, $agentDelegationAdmission->occupiedSlotCount, 'the running child; the completed one holds no slot');
+        self::assertSame([203], $agentDelegationAdmission->queuedChildIds);
+        self::assertSame([203], $agentDelegationAdmission->admittedChildIds);
+        self::assertSame(2, $agentDelegationAdmission->getTakenSlotCountAfterAdmission());
+        self::assertFalse($this->getDatabaseConnection()->isTransactionActive(), 'the admission committed its transaction');
+
+        // the lock was released after the commit: a second admission gets it at once
+        $this->insertConversation(['id' => 204, 'rootConversationId' => self::ROOT_CONVERSATION_ID, 'runState' => AIConversationRunState::QUEUED]);
+        $secondAdmission = $runClaimsService->admitQueuedDelegationChildrenAndDescribeAdmission(self::ROOT_CONVERSATION_ID);
+        self::assertSame(AgentDelegationAdmission::LOCK_OBTAINED, $secondAdmission->lockOutcome);
+        self::assertSame([204], $secondAdmission->admittedChildIds);
+    }
+
+    public function testAnAdmissionInsideAnOpenTransactionSeesTheRowWrittenInItAndLeavesTheTransactionOpen(): void
+    {
+        $this->insertConversation(['id' => self::ROOT_CONVERSATION_ID, 'runState' => AIConversationRunState::AWAITING_DELEGATES]);
+        $connection = $this->getDatabaseConnection();
+        $connection->beginTransaction();
+        try {
+            $this->insertConversation(['id' => 201, 'rootConversationId' => self::ROOT_CONVERSATION_ID, 'runState' => AIConversationRunState::QUEUED]);
+
+            $agentDelegationAdmission = $this->getRunClaimsService()->admitQueuedDelegationChildrenAndDescribeAdmission(self::ROOT_CONVERSATION_ID);
+
+            self::assertSame([201], $agentDelegationAdmission->admittedChildIds);
+            self::assertTrue($connection->isTransactionActive(), "the caller's transaction stays open");
+            $connection->commit();
+        } finally {
+            if ($connection->isTransactionActive()) {
+                $connection->rollBack();
+            }
+        }
+        self::assertSame(AIConversationRunState::IDLE, $this->findStoredConversation(201)['runState']);
     }
 
     public function testAnAwaitedConversationIsStampedAsAChildOnlyWhileItBelongsToNoDelegateRowAndHasNotEnded(): void

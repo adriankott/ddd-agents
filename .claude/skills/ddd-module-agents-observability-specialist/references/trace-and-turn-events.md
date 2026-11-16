@@ -43,8 +43,10 @@ turn), `evaluationMessageIndex`, `kind`, `site`, `subject`, `requestId`, `runTok
 | `eviction` | when a skill or tool leaves the offer | the evicted subject |
 | `forcedReDrive` | each forced tool-choice call of the stall recovery; site `stallRecovery` when the stall decision forced it, none when the ladder did; subject `step:<n>:<run token>` | `succeeded` (it produced a tool call), `forcedBy` (`stallDecision` or `ladder`), `modelName`, `toolCallCount`, its tokens, and the tokens and cost of the stalled call it replaced |
 | `turnEnd` | before the release clears the token | `outcome` (`answered`, `gaveUp`, `waitingForSubAgents`, `cancelled`; `failed` only when the run ends `FAILED`; `expired` from the sweeps; `superseded` is derived on read, never stored), model calls, skill loads, nudges, the turn's cost, the turn-start timings |
+| `delegationAdmission` | at a spawn's admission of its queued sub-agents, on the parent; subject `children:<ids>` | `lockOutcome` (`obtained`, `obtainedAfterRetry`, `timedOut`, `refused`), `lockAttempts`, `occupiedSlotCount` (before admitting), `queuedChildIds` (read), `admittedChildIds`, `retried`, `spawnedChildIds`, `concurrencyCap` |
+| `doneCriterionRecheck` | after a completed tool re-read the open done criteria (and at the turn start of an owner's typed message); subject `after:<tool>`, or `after:` followed by `turnStart` without a tool | `completedToolName`, `resolvedLeafCount`, `criteria`: per criterion leaf `itemKey`, `doneCriterion`, `statusBefore`, `statusAfter` — a leaf still open after the tool's write is a re-check that did not see it |
 
-`ALWAYS_ON_KINDS` (`eviction`, `forcedReDrive`, `turnEnd`, `chunk`) are written with every decision site off. A
+`ALWAYS_ON_KINDS` (`eviction`, `forcedReDrive`, `turnEnd`, `chunk`, `delegationAdmission`, `doneCriterionRecheck`) are written with every decision site off. A
 `turnEnd` row exists only for a turn started by the owner's text or a submitted form in a root conversation — a turn
 started by a signal, a sub-agent's turn and a supervisor turn have none. One row per attempt (the subject is the run
 token); the newest wins.
