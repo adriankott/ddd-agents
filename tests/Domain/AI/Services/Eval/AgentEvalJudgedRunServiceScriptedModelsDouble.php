@@ -14,6 +14,7 @@ use DDD\Domain\AI\Entities\Evals\AgentEvalRunOptions;
 use DDD\Domain\AI\Entities\Evals\AgentEvalScope;
 use DDD\Domain\AI\Entities\Evals\AgentEvalSimCase;
 use DDD\Domain\AI\Entities\Prompts\AIPrompt;
+use DDD\Domain\AI\Exceptions\Evals\AgentEvalHarnessModelCallFailedException;
 use DDD\Domain\AI\Services\Eval\AgentEvalJudgedRunService;
 use DDD\Infrastructure\Base\DateTime\DateTime;
 use DDD\Presentation\Mcp\Services\MCPToolExecutorService;
@@ -22,7 +23,8 @@ use RuntimeException;
 /**
  * The judged-run service with its model calls answered from scripts and the agent's turn replaced: the driver's and
  * the judge's answers come from {@see $scriptedDriverReplies} and {@see $scriptedJudgeAnswers} (an exhausted script
- * answers empty), every model call is recorded with its model, usage scope and prompt, and a driven turn appends one
+ * answers empty; a call whose failure reason is set throws the failed harness call with it, like a refused load), every
+ * model call is recorded with its model, usage scope and prompt, and a driven turn appends one
  * assistant text (`Answer <n>`) without a model call, its request snapshot sent at {@see DRIVEN_CALL_SENT_AT}. The
  * application's override points answer what the test sets. Three steps that write a stored row or reset the process
  * are recorded instead: the run identity of a stored conversation, the fresh process state of a later turn and the
@@ -48,6 +50,15 @@ class AgentEvalJudgedRunServiceScriptedModelsDouble extends AgentEvalJudgedRunSe
 
     /** @var string[] The judge's answers, in order */
     public array $scriptedJudgeAnswers = [];
+
+    /** @var string|null The provider's refusal of every judge call when set (the call throws the failed harness call) */
+    public ?string $judgeCallFailureReason = null;
+
+    /** @var int How many judge calls fail with {@see $judgeCallFailureReason}; the later ones answer from the script */
+    public int $remainingJudgeCallFailures = PHP_INT_MAX;
+
+    /** @var string|null The provider's refusal of every driver call when set (the call throws the failed harness call) */
+    public ?string $driverCallFailureReason = null;
 
     /** @var array<int, array{aiModelName: string, aiUsageScope: string, promptText: string}> Every model call, in order */
     public array $modelCalls = [];
@@ -92,7 +103,14 @@ class AgentEvalJudgedRunServiceScriptedModelsDouble extends AgentEvalJudgedRunSe
     {
         $this->modelCalls[] = ['aiModelName' => $aiModelName, 'aiUsageScope' => $aiUsageScope, 'promptText' => $promptText];
         if ($aiUsageScope === AgentAIUsageScope::AI_AGENT_JUDGE_EVALUATION) {
+            if ($this->judgeCallFailureReason !== null && $this->remainingJudgeCallFailures > 0) {
+                $this->remainingJudgeCallFailures--;
+                throw new AgentEvalHarnessModelCallFailedException($aiModelName, $aiUsageScope, $this->judgeCallFailureReason);
+            }
             return (string)(array_shift($this->scriptedJudgeAnswers) ?? '');
+        }
+        if ($this->driverCallFailureReason !== null) {
+            throw new AgentEvalHarnessModelCallFailedException($aiModelName, $aiUsageScope, $this->driverCallFailureReason);
         }
         return (string)(array_shift($this->scriptedDriverReplies) ?? '');
     }

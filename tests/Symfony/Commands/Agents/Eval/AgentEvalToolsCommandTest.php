@@ -11,6 +11,7 @@ use DDD\Domain\AI\Entities\Conversations\Messages\OwnerDevice;
 use DDD\Domain\AI\Entities\Evals\AgentEvalArms;
 use DDD\Domain\AI\Entities\Evals\AgentEvalRunSummary;
 use DDD\Domain\AI\Entities\Evals\AgentEvalSuiteTask;
+use DDD\Domain\AI\Services\Eval\AgentEvalJudgedRunService;
 use DDD\Domain\AI\Services\Eval\AgentEvalResultFilesService;
 use DDD\Infrastructure\Libs\Config;
 use DDD\Infrastructure\Services\DDDService;
@@ -199,6 +200,25 @@ class AgentEvalToolsCommandTest extends AgentEvalResultFilesTestCase
             ], $performanceRollUpLines, ['']),
             explode("\n", $commandTester->getDisplay())
         );
+    }
+
+    public function testAJudgeOrDriverModelTheCatalogDoesNotKnowIsRefusedWithTheInvalidExitCodeBeforeAnyCaseRuns(): void
+    {
+        $fixturePath = $this->writeFixture([['id' => 'own.case', 'prompt' => 'own', 'agentSpaceId' => 7, 'expect' => ['tool' => 'searchCatalog']]]);
+        foreach (['--judge-model', '--driver-model'] as $modelOptionName) {
+            $probeCommand = new AgentEvalToolsProbeCommand();
+            $resultFile = $this->temporaryDirectory . '/refused/result.json';
+
+            $commandTester = $this->runProbeCommand($probeCommand, ['--fixture' => $fixturePath, '--judge' => true, $modelOptionName => 'ALIBABA.QWEN4_MAX.json', '--no-save' => true, '--result-file' => $resultFile]);
+
+            self::assertSame(Command::INVALID, $commandTester->getStatusCode(), $modelOptionName);
+            self::assertSame(
+                $modelOptionName . ': ' . sprintf(AgentEvalJudgedRunService::UNKNOWN_MODEL_NAME_MESSAGE, 'ALIBABA.QWEN4_MAX.json'),
+                trim($commandTester->getDisplay())
+            );
+            self::assertFileDoesNotExist($resultFile, 'no case ran');
+            self::assertNull($probeCommand->suiteRunsServiceDouble->insertedAgentEvalSuiteRun);
+        }
     }
 
     public function testAChildGetsTheCaseTheScopeOptionsAsGivenAndEveryOptionOfTheRun(): void

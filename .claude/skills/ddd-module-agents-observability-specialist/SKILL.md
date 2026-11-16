@@ -107,6 +107,8 @@ scripts are the application's.
 - An evaluation command prints its progress on the error output; read the standard output for its `--json` document.
 - `app:ai-agent:eval-tools --case=<id>` runs in this process even with `--parallel`; only `--repeat` > 1 forces child
   processes for one case.
+- A judged verdict `ERROR` with `judge call failed: <model>: <reason>` is the provider refusing the judge's call, not
+  the agent failing; a `--judge-model` / `--driver-model` the catalog does not know exits `2` before anything runs.
 - A suite case without `access` that only reads runs with every write tool refused — a judged case whose rubric needs a
   write declares `"access": "write"`.
 - A chat replay refuses a recording whose wire settings or passed `--agentSpaceId` differ from the recorded ones, and a

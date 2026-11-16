@@ -5,13 +5,17 @@ declare(strict_types=1);
 namespace DDD\Symfony\Commands\Agents;
 
 use DDD\Domain\AI\Entities\AgentSpaces\AgentSpace;
+use DDD\Domain\AI\Exceptions\Evals\AgentEvalUnknownModelNameException;
+use DDD\Domain\AI\Services\Eval\AgentEvalJudgedRunService;
 use DDD\Infrastructure\Exceptions\BadRequestException;
 use DDD\Infrastructure\Exceptions\InternalErrorException;
 use DDD\Infrastructure\Services\DDDService;
 use Psr\Cache\InvalidArgumentException;
 use ReflectionException;
+use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Command\SignalableCommandInterface;
 use Symfony\Component\Console\Exception\InvalidOptionException;
+use Symfony\Component\Console\Formatter\OutputFormatter;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\ConsoleOutputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -34,7 +38,9 @@ use Symfony\Component\Console\Output\StreamOutput;
  *   through {@see handleSignal()}: the first asks for a stop, the second for the end of everything still running
  *   ({@see isStopRequested()}, {@see isKillRequested()}, the override point {@see onStopSignal()});
  * - the command line of a child process ({@see buildChildConsoleCommandLine()}, the child's name from
- *   {@see getChildCommandName()}).
+ *   {@see getChildCommandName()});
+ * - the judge and driver models: a `--judge-model` / `--driver-model` the model catalog does not know is refused
+ *   before anything runs, with the exit code `Command::INVALID` ({@see findUnknownHarnessModelNameRefusal()}).
  */
 abstract class AgentEvalConsoleCommand extends AgentConsoleCommand implements SignalableCommandInterface
 {
@@ -47,8 +53,73 @@ abstract class AgentEvalConsoleCommand extends AgentConsoleCommand implements Si
     /** @var string The PHP binary a child process is started with */
     public const string CHILD_PROCESS_PHP_BINARY = 'php';
 
+    /** @var string[] The options that name a model of the evaluation harness (the judge, the simulated owner) */
+    public const array HARNESS_MODEL_OPTION_NAMES = ['judge-model', 'driver-model'];
+
     /** @var int The stop signals this run received (0 = none) */
     protected int $stopSignalCount = 0;
+
+    /**
+     * Refuses a judge or driver model the catalog does not know before anything of the run happens: the refusal is
+     * printed and the command exits with `Command::INVALID`; no case, child process or plan runs. Otherwise the run of
+     * {@see AgentConsoleCommand::execute()}.
+     *
+     * @param InputInterface $input
+     * @param OutputInterface $output
+     * @return int
+     * @throws BadRequestException
+     * @throws InternalErrorException
+     * @throws InvalidArgumentException
+     * @throws ReflectionException
+     */
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
+        $unknownHarnessModelNameRefusal = $this->findUnknownHarnessModelNameRefusal($input);
+        if ($unknownHarnessModelNameRefusal !== null) {
+            $output->writeln('<error>' . OutputFormatter::escape($unknownHarnessModelNameRefusal) . '</error>');
+            return Command::INVALID;
+        }
+        return parent::execute($input, $output);
+    }
+
+    /**
+     * The refusal of the first harness model option ({@see HARNESS_MODEL_OPTION_NAMES}) the command declares and the
+     * caller passed whose model the catalog does not know (`--judge-model: The model catalog knows no model "…" …`);
+     * null when every passed name is known. An option the command does not declare or that was passed empty is skipped.
+     *
+     * @param InputInterface $input
+     * @return string|null
+     */
+    protected function findUnknownHarnessModelNameRefusal(InputInterface $input): ?string
+    {
+        foreach (static::HARNESS_MODEL_OPTION_NAMES as $harnessModelOptionName) {
+            if (!$input->hasOption($harnessModelOptionName)) {
+                continue;
+            }
+            $harnessModelName = trim((string)$input->getOption($harnessModelOptionName));
+            if ($harnessModelName === '') {
+                continue;
+            }
+            try {
+                $this->getJudgedRunServiceForModelNameCheck()->refuseUnknownModelName($harnessModelName);
+            } catch (AgentEvalUnknownModelNameException $unknownModelName) {
+                return '--' . $harnessModelOptionName . ': ' . $unknownModelName->getMessage();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The judged-run service that checks the harness model names.
+     *
+     * @return AgentEvalJudgedRunService
+     */
+    protected function getJudgedRunServiceForModelNameCheck(): AgentEvalJudgedRunService
+    {
+        /** @var AgentEvalJudgedRunService $agentEvalJudgedRunService */
+        $agentEvalJudgedRunService = DDDService::instance()->getService(AgentEvalJudgedRunService::class);
+        return $agentEvalJudgedRunService;
+    }
 
     // ------------------------------------------------------------------ the budget
 

@@ -86,10 +86,18 @@ then a judge model reads the trace and returns an `AgentEvalJudgeVerdict`.
 | `runSim(AgentEvalScope, AgentEvalSimCase, AgentEvalJudgedRunOptions): AgentEvalSimRunResult` | assembles the conversation like every evaluated one (arms, eval marker, budget lift), applies the case's settings blocks, tool block and purpose; the opening prompt, then the case's `followUpPrompts` (with `followUpIdleMinutes`), then the driver's messages until `[DONE]`, `[GIVE-UP]`, a closed conversation or `maxTurns` (default 6); a stored run is read back before the judge |
 | `runSimWithRestore(…)` | the same inside the restore bracket of the case's `restore` block (open → run → close in a `finally`) |
 | `runCompactionTreeEval(AgentEvalScope, AgentEvalSimCase, AgentEvalJudgedRunOptions): AgentEvalCompactionTreeRunResult` | a long conversation with the case's `compactionSettings`; the tree after every turn (a stored run: the whole stored tree), judged on growth, cover and fact survival; progress lines through the options' reporter |
-| `callModel(scope, model, prompt, usageScope)` | one plain completion on a throwaway conversation of the scope, inside `ENVELOPE.AI.AGENT.EVALUATION` billed to the scope's owner, booked as `AI.AGENT.SIMULATE.OWNER` (driver) or `AI.AGENT.JUDGE.EVALUATION` (judge) |
-| `judgeVerdict(scope, model, AIPrompt)` | an unparseable answer is asked once more; a verdict cut off by the output limit is judged once more, a second cut-off is `ERROR` |
+| `callModel(scope, model, prompt, usageScope)` | one plain completion on a throwaway conversation of the scope, inside `ENVELOPE.AI.AGENT.EVALUATION` billed to the scope's owner, booked as `AI.AGENT.SIMULATE.OWNER` (driver) or `AI.AGENT.JUDGE.EVALUATION` (judge); refuses a model the catalog does not know before the envelope opens; a load the provider refused throws `AgentEvalHarnessModelCallFailedException` (`judge call failed: <model>: <reason>` / `driver call failed: …`) instead of answering an empty text |
+| `refuseUnknownModelName(model)` / `refuseUnknownModelNamesOfRun(options)` | `AgentEvalUnknownModelNameException` for a name that is neither a key of `AI.models` nor of `AIModel::RETIRED_MODEL_SUCCESSORS` (a retired name passes: it resolves to its successor); `runSim()` and `runCompactionTreeEval()` check the run's judge and driver before the first turn |
+| `judgeVerdict(scope, model, AIPrompt)` | an unparseable answer and a failed judge call are asked once more; a second failed call is `ERROR` with the provider's message (`AgentEvalJudgeVerdict::forFailedJudgeCall()`, `isJudgeCallFailed()`), never the unparseable `FAIL`; a verdict cut off by the output limit is judged once more, a second cut-off is `ERROR` |
 | `getUserVisibleTranscript()` / `getFullTraceText()` | what the driver reads (`OWNER:` / `ASSISTANT:`, owner actions in widgets) / what the judge reads (system prompt, every row with its stored index — `AgentEvalJudgeTraceMessageLines` — task plan, write ledger, outward actions, widgets the owner saw, `AgentEvalRunCounts`, the application's end state) |
 | `getDefaultJudgeModelName()` / `getDefaultDriverModelName()` | the models when the options name none |
+
+The judge and the driver run on the model they are named, never on the agent's default: without the refusal an unknown
+name would fall back to the agent's default model (`ArgusAIAgentConversation::getAIModel()`) and that model would give
+the verdict. A failed harness call is an evaluation error, never a verdict on the agent: the judge's is the `ERROR`
+verdict (the case row gets `error: judge evaluation error: judge call failed: …`, counted as an error, not as a failed
+case); the driver's ends the case (`runSim()` throws, the evaluation command writes the case's ERROR row with the
+provider's message and runs the remaining cases) instead of sending the "please go on" owner turn.
 
 Override points of the application's same-path subclass (each default is neutral):
 `applyCaseFixtures()` (its own case keys on the new conversation, read with `AgentEvalSimCase::getApplicationValue()`),

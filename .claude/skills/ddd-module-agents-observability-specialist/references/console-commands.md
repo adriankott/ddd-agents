@@ -492,7 +492,8 @@ and a judge model). Reports per case and overall, writes the run into the result
   `--no-save` or `--no-prune`.
 - **Envelope:** every agent turn `ENVELOPE.AI.CONVERSATION.TURN` for the space's owner; the driver and the judge
   `ENVELOPE.AI.AGENT.EVALUATION` (booked as `AI.AGENT.SIMULATE.OWNER` / `AI.AGENT.JUDGE.EVALUATION`).
-- **Exit codes:** `0` when every case that counts passed; `1` otherwise or when no fixture is found.
+- **Exit codes:** `0` when every case that counts passed; `1` otherwise or when no fixture is found; `2` for a
+  `--judge-model` / `--driver-model` the model catalog does not know ([the harness models](#the-harness-models)).
 - **Budget:** `--ignore-budget`, handed to every child.
 - **Child processes:** when `--repeat` > 1, or `--parallel` > 1 without `--case`; each child is this command with
   `--case`, `--json`, `--no-save`, `--fixture`; ceiling = the case's `timeoutSeconds` (default 600, at least 60).
@@ -531,8 +532,9 @@ against a baseline. LIVE.
 - **Writes:** a run folder `<date>_<time>-suite[-<label>]` in the results folder (see
   [evaluation-fixtures](evaluation-fixtures.md#result-files)); the stored suite run; what the children write.
 - **Envelope:** none of its own; the children book as above.
-- **Exit codes:** `0` when both verdicts pass; `1` otherwise; `2` when no case matched; a stop signal before the first
-  case started ends the process with `128 + signal`.
+- **Exit codes:** `0` when both verdicts pass; `1` otherwise; `2` when no case matched or for an unknown
+  `--judge-model` / `--driver-model` (refused before the plan); a stop signal before the first case started ends the
+  process with `128 + signal`.
 - **Budget:** inverted: lifted unless `--enforce-budget`.
 - **Stop:** a `STOP` file in the run folder or SIGINT / SIGTERM ([stop signals](#stop-signals-and-the-stop-file)).
 - **Child processes:** `app:ai-agent:eval-tools` (kind `toolsCase`), `app:ai-agent:eval-selection` (`selectionCase`),
@@ -780,8 +782,9 @@ rates the tree from the per-turn snapshots.
 
 - **Writes:** the conversation with `--persist`; nothing stored otherwise.
 - **Envelope:** agent turns `ENVELOPE.AI.CONVERSATION.TURN`; driver and judge `ENVELOPE.AI.AGENT.EVALUATION`.
-- **Exit codes:** `0` only when the verdict is PASS and, with `--persist`, the stored build validates; `1` otherwise; `2`
-  without a readable case file or a space.
+- **Exit codes:** `0` only when the verdict is PASS and, with `--persist`, the stored build validates; `1` otherwise
+  (a failed driver call: `eval failed: driver call failed: <model>: <reason>`); `2` without a readable case file or a
+  space, or for an unknown `--judge-model` / `--driver-model`.
 - **Budget:** `--ignore-budget`.
 - **Override points:** `getDefaultCaseFile()`, `getDefaultCompactionParamsTemplate()`,
   `buildCompactionTreeParameters()`, `resolveTreeEvalScope()`, `buildJudgedRunOptions()`, `buildTurnSnapshotHeading()`,
@@ -982,6 +985,17 @@ work: the cap is lifted for this process, the spend is still booked, the grant e
 the other way round (`app:ai-agent:eval-suite`: `--enforce-budget`). Commands with model calls and no option:
 `app:ai-agent:activity-lines`, `app:ai-conversation:search-inspect`, `app:ai-agent:eval-tiers`; `app:ai-agent:diagnose`
 lifts for `--drive` only from the conversation's own `budgetBypass`.
+
+### The harness models
+
+`AgentEvalConsoleCommand::execute()` checks every option of `HARNESS_MODEL_OPTION_NAMES` (`--judge-model`,
+`--driver-model`) the command declares and the caller passed, before anything of the run happens
+(`findUnknownHarnessModelNameRefusal()`, through `AgentEvalJudgedRunService::refuseUnknownModelName()`): a name that is
+neither a key of the configuration `AI.models` nor a retired name of `AIModel::RETIRED_MODEL_SUCCESSORS` prints
+`--judge-model: The model catalog knows no model "<name>" (…)` and exits `2` (`Command::INVALID`); no case, child
+process or plan runs. Covers `eval-tools` (an application's subclass included), `eval-suite` and `eval-compaction-tree`.
+A command of the application that is no evaluation command (a plain `Command`) calls `refuseUnknownModelName()` itself
+after reading its options.
 
 ### Model and tier options
 

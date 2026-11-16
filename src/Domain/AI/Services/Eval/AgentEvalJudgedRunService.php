@@ -28,7 +28,10 @@ use DDD\Domain\AI\Entities\Evals\AgentEvalSimRunResult;
 use DDD\Domain\AI\Entities\Models\AIModel;
 use DDD\Domain\AI\Entities\Prompts\AIPrompt;
 use DDD\Domain\AI\Entities\UsageLogs\Enums\AIUsageInitiator;
+use DDD\Domain\AI\Exceptions\Evals\AgentEvalHarnessModelCallFailedException;
+use DDD\Domain\AI\Exceptions\Evals\AgentEvalUnknownModelNameException;
 use DDD\Domain\AI\Repo\Argus\Conversations\ArgusAIAgentConversation;
+use DDD\Domain\AI\Services\AIModelsService;
 use DDD\Domain\AI\Services\AIPromptsService;
 use DDD\Domain\AI\Services\Conversations\Agent\AIConversationModelCallsService;
 use DDD\Domain\AI\Services\Conversations\AIConversationAuditRenderService;
@@ -51,6 +54,11 @@ use RuntimeException;
  * ({@see AgentEvalRunnerService::assembleConversation()}) and driven turn by turn with the runner's parts; the driver's
  * and the judge's model calls run on throwaway conversations inside the evaluation envelope, each with its own usage
  * scope ({@see callModel()}).
+ *
+ * The judge and the driver run on the model they are named: a name the model catalog does not know is refused before
+ * any call ({@see refuseUnknownModelName()}), never answered by the agent's default model. A harness call the provider
+ * refused is an evaluation error with the provider's message ({@see AgentEvalHarnessModelCallFailedException}): the
+ * judge's becomes the ERROR verdict ({@see AgentEvalJudgeVerdict::forFailedJudgeCall()}), the driver's ends the case.
  *
  * What an application adds, each with a neutral default:
  * - {@see applyCaseFixtures()} — the case's fixtures of the application on the new conversation;
@@ -110,6 +118,9 @@ class AgentEvalJudgedRunService extends AgentEvalRunnerService
     /** @var int The longest summary preview of one tree node */
     public const int TREE_NODE_PREVIEW_MAX_LENGTH = 70;
 
+    /** @var string The refusal of a model name the catalog does not know; `%s` = the name */
+    public const string UNKNOWN_MODEL_NAME_MESSAGE = 'The model catalog knows no model "%s" (neither a model nor a retired name of one); the known names are the keys of the configuration AI.models and of AIModel::RETIRED_MODEL_SUCCESSORS.';
+
     /**
      * The model that returns the verdict when the options name none.
      *
@@ -145,14 +156,20 @@ class AgentEvalJudgedRunService extends AgentEvalRunnerService
      * `blockedToolSimulatedErrors`, read through {@see buildRunCaseOfSimCase()}) guards the agent's run and is lifted
      * when the run ends.
      *
+     * A judge or driver model the catalog does not know is refused before the first turn; a failed driver call ends the
+     * case with the provider's message, a failed judge call is the ERROR verdict.
+     *
      * @param AgentEvalScope $agentEvalScope
      * @param AgentEvalSimCase $agentEvalSimCase the judged case
      * @param AgentEvalJudgedRunOptions $agentEvalJudgedRunOptions
      * @return AgentEvalSimRunResult
+     * @throws AgentEvalUnknownModelNameException when the judge or driver model of the run is unknown to the catalog
+     * @throws AgentEvalHarnessModelCallFailedException when a driver call failed
      */
     public function runSim(AgentEvalScope $agentEvalScope, AgentEvalSimCase $agentEvalSimCase, AgentEvalJudgedRunOptions $agentEvalJudgedRunOptions): AgentEvalSimRunResult
     {
         $this->authenticateOwnerOfScope($agentEvalScope);
+        $this->refuseUnknownModelNamesOfRun($agentEvalJudgedRunOptions);
         $this->applyToolBlockOfCase($this->buildRunCaseOfSimCase($agentEvalSimCase), $agentEvalJudgedRunOptions);
         try {
             $conversation = $this->prepareConversationOfSimCase($agentEvalScope, $agentEvalSimCase, $agentEvalJudgedRunOptions);
@@ -354,6 +371,8 @@ class AgentEvalJudgedRunService extends AgentEvalRunnerService
      * @param AgentEvalSimCase $agentEvalSimCase
      * @param AgentEvalJudgedRunOptions $agentEvalJudgedRunOptions
      * @return string
+     * @throws AgentEvalHarnessModelCallFailedException when the driver call failed: the case ends, never with an empty
+     *                                                  owner turn
      */
     protected function askDriverForNextOwnerMessage(
         AIConversation $conversation,
@@ -472,16 +491,20 @@ class AgentEvalJudgedRunService extends AgentEvalRunnerService
      * One plain completion of `$aiModelName` on `$promptText` (no tools), for the driver or the judge: the prompt is the
      * one owner message of a throwaway conversation of the scope (never stored, never recorded as the run's
      * conversation), sent with the harness system prompt ({@see EVAL_HARNESS_SYSTEM_PROMPT}), inside the evaluation
-     * envelope billed to the scope's owner and booked under `$aiUsageScope`.
+     * envelope billed to the scope's owner and booked under `$aiUsageScope`. A model name the catalog does not know is
+     * refused before the envelope opens.
      *
      * @param AgentEvalScope $agentEvalScope
      * @param string $aiModelName
      * @param string $promptText
      * @param string $aiUsageScope {@see AgentAIUsageScope::AI_AGENT_SIMULATE_OWNER} or {@see AgentAIUsageScope::AI_AGENT_JUDGE_EVALUATION}
      * @return string the model's answer
+     * @throws AgentEvalUnknownModelNameException when the catalog does not know `$aiModelName`
+     * @throws AgentEvalHarnessModelCallFailedException when the provider refused the call or it failed
      */
     public function callModel(AgentEvalScope $agentEvalScope, string $aiModelName, string $promptText, string $aiUsageScope): string
     {
+        $this->refuseUnknownModelName($aiModelName);
         $aIUsageEnvelopesService = $this->getUsageEnvelopesService();
         $evaluationEnvelopeContext = $aIUsageEnvelopesService->openEnvelope(
             $agentEvalScope->getOwnerAccountId(),
@@ -509,6 +532,44 @@ class AgentEvalJudgedRunService extends AgentEvalRunnerService
     }
 
     /**
+     * Refuses a judge or driver model name the model catalog does not know: without the refusal the call would run on
+     * the agent's default model and the verdict would be given by another model. A retired name passes: the catalog
+     * resolves it to its successor ({@see AIModelsService::getAIModelByName()}).
+     *
+     * @param string $aiModelName
+     * @return void
+     * @throws AgentEvalUnknownModelNameException
+     */
+    public function refuseUnknownModelName(string $aiModelName): void
+    {
+        /** @var AIModelsService $aIModelsService */
+        $aIModelsService = DDDService::instance()->getService(AIModelsService::class);
+        $throwErrorsBeforeLookup = $aIModelsService->disableThrowErrors();
+        try {
+            $aIModel = $aIModelsService->getAIModelByName($aiModelName);
+        } finally {
+            $aIModelsService->restoreThrowErrors($throwErrorsBeforeLookup);
+        }
+        if ($aIModel === null) {
+            throw new AgentEvalUnknownModelNameException($aiModelName, sprintf(static::UNKNOWN_MODEL_NAME_MESSAGE, $aiModelName));
+        }
+    }
+
+    /**
+     * Refuses the judge and the driver model of a run (the ones set, else the defaults) before its first turn
+     * ({@see refuseUnknownModelName()}).
+     *
+     * @param AgentEvalJudgedRunOptions $agentEvalJudgedRunOptions
+     * @return void
+     * @throws AgentEvalUnknownModelNameException
+     */
+    public function refuseUnknownModelNamesOfRun(AgentEvalJudgedRunOptions $agentEvalJudgedRunOptions): void
+    {
+        $this->refuseUnknownModelName($agentEvalJudgedRunOptions->resolveJudgeModelName($this->getDefaultJudgeModelName()));
+        $this->refuseUnknownModelName($agentEvalJudgedRunOptions->resolveDriverModelName($this->getDefaultDriverModelName()));
+    }
+
+    /**
      * The model input of a harness model call: the harness system prompt ({@see EVAL_HARNESS_SYSTEM_PROMPT}) and the
      * prompt as the one owner message — none of the platform's sections of an agent call (who the agent talks to, the
      * skill catalog, the memories, the product, the clock): the driver and the judge are no agent of the platform.
@@ -526,14 +587,24 @@ class AgentEvalJudgedRunService extends AgentEvalRunnerService
 
     /**
      * Sends the prepared completion request of a harness model call and returns the model's answer (the one network
-     * call of {@see callModel()}).
+     * call of {@see callModel()}). A failed load never throws and answers an empty text; the provider's refusal is in
+     * its failure reason, which this call turns into {@see AgentEvalHarnessModelCallFailedException}.
      *
      * @param ArgusAIAgentConversation $argusAIAgentConversation the request, its model, usage scope and input set
      * @return string
+     * @throws AgentEvalHarnessModelCallFailedException when the provider refused the call or it failed
      */
     protected function loadHarnessCompletion(ArgusAIAgentConversation $argusAIAgentConversation): string
     {
         $argusAIAgentConversation->argusLoad();
+        $loadFailureReason = $argusAIAgentConversation->getLastLoadFailureReason();
+        if ($loadFailureReason !== null) {
+            throw new AgentEvalHarnessModelCallFailedException(
+                (string)$argusAIAgentConversation->aiModelNameOverride,
+                (string)$argusAIAgentConversation->getAIUsageScope(),
+                $loadFailureReason
+            );
+        }
         return (string)$argusAIAgentConversation->getAiGeneratedResponse();
     }
 
@@ -563,8 +634,9 @@ class AgentEvalJudgedRunService extends AgentEvalRunnerService
     }
 
     /**
-     * The judge's verdict on `$verdictPrompt`. An unparseable answer (an empty one included) is asked once more before
-     * it counts. A verdict cut off by the output limit carries the verdict scalars but no criteria, so the run is judged
+     * The judge's verdict on `$verdictPrompt`. An unparseable answer (an empty one included) and a failed judge call are
+     * asked once more before they count; a second failed call is the ERROR verdict with the provider's message
+     * ({@see AgentEvalJudgeVerdict::forFailedJudgeCall()}), never a FAIL. A verdict cut off by the output limit carries the verdict scalars but no criteria, so the run is judged
      * once more; a second cut-off verdict is an evaluation error ({@see AgentEvalJudgeVerdict::VERDICT_ERROR}), never
      * the salvaged verdict.
      *
@@ -588,8 +660,8 @@ class AgentEvalJudgedRunService extends AgentEvalRunnerService
     }
 
     /**
-     * The judge's verdict read from its answer; an unparseable answer is asked once more, and a second one stays the
-     * unparseable FAIL.
+     * The judge's verdict read from its answer; an unparseable answer and a failed call are asked once more, and a
+     * second one stays the unparseable FAIL or the failed-call ERROR.
      *
      * @param AgentEvalScope $agentEvalScope
      * @param string $judgeModelName
@@ -598,15 +670,31 @@ class AgentEvalJudgedRunService extends AgentEvalRunnerService
      */
     protected function askJudgeWithOneRetryOnAnUnparseableAnswer(AgentEvalScope $agentEvalScope, string $judgeModelName, string $verdictPromptText): AgentEvalJudgeVerdict
     {
-        $agentEvalJudgeVerdict = AgentEvalJudgeVerdict::fromJudgeOutput(
-            $this->callModel($agentEvalScope, $judgeModelName, $verdictPromptText, AgentAIUsageScope::AI_AGENT_JUDGE_EVALUATION)
-        );
-        if (!$agentEvalJudgeVerdict->isUnparseable()) {
+        $agentEvalJudgeVerdict = $this->askJudgeOnce($agentEvalScope, $judgeModelName, $verdictPromptText);
+        if (!$agentEvalJudgeVerdict->isUnparseable() && !$agentEvalJudgeVerdict->isJudgeCallFailed()) {
             return $agentEvalJudgeVerdict;
         }
-        return AgentEvalJudgeVerdict::fromJudgeOutput(
-            $this->callModel($agentEvalScope, $judgeModelName, $verdictPromptText, AgentAIUsageScope::AI_AGENT_JUDGE_EVALUATION)
-        );
+        return $this->askJudgeOnce($agentEvalScope, $judgeModelName, $verdictPromptText);
+    }
+
+    /**
+     * One judge call read as a verdict; a call the provider refused or that failed is the failed-call verdict (ERROR)
+     * with the provider's message.
+     *
+     * @param AgentEvalScope $agentEvalScope
+     * @param string $judgeModelName
+     * @param string $verdictPromptText
+     * @return AgentEvalJudgeVerdict
+     */
+    protected function askJudgeOnce(AgentEvalScope $agentEvalScope, string $judgeModelName, string $verdictPromptText): AgentEvalJudgeVerdict
+    {
+        try {
+            return AgentEvalJudgeVerdict::fromJudgeOutput(
+                $this->callModel($agentEvalScope, $judgeModelName, $verdictPromptText, AgentAIUsageScope::AI_AGENT_JUDGE_EVALUATION)
+            );
+        } catch (AgentEvalHarnessModelCallFailedException $judgeCallFailure) {
+            return AgentEvalJudgeVerdict::forFailedJudgeCall($judgeCallFailure->getMessage());
+        }
     }
 
     /**
@@ -827,10 +915,13 @@ class AgentEvalJudgedRunService extends AgentEvalRunnerService
      * @param AgentEvalSimCase $agentEvalSimCase a case with `compactionSettings` and `compactionParamsText`
      * @param AgentEvalJudgedRunOptions $agentEvalJudgedRunOptions
      * @return AgentEvalCompactionTreeRunResult
+     * @throws AgentEvalUnknownModelNameException when the judge or driver model of the run is unknown to the catalog
+     * @throws AgentEvalHarnessModelCallFailedException when a driver call failed
      */
     public function runCompactionTreeEval(AgentEvalScope $agentEvalScope, AgentEvalSimCase $agentEvalSimCase, AgentEvalJudgedRunOptions $agentEvalJudgedRunOptions): AgentEvalCompactionTreeRunResult
     {
         $this->authenticateOwnerOfScope($agentEvalScope);
+        $this->refuseUnknownModelNamesOfRun($agentEvalJudgedRunOptions);
         $maxTurns = $agentEvalSimCase->resolveMaxTurns(static::DEFAULT_MAX_TURNS);
         $driverModelName = $agentEvalJudgedRunOptions->resolveDriverModelName($this->getDefaultDriverModelName());
         $judgeModelName = $agentEvalJudgedRunOptions->resolveJudgeModelName($this->getDefaultJudgeModelName());

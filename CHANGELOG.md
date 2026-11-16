@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.1.0-alpha.64
+
+- Fixed: a judge or driver model name the model catalog does not know is refused before any call. Before, the call ran
+  on the agent's default model (`ArgusAIAgentConversation::getAIModel()` falls back when the name does not resolve), so
+  the verdict was given by another model than the one named. `AgentEvalJudgedRunService::refuseUnknownModelName()`
+  throws `AgentEvalUnknownModelNameException` (a retired name passes: it resolves to its successor);
+  `callModel()` checks every call, `runSim()` and `runCompactionTreeEval()` check the run's judge and driver before the
+  first turn. The evaluation commands (`eval-tools`, `eval-suite`, `eval-compaction-tree`, through
+  `AgentEvalConsoleCommand::execute()`) print `--judge-model: The model catalog knows no model "<name>" …` and exit `2`
+  before anything runs.
+- Fixed: a harness model call the provider refused is no longer read as an empty answer.
+  `loadHarnessCompletion()` reads the load's failure reason and throws `AgentEvalHarnessModelCallFailedException`
+  (`judge call failed: <model>: <reason>`, `driver call failed: …`). A failed judge call is asked once more, then is the
+  verdict `ERROR` with the provider's message (`AgentEvalJudgeVerdict::forFailedJudgeCall()`, `isJudgeCallFailed()`,
+  key `judgeCallFailed`); the case row gets `error: judge evaluation error: judge call failed: …` and counts as an
+  evaluation error. Before, it was `FAIL` "Judge output not parseable" with an empty `raw` and counted against the agent.
+- Changed: a failed driver call ends its case as an error row with the provider's message (`runSim()` throws; the
+  remaining cases of the run continue) instead of sending the "please go on" owner turn.
+- Readers of `verdict.verdict` see `ERROR` where they saw `FAIL` for a refused judge call. An application's own
+  command that is no evaluation command calls `refuseUnknownModelName()` after reading its model options.
+
 ## 0.1.0-alpha.63
 
 - Requires `mgamadeus/ddd` ^3.34.1 (the recorded-run classes of the framework: write-statement audit, message

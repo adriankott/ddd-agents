@@ -24,6 +24,9 @@ use DDD\Domain\Base\Entities\ValueObject;
  *    caller judges the run once more;
  * 4. otherwise the answer is unparseable: a FAIL marked as such ({@see isUnparseable()}).
  *
+ * A judge call the provider refused or that failed gives no answer to read: that is an evaluation error
+ * ({@see forFailedJudgeCall()}, verdict ERROR with the provider's message), never a FAIL of the run.
+ *
  * No I/O; the model call and its retries belong to the judged-run service.
  *
  * @phpstan-consistent-constructor
@@ -36,7 +39,7 @@ class AgentEvalJudgeVerdict extends ValueObject
     /** @var string The verdict of a run that violated a required criterion, and of an unparseable answer */
     public const string VERDICT_FAIL = 'FAIL';
 
-    /** @var string No verdict: the evaluation itself failed (e.g. the answer was cut off twice) */
+    /** @var string No verdict: the evaluation itself failed (e.g. the answer was cut off twice, the judge call failed) */
     public const string VERDICT_ERROR = 'ERROR';
 
     /** @var string The key of the verdict */
@@ -53,6 +56,9 @@ class AgentEvalJudgeVerdict extends ValueObject
 
     /** @var string The key that marks an answer no verdict could be read from */
     public const string KEY_JUDGE_OUTPUT_UNPARSEABLE = 'judgeOutputUnparseable';
+
+    /** @var string The key that marks a verdict whose judge call the provider refused or that failed */
+    public const string KEY_JUDGE_CALL_FAILED = 'judgeCallFailed';
 
     /** @var string The key of the head of the raw answer kept beside a salvaged or unparseable verdict */
     public const string KEY_RAW = 'raw';
@@ -105,6 +111,25 @@ class AgentEvalJudgeVerdict extends ValueObject
             static::KEY_REASONS => 'Judge output not parseable',
             static::KEY_JUDGE_OUTPUT_UNPARSEABLE => true,
             static::KEY_RAW => mb_substr($judgeOutput, 0, static::UNPARSEABLE_RAW_LENGTH),
+        ]);
+    }
+
+    /**
+     * No verdict: the judge call failed and gave no answer to read — an evaluation error (ERROR), never a FAIL of the
+     * run. The keys of the unparseable verdict (`verdict`, `goalMet`, `grounded`, `reasons`) keep the row's shape;
+     * `reasons` is the failure's message with the provider's text (`judge call failed: <model>: <reason>`).
+     *
+     * @param string $judgeCallFailureMessage the message of the failed call
+     * @return static
+     */
+    public static function forFailedJudgeCall(string $judgeCallFailureMessage): static
+    {
+        return static::fromArray([
+            static::KEY_VERDICT => static::VERDICT_ERROR,
+            'goalMet' => false,
+            'grounded' => false,
+            static::KEY_REASONS => $judgeCallFailureMessage,
+            static::KEY_JUDGE_CALL_FAILED => true,
         ]);
     }
 
@@ -258,9 +283,15 @@ class AgentEvalJudgeVerdict extends ValueObject
         return ($this->verdictFields[static::KEY_JUDGE_OUTPUT_UNPARSEABLE] ?? false) === true;
     }
 
+    /** Whether the judge call failed and no answer was read ({@see forFailedJudgeCall()}). */
+    public function isJudgeCallFailed(): bool
+    {
+        return ($this->verdictFields[static::KEY_JUDGE_CALL_FAILED] ?? false) === true;
+    }
+
     /**
      * The error of a run whose verdict is an evaluation error ({@see VERDICT_ERROR}: the judge gave no verdict, e.g.
-     * its answer was cut off twice): `judge evaluation error: <reasons>`, so the roll-ups count the case as an error,
+     * its answer was cut off twice or its call failed): `judge evaluation error: <reasons>`, so the roll-ups count the case as an error,
      * not as a failed case. Null for every other verdict.
      */
     public function findEvaluationError(): ?string

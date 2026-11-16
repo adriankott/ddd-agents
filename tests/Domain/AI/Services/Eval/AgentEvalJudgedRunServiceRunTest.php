@@ -17,6 +17,8 @@ use DDD\Domain\AI\Entities\Evals\AgentEvalScope;
 use DDD\Domain\AI\Entities\Evals\AgentEvalSimCase;
 use DDD\Domain\AI\Entities\Evals\AgentEvalSimRunResult;
 use DDD\Domain\AI\Entities\Models\AIModel;
+use DDD\Domain\AI\Exceptions\Evals\AgentEvalHarnessModelCallFailedException;
+use DDD\Domain\AI\Exceptions\Evals\AgentEvalUnknownModelNameException;
 use DDD\Domain\AI\Services\Conversations\AIConversationMessagesService;
 use DDD\Domain\AI\Services\Conversations\AIConversationsService;
 use DDD\Domain\AI\Services\Eval\AgentEvalJudgedRunService;
@@ -39,6 +41,9 @@ use RuntimeException;
  */
 class AgentEvalJudgedRunServiceRunTest extends IntegrationTestCase
 {
+    /** @var string The judge model of the options: one of the catalog, other than the default judge */
+    protected const string JUDGE_MODEL_NAME = AIModel::MODEL_ANTHROPIC_CLAUDE_HAIKU_4_5;
+
     protected const string PASS_ANSWER = '{"verdict":"PASS","scorePercent":95,"goalMet":true,"reasons":"listed"}';
 
     protected AgentEvalRunHooksServiceRecordingDouble $hooksDouble;
@@ -78,7 +83,7 @@ class AgentEvalJudgedRunServiceRunTest extends IntegrationTestCase
     protected function buildOptions(): AgentEvalJudgedRunOptions
     {
         $agentEvalJudgedRunOptions = AgentEvalJudgedRunOptions::forArms();
-        $agentEvalJudgedRunOptions->judgeModelName = 'judge-model';
+        $agentEvalJudgedRunOptions->judgeModelName = self::JUDGE_MODEL_NAME;
         $agentEvalJudgedRunOptions->progressReporter = $this->progressLinesRecorder;
         return $agentEvalJudgedRunOptions;
     }
@@ -128,7 +133,7 @@ class AgentEvalJudgedRunServiceRunTest extends IntegrationTestCase
             $agentEvalJudgedRunService->getUsageScopesOfModelCalls()
         );
         self::assertSame(
-            [AIModel::MODEL_ANTHROPIC_CLAUDE_SONNET_5, AIModel::MODEL_ANTHROPIC_CLAUDE_SONNET_5, 'judge-model'],
+            [AIModel::MODEL_ANTHROPIC_CLAUDE_SONNET_5, AIModel::MODEL_ANTHROPIC_CLAUDE_SONNET_5, self::JUDGE_MODEL_NAME],
             array_column($agentEvalJudgedRunService->modelCalls, 'aiModelName'),
             'the driver runs on the default driver model, the judge on the model of the options'
         );
@@ -165,6 +170,43 @@ class AgentEvalJudgedRunServiceRunTest extends IntegrationTestCase
         self::assertSame(['Show me my entries.', 'Please go on.'], $agentEvalJudgedRunService->ownerTextsPerDrive[1]);
         self::assertSame(AgentEvalSimRunResult::STOP_REASON_GIVE_UP, $agentEvalSimRunResult->getStopReason());
         self::assertSame(2, $agentEvalSimRunResult->getTurns());
+    }
+
+    public function testAJudgeOrDriverModelTheCatalogDoesNotKnowIsRefusedBeforeTheFirstTurn(): void
+    {
+        foreach (['judgeModelName', 'driverModelName'] as $modelOptionName) {
+            $agentEvalJudgedRunService = $this->buildService(['[DONE]']);
+            $agentEvalJudgedRunOptions = $this->buildOptions();
+            $agentEvalJudgedRunOptions->{$modelOptionName} = 'ALIBABA.QWEN4_MAX.json';
+            try {
+                $agentEvalJudgedRunService->runSim($this->buildScope(), $this->buildSimCase(), $agentEvalJudgedRunOptions);
+                self::fail("an unknown {$modelOptionName} must be refused");
+            } catch (AgentEvalUnknownModelNameException $unknownModelName) {
+                self::assertSame('ALIBABA.QWEN4_MAX.json', $unknownModelName->getUnknownModelName());
+            }
+            self::assertSame([], $agentEvalJudgedRunService->ownerTextsPerDrive, "{$modelOptionName}: no turn was driven");
+            self::assertSame([], $agentEvalJudgedRunService->modelCalls, "{$modelOptionName}: no model was called");
+        }
+    }
+
+    public function testAFailedDriverCallEndsTheCaseWithTheProvidersMessageAndNoVerdict(): void
+    {
+        $agentEvalJudgedRunService = $this->buildService(['never read']);
+        $agentEvalJudgedRunService->driverCallFailureReason = 'http 404 from the upstream call: No endpoints found';
+
+        try {
+            $agentEvalJudgedRunService->runSim($this->buildScope(), $this->buildSimCase(), $this->buildOptions());
+            self::fail('a failed driver call must end the case, never become an owner turn');
+        } catch (AgentEvalHarnessModelCallFailedException $driverCallFailure) {
+            self::assertSame(
+                'driver call failed: ' . AIModel::MODEL_ANTHROPIC_CLAUDE_SONNET_5 . ': http 404 from the upstream call: No endpoints found',
+                $driverCallFailure->getMessage(),
+                'the case\'s error row carries the provider\'s message'
+            );
+        }
+        self::assertCount(1, $agentEvalJudgedRunService->ownerTextsPerDrive, 'the opening turn ran, no "please go on" turn followed');
+        self::assertSame([AgentAIUsageScope::AI_AGENT_SIMULATE_OWNER], $agentEvalJudgedRunService->getUsageScopesOfModelCalls(), 'no judge call: the run has no verdict');
+        self::assertSame([], MCPToolExecutorService::$blockedToolNames, 'the case\'s tool block is lifted');
     }
 
     public function testTheTurnsStopAtTheCasesLimit(): void

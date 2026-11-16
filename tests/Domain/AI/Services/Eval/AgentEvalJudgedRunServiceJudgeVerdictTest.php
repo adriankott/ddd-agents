@@ -17,7 +17,8 @@ use DDD\Tests\Agents\Support\IntegrationTestCase;
 /**
  * The judge of a judged run owns its retries: an empty or unparseable answer is asked once more before it counts as
  * the unparseable FAIL, a parseable answer is never asked twice, a verdict cut off by the output limit is judged once
- * more, and a second cut-off verdict is an evaluation error — never the salvaged verdict. Every judge call is booked
+ * more, and a second cut-off verdict is an evaluation error — never the salvaged verdict. A judge call the provider
+ * refused is asked once more and then is an evaluation error with the provider's message — never the unparseable FAIL. Every judge call is booked
  * under the judge's usage scope; the default models are the service's instance methods.
  */
 class AgentEvalJudgedRunServiceJudgeVerdictTest extends IntegrationTestCase
@@ -105,6 +106,36 @@ class AgentEvalJudgedRunServiceJudgeVerdictTest extends IntegrationTestCase
         self::assertSame('PASS', $agentEvalJudgeVerdict->getVerdict());
         self::assertFalse($agentEvalJudgeVerdict->isTruncated());
         self::assertCount(3, $agentEvalJudgedRunService->modelCalls);
+    }
+
+    public function testAFailedJudgeCallIsAnEvaluationErrorThatKeepsTheProvidersMessage(): void
+    {
+        $agentEvalJudgedRunService = $this->buildJudgeWith(['never read']);
+        $agentEvalJudgedRunService->judgeCallFailureReason = 'http 404 from the upstream call: No endpoints found';
+
+        $agentEvalJudgeVerdict = $this->judge($agentEvalJudgedRunService);
+
+        self::assertSame(AgentEvalJudgeVerdict::VERDICT_ERROR, $agentEvalJudgeVerdict->getVerdict());
+        self::assertFalse($agentEvalJudgeVerdict->isPass());
+        self::assertSame('judge call failed: judge-model: http 404 from the upstream call: No endpoints found', $agentEvalJudgeVerdict->getReasons());
+        self::assertTrue($agentEvalJudgeVerdict->isJudgeCallFailed());
+        self::assertFalse($agentEvalJudgeVerdict->isUnparseable(), 'no answer was read: not the unparseable FAIL');
+        self::assertSame('judge evaluation error: judge call failed: judge-model: http 404 from the upstream call: No endpoints found', $agentEvalJudgeVerdict->findEvaluationError());
+        self::assertSame(['verdict', 'goalMet', 'grounded', 'reasons', AgentEvalJudgeVerdict::KEY_JUDGE_CALL_FAILED], array_keys($agentEvalJudgeVerdict->toArray()), 'the row keeps the shape of a verdict');
+        self::assertCount(2, $agentEvalJudgedRunService->modelCalls, 'a failed call is asked once more');
+    }
+
+    public function testAJudgeCallThatFailsOnceIsAskedAgainAndTheAnswerCounts(): void
+    {
+        $agentEvalJudgedRunService = $this->buildJudgeWith(['{"verdict":"PASS","scorePercent":90,"reasons":"ok"}']);
+        $agentEvalJudgedRunService->judgeCallFailureReason = 'http 503 from the upstream call: overloaded';
+        $agentEvalJudgedRunService->remainingJudgeCallFailures = 1;
+
+        $agentEvalJudgeVerdict = $this->judge($agentEvalJudgedRunService);
+
+        self::assertSame('PASS', $agentEvalJudgeVerdict->getVerdict());
+        self::assertFalse($agentEvalJudgeVerdict->isJudgeCallFailed());
+        self::assertCount(2, $agentEvalJudgedRunService->modelCalls);
     }
 
     public function testEveryJudgeCallIsBookedUnderTheJudgesUsageScopeWithTheFilledPrompt(): void
