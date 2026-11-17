@@ -134,6 +134,49 @@ class AnswerTextItemsAndBlockedContainersTest extends UnitTestCase
         self::assertStringEndsWith(TaskPlanItem::ANSWER_TEXT_MARK . ' ← next', end($lines), 'nothing open before it: write it now');
     }
 
+    public function testAnAnswerTextItemBehindLeavesThatOnlyWaitForTheOwnerTakesThePlainMark(): void
+    {
+        $offerItem = new TaskPlanItem();
+        $offerItem->text = 'Ask the owner which channel';
+        $offerItem->doneRequiresWidgetAnswered = true;
+        $offerItem->offerRenderedAtMessageIndex = 4;
+        $ownerBlockedItem = new TaskPlanItem();
+        $ownerBlockedItem->text = 'Connect the account';
+        $ownerBlockedItem->status = TaskPlanItem::STATUS_BLOCKED;
+        $ownerBlockedItem->requiresUserAction = true;
+        $draftItem = new TaskPlanItem();
+        $draftItem->text = 'Post draft';
+        $draftItem->markResultIsTextInTheAnswer();
+        $taskPlanItems = new TaskPlanItems();
+        $taskPlanItems->add($offerItem);
+        $taskPlanItems->add($ownerBlockedItem);
+        $taskPlanItems->add($draftItem);
+
+        $lines = $taskPlanItems->buildCompactTailHintLines();
+        self::assertStringContainsString(TaskPlanItem::ANSWER_TEXT_MARK, end($lines), 'every earlier open leaf waits for the owner: write it in the answer that asks');
+        self::assertStringNotContainsString(TaskPlanItem::ANSWER_TEXT_AFTER_OPEN_ITEMS_MARK, end($lines));
+    }
+
+    public function testAnAnswerTextItemBehindAnOwedLeafAndAnOwnerWaitingLeafKeepsTheAfterMark(): void
+    {
+        $offerItem = new TaskPlanItem();
+        $offerItem->text = 'Ask the owner which channel';
+        $offerItem->doneRequiresWidgetAnswered = true;
+        $offerItem->offerRenderedAtMessageIndex = 4;
+        $readItem = new TaskPlanItem();
+        $readItem->text = 'Read the rankings';
+        $draftItem = new TaskPlanItem();
+        $draftItem->text = 'Post draft';
+        $draftItem->markResultIsTextInTheAnswer();
+        $taskPlanItems = new TaskPlanItems();
+        $taskPlanItems->add($offerItem);
+        $taskPlanItems->add($readItem);
+        $taskPlanItems->add($draftItem);
+
+        $lines = $taskPlanItems->buildCompactTailHintLines();
+        self::assertStringEndsWith(TaskPlanItem::ANSWER_TEXT_AFTER_OPEN_ITEMS_MARK, end($lines));
+    }
+
     public function testASeededItemOrAContainerIsNotMarked(): void
     {
         $seededItem = new TaskPlanItem();

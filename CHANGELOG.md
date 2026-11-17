@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.0-alpha.69
+
+- Changed: the plan line of an answer-text item carries "after the items before it" only while an earlier open leaf is
+  owed by the agent; when every earlier open leaf only waits for the owner's answer (`TaskPlanItem::isOwedWhenOpen()`
+  false — a rendered owner widget unanswered; a blocked leaf is not open), it carries the plain answer-text mark, so the
+  draft goes into the answer that asks the question instead of being held back and dropped. Mark wording unchanged.
+
 ## 0.1.0-alpha.68
 
 - Changed: in a turn whose answer ends on the model's question to the owner (`askOwner`), the model's done tick of an

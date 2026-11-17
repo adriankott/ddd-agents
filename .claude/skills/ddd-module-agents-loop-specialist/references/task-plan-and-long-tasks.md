@@ -63,7 +63,8 @@ Structure only, keyed (`UpdateTaskPlanTool`, arguments `UpdateTaskPlanArguments`
   check; an `askOwner` call of the same response still pending counts; every other item kind keeps its gates) — and only when no leaf before it in plan order is still open
   (`closeLeavesWhoseWidgetOrDeliveryEvidenceLandedAtTurnEnd()`; the checked stop's read does not hold it back). Its
   open plan line carries `TaskPlanItem::ANSWER_TEXT_MARK` — `ANSWER_TEXT_AFTER_OPEN_ITEMS_MARK` while a leaf before it
-  is open, `ANSWER_TEXT_MAYBE_GIVEN_MARK` once an answer held it open (`answerTextHeldOpenAtMessageIndex`; then the
+  is open and owed (a leaf that only waits for the owner's answer, `TaskPlanItem::isOwedWhenOpen()` false, or a blocked one
+  does not count: the draft goes into the answer that asks), `ANSWER_TEXT_MAYBE_GIVEN_MARK` once an answer held it open (`answerTextHeldOpenAtMessageIndex`; then the
   model's done tick is accepted) — and the answer step after a recorded question asks for the text of the items whose
   line says "write it in the answer of this turn".
 

@@ -1059,13 +1059,15 @@ class TaskPlanItems extends ObjectSet
         $terminalKeysUnderDoneItems = [];
         $renderLines = [];
         // an answer-text leaf behind an open leaf is written only by the answer that finished the leaves before it
-        // (the turn-end closer holds it otherwise, {@see closeLeavesWhoseWidgetOrDeliveryEvidenceLandedAtTurnEnd()})
+        // (the turn-end closer holds it otherwise, {@see closeLeavesWhoseWidgetOrDeliveryEvidenceLandedAtTurnEnd()});
+        // an earlier leaf that only waits for the owner's answer ({@see TaskPlanItem::isOwedWhenOpen()}) does not hold
+        // it: the draft goes into the same answer that asks
         $anEarlierLeafIsOpen = false;
         foreach ($this->buildItemAddresses()->getElements() as $taskPlanItemAddress) {
             $taskPlanItem = $taskPlanItemAddress->item;
             $hasOpenLeafBefore = $anEarlierLeafIsOpen;
             if (($taskPlanItem->subtasks === null || $taskPlanItem->subtasks->count() === 0)
-                && $taskPlanItem->isOpen() && !$taskPlanItemAddress->hasBlockedAncestor
+                && $taskPlanItem->isOpen() && $taskPlanItem->isOwedWhenOpen() && !$taskPlanItemAddress->hasBlockedAncestor
             ) {
                 $anEarlierLeafIsOpen = true;
             }
