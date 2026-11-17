@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.0
+
+- First stable release, the state of 0.1.0-alpha.70 unchanged. Composer `mgamadeus/ddd-agents` 0.1.0 and npm
+  `@mgamadeus/ddd-agents` 0.1.0 (dist-tag `latest`; prereleases keep `next`). Requires `mgamadeus/ddd` ^3.34.3 and
+  `mgamadeus/ddd-argus` ^1.6.0 as before. While the package is 0.x, a minor release may break: pin `~0.1.0` / exact.
+
 ## 0.1.0-alpha.70
 
 - Added: `askOwner` takes the optional argument `planItemKey` (`AskOwnerQuestion::$planItemKey`), the key of the plan
