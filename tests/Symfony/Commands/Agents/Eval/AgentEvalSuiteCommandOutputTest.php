@@ -118,12 +118,13 @@ class AgentEvalSuiteCommandOutputTest extends IntegrationTestCase
         $retriedInfrastructureErrors = $this->buildProbeCommand()->exposeRetriedInfrastructureErrors();
 
         self::assertSame(
-            ['Deadlock found when trying to get lock', 'Lock wait timeout exceeded', 'cURL error 28', 'cURL error 56', 'MySQL server has gone away', '/var/cache/'],
+            ['Deadlock found when trying to get lock', 'Lock wait timeout exceeded', 'cURL error 28', 'cURL error 56', 'cURL error 35', 'MySQL server has gone away', '/var/cache/'],
             $retriedInfrastructureErrors
         );
         self::assertSame('Deadlock found when trying to get lock', AgentEvalCaseRow::fromArray(['passed' => false, 'error' => 'An exception occurred while executing a query: SQLSTATE[40001]: Serialization failure: 1213 Deadlock found when trying to get lock; try restarting transaction'])->findInfrastructureError($retriedInfrastructureErrors));
         self::assertSame('cURL error 28', AgentEvalCaseRow::fromArray(['passed' => false, 'error' => 'cURL error 28: Operation timed out after 300000 milliseconds'])->findInfrastructureError($retriedInfrastructureErrors));
         self::assertSame('cURL error 56', AgentEvalCaseRow::fromArray(['passed' => false, 'error' => 'Model call transport failed: cURL error 56: Recv failure: Connection reset by peer'])->findInfrastructureError($retriedInfrastructureErrors));
+        self::assertSame('cURL error 35', AgentEvalCaseRow::fromArray(['passed' => false, 'error' => 'Model call transport failed: cURL error 35: TLS connect error: error:0A000126:SSL routines::unexpected eof while reading'])->findInfrastructureError($retriedInfrastructureErrors));
         self::assertNull(AgentEvalCaseRow::fromArray(['passed' => false, 'failures' => ['tool not called: expected one of [getItems]']])->findInfrastructureError($retriedInfrastructureErrors), 'an assertion failure is a result');
         self::assertNull(AgentEvalCaseRow::fromArray(['passed' => false, 'error' => 'Space 1 not found'])->findInfrastructureError($retriedInfrastructureErrors), 'an unknown error is a result');
         self::assertNull(AgentEvalCaseRow::fromArray(['passed' => false, 'error' => "the case's child process exceeded its 600s ceiling and was ended"])->findInfrastructureError($retriedInfrastructureErrors), 'a timeout of the case is a result');

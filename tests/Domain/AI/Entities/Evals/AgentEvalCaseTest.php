@@ -271,4 +271,24 @@ class AgentEvalCaseTest extends UnitTestCase
         self::assertNotNull($runSettings->describeEvalToolBlock('publishProfile'));
         self::assertNull($runSettings->describeEvalToolBlock('listComments'));
     }
+
+    /**
+     * A blocked tool and a write under the read-only switch answer the tool's name and one sentence that keeps the run
+     * on the skill's other steps; a simulated error of the case answers as it is.
+     */
+    public function testTheEvalToolRefusalNamesTheToolAndKeepsTheRunOnTheSkillsOtherSteps(): void
+    {
+        self::assertSame(
+            "Tool 'replyToComment': this step is not executed in a test run; go on with the task's other steps as the skill says",
+            RunSettings::describeEvalToolRefusal('replyToComment', ['replyToComment'], [], false)
+        );
+        self::assertSame(
+            "Tool 'publishProfile': this step is not executed in a test run; go on with the task's other steps as the skill says",
+            RunSettings::describeEvalToolRefusal('publishProfile', [], [], true)
+        );
+        self::assertSame(
+            'Rate limit reached',
+            RunSettings::describeEvalToolRefusal('replyToComment', ['replyToComment'], ['replyToComment' => 'Rate limit reached'], false)
+        );
+    }
 }

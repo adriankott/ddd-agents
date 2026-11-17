@@ -10,6 +10,7 @@ use DDD\Domain\AI\Entities\Conversations\Messages\DelegationResults;
 use DDD\Domain\AI\Entities\Conversations\Messages\RequestSnapshot;
 use DDD\Domain\AI\Entities\Conversations\Messages\ToolCall;
 use DDD\Domain\AI\Entities\Evals\AgentEvalJudgeTraceMessageLines;
+use DDD\Infrastructure\Base\DateTime\DateTime;
 use DDD\Tests\Agents\Support\IntegrationTestCase;
 use ReflectionClass;
 
@@ -218,6 +219,35 @@ class AgentEvalJudgeTraceMessageLinesTest extends IntegrationTestCase
         self::assertStringStartsWith('[5] TOOL getEntries({}) [COMPLETED] sections=none (READ — persists nothing)', $traceLines[6]);
         self::assertStringEndsWith('): reach: proposed → owner', $traceLines[8]);
         self::assertStringStartsWith('[7] VARIANTS', $traceLines[8]);
+    }
+
+    /**
+     * The clock of each call rides on the wire tail the judge never sees: the trace names it per call in the space's
+     * zone (local date, weekday, time), so "tomorrow" is counted from the local date, not from the UTC one. A call
+     * without a zone got no clock signal and gets no clock line.
+     */
+    public function testEachCallWithAClockGetsAClockLineInTheSpacesZone(): void
+    {
+        $lateEveningCall = $this->buildToolCallMessage(3, 'getEntries');
+        $lateEveningSnapshot = new RequestSnapshot();
+        // 23:30 UTC on Monday is already Tuesday 01:30 in Berlin (summer time)
+        $lateEveningSnapshot->clockAt = new DateTime('2026-06-15 23:30:00', new \DateTimeZone('UTC'));
+        $lateEveningSnapshot->timezoneIdentifier = 'Europe/Berlin';
+        $lateEveningCall->requestSnapshot = $lateEveningSnapshot;
+        $callWithoutZone = $this->buildToolCallMessage(5, 'getEntries');
+        $snapshotWithoutZone = new RequestSnapshot();
+        $snapshotWithoutZone->clockAt = new DateTime('2026-06-15 23:31:00', new \DateTimeZone('UTC'));
+        $callWithoutZone->requestSnapshot = $snapshotWithoutZone;
+
+        $traceLines = explode("\n", $this->buildTraceText($lateEveningCall, $callWithoutZone));
+
+        self::assertSame(
+            '[3] CLOCK (the "now" the agent was given for this call, in the space\'s zone Europe/Berlin — count today, tomorrow and weekdays from this local date): 2026-06-16 Tuesday 01:30',
+            $traceLines[0]
+        );
+        self::assertStringStartsWith('[3] TOOL getEntries', $traceLines[1]);
+        self::assertStringStartsWith('[5] TOOL getEntries', $traceLines[3], 'a call without a zone has no clock line');
+        self::assertStringNotContainsString('[5] CLOCK', implode("\n", $traceLines));
     }
 
     public function testTheSystemPromptSectionNamesTheContextBlockInTheApplicationsWords(): void

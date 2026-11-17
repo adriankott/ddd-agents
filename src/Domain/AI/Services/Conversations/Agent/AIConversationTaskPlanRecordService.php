@@ -307,6 +307,8 @@ class AIConversationTaskPlanRecordService extends Service
         // the outcome is recorded where it is decided — the replay never re-judges this call
         $toolCall->taskPlanCallOutcome = ToolCall::TASK_PLAN_CALL_OUTCOME_APPLIED_KEYED;
         $toolCall->markCompleted();
+        // the drop warning quotes the owner's words beside the dropped items: the model sees what the owner cancelled
+        $taskPlanUpdateOutcome->ownerWordsForDropWarning = $conversation->messages->getNewestOwnerTextMessageText();
         return $taskPlanUpdateOutcome->renderAppliedSummary() . $maintenanceText
             . ($taskPlanUpdateOutcome->isCreation ? ' ' . TaskPlanUpdateOutcome::CREATION_KEY_SENTENCE : '');
     }

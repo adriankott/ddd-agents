@@ -947,6 +947,29 @@ class ToolCall extends ValueObject
     }
 
     /**
+     * The result served again to an identical repeated read (the repeat guard answers it without running the tool):
+     * the words the tool rendered and, for a result the executor returned in its structured shape (the words are only
+     * `Successful response for '<tool>'`), its `structuredContent` as JSON — the data the first serve carried, without
+     * the fields the platform keeps for itself (`backgroundOperations`). Never longer than the first serve: both parts
+     * come out of the stored result. A markdown-rendered result keeps its words only (its `structuredContent` holds
+     * loop-control fields, no data).
+     */
+    public function buildResultTextServedAgainOnARepeat(): string
+    {
+        $decodedResult = $this->getDecodedResult();
+        $resultText = $decodedResult->contentText;
+        if (!$decodedResult->isStructuredShapeResult()) {
+            return $resultText;
+        }
+        $structuredContent = $decodedResult->structuredContent;
+        unset($structuredContent['backgroundOperations']);
+        if ($structuredContent === []) {
+            return $resultText;
+        }
+        return trim($resultText . "\n" . (string)json_encode($structuredContent, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    }
+
+    /**
      * The result as the model read it: the persisted result is often the JSON envelope (`{"content":[{"text":…}]}`)
      * with escaped umlauts and slashes, so a name like "Kaffeerösterei" never matches "Kaffeer\u00f6sterei" in the raw
      * string. Every non-empty string leaf of the decoded result, depth first, joined by "\n"; a result that is not a

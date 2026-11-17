@@ -17,9 +17,11 @@ use DDD\Infrastructure\Services\DDDService;
  * The lines of the messages in the trace the judge of a judged run reads, and the headline of the agent's system prompt
  * above them. The markers are written here, never by the agent; the verdict prompt's legend names them.
  *
- * Per message, in order: the lines of its request snapshot — a VARIANTS line where the situation of the skill sections
- * changes (each changed dimension before and after, the evidence row left out), the skills an append-only call
- * appended, a started state epoch, the state notes the call delivered — then its own line:
+ * Per message, in order: the lines of its request snapshot — a CLOCK line with the "now" the call was given, in the
+ * space's zone (local date, weekday, time: the judge counts "today" and "tomorrow" from it, never from a UTC date), a
+ * VARIANTS line where the situation of the skill sections changes (each changed dimension before and after, the
+ * evidence row left out), the skills an append-only call appended, a started state epoch, the state notes the call
+ * delivered — then its own line:
  * - a tool call: `[N] TOOL name(arguments) [status]` with the skills loaded on the row, the skill sections of the call
  *   that made it, `(READ — persists nothing)` on a call that stores nothing, and the result as the model received it
  *   (never cut: the judge checks every number against it);
@@ -41,6 +43,13 @@ class AgentEvalJudgeTraceMessageLines extends ValueObject
 {
     /** @var string The headline of the system prompt; `%s` = the label of the space's context block */
     public const string SYSTEM_PROMPT_HEADLINE = "[SYSTEM PROMPT — the base data it carries (in particular in its '%s' block) counts as GROUNDED, also without a tool call]";
+
+    /** @var string The clock line of a call; `%d` = the index, `%s` = the zone, `%s` = the local date, weekday and time */
+    public const string CLOCK_LINE = '[%d] CLOCK (the "now" the agent was given for this call, in the space\'s zone %s — count today, '
+        . 'tomorrow and weekdays from this local date): %s';
+
+    /** @var string The local date, weekday and time of a clock line */
+    public const string CLOCK_LOCAL_FORMAT = 'Y-m-d l H:i';
 
     /** @var string A line where the situation changes; `%d` = the index, `%s` = the transitions */
     public const string VARIANTS_LINE = '[%d] VARIANTS (the SITUATION the platform resolved from the stored record and the owner\'s statements — '
@@ -175,8 +184,9 @@ class AgentEvalJudgeTraceMessageLines extends ValueObject
     }
 
     /**
-     * Adds the lines of a request snapshot: the VARIANTS line where the situation changed (and the call's skill
-     * sections remembered), what an append-only call appended, a started state epoch and the delivered state notes.
+     * Adds the lines of a request snapshot: the clock line, the VARIANTS line where the situation changed (and the
+     * call's skill sections remembered), what an append-only call appended, a started state epoch and the delivered
+     * state notes.
      *
      * @param int $messageIndex
      * @param RequestSnapshot $requestSnapshot
@@ -184,6 +194,10 @@ class AgentEvalJudgeTraceMessageLines extends ValueObject
      */
     protected function addRequestSnapshotLines(int $messageIndex, RequestSnapshot $requestSnapshot): void
     {
+        $clockLine = $this->buildClockLine($messageIndex, $requestSnapshot);
+        if ($clockLine !== null) {
+            $this->lines[] = $clockLine;
+        }
         if (is_array($requestSnapshot->variants)) {
             $snapshotVariantTokens = $this->buildVariantTokensOfRequestSnapshot($requestSnapshot);
             if ($snapshotVariantTokens !== $this->currentVariantTokens) {
@@ -212,6 +226,27 @@ class AgentEvalJudgeTraceMessageLines extends ValueObject
             );
             $this->lines[] = sprintf(static::STATE_NOTES_LINE, $messageIndex, $spaceSubjectName, implode(' | ', $stateNoteTexts));
         }
+    }
+
+    /**
+     * The clock line of a call: the instant the model was told is "now", in the zone the call thought in, as local
+     * date, weekday and time. Null where the call had no clock signal (a snapshot without a clock or without a zone:
+     * the model then got no clock either).
+     *
+     * @param int $messageIndex
+     * @param RequestSnapshot $requestSnapshot
+     * @return string|null
+     */
+    protected function buildClockLine(int $messageIndex, RequestSnapshot $requestSnapshot): ?string
+    {
+        $clockAt = $requestSnapshot->clockAt ?? null;
+        $timezoneIdentifier = $requestSnapshot->timezoneIdentifier ?? null;
+        if ($clockAt === null || $timezoneIdentifier === null || $timezoneIdentifier === '') {
+            return null;
+        }
+        $timezone = new \DateTimeZone($timezoneIdentifier);
+        $localClock = \DateTimeImmutable::createFromInterface($clockAt)->setTimezone($timezone);
+        return sprintf(static::CLOCK_LINE, $messageIndex, $timezone->getName(), $localClock->format(static::CLOCK_LOCAL_FORMAT));
     }
 
     /**

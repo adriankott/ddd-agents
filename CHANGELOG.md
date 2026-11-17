@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.1.0-alpha.67
+
+- Fixed: `app:ai-agent:eval-suite` runs a case once more that ended on cURL error 35 (the TLS handshake with the model
+  provider broke off, "unexpected eof while reading"), as it does for cURL 28 and 56
+  (`AgentEvalSuiteCommand::RETRIED_INFRASTRUCTURE_ERRORS`).
+- Fixed: the judge of a judged run sees the clock of each call. The clock rides on the wire tail, which the trace does
+  not carry; a judge counted "tomorrow" from the UTC date and failed a correct answer. The trace now gives every call
+  with a clock a line `[N] CLOCK (the "now" the agent was given for this call, in the space's zone <zone> — …): <local
+  date> <weekday> <time>` (`AgentEvalJudgeTraceMessageLines::CLOCK_LINE`), in the zone the call's request snapshot
+  recorded; a call without a zone (no clock signal) gets none.
+- Fixed: an identical read answered from the earlier result of the turn gets that result's data. Before, only the
+  words of the result came back; for a tool whose data sits in `structuredContent` (words "Successful response for
+  '<tool>'") the model got no data. `ToolCall::buildResultTextServedAgainOnARepeat()` adds the `structuredContent` as
+  JSON (without `backgroundOperations`) for a result in the executor's structured shape; it is never longer than the
+  first serve. A markdown-rendered result is served as before.
+- Changed: the eval tool block answers a blocked tool (without a simulated error) and a write under the read-only
+  switch with `Tool '<name>': this step is not executed in a test run; go on with the task's other steps as the skill
+  says` (`RunSettings::EVAL_TOOL_REFUSAL_SENTENCE`). The former texts ("complete the task without it", "answer from what
+  you can read and say what you would change") pushed the model away from the skill's rules. A recording made before
+  this version differs in these result texts.
+- Changed: the warning of an `update_task_plan` call that drops items quotes the owner's newest message beside them
+  (`TaskPlanUpdateOutcome::$ownerWordsForDropWarning`, at most `DROP_WARNING_OWNER_WORDS_MAX_LENGTH` characters), so the
+  model sees whether the owner cancelled them. Added: `AIConversationMessages::getNewestOwnerTextMessageText()`.
+
 ## 0.1.0-alpha.66
 
 - Fixed: the admission of queued sub-agents reads where the spawn wrote. `admitQueuedDelegationChildren()` counted the

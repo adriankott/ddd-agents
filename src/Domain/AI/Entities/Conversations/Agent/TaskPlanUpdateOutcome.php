@@ -22,6 +22,9 @@ class TaskPlanUpdateOutcome extends ValueObject
     /** The sentence a created plan adds. */
     public const string CREATION_KEY_SENTENCE = 'Each item\'s number is its key: in a later update_task_plan send an existing item as {"key": "2"} and a new item as {"text": "…"}.';
 
+    /** @var int The longest quote of the owner's words in the drop warning */
+    public const int DROP_WARNING_OWNER_WORDS_MAX_LENGTH = 400;
+
     /** The sentence an applied call adds after its count when a gate refused a status it sent. */
     public const string STATUS_NOT_APPLIED_SENTENCE = '(A status you sent was NOT applied — see the lines below.)';
 
@@ -42,6 +45,12 @@ class TaskPlanUpdateOutcome extends ValueObject
 
     /** @var string[] One entry per dropped item: `<key> '<text>'[ with its subtasks 3.1, 3.2][ — its state leaves with it]`. */
     public array $droppedItemDescriptions = [];
+
+    /**
+     * The owner's newest message, quoted in the drop warning beside the dropped items so the model sees what the owner
+     * actually cancelled; null when the conversation has none (the warning then quotes nothing).
+     */
+    public ?string $ownerWordsForDropWarning = null;
 
     /** An added key stands before a sibling with a lower number. */
     public bool $addedKeyStandsOutOfOrder = false;
@@ -83,7 +92,8 @@ class TaskPlanUpdateOutcome extends ValueObject
     /**
      * The applied call's result before the run-level sentences: `Task plan updated: 7 items (2 done, 5 open, 0 blocked).`,
      * the warning that a sent status was not applied when a gate refused one ({@see STATUS_NOT_APPLIED_SENTENCE}), then
-     * (a change only) `Added: …`, `Dropped: …` and the keys-never-change sentence, then the feedback.
+     * (a change only) `Added: …`, `Dropped: …` with the owner's newest message quoted ({@see $ownerWordsForDropWarning})
+     * and the keys-never-change sentence, then the feedback.
      */
     public function renderAppliedSummary(): string
     {
@@ -103,7 +113,10 @@ class TaskPlanUpdateOutcome extends ValueObject
                 $sentences[] = 'Added: ' . implode(', ', $this->addedItemDescriptions) . '.';
             }
             if ($this->droppedItemDescriptions !== []) {
-                $sentences[] = 'Dropped: ' . implode(', ', $this->droppedItemDescriptions) . '. A dropped item is gone from the plan '
+                $ownerWordsSentence = $this->buildOwnerWordsSentenceForDropWarning();
+                $sentences[] = 'Dropped: ' . implode(', ', $this->droppedItemDescriptions) . '.'
+                    . ($ownerWordsSentence !== null ? ' ' . $ownerWordsSentence : '')
+                    . ' A dropped item is gone from the plan '
                     . 'and its work is not delivered: if the owner\'s message did not cancel one of these, add it back now and work it.';
             }
             if ($this->addedKeyStandsOutOfOrder) {
@@ -111,5 +124,21 @@ class TaskPlanUpdateOutcome extends ValueObject
             }
         }
         return implode(' ', array_merge($sentences, $this->feedback));
+    }
+
+    /**
+     * The owner's words beside the dropped items: their newest message, whitespace collapsed and cut to
+     * {@see DROP_WARNING_OWNER_WORDS_MAX_LENGTH}; null without one.
+     */
+    protected function buildOwnerWordsSentenceForDropWarning(): ?string
+    {
+        $ownerWords = trim((string)preg_replace('/\s+/u', ' ', (string)$this->ownerWordsForDropWarning));
+        if ($ownerWords === '') {
+            return null;
+        }
+        if (mb_strlen($ownerWords) > self::DROP_WARNING_OWNER_WORDS_MAX_LENGTH) {
+            $ownerWords = mb_substr($ownerWords, 0, self::DROP_WARNING_OWNER_WORDS_MAX_LENGTH) . '…';
+        }
+        return 'The owner\'s newest message: «' . $ownerWords . '».';
     }
 }

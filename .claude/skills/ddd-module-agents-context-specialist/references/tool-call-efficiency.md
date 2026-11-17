@@ -48,7 +48,11 @@ running it:
   pictures of newer results, within the picture cap. Otherwise the read runs again, so a cleared result is never
   answered with "you already called this".
 
-The repeat gets the earlier result again with a notice, so the model has the answer and keeps every tool.
+The repeat gets the earlier result again with a notice, so the model has the answer and keeps every tool
+(`ToolCall::buildResultTextServedAgainOnARepeat()`): the words the tool rendered and, for a result in the executor's
+structured shape (words only "Successful response for '<tool>'"), its `structuredContent` as JSON without
+`backgroundOperations` — never longer than the first serve, both parts come out of the stored result. A
+markdown-rendered result keeps its words only.
 
 ## 3. The repeat guard
 

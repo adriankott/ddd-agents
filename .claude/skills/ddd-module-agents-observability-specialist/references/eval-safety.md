@@ -31,10 +31,11 @@ history: an eval run is kept out of the cross-conversation search, a seeded hist
 `RunSettings::setEvalToolBlock($blockedToolNames, $blockedToolSimulatedErrors, $everyWriteToolBlocked)` stores the
 case's block on the run settings:
 
-- a blocked tool answers its simulated error text, else "Tool '…' is blocked in this evaluation run …", and does not
-  run;
+- a blocked tool answers its simulated error text, else "Tool '…': " and `RunSettings::EVAL_TOOL_REFUSAL_SENTENCE`
+  ("this step is not executed in a test run; go on with the task's other steps as the skill says"), and does not run;
 - with `$everyWriteToolBlocked`, every tool that `MCPToolEffectCatalog::isReadOnlyToolName()` does not declare a read
-  answers that it changed nothing and was not executed;
+  answers the same text and is not executed — the sentence keeps the model on the skill's other steps instead of
+  answering around the refused one;
 - the executor reads the block from the **root** conversation's run settings (`RunSettings::describeEvalToolBlock()`):
   the live root object when the call is the root's own, else the root loaded once per process for a sub-agent and
   kept until the next worker job (`MCPToolExecutorService::resetToolBlocksForNewJob()`). A worker that resumes the

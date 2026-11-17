@@ -71,6 +71,9 @@ or the last child dropped. One violation rejects the WHOLE call — nothing chan
 names every line, the plan's keys and the valid shapes. `applyUpdate()` applies an accepted call to a deep copy that
 keeps every stored item with its declarations, records and status (`TaskPlanUpdateApplication`); a call that changes
 nothing is `unchanged`. Without items the call is a creation (`createFromUpdate()`, keys minted in pre-order).
+An applied call that drops items warns that their work is not delivered and quotes the owner's newest message beside
+them (`TaskPlanUpdateOutcome::$ownerWordsForDropWarning`, from `AIConversationMessages::getNewestOwnerTextMessageText()`,
+cut at `DROP_WARNING_OWNER_WORDS_MAX_LENGTH`), so the model sees whether the owner cancelled them.
 
 A status sent on an item passes the same tick application as `set_task_status`
 (`applyStatusUpdatesWithoutTheTurnStamps()`); the stored status again is no transition, and a status never rejects

@@ -137,6 +137,8 @@ class AgentEvalSuiteCommand extends AgentEvalConsoleCommand
         'cURL error 28',
         // the model provider reset the connection while the answer was read
         'cURL error 56',
+        // the TLS handshake with the model provider broke off (unexpected eof while reading)
+        'cURL error 35',
         'MySQL server has gone away',
         // processes booting in the same moment race for the compiled container: a file of it is gone
         '/var/cache/',

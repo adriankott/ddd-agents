@@ -39,6 +39,12 @@ class RunSettings extends ValueObject
     public const int MAX_STEPS_PER_TURN_CEILING = 120;
 
     /**
+     * @var string What an eval tool block answers after the tool's name (a blocked tool without a simulated error, a
+     * write under the read-only switch): the run goes on with the skill's other steps instead of leaving them.
+     */
+    public const string EVAL_TOOL_REFUSAL_SENTENCE = "this step is not executed in a test run; go on with the task's other steps as the skill says";
+
+    /**
      * @var int|null Total model-call steps ONE user turn may consume ACROSS all of its worker invocations (chunks).
      * Derived per invocation from the persisted usage-stamped messages of the current turn — no stored counter, so
      * the cap is crash/park/chunk-safe. Inherited by delegation children ({@see \DDD\Domain\AI\Entities\Conversations\AIConversation::inheritDelegationScopeFrom()}
@@ -427,8 +433,8 @@ class RunSettings extends ValueObject
 
     /**
      * The refusal text of an eval tool block for `$toolName` (pure), else null: a blocked name answers its simulated
-     * error or the generic block text; under the read-only switch every tool that is not a declared read answers the
-     * read-only text. The one wording for the console's process guard and the conversation's persisted block.
+     * error or the tool name and {@see EVAL_TOOL_REFUSAL_SENTENCE}; under the read-only switch every tool that is not a
+     * declared read answers the same. The one wording for the console's process guard and the conversation's persisted block.
      *
      * @param string[] $blockedToolNames
      * @param array<string, string> $blockedToolSimulatedErrors
@@ -436,12 +442,10 @@ class RunSettings extends ValueObject
     public static function describeEvalToolRefusal(string $toolName, array $blockedToolNames, array $blockedToolSimulatedErrors, bool $everyWriteToolBlocked): ?string
     {
         if (in_array($toolName, $blockedToolNames, true)) {
-            return $blockedToolSimulatedErrors[$toolName]
-                ?? "Tool '{$toolName}' is blocked in this evaluation run — do not call it; complete the task without it.";
+            return $blockedToolSimulatedErrors[$toolName] ?? "Tool '{$toolName}': " . static::EVAL_TOOL_REFUSAL_SENTENCE;
         }
         if ($everyWriteToolBlocked && !MCPToolEffectCatalog::isReadOnlyToolName($toolName)) {
-            return "Tool '{$toolName}' changes data and was NOT executed: this evaluation run may only read. Do not retry it; "
-                . 'answer from what you can read and say what you would change.';
+            return "Tool '{$toolName}': " . static::EVAL_TOOL_REFUSAL_SENTENCE;
         }
         return null;
     }

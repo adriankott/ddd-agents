@@ -121,6 +121,26 @@ class UpdateTaskPlanKeyedCatalogueTest extends KeyedTaskPlanUpdateTestCase
         self::assertSame("Task plan updated: 5 items (2 done, 3 open, 0 blocked). Added: 4 'Mail the owner a summary' (at the end).", $laterOutcome->renderAppliedSummary());
     }
 
+    /**
+     * The drop warning quotes the owner's newest message beside the dropped items (whitespace collapsed, cut at
+     * {@see TaskPlanUpdateOutcome::DROP_WARNING_OWNER_WORDS_MAX_LENGTH}): the model sees whether the owner cancelled them.
+     */
+    public function testF6bTheDropWarningQuotesTheOwnersWordsBesideTheDroppedItems(): void
+    {
+        $taskPlanUpdateOutcome = $this->update(self::s1(), [['key' => '1'], ['key' => '2'], ['key' => '3', 'remove' => true]]);
+        $taskPlanUpdateOutcome->ownerWordsForDropWarning = "Change the hours,\n  answer the reviews — and the review answers in German please.";
+
+        self::assertSame(
+            "Task plan updated: 4 items (2 done, 2 open, 0 blocked). Dropped: 3 'Write the holiday post' with its subtasks 3.1, 3.2."
+                . " The owner's newest message: «Change the hours, answer the reviews — and the review answers in German please.»."
+                . " A dropped item is gone from the plan and its work is not delivered: if the owner's message did not cancel one of these, add it back now and work it.",
+            $taskPlanUpdateOutcome->renderAppliedSummary()
+        );
+
+        $taskPlanUpdateOutcome->ownerWordsForDropWarning = str_repeat('a', TaskPlanUpdateOutcome::DROP_WARNING_OWNER_WORDS_MAX_LENGTH + 10);
+        self::assertStringContainsString('«' . str_repeat('a', TaskPlanUpdateOutcome::DROP_WARNING_OWNER_WORDS_MAX_LENGTH) . '…»', $taskPlanUpdateOutcome->renderAppliedSummary());
+    }
+
     public function testF7ASeededItemCannotBeDroppedUnderTheSeededProtections(): void
     {
         // unreachable through the dispatch: it refuses every update_task_plan of a seeded purpose first (F23); the

@@ -615,6 +615,21 @@ class AIConversationMessages extends EntitySet
         return $newestOwnerTurnStartIndex;
     }
 
+    /**
+     * The text of the owner's newest message of the loaded set ({@see AIConversationMessage::isOwnerOrLegacyUserRoleText()}),
+     * null when the owner has written none. Pure.
+     */
+    public function getNewestOwnerTextMessageText(): ?string
+    {
+        $newestOwnerText = null;
+        foreach ($this->getElements() as $message) {
+            if ($message->isOwnerOrLegacyUserRoleText() && trim((string)($message->message ?? '')) !== '') {
+                $newestOwnerText = (string)$message->message;
+            }
+        }
+        return $newestOwnerText;
+    }
+
     /** The newest turn-initiator message of the loaded set (the message the current turn answers), pure. */
     public function getNewestInitiatorMessage(): ?AIConversationMessage
     {

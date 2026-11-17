@@ -539,7 +539,8 @@ against a baseline. LIVE.
 - **Stop:** a `STOP` file in the run folder or SIGINT / SIGTERM ([stop signals](#stop-signals-and-the-stop-file)).
 - **Child processes:** `app:ai-agent:eval-tools` (kind `toolsCase`), `app:ai-agent:eval-selection` (`selectionCase`),
   `app:ai-agent:eval-recall` (`recallCase`); ceiling = the case's `timeoutSeconds` (default 600, at least 60); a case
-  that ended on an infrastructure error (`RETRIED_INFRASTRUCTURE_ERRORS`) runs once more.
+  that ended on an infrastructure error (`RETRIED_INFRASTRUCTURE_ERRORS`: deadlock, lock wait timeout, cURL 28 / 35 /
+  56, server gone away, a missing compiled-container file) runs once more.
 - **Override points:** `getDefaultModelName()`, `getRetriedInfrastructureErrors()`, `getChildCommandNameOfKind()` (the
   child of an application's own kind), `buildApplicationArgumentsOfTask()`, `buildPlanOptions()`,
   `buildFixturesOfSuite()`, `configureApplicationOptions()`, `isIsolateWholeScopeRequested()`, `getDecisionLayerLabel()`,

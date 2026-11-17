@@ -328,8 +328,9 @@ class AgentToolCallDispatchService extends Service
                 $nextOwedGateToolName = $conversation->findNextOwedPlanDoneGateToolName();
                 // The repeat gets the SAME result again, the notice in front: a pointer to "the
                 // result above" lost the model (it re-read once, then only apologised), the result itself
-                // does not. No Argus round-trip runs — the earlier call's recorded result is what comes back.
-                $priorResultText = trim($reusablePriorReadCall->getResultTextHead(PHP_INT_MAX));
+                // does not. No Argus round-trip runs — the earlier call's recorded result is what comes back, its
+                // structured data included (a structured-shape result's words are only "Successful response for …").
+                $priorResultText = trim($reusablePriorReadCall->buildResultTextServedAgainOnARepeat());
                 // The hint names the plan's NEXT OWED ITEM (its text), not only a later tool gate: a leaf with
                 // a widget gate is skipped by the gate lookup, which then names a later tool — a model that had not
                 // done the skipped leaf's work read "the next gate is <that tool>", did nothing and told the owner
