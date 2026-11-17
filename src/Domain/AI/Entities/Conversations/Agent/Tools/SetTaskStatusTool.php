@@ -78,7 +78,7 @@ class SetTaskStatusTool extends ValueObject implements AgentMetaTool
             'function' => [
                 'name' => self::NAME,
                 'description' => 'Update the status of existing task-plan items by the key shown in "Your task plan" (e.g. '
-                    . '"2.1"). ' . TaskPlan::buildTickRules() . ' Batch EVERY update you owe into ONE call via the updates array — '
+                    . '"2.1"). ' . TaskPlan::buildTickRules() . ' ' . AskOwnerTool::NAME_THE_PLAN_ITEM_SENTENCE . ' Batch EVERY update you owe into ONE call via the updates array — '
                     . 'never tick items in separate single-update calls; each extra call burns one of your work steps. For '
                     . 'structure changes (new items, subtasks) use update_task_plan.',
                 'parameters' => [

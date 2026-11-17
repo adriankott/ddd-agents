@@ -46,6 +46,12 @@ wording:
   dropped, the question is recorded as a free one, and the result says why (`AskOwnerArgumentsCheck::$keyDropped`).
   A refusal sent models into loops of re-asks with other keys.
 - A malformed call fails with the feedback and does not force the next step.
+- `planItemKey` (optional): the key of the plan item whose open question it is, as "Your task plan" shows it
+  (`AskOwnerQuestion::$planItemKey`). The plan render treats that item (and its subtree) as waiting for the owner for
+  the rest of the turn (`TaskPlanRenderTurnState`; loop skill, task plan); the result ends with
+  `item <key> waits for this answer` (`AskOwnerTool::buildPlanItemWaitsForThisAnswerLine()`). A key that names no item
+  of the plan fails nothing and adds no line. The askOwner description, the argument and the descriptions of
+  `set_task_status` and `update_task_plan` carry `AskOwnerTool::NAME_THE_PLAN_ITEM_SENTENCE`.
 
 ## The forced answer step without tools
 

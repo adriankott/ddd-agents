@@ -355,6 +355,13 @@ class AgentModelInput extends ValueObject
     public ?TaskPlan $taskPlan = null;
 
     /**
+     * What the current turn adds to the plan render ({@see TaskPlanRenderTurnState}: the plan item an open askOwner
+     * question of this turn names), derived from the turn's rows at context build; null = nothing (the render is the
+     * stored plan alone). Never persisted.
+     */
+    public ?TaskPlanRenderTurnState $taskPlanRenderTurnState = null;
+
+    /**
      * @var string|null The decision model's plan directive for THIS owner turn (`[SIGNAL:plan] …`), copied
      *      from the applied plan-dynamics decision at context build; null = none (site off / shadow, a fallback, a
      *      turn without the question). Rendered by {@see self::planDirectiveTailHint()} at the volatile tail.
@@ -1238,7 +1245,7 @@ class AgentModelInput extends ValueObject
 
     public function taskPlanTailHint(): ?string
     {
-        $tailHintText = $this->taskPlan?->toTailHintText() ?? '';
+        $tailHintText = $this->taskPlan?->toTailHintText($this->taskPlanRenderTurnState) ?? '';
         if ($tailHintText === '') {
             return null;
         }

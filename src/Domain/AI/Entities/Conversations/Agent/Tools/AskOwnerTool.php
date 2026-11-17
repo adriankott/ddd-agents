@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DDD\Domain\AI\Entities\Conversations\Agent\Tools;
 
 use DDD\Domain\AI\Entities\Conversations\Agent\OwnerPresence;
+use DDD\Domain\AI\Entities\Conversations\Agent\TaskPlan;
 use DDD\Domain\AI\Entities\Conversations\Messages\ToolCall;
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Entities\Conversations\Widgets\ConversationWidget;
@@ -291,6 +292,15 @@ class AskOwnerTool extends ValueObject implements AgentMetaTool
         . 'running on its own and no one will answer. Decide with the information you have, or name the open question '
         . 'in your report so the owner can settle it later.';
 
+    /**
+     * The sentence of the tool description and of the `planItemKey` argument that asks the model to name the plan item
+     * the question belongs to (the plan tool descriptions carry it too, {@see SetTaskStatusTool::toOpenAiToolSchema()}, {@see UpdateTaskPlanTool::toOpenAiToolSchema()}).
+     */
+    public const string NAME_THE_PLAN_ITEM_SENTENCE = 'Name the plan item your question belongs to.';
+
+    /** The result's confirmation that the named plan item waits for the owner's answer: `%s` is the item's key as the plan render shows it. */
+    public const string RESULT_PLAN_ITEM_WAITS_FOR_THIS_ANSWER = 'item %s waits for this answer';
+
     public const string RESULT_ALREADY_ASKED_THIS_TURN = 'Already asked a question this turn — nothing changes. ONE askOwner per turn: '
         . 'end your turn on the question you asked.';
 
@@ -338,9 +348,27 @@ class AskOwnerTool extends ValueObject implements AgentMetaTool
         if ($askOwnerArgumentsCheck->keyDropped !== null) {
             $resultText .= $noteSeparator . $askOwnerArgumentsCheck->keyDropped;
         }
+        $planItemWaitsLine = self::buildPlanItemWaitsForThisAnswerLine($askOwnerArgumentsCheck->question, $conversation->getTaskPlan());
+        if ($planItemWaitsLine !== null) {
+            $resultText .= $noteSeparator . $planItemWaitsLine;
+        }
         // the question is recorded — what the turn still owes is the final text under which the widget renders:
         // the next step runs tool-less (the same lever the repeat guard uses), never another call
         return AgentMetaToolCallAnswer::completed($resultText)->withToolLessAnswerStep();
+    }
+
+    /**
+     * The result line confirming that the plan item the question names ({@see AskOwnerQuestion::$planItemKey}) waits for
+     * the owner's answer, with the item's key as the plan render shows it; null without a key, without a plan, or when the
+     * key names no item of the plan (the question stands, nothing is added). Pure.
+     */
+    public static function buildPlanItemWaitsForThisAnswerLine(?AskOwnerQuestion $askOwnerQuestion, ?TaskPlan $taskPlan): ?string
+    {
+        $planItemKey = $askOwnerQuestion?->planItemKey;
+        if ($planItemKey === null || $taskPlan?->items?->getItemByKey($planItemKey) === null) {
+            return null;
+        }
+        return sprintf(self::RESULT_PLAN_ITEM_WAITS_FOR_THIS_ANSWER, $planItemKey);
     }
 
     /**
@@ -403,6 +431,7 @@ class AskOwnerTool extends ValueObject implements AgentMetaTool
                     . 'number, an address, free wording) — ask those in prose. ONE call per turn. When the question is one '
                     . 'the platform knows, pass its questionKey and optionMeanings (one catalogue meaning per option, same '
                     . 'order) — the platform records the pick itself: ' . AskOwnerQuestionCatalogue::buildQuestionListOfTheToolDescription() . '.'
+                    . ' ' . self::NAME_THE_PLAN_ITEM_SENTENCE
                     . ($ownerIsOnThePhoneLine ? self::DESCRIPTION_ON_THE_PHONE_LINE : ''),
                 'parameters' => [
                     'type' => 'object',
@@ -423,6 +452,7 @@ class AskOwnerTool extends ValueObject implements AgentMetaTool
                         'multiSelect' => ['type' => 'boolean', 'description' => 'true when the owner may pick several options (default false)'],
                         'questionKey' => ['type' => 'string', 'enum' => AskOwnerQuestionCatalogue::getQuestionKeys(), 'description' => 'A catalogue key when the platform knows the question'],
                         'optionMeanings' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'With questionKey: the catalogue meaning of each option, same order as options'],
+                        'planItemKey' => ['type' => 'string', 'description' => 'Optional: the key of the plan item whose open question this is, as shown in "Your task plan" (e.g. "2.1"). ' . self::NAME_THE_PLAN_ITEM_SENTENCE],
                     ],
                     'required' => ['question', 'options'],
                 ],
@@ -532,6 +562,9 @@ class AskOwnerTool extends ValueObject implements AgentMetaTool
         $askOwnerQuestion->multiSelect = $multiSelect;
         $askOwnerQuestion->questionKey = $questionKey !== '' ? $questionKey : null;
         $askOwnerQuestion->optionMeanings = $questionKey !== '' ? $optionMeanings : null;
+        $rawPlanItemKey = $arguments['planItemKey'] ?? $arguments['plan_item_key'] ?? null;
+        $planItemKey = is_string($rawPlanItemKey) || is_int($rawPlanItemKey) || is_float($rawPlanItemKey) ? trim((string)$rawPlanItemKey) : '';
+        $askOwnerQuestion->planItemKey = $planItemKey !== '' ? $planItemKey : null;
         $argumentsCheck->keyDropped = $keyDropped;
         $argumentsCheck->question = $askOwnerQuestion;
         return $argumentsCheck;

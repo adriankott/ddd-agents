@@ -25,6 +25,13 @@ class AskOwnerQuestion extends ValueObject
     /** @var string[]|null One catalogue meaning per option, same order; null for a free question. */
     public ?array $optionMeanings = null;
 
+    /**
+     * The key of the plan item whose open question this is, as the plan render shows it ("2.1"); optional, null when the
+     * call names none. The render treats the item as waiting for the owner for the rest of the turn
+     * ({@see \DDD\Domain\AI\Entities\Conversations\Agent\TaskPlanRenderTurnState}); a key that names no item changes nothing.
+     */
+    public ?string $planItemKey = null;
+
     /** The same question as a FREE one: no catalogue key, no meanings — nothing is recorded from the click. */
     public function withoutCatalogueKey(): self
     {

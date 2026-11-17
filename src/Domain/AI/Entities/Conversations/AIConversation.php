@@ -35,6 +35,7 @@ use DDD\Domain\AI\Entities\Conversations\Agent\AgentTurn;
 use DDD\Domain\AI\Entities\Conversations\Agent\AgentWorkingState;
 use DDD\Domain\AI\Entities\Conversations\Agent\TaskPlan;
 use DDD\Domain\AI\Entities\Conversations\Agent\TaskPlanItems;
+use DDD\Domain\AI\Entities\Conversations\Agent\TaskPlanRenderTurnState;
 use DDD\Domain\AI\Entities\Conversations\Agent\TaskPlanReplay;
 use DDD\Domain\AI\Entities\Conversations\Agent\TaskPlanEvidence;
 use DDD\Domain\AI\Entities\Conversations\Agent\OwnerPresence;
@@ -2768,6 +2769,12 @@ class AIConversation extends Entity
         // the current task plan rides the same volatile wire-TAIL seam (after the reads hint, before the
         // reply-language cue) — never the cacheable prefix. Copied here so the render stays a pure AgentModelInput fold.
         $agentContext->taskPlan = $this->buildTaskPlanOfContext($anchorMessage, $onlyCompactionsBefore);
+        // the plan item an open askOwner question of this turn names waits for the owner for the rest of the turn; a
+        // rebuild of a recorded call reads only the questions recorded before that call
+        $agentContext->taskPlanRenderTurnState = TaskPlanRenderTurnState::ofTurn(
+            $this->messages->buildCurrentTurn(),
+            $onlyCompactionsBefore !== null && $anchorMessage !== null && isset($anchorMessage->indexInConversation) ? (int)$anchorMessage->indexInConversation : null
+        );
         // the plan directive of the CURRENT owner turn and the tick-with-delivery header — only while the
         // plan-dynamics site GUIDES this conversation (switch 2); under off / shadow the wire stays byte-identical.
         $agentWorkingStateForPlan = $this->getAgentWorkingState();

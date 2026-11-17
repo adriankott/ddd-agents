@@ -64,7 +64,10 @@ Structure only, keyed (`UpdateTaskPlanTool`, arguments `UpdateTaskPlanArguments`
   (`closeLeavesWhoseWidgetOrDeliveryEvidenceLandedAtTurnEnd()`; the checked stop's read does not hold it back). Its
   open plan line carries `TaskPlanItem::ANSWER_TEXT_MARK` — `ANSWER_TEXT_AFTER_OPEN_ITEMS_MARK` while a leaf before it
   is open and owed (a leaf that only waits for the owner's answer, `TaskPlanItem::isOwedWhenOpen()` false, or a blocked one
-  does not count: the draft goes into the answer that asks), `ANSWER_TEXT_MAYBE_GIVEN_MARK` once an answer held it open (`answerTextHeldOpenAtMessageIndex`; then the
+  does not count: the draft goes into the answer that asks; nor does a leaf, or a leaf under an item, that an open
+  `askOwner` question of this turn names with `planItemKey` — `TaskPlanRenderTurnState::ofTurn()` derives it from the
+  current turn's rows at context build, `AgentModelInput::$taskPlanRenderTurnState` hands it to
+  `TaskPlan::toTailHintText()` / `TaskPlanItems::buildCompactTailHintLines()`), `ANSWER_TEXT_MAYBE_GIVEN_MARK` once an answer held it open (`answerTextHeldOpenAtMessageIndex`; then the
   model's done tick is accepted) — and the answer step after a recorded question asks for the text of the items whose
   line says "write it in the answer of this turn".
 

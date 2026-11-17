@@ -127,7 +127,8 @@ class UpdateTaskPlanTool extends ValueObject implements AgentSeededPlanRefusingM
                     . 'item as {"key": "<its number from Your task plan>"} — a key is that number only, e.g. "2.1", as a '
                     . 'string; its text is fixed and need not be sent. Every NEW item as {"text": "…"} WITHOUT a key (the '
                     . 'platform assigns one). Drop an item with {"key": "…", "remove": true}. An existing item sent without '
-                    . '"subtasks" keeps its subtasks. Items may nest to any depth. For status changes use set_task_status.',
+                    . '"subtasks" keeps its subtasks. Items may nest to any depth. ' . AskOwnerTool::NAME_THE_PLAN_ITEM_SENTENCE
+                    . ' For status changes use set_task_status.',
                 'parameters' => [
                     'type' => 'object',
                     'properties' => [

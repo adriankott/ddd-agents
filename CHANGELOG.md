@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.1.0-alpha.70
+
+- Added: `askOwner` takes the optional argument `planItemKey` (`AskOwnerQuestion::$planItemKey`), the key of the plan
+  item whose open question it is, as the plan render shows it. The plan render treats that item (and its subtree) as
+  waiting for the owner for the rest of the turn: for the "after the items before it" mark of a later answer-text item it
+  counts like an unanswered owner widget (`TaskPlanItem::isAwaitingOwnerOffer()`). The turn state reaches the render as
+  `TaskPlanRenderTurnState` (`TaskPlanRenderTurnState::ofTurn()` over the current turn's rows at context build,
+  `AgentModelInput::$taskPlanRenderTurnState`, `TaskPlan::toTailHintText()` and
+  `TaskPlanItems::buildCompactTailHintLines()` take it, optional). The askOwner result ends with
+  `item <key> waits for this answer` when the key names an item of the plan; an unknown key fails nothing and adds
+  nothing. Without the key nothing changes.
+- Changed: the askOwner description, its `planItemKey` argument and the descriptions of both plan tools (`set_task_status`, `update_task_plan`) carry the
+  sentence "Name the plan item your question belongs to." (`AskOwnerTool::NAME_THE_PLAN_ITEM_SENTENCE`); no other
+  wording changed.
+
 ## 0.1.0-alpha.69
 
 - Changed: the plan line of an answer-text item carries "after the items before it" only while an earlier open leaf is

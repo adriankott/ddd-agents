@@ -668,14 +668,15 @@ class TaskPlan extends ValueObject
      * The plan as the model reads it in EVERY call: the header with the one tick rule set
      * ({@see buildTickRules()}) and the compact tree ({@see TaskPlanItems::buildCompactTailHintLines()}) — key, status and
      * title per item, the full text only for the `← next` item. Empty string when the plan has no items.
+     * `$taskPlanRenderTurnState`: what the current turn adds to the render ({@see TaskPlanRenderTurnState}).
      */
-    public function toTailHintText(): string
+    public function toTailHintText(?TaskPlanRenderTurnState $taskPlanRenderTurnState = null): string
     {
         if ($this->items === null || $this->items->count() === 0) {
             return '';
         }
         return 'Your task plan (the keys below address the items). ' . static::buildTickRules() . "\n"
-            . implode("\n", $this->items->buildCompactTailHintLines());
+            . implode("\n", $this->items->buildCompactTailHintLines($taskPlanRenderTurnState));
     }
 
     /** The decision model's plan line width ({@see toDecisionPlanText()}): the act and its skill name fit, the rule prose behind them does not. */

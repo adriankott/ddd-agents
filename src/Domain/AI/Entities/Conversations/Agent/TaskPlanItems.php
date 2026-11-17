@@ -1050,9 +1050,13 @@ class TaskPlanItems extends ObjectSet
      * {@see TaskPlanItem::toCompactTailHintLine()} — key, status and title, a short reason on blocked / n-a items, the full
      * text only on the one `← next` line. Deterministic: an unchanged plan renders the same bytes.
      *
+     * `$taskPlanRenderTurnState`: what the current turn adds — an item an open askOwner question of this turn names
+     * ({@see TaskPlanRenderTurnState::isAddressWaitingForOwnerAnswer()}) waits for the owner like an unanswered owner
+     * widget and holds no later answer-text item behind the after-mark. Null renders the stored plan alone.
+     *
      * @return string[]
      */
-    public function buildCompactTailHintLines(): array
+    public function buildCompactTailHintLines(?TaskPlanRenderTurnState $taskPlanRenderTurnState = null): array
     {
         $nextMarkedItem = $this->getNextMarkedItem();
         $doneKeys = [];
@@ -1061,13 +1065,14 @@ class TaskPlanItems extends ObjectSet
         // an answer-text leaf behind an open leaf is written only by the answer that finished the leaves before it
         // (the turn-end closer holds it otherwise, {@see closeLeavesWhoseWidgetOrDeliveryEvidenceLandedAtTurnEnd()});
         // an earlier leaf that only waits for the owner's answer ({@see TaskPlanItem::isOwedWhenOpen()}) does not hold
-        // it: the draft goes into the same answer that asks
+        // it: the draft goes into the same answer that asks — nor does a leaf an open askOwner question of this turn names
         $anEarlierLeafIsOpen = false;
         foreach ($this->buildItemAddresses()->getElements() as $taskPlanItemAddress) {
             $taskPlanItem = $taskPlanItemAddress->item;
             $hasOpenLeafBefore = $anEarlierLeafIsOpen;
             if (($taskPlanItem->subtasks === null || $taskPlanItem->subtasks->count() === 0)
                 && $taskPlanItem->isOpen() && $taskPlanItem->isOwedWhenOpen() && !$taskPlanItemAddress->hasBlockedAncestor
+                && $taskPlanRenderTurnState?->isAddressWaitingForOwnerAnswer($taskPlanItemAddress) !== true
             ) {
                 $anEarlierLeafIsOpen = true;
             }

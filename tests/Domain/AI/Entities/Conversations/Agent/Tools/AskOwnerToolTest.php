@@ -39,7 +39,7 @@ class AskOwnerToolTest extends UnitTestCase
 
         $schema = AskOwnerTool::create()->toOpenAiToolSchema();
         self::assertSame(['draftApproval'], $schema['function']['parameters']['properties']['questionKey']['enum']);
-        self::assertStringEndsWith('the platform records the pick itself: draftApproval [approved, change].', $schema['function']['description']);
+        self::assertStringEndsWith('the platform records the pick itself: draftApproval [approved, change]. ' . AskOwnerTool::NAME_THE_PLAN_ITEM_SENTENCE, $schema['function']['description']);
 
         $questionOfAnApplication = AskOwnerTool::checkArguments([
             'question' => 'Q?', 'options' => ['A', 'B'], 'questionKey' => 'serveModel', 'optionMeanings' => ['walkIn', 'mobile'],
@@ -197,7 +197,7 @@ class AskOwnerToolTest extends UnitTestCase
         self::assertSame(['question', 'options'], $schema['function']['parameters']['required']);
         self::assertSame(['serveModel', 'addressVisibility', 'draftApproval', 'setsApproval', 'connectOffer'], $schema['function']['parameters']['properties']['questionKey']['enum']);
         self::assertStringEndsWith(
-            'the platform records the pick itself: serveModel [walkIn, mobile, hybrid, online], addressVisibility [shown, hidden], draftApproval [approved, change], connectOffer [connect, later].',
+            'the platform records the pick itself: serveModel [walkIn, mobile, hybrid, online], addressVisibility [shown, hidden], draftApproval [approved, change], connectOffer [connect, later]. ' . AskOwnerTool::NAME_THE_PLAN_ITEM_SENTENCE,
             $schema['function']['description'],
             'a key the application keeps out of the description is in the enum only'
         );

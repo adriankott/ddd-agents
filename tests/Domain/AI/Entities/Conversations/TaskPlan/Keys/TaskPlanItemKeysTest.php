@@ -6,6 +6,7 @@ namespace DDD\Tests\Agents\Domain\AI\Entities\Conversations\TaskPlan\Keys;
 
 use DDD\Tests\Agents\Domain\AI\Entities\Conversations\TaskPlan\TaskPlanItemArraysFixture;
 use DDD\Domain\AI\Entities\Conversations\Agent\TaskPlan;
+use DDD\Domain\AI\Entities\Conversations\Agent\TaskPlanRenderTurnState;
 use DDD\Domain\AI\Entities\Conversations\Agent\TaskPlanItem;
 use DDD\Domain\AI\Entities\Conversations\Agent\TaskPlanItems;
 use DDD\Tests\Agents\Domain\AI\Entities\Conversations\TaskPlan\Characterization\TaskPlanHolidayPlanFixture as Holiday;
@@ -152,7 +153,10 @@ class TaskPlanItemKeysTest extends UnitTestCase
     {
         $parsedPlan = self::parsedP0();
         self::assertSame(Holiday::p0()->toTailHintText(), $parsedPlan->toTailHintText(), 'the keyed plan renders the bytes of the keyless one');
-        self::assertSame(Holiday::p0()->toTailHintText(true), $parsedPlan->toTailHintText(true));
+        self::assertSame(
+            Holiday::p0()->toTailHintText(TaskPlanRenderTurnState::forItemKeysWaitingForOwnerAnswer('1')),
+            $parsedPlan->toTailHintText(TaskPlanRenderTurnState::forItemKeysWaitingForOwnerAnswer('1'))
+        );
         self::assertSame(Holiday::p0()->toJudgeText(), $parsedPlan->toJudgeText());
         self::assertSame(Holiday::p0()->toDecisionPlanText(), $parsedPlan->toDecisionPlanText());
         self::assertSame(Holiday::p0()->toFinishedDetailText(1), $parsedPlan->toFinishedDetailText(1));
