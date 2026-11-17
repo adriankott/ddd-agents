@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.0-alpha.68
+
+- Changed: in a turn whose answer ends on the model's question to the owner (`askOwner`), the model's done tick of an
+  item whose result is text in the answer (`inAnswer`), sent with `set_task_status` or as the item's status in
+  `update_task_plan`, is accepted and closes the item; its result says "closed: its text is in this answer"
+  (`TaskPlanItemTickGate::checkDoneEvidence()`, `TaskPlanItemPlatformCloser::turnEndsOnAnOwnerQuestion()` counts an
+  `askOwner` call of the same response that has not run yet). No content check. Without that tick such an answer still
+  closes nothing; every other item kind keeps its rules. The tick rules (`TaskPlan::buildTickRules()`) state the
+  exception, and the checked-stop bounce says that an answer without a question to the owner closes these items itself (no tick), and one
+  ending with `askOwner` only with a done tick of each in the same turn.
+
 ## 0.1.0-alpha.67
 
 - Fixed: `app:ai-agent:eval-suite` runs a case once more that ended on cURL error 35 (the TLS handshake with the model

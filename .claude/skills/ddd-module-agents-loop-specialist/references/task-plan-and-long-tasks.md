@@ -58,7 +58,9 @@ Structure only, keyed (`UpdateTaskPlanTool`, arguments `UpdateTaskPlanArguments`
   via `TaskPlanItem::markResultIsTextInTheAnswer()`; never a seeded item or a container): a tick before the answer is
   not applied, and the turn-end closer (`TaskPlanItemPlatformCloser`) closes the leaf from the turn's owner-visible
   answer — no call proves it — but never from the answer of a turn that ends on the model's question to the owner
-  (`TaskPlanItemPlatformCloser::turnEndsOnAnOwnerQuestion()`), and only when no leaf before it in plan order is still open
+  (`TaskPlanItemPlatformCloser::turnEndsOnAnOwnerQuestion()`) — there the model's own done tick (`set_task_status`, or
+  the item's status in `update_task_plan`) closes it, its result line "closed: its text is in this answer" (no content
+  check; an `askOwner` call of the same response still pending counts; every other item kind keeps its gates) — and only when no leaf before it in plan order is still open
   (`closeLeavesWhoseWidgetOrDeliveryEvidenceLandedAtTurnEnd()`; the checked stop's read does not hold it back). Its
   open plan line carries `TaskPlanItem::ANSWER_TEXT_MARK` — `ANSWER_TEXT_AFTER_OPEN_ITEMS_MARK` while a leaf before it
   is open, `ANSWER_TEXT_MAYBE_GIVEN_MARK` once an answer held it open (`answerTextHeldOpenAtMessageIndex`; then the
@@ -183,7 +185,7 @@ turn (or a turn a work signal started), items still owed once the candidate text
 discarded and bounced with `SIGNAL_SOURCE_TASK_PLAN_OPEN_BOUNCE`, at most `MAX_BOUNCES_PER_CHUNK` per chunk. The bounce
 is ONE text (`AgentCheckedStopPolicy::buildCheckedStopBounceText()`): the owed items by key, split into the ones the
 model ticks, the ones the record closes and the ones whose result is text in the answer (`inAnswer`: write that text
-now, never tick them — `TaskPlanItems::getOwedOpenAnswerTextItemTitleLines()`); it names the owner's stop too (stop, wait or not now: no item is worked,
+now; an answer without a question to the owner closes them, one ending with `askOwner` only with a done tick of each in the same turn — `TaskPlanItems::getOwedOpenAnswerTextItemTitleLines()`); it names the owner's stop too (stop, wait or not now: no item is worked,
 the answer is repeated and names what stays open), as the tick rules do. A plan-less turn is never bounced, nor is the opener of a kickoff the owner
 has not answered yet (`AIConversationMessages::isKickoffBeforeTheOwnerSpoke()`). The site and its other bounces: [stall-and-final-text](stall-and-final-text.md).
 

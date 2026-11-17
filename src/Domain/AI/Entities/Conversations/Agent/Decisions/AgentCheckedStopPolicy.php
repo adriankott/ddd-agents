@@ -100,7 +100,7 @@ class AgentCheckedStopPolicy extends ValueObject
         }
         if ($answerTextItemLines !== []) {
             $bounceText .= ' Items whose result is text in your answer: ' . implode('; ', $answerTextItemLines)
-                . '. Write that text in the answer you give now — the platform closes them from it; never tick them.';
+                . '. Write that text in the answer you give now: an answer that ends without a question to the owner closes these items itself — do not tick them; an answer that ends with askOwner closes them only when you tick each one done in the same turn.';
         }
         return $bounceText . ' An item only the owner\'s reply can resolve: resolve every other item first, then end with the ONE question that unblocks it. '
             . 'When the owner asked you to stop after a part and check back with them: report that part and end with that ONE question — the items after it stay open. '

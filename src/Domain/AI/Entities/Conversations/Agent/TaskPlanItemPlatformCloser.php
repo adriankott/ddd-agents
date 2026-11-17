@@ -292,10 +292,16 @@ class TaskPlanItemPlatformCloser extends ValueObject
     /**
      * Whether the turn after `$turnInitiatorMessageIndex` ends on the model's question to the owner: a completed
      * `askOwner` call with no later tool call other than plan bookkeeping. Such a turn's answer carries no answer text
-     * of an `inAnswer` leaf ({@see TaskPlanItem::isResultTextInTheAnswer()}); the next turn's answer closes it.
+     * of an `inAnswer` leaf ({@see TaskPlanItem::isResultTextInTheAnswer()}); the next turn's answer closes it — unless
+     * the model ticks that leaf done in this turn ({@see TaskPlanItemTickGate::checkDoneEvidence()}). With
+     * `$countsAnAskStillRunning` an `askOwner` call of the same response that has not run yet (pending or running)
+     * counts too: the tick of that response runs before it.
      */
-    public static function turnEndsOnAnOwnerQuestion(AIConversationMessages $conversationMessages, int $turnInitiatorMessageIndex): bool
+    public static function turnEndsOnAnOwnerQuestion(AIConversationMessages $conversationMessages, int $turnInitiatorMessageIndex, bool $countsAnAskStillRunning = false): bool
     {
+        $countedAskStatuses = $countsAnAskStillRunning
+            ? [AIConversationMessage::STATUS_COMPLETED, AIConversationMessage::STATUS_PENDING, AIConversationMessage::STATUS_RUNNING]
+            : [AIConversationMessage::STATUS_COMPLETED];
         $endsOnOwnerQuestion = false;
         foreach ($conversationMessages->getElements() as $message) {
             if (($message->indexInConversation ?? -1) <= $turnInitiatorMessageIndex || !isset($message->toolCall)) {
@@ -305,7 +311,7 @@ class TaskPlanItemPlatformCloser extends ValueObject
             if (in_array($toolName, TaskPlan::PLAN_TOOL_NAMES, true)) {
                 continue;
             }
-            $endsOnOwnerQuestion = $toolName === AskOwnerTool::NAME && $message->toolCall->status === AIConversationMessage::STATUS_COMPLETED;
+            $endsOnOwnerQuestion = $toolName === AskOwnerTool::NAME && in_array($message->toolCall->status, $countedAskStatuses, true);
         }
         return $endsOnOwnerQuestion;
     }

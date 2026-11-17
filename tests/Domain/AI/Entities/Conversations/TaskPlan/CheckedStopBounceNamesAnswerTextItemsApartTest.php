@@ -29,7 +29,7 @@ class CheckedStopBounceNamesAnswerTextItemsApartTest extends UnitTestCase
 
         self::assertStringContainsString(" Items you tick: 1 'Read the posts'. For each, use set_task_status", $bounceText);
         self::assertStringContainsString(
-            " Items whose result is text in your answer: 2 'Draft the post'. Write that text in the answer you give now — the platform closes them from it; never tick them.",
+            " Items whose result is text in your answer: 2 'Draft the post'. Write that text in the answer you give now: an answer that ends without a question to the owner closes these items itself — do not tick them; an answer that ends with askOwner closes them only when you tick each one done in the same turn.",
             $bounceText
         );
         self::assertStringEndsWith(

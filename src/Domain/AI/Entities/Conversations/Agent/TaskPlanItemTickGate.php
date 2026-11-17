@@ -70,6 +70,13 @@ class TaskPlanItemTickGate extends ValueObject
     protected ?int $previousTurnDeliveryEvidenceIndex = null;
 
     /**
+     * Whether the done gates accepted the tick of an answer-text leaf ({@see TaskPlanItem::isResultTextInTheAnswer()})
+     * in a turn whose answer ends on the model's question to the owner: the model's tick closes it — the answer carries
+     * its text ({@see checkDoneEvidence()}); the applied tick says so ({@see applyTick()}).
+     */
+    protected bool $answerTextTickedInAnOwnerQuestionTurn = false;
+
+    /**
      * The gate of `$setTaskStatusArgumentsUpdate` (its status recognized) on `$taskPlanItem`, a node of the live plan tree,
      * judged by the call's criteria and their inputs.
      *
@@ -281,7 +288,11 @@ class TaskPlanItemTickGate extends ValueObject
         }
         // an `inAnswer` leaf an earlier answer may already have carried: the model knows whether it did — its tick stands
         $answerTextMayAlreadyBeGiven = $taskPlanItem->isResultTextInTheAnswer() && $taskPlanItem->answerTextHeldOpenAtMessageIndex !== null;
-        if ($taskPlanItem->doneRequiresOwnerVisibleAnswerInSameTurn && !$answerTextMayAlreadyBeGiven
+        // an `inAnswer` leaf ticked in a turn whose answer ends on askOwner: the platform closes none there — the model's
+        // explicit tick says this answer carries its text, and closes it (no content check)
+        $this->answerTextTickedInAnOwnerQuestionTurn = $taskPlanItem->isResultTextInTheAnswer()
+            && TaskPlanItemPlatformCloser::turnEndsOnAnOwnerQuestion($conversationMessages, $currentTurnInitiatorMessageIndex, true);
+        if ($taskPlanItem->doneRequiresOwnerVisibleAnswerInSameTurn && !$answerTextMayAlreadyBeGiven && !$this->answerTextTickedInAnOwnerQuestionTurn
             && !$conversationMessages->hasOwnerVisibleAssistantAnswerAfterIndex($sameTurnAnswerFloorIndex)
         ) {
             $this->previousTurnDeliveryEvidenceIndex = $taskPlanItem->previousTurnDeliveryEvidenceToolNames !== null
@@ -527,6 +538,9 @@ class TaskPlanItemTickGate extends ValueObject
             $taskPlanItem->recordAcceptedDeliveryEvidenceAt($this->previousTurnDeliveryEvidenceIndex);
         }
         $feedbackLines = [];
+        if ($status === TaskPlanItem::STATUS_DONE && $this->answerTextTickedInAnOwnerQuestionTurn) {
+            $feedbackLines[] = "Task '{$this->taskAddress}': closed: its text is in this answer.";
+        }
         if (($status === TaskPlanItem::STATUS_DONE || $status === TaskPlanItem::STATUS_NOT_APPLICABLE)
             && ($taskPlanItem->doneCriterion ?? null) !== null
         ) {
