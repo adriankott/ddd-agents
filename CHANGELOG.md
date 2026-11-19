@@ -2,6 +2,19 @@
 
 ## 0.1.2
 
+- Added: `DBAIConversationMessage::buildToolCallExecutionCostInUSDSql()`, the SQL of what a row's tool call booked
+  while it ran (0 without one), for a reader that shows tool executions apart from the model steps.
+  `buildCostInUSDIncludingToolCallExecutionSql()` builds on it; its SQL is unchanged.
+- Fixed: `DBAIConversation::findTopConversationStats()` leaves truncated rows out (`truncatedAt IS NULL`), as the
+  conversation's own totals do.
+- Fixed: `ArgusAgentDecisions` declares its elements as `A[]|B[]|…` instead of `(A|B|…)[]`, the form the framework
+  reads when a cached set is loaded.
+- Fixed (npm): the widget image capture's `html, body { margin: 0; padding: 0 }` applies only to a page that holds a
+  capture root; loaded app-wide it removed the host page's body spacing.
+- Added (npm): the widget text variant `title` (`AgentsWidgetTextVariant`, 1.125rem / 500 in the default
+  components), between `headline` and `value`.
+- Changed (npm): a KPI text value is shown with the `title` variant and sits on the bottom of the hero's line box, so
+  text and number values end on the same line across a row of tiles.
 - Requires `mgamadeus/ddd` ^3.36.2 (was ^3.34.3): the framework's Redis cache backends read a configuration without
   `password` without the "Undefined array key" warning, which `app:mcp:clear-cache` aborted on.
 - Fixed: the module called a global function `___()` that neither the framework nor the module defines (the run report,
@@ -101,6 +114,7 @@ npm `@mgamadeus/ddd-agents` only; every addition is opt-in, the fixes are named 
   not have (`--agents-chat-top-padding` is 24 px on `AgentChat`'s chat area).
 - Fixed: the composer shows its placeholder while empty, also when focused — it disappeared once a conversation existed,
   because the chat focuses the composer after each turn.
+
 
 ## 0.1.1
 
