@@ -221,6 +221,7 @@ class AgentEvalToolsCommand extends AgentEvalConsoleCommand
         $runSettings->ownerDeviceSurface = (string)($input->getOption('owner-device') ?? '');
         $runSettings->simulatedOwnerDevice = $this->buildSimulatedOwnerDevice($runSettings->ownerDeviceSurface);
         $runSettings->fallbackAgentSpaceId = $this->resolveFallbackAgentSpaceId($input);
+        $runSettings->fallbackAccountId = $this->resolveFallbackAccountId($input);
         $runSettings->modelCanSeeImages = $this->modelCanSeeImages($runSettings->modelName);
         $runSettings->scopeTag = $this->getResultFilesService()->getScopeTagOfToolsRun($runSettings->skillFilter, $runSettings->caseFilter);
         return $runSettings;
@@ -312,6 +313,7 @@ class AgentEvalToolsCommand extends AgentEvalConsoleCommand
         $agentEvalSuitePlanOptions->includeAsyncOnlyCases = $runSettings->includeAsyncOnlyCases;
         $agentEvalSuitePlanOptions->caseFilter = $runSettings->caseFilter;
         $agentEvalSuitePlanOptions->fallbackAgentSpaceId = $runSettings->fallbackAgentSpaceId;
+        $agentEvalSuitePlanOptions->fallbackAccountId = $runSettings->fallbackAccountId;
         return $agentEvalSuitePlanOptions;
     }
 
@@ -420,11 +422,18 @@ class AgentEvalToolsCommand extends AgentEvalConsoleCommand
      */
     protected function runCase(AgentEvalToolsRunSettings $runSettings, AgentEvalToolsCaseRun $agentEvalToolsCaseRun, OutputInterface $output): AgentEvalCaseRow
     {
-        $agentEvalNotApplicableReason = $this->getRunnerService()->resolveScopeAndFindNotApplicableReasonForCase(
-            $agentEvalToolsCaseRun->agentEvalCase,
-            $runSettings->fallbackAgentSpaceId,
-            $agentEvalToolsCaseRun->runOptions
-        );
+        $agentEvalNotApplicableReason = $runSettings->fallbackAccountId === null
+            ? $this->getRunnerService()->resolveScopeAndFindNotApplicableReasonForCase(
+                $agentEvalToolsCaseRun->agentEvalCase,
+                $runSettings->fallbackAgentSpaceId,
+                $agentEvalToolsCaseRun->runOptions
+            )
+            : $this->getRunnerService()->resolveScopeWithFallbackAccountAndFindNotApplicableReasonForCase(
+                $agentEvalToolsCaseRun->agentEvalCase,
+                $runSettings->fallbackAgentSpaceId,
+                $runSettings->fallbackAccountId,
+                $agentEvalToolsCaseRun->runOptions
+            );
         if ($agentEvalNotApplicableReason !== null) {
             return $this->buildNotApplicableRow($runSettings, $agentEvalToolsCaseRun, $runSettings->flavor, $agentEvalNotApplicableReason, $output);
         }
@@ -526,7 +535,7 @@ class AgentEvalToolsCommand extends AgentEvalConsoleCommand
         $agentEvalRunnerService = $this->getRunnerService();
         $agentEvalCase = $agentEvalToolsCaseRun->agentEvalCase;
         try {
-            $agentEvalScope = $agentEvalRunnerService->resolveEvalScope($agentEvalCase, $runSettings->fallbackAgentSpaceId);
+            $agentEvalScope = $agentEvalRunnerService->resolveEvalScopeWithFallbackAccount($agentEvalCase, $runSettings->fallbackAgentSpaceId, $runSettings->fallbackAccountId);
             $agentEvalSimCase = AgentEvalSimCase::fromEvaluatedCase($agentEvalCase, AgentEvalJudgedCaseTexts::forCase($agentEvalCase));
             $agentEvalJudgedRunService = $this->getJudgedRunService();
             $agentEvalSimRunResult = $agentEvalCase->getRestore() !== null
@@ -608,7 +617,7 @@ class AgentEvalToolsCommand extends AgentEvalConsoleCommand
         $agentEvalRunnerService = $this->getRunnerService();
         $agentEvalCase = $agentEvalToolsCaseRun->agentEvalCase;
         try {
-            $agentEvalScope = $agentEvalRunnerService->resolveEvalScope($agentEvalCase, $runSettings->fallbackAgentSpaceId);
+            $agentEvalScope = $agentEvalRunnerService->resolveEvalScopeWithFallbackAccount($agentEvalCase, $runSettings->fallbackAgentSpaceId, $runSettings->fallbackAccountId);
             $agentEvalRunOutcome = $agentEvalRunnerService->runCase($agentEvalScope, $agentEvalCase, $agentEvalToolsCaseRun->runOptions);
             $conversation = $agentEvalRunOutcome->getConversation();
             // a call that leaves out an argument the platform fills counts as carrying the run's value

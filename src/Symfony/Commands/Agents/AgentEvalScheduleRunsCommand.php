@@ -110,7 +110,7 @@ class AgentEvalScheduleRunsCommand extends AgentEvalConsoleCommand
         }
         try {
             $agentEvalRunnerService = $this->getAgentEvalRunnerService();
-            $agentEvalScope = $agentEvalRunnerService->resolveEvalScope(AgentEvalCase::fromArray([]), $this->resolveFallbackAgentSpaceId($input));
+            $agentEvalScope = $agentEvalRunnerService->resolveEvalScopeWithFallbackAccount(AgentEvalCase::fromArray([]), $this->resolveFallbackAgentSpaceId($input), $this->resolveFallbackAccountId($input));
             $agentEvalRunnerService->authenticateOwnerOfScope($agentEvalScope);
             if (!$this->isOwnerAnEvalAccount($agentEvalScope)) {
                 $symfonyStyle->error(sprintf(

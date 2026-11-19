@@ -65,6 +65,33 @@ class AgentSpaceSqlConditionTest extends UnitTestCase
         self::assertSame(['accountIdOfRowsWithoutAgentSpace' => 12], $agentSpaceSqlCondition->getParameters());
     }
 
+    public function testTheRowsOneAccountHoldsInASharedSpaceCarrySpaceAndAccount(): void
+    {
+        $account = new Account();
+        $account->id = 12;
+        $agentSpaceSqlCondition = AgentSpaceSqlCondition::forAgentSpaceOfAccount($this->buildStoredAgentSpace(7), $account);
+
+        self::assertSame('(`c`.`agentSpaceId` = :agentSpaceId AND `c`.`accountId` = :accountIdOfRowsWithoutAgentSpace)', $agentSpaceSqlCondition->getConditionSql('c'));
+        self::assertSame('(conversation.agentSpaceId = :agentSpaceId AND conversation.accountId = :accountIdOfRowsWithoutAgentSpace)', $agentSpaceSqlCondition->getConditionDql('conversation'));
+        self::assertSame(['agentSpaceId' => 7, 'accountIdOfRowsWithoutAgentSpace' => 12], $agentSpaceSqlCondition->getParameters());
+        self::assertSame(
+            AgentSpaceSqlCondition::forAccountWithoutAgentSpace($account)->getConditionSql('c'),
+            AgentSpaceSqlCondition::forAgentSpaceOfAccount(null, $account)->getConditionSql('c'),
+            'without a space: the rows the account holds without one'
+        );
+        self::assertSame(
+            '(`c`.`agentSpaceId` = :agentSpaceId AND `c`.`accountId` = :accountIdOfRowsWithoutAgentSpace)',
+            AgentSpaceSqlCondition::forAgentSpaceOfAccount(new AgentSpace(), $account)->getConditionSql('c')
+        );
+        self::assertSame(['agentSpaceId' => AgentSpaceSqlCondition::AGENT_SPACE_ID_THAT_MATCHES_NO_ROW, 'accountIdOfRowsWithoutAgentSpace' => 12], AgentSpaceSqlCondition::forAgentSpaceOfAccount(new AgentSpace(), $account)->getParameters(), 'a space that is not stored has no rows');
+    }
+
+    public function testASharedSpaceNeverReadsAnAccountThatIsNotStoredAsEveryAccount(): void
+    {
+        $this->expectException(InternalErrorException::class);
+        AgentSpaceSqlCondition::forAgentSpaceOfAccount($this->buildStoredAgentSpace(7), new Account());
+    }
+
     public function testAnAccountThatIsNotStoredIsNeverReadAsEveryAccount(): void
     {
         $this->expectException(InternalErrorException::class);

@@ -47,6 +47,9 @@ class AgentModelInputTailEntry extends ValueObject
     /** The `[SIGNAL:time-zone]` line: the `# Time` zone is unverified (a country default or the schedule's zone). */
     public const string KIND_TIME_ZONE = 'TIME_ZONE';
 
+    /** The `[SIGNAL:client-context]` line: what the owner's client showed with the newest owner input. */
+    public const string KIND_CLIENT_CONTEXT = 'CLIENT_CONTEXT';
+
     /** The `[SIGNAL:clock]` line: the captured "now" of this model call. */
     public const string KIND_CLOCK = 'CLOCK';
 

@@ -154,6 +154,26 @@ class AgentEvalToolsCommandTest extends AgentEvalResultFilesTestCase
         self::assertContains('Saved: ' . $runDirectory . '/', $displayLines);
     }
 
+    public function testARunThatNamesAnAccountRunsTheCasesWithoutASpaceAtAccountLevel(): void
+    {
+        $probeCommand = new AgentEvalToolsProbeCommand();
+        $runnerServiceDouble = new AgentEvalRunnerServiceWithScriptedApplicabilityDouble();
+        $probeCommand->runnerServiceDouble = $runnerServiceDouble;
+        $probeCommand->ownShapeRowFields = ['passed' => true];
+        $fixturePath = $this->writeFixture([
+            ['id' => 'own.spaceless', 'prompt' => 'which tickets are open?', 'expect' => ['tool' => 'searchCatalog']],
+        ]);
+        $resultFile = $this->temporaryDirectory . '/account-level/result.json';
+
+        $commandTester = $this->runProbeCommand($probeCommand, ['--fixture' => $fixturePath, '--parallel' => '1', '--no-save' => true, '--result-file' => $resultFile, '--accountId' => '40']);
+
+        self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
+        self::assertStringNotContainsString('SKIP', $commandTester->getDisplay(), 'an account-level run plans the case');
+        self::assertSame([40], $runnerServiceDouble->fallbackAccountIdsOfChecks);
+        $resultDocument = json_decode((string)file_get_contents($resultFile), true);
+        self::assertSame([1, 1], [$resultDocument['total'], $resultDocument['passed']]);
+    }
+
     public function testTheRunInThisProcessReportsTheCasesThatDoNotApplyAndPrintsTheReport(): void
     {
         $probeCommand = new AgentEvalToolsProbeCommand();

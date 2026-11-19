@@ -52,6 +52,7 @@ an example output into the method's docblock. Three details:
 | Situation | What the model reads | `isError` |
 |---|---|---|
 | a framework exception with a 400–499 code (bad request, forbidden, not found) or `AgentToolExecutionTimeoutException` | "Execution failed for Tool '<tool>': <message>" | yes |
+| a validation failure (a `BadRequestException` with `validationErrors`: an entity's `update()`, a request that did not validate) | the message, then `Violations:` with one line per violation, `- <property path>: <message>` — at most `MCPToolExecutorService::MAX_VALIDATION_VIOLATIONS_IN_FAILURE_TEXT` (10) lines, each message cut at `MAX_VALIDATION_VIOLATION_MESSAGE_CHARS` (200), `- … and <n> more`; the received value is never shown | yes |
 | any other throwable | "… an internal error occurred (issue id <id>)…" — the message is written to the issues log (`IssuesLogService`), never shown | yes |
 | a refusal of an executor gate | the gate's text; `MCPToolResponse::$refusalKind` set (`REFUSAL_MANDATE_REQUIRED`, `REFUSAL_OWNER_CONFIRMATION_REQUIRED`, `REFUSAL_SCOPE_NOT_ELIGIBLE`, `REFUSAL_ADMIN_ACCESS_REQUIRED`, `REFUSAL_ENVIRONMENT_WRITE_LOCKED`) | yes |
 | a FINAL refusal — the same arguments are refused again (`MCPToolResponse::finalRefusal()`: a missing feature or account right, an ineligible scope, a space the account may not use, a mandate a sub-agent or a scheduled run cannot obtain) | the refusal's text; `MCPToolResponse::isFinalRefusal()` (public; the property `$refusalIsFinal` it reads is protected, never in the response); the loop answers the identical repeat of such a write in the same turn without running it and the next step has no tools | yes |
@@ -101,9 +102,14 @@ instructions in a result read like an injection.
 
 ## Third-party text
 
-Wrap every passage a third party wrote with `ToolResultUntrustedSegments::wrap($source, $text)` and put
-`ToolResultUntrustedSegments::READING_RULE` into the platform note (so the DTO renders as markdown). The marks show the model where foreign text
-starts and ends; the screening of a tool marked `MCPToolReturnsUntrustedContent` then reads only the marked passages.
+Wrap every passage a third party wrote with `ToolResultUntrustedSegments::wrap($source, $text)` (one passage per
+line of its own) or `ToolResultUntrustedSegments::wrapSingleLine($source, $text)` (a passage inside one line: line
+breaks become spaces). The executor puts `ToolResultUntrustedSegments::READING_RULE` into the platform note of every
+result whose text holds a mark (`ToolResultUntrustedSegments::buildPlatformNoteWithReadingRule()`, once, after the
+tool's own note); a signal that holds a mark gets the rule appended
+(`ToolResultUntrustedSegments::appendReadingRuleWhenMarked()`). The marks show the model where foreign text starts and
+ends; the screening of a tool marked `MCPToolReturnsUntrustedContent` then reads only the marked passages (both
+forms).
 
 ## Why size matters, and the levers in order
 

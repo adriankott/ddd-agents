@@ -17,6 +17,7 @@ use Symfony\Component\Console\Command\SignalableCommandInterface;
 use Symfony\Component\Console\Exception\InvalidOptionException;
 use Symfony\Component\Console\Formatter\OutputFormatter;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\ConsoleOutputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Output\StreamOutput;
@@ -44,6 +45,15 @@ use Symfony\Component\Console\Output\StreamOutput;
  */
 abstract class AgentEvalConsoleCommand extends AgentConsoleCommand implements SignalableCommandInterface
 {
+    /** @var string The option that names the account of a run without a space, or in a space without an owner */
+    public const string OPTION_EVAL_ACCOUNT_ID = 'accountId';
+
+    /**
+     * @var int|null The account the run names (`--accountId`, {@see resolveFallbackAccountId()}), kept for the run by a
+     * command that reads it once ({@see rememberFallbackAccountIdOfRun()}); null = none
+     */
+    protected ?int $fallbackAccountIdOfRun = null;
+
     /** @var string The indentation of a progress line on the error output */
     public const string PROGRESS_LINE_PREFIX = '  ';
 
@@ -153,14 +163,52 @@ abstract class AgentEvalConsoleCommand extends AgentConsoleCommand implements Si
     // ------------------------------------------------------------------ the scope
 
     /**
-     * Declares the scope options: `--agentSpaceId` and the options of the agent-spaces service (e.g. an application's
-     * own id of the entity a space stands for). Call it from `configure()`.
+     * Declares the scope options: `--agentSpaceId`, the options of the agent-spaces service (e.g. an application's
+     * own id of the entity a space stands for) and `--accountId` (a run at account level, or in a space without an
+     * owner). Call it from `configure()`.
      *
      * @return void
      */
     protected function configureEvalScopeOptions(): void
     {
         $this->configureAgentSpaceOptions();
+        $this->addOption(
+            static::OPTION_EVAL_ACCOUNT_ID,
+            null,
+            InputOption::VALUE_REQUIRED,
+            'The account of a run without a space (cases that name none run at account level for it) and of a run in a space without an owner'
+        );
+    }
+
+    /**
+     * The account the run names (`--accountId`): cases that name no space (and no `--agentSpaceId`) run at account level
+     * for it, and a space without an owner runs for it; null when the option is not given.
+     *
+     * @param InputInterface $input
+     * @return int|null
+     * @throws InvalidOptionException when the value is no positive whole number
+     */
+    protected function rememberFallbackAccountIdOfRun(InputInterface $input): ?int
+    {
+        $this->fallbackAccountIdOfRun = $this->resolveFallbackAccountId($input);
+        return $this->fallbackAccountIdOfRun;
+    }
+
+    /**
+     * The account the run names (`--accountId`); see {@see configureEvalScopeOptions()}.
+     *
+     * @throws InvalidOptionException when the value is no positive whole number
+     */
+    protected function resolveFallbackAccountId(InputInterface $input): ?int
+    {
+        $accountIdValue = $input->hasOption(static::OPTION_EVAL_ACCOUNT_ID) ? trim((string)$input->getOption(static::OPTION_EVAL_ACCOUNT_ID)) : '';
+        if ($accountIdValue === '') {
+            return null;
+        }
+        if (!ctype_digit($accountIdValue) || (int)$accountIdValue <= 0) {
+            throw new InvalidOptionException('--' . static::OPTION_EVAL_ACCOUNT_ID . " must be a positive whole number, got '{$accountIdValue}'");
+        }
+        return (int)$accountIdValue;
     }
 
     /**
@@ -188,8 +236,8 @@ abstract class AgentEvalConsoleCommand extends AgentConsoleCommand implements Si
     }
 
     /**
-     * The scope options as a child process gets them: `--agentSpaceId=<id>` and every option of the agent-spaces
-     * service, each as it was given (a value the command declared as the option's default included), in that order.
+     * The scope options as a child process gets them: `--agentSpaceId=<id>`, every option of the agent-spaces
+     * service and `--accountId=<id>`, each as it was given (a value the command declared as the option's default included), in that order.
      * Read nothing: a parent that only starts children never resolves the space itself.
      *
      * @param InputInterface $input
@@ -204,6 +252,10 @@ abstract class AgentEvalConsoleCommand extends AgentConsoleCommand implements Si
         }
         foreach ($this->findGivenAgentSpaceScopeOptionValues($input) as $scopeOptionName => $scopeOptionValue) {
             $childArguments[] = '--' . $scopeOptionName . '=' . $scopeOptionValue;
+        }
+        $accountIdValue = $input->hasOption(static::OPTION_EVAL_ACCOUNT_ID) ? trim((string)$input->getOption(static::OPTION_EVAL_ACCOUNT_ID)) : '';
+        if ($accountIdValue !== '') {
+            $childArguments[] = '--' . static::OPTION_EVAL_ACCOUNT_ID . '=' . $accountIdValue;
         }
         return $childArguments;
     }

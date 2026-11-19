@@ -9,6 +9,10 @@ use DDD\Infrastructure\Exceptions\BadRequestException;
 use DDD\Infrastructure\Exceptions\ForbiddenException;
 use DDD\Infrastructure\Exceptions\InternalErrorException;
 use DDD\Infrastructure\Exceptions\NotFoundException;
+use DDD\Infrastructure\Validation\ValidationError;
+use DDD\Infrastructure\Validation\ValidationErrors;
+use DDD\Infrastructure\Validation\ValidationResult;
+use DDD\Presentation\Mcp\Services\MCPToolExecutorService;
 use DDD\Tests\Agents\Support\UnitTestCase;
 use PDOException;
 use RuntimeException;
@@ -38,6 +42,48 @@ class MCPToolFailureTextTest extends UnitTestCase
             $executor->callBuildToolFailureText('getNote', new ForbiddenException('No access.'), new AgentToolCallProvenance())
         );
         self::assertSame([], $executor->loggedMessages, 'a refusal written for the caller is no issue');
+    }
+
+    public function testAValidationFailureNamesItsViolations(): void
+    {
+        $validationError = new ValidationError('.');
+        $titleValidationResult = new ValidationResult('title', 'This value should not be blank.', '', 'Note');
+        $validationError->add($titleValidationResult);
+        $nestedValidationError = new ValidationError('.address.');
+        $postalCodeValidationResult = new ValidationResult('postalCode', "This value is too long.\nIt should have 10 characters or less.", '123456789012345', 'Address');
+        $nestedValidationError->add($postalCodeValidationResult);
+        $validationErrors = new ValidationErrors();
+        $validationErrors->add($validationError);
+        $validationErrors->add($nestedValidationError);
+        $badRequestException = new BadRequestException('Request contains invalid data');
+        $badRequestException->validationErrors = $validationErrors;
+
+        self::assertSame(
+            "Execution failed for Tool 'updateNote': Request contains invalid data\nViolations:\n"
+            . "- title: This value should not be blank.\n"
+            . '- address.postalCode: This value is too long. It should have 10 characters or less.',
+            (new IssueIdStubbedToolExecutor())->callBuildToolFailureText('updateNote', $badRequestException)
+        );
+    }
+
+    public function testTheViolationsAreCappedAndTheReceivedValueIsLeftOut(): void
+    {
+        $validationError = new ValidationError('.');
+        for ($violationNumber = 1; $violationNumber <= 13; $violationNumber++) {
+            $fieldValidationResult = new ValidationResult('field' . $violationNumber, str_repeat('x', 300), 'SECRET-VALUE', 'Note');
+            $validationError->add($fieldValidationResult);
+        }
+        $validationErrors = new ValidationErrors();
+        $validationErrors->add($validationError);
+        $badRequestException = new BadRequestException('Request contains invalid data');
+        $badRequestException->validationErrors = $validationErrors;
+
+        $failureText = (new IssueIdStubbedToolExecutor())->callBuildToolFailureText('updateNote', $badRequestException);
+
+        self::assertStringNotContainsString('SECRET-VALUE', $failureText);
+        self::assertSame(MCPToolExecutorService::MAX_VALIDATION_VIOLATIONS_IN_FAILURE_TEXT, substr_count($failureText, "\n- field"));
+        self::assertStringEndsWith("\n- … and 3 more", $failureText);
+        self::assertStringContainsString('- field1: ' . str_repeat('x', MCPToolExecutorService::MAX_VALIDATION_VIOLATION_MESSAGE_CHARS - 1) . "…\n", $failureText);
     }
 
     public function testAnyOtherThrowableIsLoggedAndAnsweredWithTheIssueIdOnly(): void

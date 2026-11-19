@@ -736,7 +736,8 @@ class AIConversationsService extends EntitiesService
      * `$preferredConversationId` wins when it passes the same predicate (the chat a background run was requested from);
      * `$excludedConversationId` never qualifies (the run's own conversation). The whole predicate sits in the query BEFORE the
      * limit — a read that limits first and filters after lets newer ineligible chats hide an eligible older one. One raw
-     * read on the index of `agentSpaceId`, no rights (the caller works on its own space): the space fixes the account.
+     * read on the index of `agentSpaceId`, no rights (the caller works on its own space): the space fixes the account (a space
+     * several accounts share: {@see findNewestOpenCustomerChatIdOfAgentSpaceAndAccount()}).
      * Read by the question relay of a background run.
      *
      * @param AgentSpace $agentSpace
@@ -748,8 +749,37 @@ class AIConversationsService extends EntitiesService
      */
     public function findNewestOpenCustomerChatIdOfAgentSpace(AgentSpace $agentSpace, DateTime $inboundSince, ?int $preferredConversationId = null, ?int $excludedConversationId = null): ?int
     {
+        return $this->findNewestOpenCustomerChatIdInAgentSpacePartition(AgentSpaceSqlCondition::forAgentSpace($agentSpace), $inboundSince, $preferredConversationId, $excludedConversationId);
+    }
+
+    /**
+     * {@see findNewestOpenCustomerChatIdOfAgentSpace()} over the chats `$account` holds in `$agentSpace` — for a space
+     * several accounts work in (a space without one owner), where the newest chat of the space may be another
+     * account's.
+     *
+     * @param AgentSpace $agentSpace
+     * @param Account $account
+     * @param DateTime $inboundSince
+     * @param int|null $preferredConversationId
+     * @param int|null $excludedConversationId
+     * @return int|null
+     * @throws \Doctrine\DBAL\Exception
+     * @throws InternalErrorException when the account is not stored
+     */
+    public function findNewestOpenCustomerChatIdOfAgentSpaceAndAccount(AgentSpace $agentSpace, Account $account, DateTime $inboundSince, ?int $preferredConversationId = null, ?int $excludedConversationId = null): ?int
+    {
+        return $this->findNewestOpenCustomerChatIdInAgentSpacePartition(AgentSpaceSqlCondition::forAgentSpaceOfAccount($agentSpace, $account), $inboundSince, $preferredConversationId, $excludedConversationId);
+    }
+
+    /**
+     * The read of {@see findNewestOpenCustomerChatIdOfAgentSpace()} over the conversations `$agentSpaceSqlCondition`
+     * selects.
+     *
+     * @throws \Doctrine\DBAL\Exception
+     */
+    protected function findNewestOpenCustomerChatIdInAgentSpacePartition(AgentSpaceSqlCondition $agentSpaceSqlCondition, DateTime $inboundSince, ?int $preferredConversationId, ?int $excludedConversationId): ?int
+    {
         $tableName = DBAIConversationModel::getTableName();
-        $agentSpaceSqlCondition = AgentSpaceSqlCondition::forAgentSpace($agentSpace);
         $openChatId = EntityManagerFactory::getInstance()->getConnection()->fetchOne(
             'SELECT `id` FROM `' . $tableName . '`'
             . ' WHERE ' . $agentSpaceSqlCondition->getConditionSql()

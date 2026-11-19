@@ -56,6 +56,7 @@ trait AgentConversationWritesTrait
         AIConversationAgentService $aiConversationAgentService
     ): AIConversationGetResponseDto {
         $this->authorizeConversationAccess();
+        $requestDto = $this->resolveRequestDtoOfRoutedMethod(__FUNCTION__, $requestDto);
         $aIUsageEnvelopeContext = $this->openConversationEnvelopeIfNoneIsOpen(AgentAIUsageScope::ENVELOPE_AI_CONVERSATION_TURN);
         try {
             return $this->buildMessagePostedResponse($requestDto, $aiConversationAgentService);
@@ -85,7 +86,8 @@ trait AgentConversationWritesTrait
             $requestDto->aiModelName ?? null,
             $requestDto->budgetBypass ?? null,
             runSettingsOverride: $this->buildRunSettingsOverride($requestDto), // honoured only in an admin session
-            ownerDevice: $this->readOwnerDeviceFromRequest()
+            ownerDevice: $this->readOwnerDeviceFromRequest(),
+            clientContext: $requestDto->clientContext ?? null
         );
         $this->afterMessagePosted($responseDto->aiConversation);
         $this->hideParentConversationAndLoadedCapabilitiesOnEmbeddedMessages($responseDto->aiConversation);
@@ -94,7 +96,8 @@ trait AgentConversationWritesTrait
 
     /**
      * Inject a frontend-widget SIGNAL (a human-readable description of a widget interaction) into an existing
-     * conversation and drive ONE agentic turn (asynchronously). The conversation is resolved under read rights.
+     * conversation and drive ONE agentic turn (asynchronously). The conversation is resolved under read rights
+     * ({@see self::findConversationOfInjectedSignal()}).
      *
      * @param AIConversationInjectSignalPostRequestDto $requestDto
      * @param AIConversationTurnSignalsService $aIConversationTurnSignalsService
@@ -114,6 +117,7 @@ trait AgentConversationWritesTrait
         AIConversationsService $aiConversationsService
     ): AIConversationGetResponseDto {
         $this->authorizeConversationAccess();
+        $requestDto = $this->resolveRequestDtoOfRoutedMethod(__FUNCTION__, $requestDto);
         $aIUsageEnvelopeContext = $this->openConversationEnvelopeIfNoneIsOpen(AgentAIUsageScope::ENVELOPE_AI_CONVERSATION_TURN);
         try {
             return $this->buildSignalInjectedResponse($requestDto, $aIConversationTurnSignalsService, $aiConversationsService);
@@ -138,7 +142,7 @@ trait AgentConversationWritesTrait
         // read rights APPLIED → resolves only the caller's OWN conversation; with throwErrors a foreign / missing id
         // throws NotFoundException → 404.
         $aiConversationsService->throwErrors = true;
-        $conversation = $this->findVisibleConversation($aiConversationsService, (int)$requestDto->aiConversationId);
+        $conversation = $this->findConversationOfInjectedSignal($requestDto, $aiConversationsService);
         // Closed conversation: no further customer input — widget signals included.
         if ($conversation instanceof AIConversation && $conversation->isClosed()) {
             throw new ConversationClosedException();
@@ -149,7 +153,8 @@ trait AgentConversationWritesTrait
             $conversation,
             $requestDto->signalText,
             $signalSource,
-            ownerDevice: $this->readOwnerDeviceFromRequest()
+            ownerDevice: $this->readOwnerDeviceFromRequest(),
+            clientContext: $requestDto->clientContext ?? null
         );
         $this->hideParentConversationAndLoadedCapabilitiesOnEmbeddedMessages($conversation);
         $responseDto = new AIConversationGetResponseDto();
@@ -177,6 +182,7 @@ trait AgentConversationWritesTrait
         AIConversationsService $aiConversationsService
     ): AIConversationGetResponseDto {
         $this->authorizeConversationAccess();
+        $requestDto = $this->resolveRequestDtoOfRoutedMethod(__FUNCTION__, $requestDto);
         return $this->buildRunRetriedResponse($requestDto, $aiConversationsService);
     }
 
@@ -226,6 +232,7 @@ trait AgentConversationWritesTrait
         AIConversationsService $aiConversationsService
     ): AIConversationGetResponseDto {
         $this->authorizeConversationAccess();
+        $requestDto = $this->resolveRequestDtoOfRoutedMethod(__FUNCTION__, $requestDto);
         return $this->buildTitleUpdatedResponse($requestDto, $aiConversationsService);
     }
 
@@ -269,6 +276,7 @@ trait AgentConversationWritesTrait
         AIConversationsService $aiConversationsService
     ): AIConversationDeleteResponseDto {
         $this->authorizeConversationAccess();
+        $requestDto = $this->resolveRequestDtoOfRoutedMethod(__FUNCTION__, $requestDto);
         $this->deleteVisibleConversation($requestDto, $aiConversationsService);
         return new AIConversationDeleteResponseDto();
     }

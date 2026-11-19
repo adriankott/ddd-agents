@@ -26,7 +26,7 @@ use ReflectionProperty;
 class MessageLoadProfileTest extends UnitTestCase
 {
     /** Heavy columns a profile may drop — each MUST stay default-less for clobber-safety. */
-    protected const array DROPPABLE_HEAVY_COLUMNS = ['toolCall', 'loadedCapabilities', 'requestSnapshot', 'taskPlanSnapshot'];
+    protected const array DROPPABLE_HEAVY_COLUMNS = ['toolCall', 'loadedCapabilities', 'requestSnapshot', 'taskPlanSnapshot', 'clientContext'];
 
     /**
      * Persisted columns DELIBERATELY excluded from CONTEXT: `taskPlanSnapshot` is the per-message plan-traceability

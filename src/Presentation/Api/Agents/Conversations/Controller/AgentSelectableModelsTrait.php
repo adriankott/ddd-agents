@@ -34,6 +34,7 @@ trait AgentSelectableModelsTrait
         AIConversationModelCallsService $aIConversationModelCallsService
     ): AIConversationSelectableModelsGetResponseDto {
         $this->authorizeConversationAccess();
+        $requestDto = $this->resolveRequestDtoOfRoutedMethod(__FUNCTION__, $requestDto);
         $responseDto = new AIConversationSelectableModelsGetResponseDto();
         $responseDto->models = $this->findSelectableAgentModels($aIConversationModelCallsService);
         return $responseDto;

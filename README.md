@@ -38,6 +38,14 @@ row of the agent's tables; by default the framework's admin role of any account)
 `MCPToolExecutorService::isEnvironmentWideWriteLockActive()` (refuses every tool that is no declared read; off by
 default). The entry skill's override-points reference lists every hook.
 
+**The client context.** The web client sends what the owner sees (route path, route parameters, record kind and id,
+tab; each capped, an over-cap value refused with HTTP 400) with a start, a posted message and an injected signal. The
+server stores it on that owner message (`AgentClientContext`) and the model reads the newest owner input's context as
+one volatile line `[SIGNAL:client-context]` right before the clock — never in the cached prefix, never a transcript row.
+A host turns ids into names and labels the keys in a same-path subclass of `AgentClientContextService`
+(`describeRecordOfClientContext()`, `getClientContextKeyLabel()`); the default renders the keys plainly. Details: the
+context skill, "What the model sees", section "The client context".
+
 ## Environment of the package test kernel (`tests/Support/kernel`)
 
 No env file is committed. `tests/Support/PackageTestEnvironment.php` sets every variable where the kernel is built

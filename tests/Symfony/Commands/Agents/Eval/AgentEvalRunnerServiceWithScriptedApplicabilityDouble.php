@@ -24,6 +24,19 @@ class AgentEvalRunnerServiceWithScriptedApplicabilityDouble extends AgentEvalRun
     /** @var array<int, int|null> The fallback agent space of every check, in order */
     public array $fallbackAgentSpaceIdsOfChecks = [];
 
+    /** @var array<int, int|null> The account each check of a run that names one received, in order */
+    public array $fallbackAccountIdsOfChecks = [];
+
+    public function resolveScopeWithFallbackAccountAndFindNotApplicableReasonForCase(AgentEvalCase $agentEvalCase, ?int $fallbackAgentSpaceId, ?int $fallbackAccountId, AgentEvalRunOptions $agentEvalRunOptions): ?AgentEvalNotApplicableReason
+    {
+        $this->fallbackAccountIdsOfChecks[] = $fallbackAccountId;
+        if ($fallbackAccountId === null) {
+            return $this->resolveScopeAndFindNotApplicableReasonForCase($agentEvalCase, $fallbackAgentSpaceId, $agentEvalRunOptions);
+        }
+        $notApplicableDetail = $this->notApplicableDetailByCaseId[$agentEvalCase->getId()] ?? null;
+        return $notApplicableDetail !== null ? AgentEvalNotApplicableReason::withReasonAndDetail(self::SCRIPTED_REASON, $notApplicableDetail) : null;
+    }
+
     public function resolveScopeAndFindNotApplicableReasonForCase(AgentEvalCase $agentEvalCase, ?int $fallbackAgentSpaceId, AgentEvalRunOptions $agentEvalRunOptions): ?AgentEvalNotApplicableReason
     {
         $this->fallbackAgentSpaceIdsOfChecks[] = $fallbackAgentSpaceId;

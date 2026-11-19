@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DDD\Domain\AI\Entities\Conversations;
 
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
+use DDD\Domain\AI\Entities\Conversations\Messages\AgentClientContext;
 use DDD\Domain\AI\Entities\UsageLogs\AIBudgetBypassGrant;
 use DDD\Domain\Base\Entities\ValueObject;
 use DDD\Infrastructure\Exceptions\BadRequestException;
@@ -34,6 +35,12 @@ class AIConversationDriveRequest extends ValueObject
 
     /** The invisible START context, sanitized and capped to {@see MAX_START_SIGNAL_TEXT_CHARS}; null when none was sent. */
     public ?string $sanitizedStartSignalText = null;
+
+    /**
+     * What the owner's client showed with this drive, checked against its caps; null when the client sent none (or an
+     * empty one). Stored on the owner's row the drive appends ({@see AIConversationMessage::$clientContext}).
+     */
+    public ?AgentClientContext $clientContext = null;
 
     /** Whether the drive's work runs without the AI-budget check — persisted on the conversation for the async workers. */
     public bool $effectiveBudgetBypass = false;

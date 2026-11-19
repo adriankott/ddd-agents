@@ -54,9 +54,13 @@ class MCPObjectProperty extends ValueObject
      * the params live on the framework base `RequestDto` (mgamadeus/ddd), which is MCP-agnostic — MCP is a concept of
      * the agent layer, so the hide list stays here in the MCP layer. REST/OpenApi + the executor keep the param fully functional.
      *
+     * `noCache` is hidden as well: on a tool call nothing reads it (the framework reads the HTTP request's own
+     * `noCache` query parameter, never a tool argument), so in the schema it only cost tokens on every tool and let a
+     * model flip it to force a repeat of a read. A value a client still sends is hydrated and ignored as before.
+     *
      * @var string[]
      */
-    public const array MCP_HIDDEN_SHARED_PARAMETERS = ['outputFormat'];
+    public const array MCP_HIDDEN_SHARED_PARAMETERS = ['outputFormat', 'noCache'];
 
     /** @var MCPObjectProperty[] Per-name cache of the (endpoint-invariant) shared-parameter rendering. */
     protected static array $sharedParameterCache = [];

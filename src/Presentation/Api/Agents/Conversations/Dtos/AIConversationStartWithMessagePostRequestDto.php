@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DDD\Presentation\Api\Agents\Conversations\Dtos;
 
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
+use DDD\Domain\AI\Entities\Conversations\Messages\AgentClientContext;
 use DDD\Presentation\Base\Dtos\RequestDto;
 use DDD\Presentation\Base\OpenApi\Attributes\Parameter;
 
@@ -98,4 +99,21 @@ class AIConversationStartWithMessagePostRequestDto extends RequestDto
      */
     #[Parameter(in: Parameter::BODY, required: false)]
     public ?string $entryPointKey = null;
+
+    /**
+     * @var AgentClientContext|null What the owner's client shows while the owner writes: the route path, its
+     * parameters, the record on screen and the tab. Stored on the owner's row and read by the agent as one line
+     * beside the newest owner input; refused with HTTP 400 when a field exceeds its cap
+     * ({@see AgentClientContext::MAX_ROUTE_PATH_CHARS} and the other caps), never cut.
+     */
+    #[Parameter(in: Parameter::BODY, required: false)]
+    public ?AgentClientContext $clientContext = null;
+
+    /**
+     * @var bool|null Debug: store the full sent payload and the raw model response on every model call of the new
+     * conversation (`RunSettings::$storeRequestSnapshot`). Honoured ONLY when a validated admin acts in this session
+     * (an application widens it with the start trait's hook); a customer's value is ignored.
+     */
+    #[Parameter(in: Parameter::QUERY, required: false)]
+    public ?bool $storeRequestSnapshot = null;
 }

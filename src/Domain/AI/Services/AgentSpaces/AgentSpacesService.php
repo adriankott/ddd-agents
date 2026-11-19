@@ -76,6 +76,21 @@ class AgentSpacesService extends EntitiesService
     /** @var string The tool argument by which a tool of the package names the space a call targets */
     public const string TOOL_ARGUMENT_AGENT_SPACE_ID = 'agentSpaceId';
 
+    /**
+     * @var string The value of a filled argument ({@see TOOL_ARGUMENT_AGENT_SPACE_ID}) that says "do not narrow": the
+     * executor leaves the argument out instead of filling it from the conversation's space, so the tool runs as it
+     * runs without the argument (at account level, or across what the tool's own filter allows). Only a positive id
+     * names a space; 0 and an empty value still mean "the conversation's space".
+     */
+    public const string TOOL_ARGUMENT_VALUE_NOT_NARROWED_TO_AGENT_SPACE = 'none';
+
+    /**
+     * @var string The description prefix of a filled argument that also offers {@see TOOL_ARGUMENT_VALUE_NOT_NARROWED_TO_AGENT_SPACE}.
+     * Not used by default (the default prefix stays as it is); an application whose tools read across spaces returns
+     * it from {@see getDescriptionPrefixesOfToolArgumentsFilledFromAgentSpaceOfConversation()} for those arguments.
+     */
+    public const string DESCRIPTION_PREFIX_OF_TOOL_ARGUMENT_FILLED_FROM_AGENT_SPACE_OR_NOT_NARROWED = 'OPTIONAL — omit it: it defaults to what this conversation works for. Pass "none" to not narrow to one; pass an id ONLY to target another one.';
+
     /** @var string What the model reads in front of the description of a tool argument that is filled from the conversation's space */
     public const string DESCRIPTION_PREFIX_OF_TOOL_ARGUMENT_FILLED_FROM_AGENT_SPACE = 'OPTIONAL — omit it: it defaults to what this conversation works for. Pass it ONLY to target another one.';
 
@@ -644,6 +659,47 @@ class AgentSpacesService extends EntitiesService
     }
 
     /**
+     * The arguments of a call in the agent loop as the tool receives them: an argument the space fills that the model
+     * passed as {@see TOOL_ARGUMENT_VALUE_NOT_NARROWED_TO_AGENT_SPACE} ({@see isToolArgumentValueNotNarrowedToAgentSpace()})
+     * is left out and never filled; every other argument goes through {@see applyAgentSpaceDefaultsToToolArguments()}
+     * when the conversation has a space. Called by the executor before the gates and the hydration.
+     *
+     * @param array<array-key, mixed> $toolArguments
+     * @param string[] $parameterClassNames the classes of the tool method's parameters
+     * @param AgentSpace|null $agentSpace the space of the conversation the call runs in; null = none
+     * @return array<array-key, mixed>
+     */
+    public function applyAgentSpaceDefaultsToToolArgumentsOfCall(array $toolArguments, array $parameterClassNames, ?AgentSpace $agentSpace): array
+    {
+        $argumentNamesNotNarrowed = [];
+        foreach (array_keys($this->getDescriptionPrefixesOfToolArgumentsFilledFromAgentSpace()) as $argumentNameFilledFromAgentSpace) {
+            if (array_key_exists($argumentNameFilledFromAgentSpace, $toolArguments)
+                && $this->isToolArgumentValueNotNarrowedToAgentSpace($toolArguments[$argumentNameFilledFromAgentSpace])
+            ) {
+                $argumentNamesNotNarrowed[] = $argumentNameFilledFromAgentSpace;
+                unset($toolArguments[$argumentNameFilledFromAgentSpace]);
+            }
+        }
+        if ($agentSpace === null) {
+            return $toolArguments;
+        }
+        $filledToolArguments = $this->applyAgentSpaceDefaultsToToolArguments($toolArguments, $parameterClassNames, $agentSpace);
+        foreach ($argumentNamesNotNarrowed as $argumentNameNotNarrowed) {
+            unset($filledToolArguments[$argumentNameNotNarrowed]);
+        }
+        return $filledToolArguments;
+    }
+
+    /**
+     * Override point: whether `$argumentValue` of a filled argument says "do not narrow to a space". The default: the
+     * text {@see TOOL_ARGUMENT_VALUE_NOT_NARROWED_TO_AGENT_SPACE}, in any case.
+     */
+    public function isToolArgumentValueNotNarrowedToAgentSpace(mixed $argumentValue): bool
+    {
+        return is_string($argumentValue) && strtolower(trim($argumentValue)) === static::TOOL_ARGUMENT_VALUE_NOT_NARROWED_TO_AGENT_SPACE;
+    }
+
+    /**
      * What the model reads in front of the description of each tool argument that
      * {@see self::applyAgentSpaceDefaultsToToolArguments()} fills, by argument name. In a conversation with a space
      * the tool schema drops these arguments from its required list and puts the text in front of their description;
@@ -654,6 +710,34 @@ class AgentSpacesService extends EntitiesService
     public function getDescriptionPrefixesOfToolArgumentsFilledFromAgentSpace(): array
     {
         return [static::TOOL_ARGUMENT_AGENT_SPACE_ID => static::DESCRIPTION_PREFIX_OF_TOOL_ARGUMENT_FILLED_FROM_AGENT_SPACE];
+    }
+
+    /**
+     * Override point: the description prefixes of the tool arguments the space of `$conversation` fills, by argument
+     * name — what a conversation's tool schema reads ({@see AIConversation::getDescriptionPrefixesOfToolArgumentsFilledFromAgentSpace()}).
+     * An application whose spaces fill different arguments by kind decides per conversation and space here. The
+     * default: {@see getDescriptionPrefixesOfToolArgumentsFilledFromAgentSpace()}, the same for every space.
+     *
+     * @param AIConversation $conversation the conversation whose tool schema is built
+     * @param AgentSpace|null $agentSpace its space as far as it is loaded; null when only its id is known
+     * @return string[] description prefix by argument name
+     */
+    public function getDescriptionPrefixesOfToolArgumentsFilledFromAgentSpaceOfConversation(AIConversation $conversation, ?AgentSpace $agentSpace): array
+    {
+        return $this->getDescriptionPrefixesOfToolArgumentsFilledFromAgentSpace();
+    }
+
+    /**
+     * Override point: the tool arguments the read dedup line leaves out
+     * ({@see \DDD\Domain\AI\Entities\Conversations\Agent\AgentPausedTurnRecord}): the arguments that name the target
+     * of a call rather than the question, so two reads of the same question on the conversation's space count as one.
+     * The default: the argument names of {@see getDescriptionPrefixesOfToolArgumentsFilledFromAgentSpace()}.
+     *
+     * @return string[] argument names
+     */
+    public function getToolArgumentNamesLeftOutOfTheReadDedupLine(): array
+    {
+        return array_keys($this->getDescriptionPrefixesOfToolArgumentsFilledFromAgentSpace());
     }
 
     /**

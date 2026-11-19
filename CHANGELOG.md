@@ -1,5 +1,103 @@
 # Changelog
 
+## 0.1.3
+
+- **Schema:** one new nullable JSON column, `AIConversationMessages.clientContext` (the client context below). Apply it
+  with the schema diff before the release goes live: the context load selects it and owner rows write it. A host with a
+  table prefix or `tableNames` regenerates its models as always.
+- Added: the client-context contract. A start, a posted message and an injected signal take the body field
+  `clientContext` (`AgentClientContext`: `routePath` ≤ 512 characters, `routeParameters` as a list of `{name, value}` —
+  ≤ 512 characters as `name=value&…`, at most 20 —, `recordKind` ≤ 64, `recordId` ≤ 128, `tab` ≤ 64). A value over a
+  cap or with a control character is refused with HTTP 400, never cut; an empty context is stored as none. It is stored
+  on that owner row (`AIConversationMessage::$clientContext`, in `CONTEXT_LOAD_COLUMNS`; on a signal-only start on the
+  start signal) and rendered from the owner's newest input as ONE volatile tail entry `[SIGNAL:client-context]` right
+  before the clock (`AgentModelInputTailEntry::KIND_CLIENT_CONTEXT`): never part of the cached prefix, never a
+  transcript row, never in a delegation child, nothing when the newest owner input carries none. The host hook is the
+  new service `AgentClientContextService` (`buildClientContextTailText()`, `describeRecordOfClientContext()` to turn an
+  id into a name, `getClientContextKeyLabel()`); the default renders the keys plainly in about 40 tokens; a failing
+  hook is logged and leaves the entry out. Service entries: `driveConversation(…, clientContext:)`,
+  `startOrReopenConversationAtEntryPoint(…, $clientContext, $runSettings)`, `AIConversationTurnSignalsService::injectSignal(…, clientContext:)`,
+  `AIConversationMessagesService::appendInboundSignal(…, clientContext:)` — trailing optional parameters: a host
+  subclass that overrides one of these methods adds the parameter to its signature.
+- Added: `AIConversationMessage::getContextLoadColumns()` (the context load reads it on the class the host uses,
+  `AIConversationMessagesService::getContextLoadColumns()`): a host message class with a column of its own redeclares
+  `CONTEXT_LOAD_COLUMNS` as `[...parent::CONTEXT_LOAD_COLUMNS, 'itsColumn']` and the column rides every context load.
+- Added: `AgentConversationControllerHooksTrait::getRequestDtoClassOfRoutedMethod()` and
+  `resolveRequestDtoOfRoutedMethod()`: every routed trait method reads its request into the class the hook names —
+  default the host's request DTO at the same path, else the module's — so one more request parameter needs no
+  redeclared route (the generated API document keeps naming the module's DTO). A host that has a same-path request DTO
+  already now gets it on the trait's routes too.
+- Added: `AIConversationAgentService::beforeTurnOfDriveIsDispatched($conversation, $driveRequest, $isNewConversation)`,
+  called by `driveConversation()` after the conversation is created and the owner's rows are appended, before the turn
+  is dispatched (default nothing); `AIConversationDriveRequest::$clientContext` carries the drive's client context.
+- Docs: a host subclass of `AIConversation` repeats its class-level `#[DatabaseIndex]` lines and `#[LazyLoadRepo]`
+  verbatim (PHP does not inherit attributes; the framework's model generator reads the generated class only). The entry
+  skill lists them; `ConversationClassAttributesDocumentedForHostSubclassesTest` keeps the list equal to the class.
+- Fixed: `ToolResultUntrustedSegments::READING_RULE` reached no model. The executor now puts it into the platform note
+  of every tool result whose text holds a mark (`buildPlatformNoteWithReadingRule()`, once, after the tool's own note),
+  and an injected signal holding a mark gets it appended (`appendReadingRuleWhenMarked()`). Added the one-line form
+  `ToolResultUntrustedSegments::wrapSingleLine()`; `findSegmentsInText()` finds both forms.
+- Added: `AgentConversationControllerHooksTrait::findConversationOfInjectedSignal()`, the conversation of an injected
+  signal (default `findVisibleConversation()`, as before).
+- Added: `AgentSpacesService::getDescriptionPrefixesOfToolArgumentsFilledFromAgentSpaceOfConversation($conversation,
+  $agentSpace)` (what `AIConversation::getDescriptionPrefixesOfToolArgumentsFilledFromAgentSpace()` asks now; default
+  the space-independent method, so a host override of that one keeps working) and
+  `getToolArgumentNamesLeftOutOfTheReadDedupLine()` (the strip list of the read dedup line of a paused turn, apart
+  from the prefixes; default their names).
+- Added: reads keyed by space AND account for a space several accounts share — `AgentSpaceSqlCondition::forAgentSpaceOfAccount()`,
+  `AIConversationsService::findNewestOpenCustomerChatIdOfAgentSpaceAndAccount()`,
+  `AIConversationSchedulesService::countAgentRecurringSchedulesCreatedForAgentSpaceOfAccountSince()`,
+  `countUnseenFinishedRunsOfAgentSpaceOfAccount()` and `buildMonthlyCostEstimateForActiveRecurringSchedulesOfAgentSpaceOfAccount()`.
+  The space-only reads are unchanged.
+- Added: "do not narrow" for a tool argument the space fills — the model passes `"none"`
+  (`AgentSpacesService::TOOL_ARGUMENT_VALUE_NOT_NARROWED_TO_AGENT_SPACE`, `isToolArgumentValueNotNarrowedToAgentSpace()`)
+  and the executor leaves the argument out instead of filling it (`applyAgentSpaceDefaultsToToolArgumentsOfCall()`).
+  The default description prefix is unchanged; `DESCRIPTION_PREFIX_OF_TOOL_ARGUMENT_FILLED_FROM_AGENT_SPACE_OR_NOT_NARROWED`
+  is the prefix a host returns for arguments that may read across spaces. Before, such a value failed the hydration.
+- Added: request snapshots for a conversation started over HTTP — the start's query parameter `storeRequestSnapshot`,
+  honoured in an admin session (`AgentConversationControllerHooksTrait::isRequestSnapshotStoredForStartRequest()`, the
+  host's hook), stamps `RunSettings::$storeRequestSnapshot` on the new conversation.
+- Added: evaluation runs at account level. Every evaluation command on `AgentEvalConsoleCommand` takes `--accountId`
+  (`OPTION_EVAL_ACCOUNT_ID`, forwarded to child processes): a case without a space runs at account level for it, a
+  space without an owner runs for it (a space with an owner keeps its owner) —
+  `AgentEvalRunHooksService::resolveEvalScopeWithFallbackAccount()` (account read by `findAccountOfEvalScope()`),
+  `AgentEvalRunnerService::resolveEvalScopeWithFallbackAccount()`,
+  `resolveScopeWithFallbackAccountAndFindNotApplicableReasonForCase()`. The planning gives such a case the scope
+  `AgentEvalSuiteTask::$accountId` (scope id = the negated account id), `AgentEvalSuitePlanOptions::$fallbackAccountId`.
+  Without the option nothing changes: `resolveEvalScope()` (and a host's override of it) decides, and a case without a
+  space is skipped as before.
+- Added: `MCPToolExecutorService::recordAdminAudienceToolCallWithCallContext()` with the call's provenance
+  (`findConversationIdOfCallContext()`); its default calls `recordAdminAudienceToolCall()`, so a host override of that
+  one keeps working.
+- Changed: `noCache` is no longer in the agent's tool schemas (`MCPObjectProperty::MCP_HIDDEN_SHARED_PARAMETERS` =
+  `outputFormat`, `noCache`): no tool call reads it (the framework reads the HTTP request's own query parameter), so it
+  cost tokens on every tool and let a model flip it to repeat a read; a value a client still sends is ignored as
+  before. The tool schemas change once (a one-time prompt-cache miss after the deploy).
+- Changed: a validation failure inside a tool (a `BadRequestException` with `validationErrors`: an entity's `update()`,
+  a request that did not validate) answers the model with its violations after the message — `Violations:` and one
+  line `- <property path>: <message>` each, at most 10 (`MAX_VALIDATION_VIOLATIONS_IN_FAILURE_TEXT`), a message cut at
+  200 characters, `- … and <n> more`; the received value is never shown.
+- Changed: `findWidgets` is offered only while a skill the conversation can reach (or holds loaded) brings the data of a
+  catalog widget (`AIConversation::hasWidgetsBroughtByReachableSkills()`,
+  `ConversationWidgetCatalog::hasEntryProvidedByOneOfSkills()`); in a conversation without such a skill it answered
+  every search with "no match". A catalog that cannot be built keeps it offered.
+- Docs: the context skill (the client context, the tail order), the tools skill (the reading rule, the violations,
+  `noCache`, "do not narrow", the admin audit), the widgets skill (the `findWidgets` offer), the autonomy and entry
+  skills (shared spaces, the new hooks, the conversation's class attributes), the loop skill (the drive hook), the
+  observability skill (`--accountId`, the start's snapshot switch), the README.
+
+### Frontend (`@mgamadeus/ddd-agents`)
+
+- Added: `createAgentsHttpConversationClient({ clientContext })` (`/client`): read on every start, posted message and
+  injected signal and sent as the body field `clientContext`; `AgentsClientContext` and `AGENTS_CLIENT_CONTEXT_LIMITS`
+  (`/contract`), `mapClientContextToWire`, `WireClientContext`, `AgentsClientContextOperation`. A field over its cap or
+  with a control character is left out, never cut, so a send never fails on it.
+- Fixed: the two icon-only buttons at the composer carry accessible names through the package's texts — the send
+  button (`chat-input-send-button`): `Send message`; the round scroll-to-latest button beside it
+  (`chat-scroll-to-latest-button`, new test id): `Scroll to the latest message`. The text-key manifest lists both.
+- Docs: the README's adapter section — a binding over RTK Query with forced reads and no subscription must not set
+  `keepUnusedDataFor: 0` (the store aborts a read in flight when a second read of the same key arrives).
+
 ## 0.1.2
 
 - Requires `mgamadeus/ddd` ^3.36.2 (was ^3.34.3): the framework's Redis cache backends read a configuration without

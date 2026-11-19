@@ -6,6 +6,7 @@ namespace DDD\Presentation\Api\Agents\Conversations\Controller;
 
 use DDD\Domain\AI\Entities\AgentSpaces\AgentSpace;
 use DDD\Domain\AI\Entities\Conversations\AIConversationDriveScope;
+use DDD\Domain\AI\Entities\Conversations\Messages\RunSettings;
 use DDD\Domain\AI\Services\AgentSpaces\AgentSpacesService;
 use DDD\Domain\AI\Services\Conversations\AIConversationAgentService;
 use DDD\Domain\AI\Services\Conversations\AIConversationsService;
@@ -61,6 +62,12 @@ trait AgentConversationStartTrait
             $this->assertSignalSourceIsPostedByTheClient($requestDto->signalSource);
         }
         $runSettingsOverride = $this->buildRunSettingsOverride($requestDto); // honoured only in an admin session
+        // the debug capture of every model call of the new conversation, when the start asks for it and may
+        $runSettings = null;
+        if ($this->isRequestSnapshotStoredForStartRequest($requestDto)) {
+            $runSettings = RunSettings::newInstance();
+            $runSettings->storeRequestSnapshot = true;
+        }
         $responseDto = new AIConversationStartWithMessagePostResponseDto();
         if (($requestDto->entryPointKey ?? null) !== null) {
             $aIConversationEntryPointStart = $aiConversationAgentService->startOrReopenConversationAtEntryPoint(
@@ -72,7 +79,9 @@ trait AgentConversationStartTrait
                 $requestDto->signalText ?? null,
                 $requestDto->signalSource ?? null,
                 $runSettingsOverride,
-                $this->readOwnerDeviceFromRequest()
+                $this->readOwnerDeviceFromRequest(),
+                $requestDto->clientContext ?? null,
+                $runSettings
             );
             $responseDto->aiConversation = $aIConversationEntryPointStart->conversation;
             $responseDto->reopenedExistingConversation = $aIConversationEntryPointStart->reopenedExisting;
@@ -90,8 +99,10 @@ trait AgentConversationStartTrait
                 $requestDto->budgetBypass ?? null,
                 startSignalText: $requestDto->signalText ?? null,
                 startSignalSource: $requestDto->signalSource ?? null,
+                runSettings: $runSettings,
                 runSettingsOverride: $runSettingsOverride,
-                ownerDevice: $this->readOwnerDeviceFromRequest()
+                ownerDevice: $this->readOwnerDeviceFromRequest(),
+                clientContext: $requestDto->clientContext ?? null
             );
         }
         $this->hideParentConversationAndLoadedCapabilitiesOnEmbeddedMessages($responseDto->aiConversation);

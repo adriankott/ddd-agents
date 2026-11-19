@@ -102,6 +102,7 @@ class AgentEvalSelectionCommand extends AgentEvalConsoleCommand
         $this->evalArms = $this->resolveEvalArmOptions($input);
         $this->persistsConversations = !(bool)$input->getOption('transient') || (bool)$input->getOption('persist-conversations') || $this->evalArms !== [];
         $this->fallbackAgentSpaceId = $this->resolveFallbackAgentSpaceId($input);
+        $this->rememberFallbackAccountIdOfRun($input);
 
         $fixturePath = $this->resolveFixturePath($input);
         $agentEvalCases = $this->findCasesOfFixture($fixturePath);
@@ -161,15 +162,16 @@ class AgentEvalSelectionCommand extends AgentEvalConsoleCommand
         $prompt = $agentEvalCase->getPrompt();
         $expectedSkills = (string)($agentEvalCase->getExpectedSkillName() ?? '');
         $caseScopeValue = $this->findScopeValueNamedByCase($agentEvalCase);
-        if ($caseScopeValue === null && $this->fallbackAgentSpaceId === null) {
+        if ($caseScopeValue === null && $this->fallbackAgentSpaceId === null && $this->fallbackAccountIdOfRun === null) {
             $this->printCaseLine($output, sprintf('  [%d] <error>SKIP</error> %s — %s', $casePosition, $this->describeMissingScope(), $prompt));
             return null;
         }
         $agentEvalRunOptions = $this->buildRunOptionsOfCase();
         $agentEvalRunnerService = $this->getAgentEvalRunnerService();
-        $agentEvalNotApplicableReason = $agentEvalRunnerService->resolveScopeAndFindNotApplicableReasonForCase(
+        $agentEvalNotApplicableReason = $agentEvalRunnerService->resolveScopeWithFallbackAccountAndFindNotApplicableReasonForCase(
             AgentEvalCase::fromArray(['expect' => ['anyOfSkills' => array_map('trim', explode('|', $expectedSkills))]] + $agentEvalCase->toArray()),
             $this->fallbackAgentSpaceId,
+            $this->fallbackAccountIdOfRun,
             $agentEvalRunOptions
         );
         if ($agentEvalNotApplicableReason !== null) {
@@ -182,7 +184,7 @@ class AgentEvalSelectionCommand extends AgentEvalConsoleCommand
         try {
             // the prompt only: no follow-ups, purpose or channel
             $promptOnlyCase = AgentEvalCase::fromArray($this->buildScopeFieldsOfCase($agentEvalCase) + ['prompt' => $prompt]);
-            $agentEvalScope = $agentEvalRunnerService->resolveEvalScope($promptOnlyCase, $this->fallbackAgentSpaceId);
+            $agentEvalScope = $agentEvalRunnerService->resolveEvalScopeWithFallbackAccount($promptOnlyCase, $this->fallbackAgentSpaceId, $this->fallbackAccountIdOfRun);
             $conversation = $agentEvalRunnerService->run($agentEvalScope, $promptOnlyCase, $agentEvalRunOptions)->getConversation();
         } catch (Throwable $throwable) {
             $this->printCaseLine($output, sprintf('  [%d] <error>ERROR</error> %s', $casePosition, $throwable->getMessage()));

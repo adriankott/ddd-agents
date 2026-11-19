@@ -19,6 +19,7 @@ use DDD\Infrastructure\Exceptions\InternalErrorException;
  * | {@see self::forAgentSpace()} — the rows OF this space | conversation, schedule | `col = :id` | `col IS NULL`: the account-level rows — of EVERY account, so the statement carries its own condition on the account |
  * | {@see self::forAgentSpaceOrAccountWide()} — the rows that APPLY to this space | mandate | `(col = :id OR col IS NULL)`: bound to the space, or account-wide | `col IS NULL`: the account-wide rows only (the statement carries the account, as above) |
  * | {@see self::forAccountWithoutAgentSpace()} — the rows ONE account holds without a space | schedule | — | `(col IS NULL AND accountId = :accountId)` |
+ * | {@see self::forAgentSpaceOfAccount()} — the rows ONE account holds in this space (a space shared by several accounts) | conversation, schedule | `(col = :id AND accountId = :accountId)` | as {@see self::forAccountWithoutAgentSpace()} |
  *
  * In no mode does "no space" select the rows of all spaces of an account: a read across spaces carries no space
  * condition and says so in its name, so a caller that failed to load a space lands on the narrow side.
@@ -62,6 +63,39 @@ class AgentSpaceSqlCondition extends ValueObject
 
     /** @var string The name of the bound parameter of {@see self::$accountIdOfRowsWithoutAgentSpace} */
     public string $accountIdParameterName = self::ACCOUNT_ID_PARAMETER_NAME;
+
+    /** @var int|null The id of the account whose rows of the space match (the mode of {@see self::forAgentSpaceOfAccount()}); null in the other modes */
+    public ?int $accountIdOfRowsOfAgentSpace = null;
+
+    /**
+     * The rows `$account` holds in `$agentSpace` — for a space several accounts work in (a space without one owner),
+     * where the rows of the space alone would mix the accounts. Without a space the rows `$account` holds without one
+     * ({@see self::forAccountWithoutAgentSpace()}).
+     *
+     * @param AgentSpace|null $agentSpace
+     * @param Account $account
+     * @param string $parameterName
+     * @param string $accountIdParameterName
+     * @return static
+     * @throws InternalErrorException when the account is not stored
+     */
+    public static function forAgentSpaceOfAccount(
+        ?AgentSpace $agentSpace,
+        Account $account,
+        string $parameterName = self::COLUMN_NAME,
+        string $accountIdParameterName = self::ACCOUNT_ID_PARAMETER_NAME
+    ): static {
+        if ($agentSpace === null) {
+            return static::forAccountWithoutAgentSpace($account, $accountIdParameterName);
+        }
+        if (!isset($account->id)) {
+            throw new InternalErrorException('An account without an id cannot be used in a condition.');
+        }
+        $agentSpaceSqlCondition = static::forAgentSpaceId(static::idOf($agentSpace), $parameterName);
+        $agentSpaceSqlCondition->accountIdOfRowsOfAgentSpace = (int)$account->id;
+        $agentSpaceSqlCondition->accountIdParameterName = $accountIdParameterName;
+        return $agentSpaceSqlCondition;
+    }
 
     /**
      * The rows OF `$agentSpace`; without a space the account-level rows.
@@ -165,14 +199,17 @@ class AgentSpaceSqlCondition extends ValueObject
 
     /**
      * The values of the named parameters the condition uses, by parameter name: the id of the space when one is
-     * given, the id of the account in the mode of {@see self::forAccountWithoutAgentSpace()}, else none.
+     * given (with the id of the account in the mode of {@see self::forAgentSpaceOfAccount()}), the id of the account in
+     * the mode of {@see self::forAccountWithoutAgentSpace()}, else none.
      *
      * @return int[]
      */
     public function getParameters(): array
     {
         if ($this->agentSpaceId !== null) {
-            return [$this->parameterName => $this->agentSpaceId];
+            return $this->accountIdOfRowsOfAgentSpace !== null
+                ? [$this->parameterName => $this->agentSpaceId, $this->accountIdParameterName => $this->accountIdOfRowsOfAgentSpace]
+                : [$this->parameterName => $this->agentSpaceId];
         }
         if ($this->accountIdOfRowsWithoutAgentSpace !== null) {
             return [$this->accountIdParameterName => $this->accountIdOfRowsWithoutAgentSpace];
@@ -194,6 +231,9 @@ class AgentSpaceSqlCondition extends ValueObject
             return $columnReference . ' IS NULL';
         }
         $equalsSpace = $columnReference . ' = :' . $this->parameterName;
+        if ($this->accountIdOfRowsOfAgentSpace !== null) {
+            return '(' . $equalsSpace . ' AND ' . $accountColumnReference . ' = :' . $this->accountIdParameterName . ')';
+        }
         if (!$this->includesRowsWithoutSpace) {
             return $equalsSpace;
         }

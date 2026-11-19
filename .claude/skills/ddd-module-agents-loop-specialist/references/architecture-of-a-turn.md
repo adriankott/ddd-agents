@@ -48,7 +48,8 @@ own root customer dialog with the same key, no purpose, no initiator, not closed
 `driveConversation()` in order:
 
 1. `AIConversationDriveRequest::buildFor()` sanitises the owner text and the start signal; a customer drive with
-   neither is refused.
+   neither is refused. The client context of the drive (`AIConversationDriveRequest::$clientContext`) is refused over a
+   cap (HTTP 400) before anything is resolved (`AgentClientContextService::prepareClientContextForStorage()`).
 2. `AIConversationsService::findConversationToDrive()` decides the conversation, the space and the account. A new
    conversation is checked by `AgentSpacesService::requireAgentSpaceUsableByAccount()` (or
    `requireConversationStartWithoutAgentSpaceAllowed()` without a space). A customer continuing a closed conversation
@@ -60,7 +61,11 @@ own root customer dialog with the same key, no purpose, no initiator, not closed
 4. The budget bypass is decided (`AIConversationDriveRequest::decideBudgetBypass()`) and persisted on the conversation,
    so the worker honours it; a plain customer drive resets it to false.
 5. The start signal (if any) is written with `appendInboundSignal()`, then the owner's row with
-   `persistInboundRowIndexSafe()`, then `recordInboundMessageActivity()` stamps `lastInboundMessageAt`.
+   `persistInboundRowIndexSafe()` (carrying the client context; on a signal-only start the start signal carries it),
+   then `recordInboundMessageActivity()` stamps `lastInboundMessageAt`.
+5a. The host's hook `beforeTurnOfDriveIsDispatched($conversation, $driveRequest, $isNewConversation)` (a same-path
+   subclass of `AIConversationAgentService`; default nothing) writes the host's own data onto the conversation before
+   the turn is dispatched; a throw ends the drive before any turn runs.
 6. Async (always for CUSTOMER, for ADMIN when not IDLE or a delegation child): `resumeConversationIfReady($conversation,
    async: true)` dispatches `AIConversationResumeMessage` FIRST, then the realtime status `running` is published.
    Sync (ADMIN on an IDLE root): an envelope `ENVELOPE_AI_CONVERSATION_TURN` is opened and `generateAgentReply()` runs

@@ -463,6 +463,7 @@ and a judge model). Reports per case and overall, writes the run into the result
 | Option | Default | Meaning |
 |---|---|---|
 | `--agentSpaceId` and the application's space options | none | the space of the cases that name none |
+| `--accountId` | none | the account of the cases that name no space (and no `--agentSpaceId`): they run at account level for it instead of being skipped; also the account of a space without an owner |
 | `--fixture` | none | one fixture file; default every fixture of `AI.evalSuite.fixturePaths.tools` |
 | `--skill` | none | only the fixture whose `skill` matches |
 | `--case` | none | only this case id (runs in this process) |
@@ -527,6 +528,7 @@ against a baseline. LIVE.
 | `--json` | flag | the suite record as JSON at the end |
 | `--enforce-budget` | flag | keep the budget cap; without it every child gets `--ignore-budget` |
 | `--agentSpaceId` and the application's space options | none | the fallback space |
+| `--accountId` | none | cases without a space are planned at account level for it (scope id = the negated account id); forwarded to every child |
 | the arm options | none | [evaluation arm options](#evaluation-arm-options) |
 
 - **Writes:** a run folder `<date>_<time>-suite[-<label>]` in the results folder (see
@@ -975,6 +977,17 @@ declares none). `resolveAgentSpaceFromInput()` resolves them under the rights of
 The refusals are `InvalidOptionException`. The evaluation base calls the same pair `configureEvalScopeOptions()`;
 `resolveFallbackAgentSpaceId()` resolves the space of the cases that name none with the rights lifted, and
 `buildScopeArgumentsForChild()` hands the options to a child as given.
+
+`configureEvalScopeOptions()` also declares `--accountId` (`AgentEvalConsoleCommand::OPTION_EVAL_ACCOUNT_ID`, a
+positive whole number; `resolveFallbackAccountId()`, kept for the run by `rememberFallbackAccountIdOfRun()`): every
+evaluation command on the base runs a case without a space at account level for that account, and a case in a space
+without an owner for it (a space with an owner keeps its owner). The scope comes from
+`AgentEvalRunnerService::resolveEvalScopeWithFallbackAccount()` →
+`AgentEvalRunHooksService::resolveEvalScopeWithFallbackAccount()` (the account read by `findAccountOfEvalScope()`);
+without the option it is `resolveEvalScope()` unchanged, so a host's override of that method keeps deciding. The
+planning (`AgentEvalSuitePlanService::assignScopeOfCaseToTask()`) gives such a case the task scope
+`AgentEvalSuiteTask::$accountId` (`getScopeId()` = the negated account id, never a space's id), so a host without
+spaces plans its cases; without the option such a case is skipped as before.
 
 ### The budget grant
 

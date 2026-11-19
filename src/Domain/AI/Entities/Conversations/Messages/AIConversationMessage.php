@@ -907,8 +907,21 @@ class AIConversationMessage extends Entity
         'toolCall', 'loadedCapabilities', 'delegationResults', 'requestSnapshot', 'message', 'ownerDevice',
         'generationDurationInSeconds', 'aiModelName', 'inputTokens', 'outputTokens', 'webSearchCount', 'costInUSD',
         'cachedInputTokens', 'cacheWriteTokens', 'cacheDiscount', 'fixedOverheadTokens',
-        'role', 'truncatedAt', 'memoryIngestedAt', 'supervisorTurnMessageId', 'created', 'updated',
+        'role', 'truncatedAt', 'memoryIngestedAt', 'supervisorTurnMessageId', 'clientContext', 'created', 'updated',
     ];
+
+    /**
+     * The columns the context load selects ({@see CONTEXT_LOAD_COLUMNS} of the called class). The messages service
+     * asks the class the application uses for the message ({@see \DDD\Infrastructure\Services\DDDService::getContainerServiceClassNameForClass()}),
+     * so an application whose message class adds a column redeclares the constant on its class
+     * (`[...parent::CONTEXT_LOAD_COLUMNS, 'itsColumn']`) and the column rides every context load.
+     *
+     * @return string[]
+     */
+    public static function getContextLoadColumns(): array
+    {
+        return static::CONTEXT_LOAD_COLUMNS;
+    }
 
     /** OWNER_TEXT = an owner row's words and locus for a containment check — no heavy column. */
     public const array OWNER_TEXT_LOAD_COLUMNS = ['id', 'aiConversationId', 'indexInConversation', 'messageType', 'role', 'authorType', 'signalSource', 'message', 'ownerDevice', 'created'];
@@ -1157,6 +1170,16 @@ class AIConversationMessage extends Entity
      * `= null` default so a projected load + later partial write SKIPS it.
      */
     public ?OwnerDevice $ownerDevice;
+
+    /**
+     * @var AgentClientContext|null What the owner's client showed when the owner sent this row (route, route
+     * parameters, record, tab): written at append on an owner text row or a client-posted signal when the client
+     * sent one, NULL everywhere else. The model reads the newest owner input's context as one volatile tail entry
+     * (`[SIGNAL:client-context]`, {@see \DDD\Domain\AI\Services\Conversations\Agent\AgentClientContextService}),
+     * never as part of this row's wire content. Default JSON column; in {@see CONTEXT_LOAD_COLUMNS}. Declared with NO
+     * `= null` default so a projected load + later partial write SKIPS it.
+     */
+    public ?AgentClientContext $clientContext;
 
     /**
      * @var TaskPlan|null The task-plan TREE as of AFTER this message's plan mutation (for traceability)

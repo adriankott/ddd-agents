@@ -72,6 +72,7 @@ class AgentEvalTiersCommand extends AgentEvalConsoleCommand
         $vendor = $input->getOption('vendor');
         $vendor = is_string($vendor) && $vendor !== '' ? $vendor : null;
         $fallbackAgentSpaceId = $this->resolveFallbackAgentSpaceId($input);
+        $this->rememberFallbackAccountIdOfRun($input);
 
         $agentEvalCases = $this->findCasesOfFixtures($this->resolveFixturePaths($input->getOption('fixture')), $fallbackAgentSpaceId);
         if ($agentEvalCases->count() === 0) {
@@ -138,7 +139,7 @@ class AgentEvalTiersCommand extends AgentEvalConsoleCommand
             $agentEvalRunOptions->aiModelName = $agentEvalTiersResult->modelName;
             $agentEvalRunOptions->progressReporter = $this->getProgressReporter();
             $agentEvalRunnerService = $this->getAgentEvalRunnerService();
-            $conversation = $agentEvalRunnerService->runCase($agentEvalRunnerService->resolveEvalScope($runCase, $fallbackAgentSpaceId), $runCase, $agentEvalRunOptions)->getConversation();
+            $conversation = $agentEvalRunnerService->runCase($agentEvalRunnerService->resolveEvalScopeWithFallbackAccount($runCase, $fallbackAgentSpaceId, $this->fallbackAccountIdOfRun), $runCase, $agentEvalRunOptions)->getConversation();
             $durationMs = AgentEvalCaseRunMeasurement::measureDurationMsSince($startedAtMicrotime);
             // the conversation with its delegated conversations
             $messagesOfTree = $conversation->getAllMessagesIncludingDelegations();
@@ -211,7 +212,7 @@ class AgentEvalTiersCommand extends AgentEvalConsoleCommand
                     continue;
                 }
                 $agentEvalCase = AgentEvalCase::fromArray($caseFields);
-                if ($this->findScopeValueNamedByCase($agentEvalCase) === null && $fallbackAgentSpaceId === null) {
+                if ($this->findScopeValueNamedByCase($agentEvalCase) === null && $fallbackAgentSpaceId === null && $this->fallbackAccountIdOfRun === null) {
                     continue;
                 }
                 $agentEvalCases->add($agentEvalCase);

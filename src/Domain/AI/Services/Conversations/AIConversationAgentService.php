@@ -69,6 +69,8 @@ use DDD\Domain\AI\Entities\Conversations\Agent\Tools\DelegateTool;
 use DDD\Domain\AI\Entities\Conversations\Agent\Tools\LoadSkillsTool;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
 use DDD\Domain\AI\Entities\Conversations\Messages\OwnerDevice;
+use DDD\Domain\AI\Entities\Conversations\Messages\AgentClientContext;
+use DDD\Domain\AI\Services\Conversations\Agent\AgentClientContextService;
 use DDD\Domain\AI\Entities\Conversations\Purposes\AgentPurposedConversationStart;
 use DDD\Domain\AI\Entities\Conversations\Purposes\AIConversationPurpose;
 use DDD\Domain\AI\Services\Mandates\AgentMandatesService;
@@ -1096,7 +1098,9 @@ class AIConversationAgentService extends Service implements AgentModelCallRunner
         ?string $startSignalText = null,
         ?string $startSignalSource = null,
         ?RunSettingsOverride $runSettingsOverride = null,
-        ?OwnerDevice $ownerDevice = null
+        ?OwnerDevice $ownerDevice = null,
+        ?AgentClientContext $clientContext = null,
+        ?RunSettings $runSettings = null
     ): AIConversationEntryPointStart {
         $entryPointKey = trim($entryPointKey);
         if ($entryPointKey === '' || mb_strlen($entryPointKey) > 255 || preg_match(AIConversation::ENTRY_POINT_KEY_PATTERN, $entryPointKey) !== 1) {
@@ -1124,9 +1128,11 @@ class AIConversationAgentService extends Service implements AgentModelCallRunner
                 $budgetBypass,
                 startSignalText: $startSignalText,
                 startSignalSource: $startSignalSource,
+                runSettings: $runSettings,
                 runSettingsOverride: $runSettingsOverride,
                 ownerDevice: $ownerDevice,
-                entryPointKey: $entryPointKey
+                entryPointKey: $entryPointKey,
+                clientContext: $clientContext
             ));
         } finally {
             $aIConversationsService->unlockEntryPointStart($aIConversationEntryPointStartLock);
@@ -1179,6 +1185,9 @@ class AIConversationAgentService extends Service implements AgentModelCallRunner
      *                                    ({@see AIConversation::$entryPointKey}), stamped at creation; ignored when
      *                                    continuing. The reopen of a recent one is
      *                                    {@see startOrReopenConversationAtEntryPoint()}
+     * @param AgentClientContext|null $clientContext what the owner's client shows (route, record, tab): refused over a
+     *                                               cap (HTTP 400) before anything is stored, then stored on the
+     *                                               owner's row ({@see AgentClientContextService})
      * @return AIConversation the driven conversation (messages expanded)
      * @throws BadRequestException when the account the drive runs as cannot be resolved, or a start without a space
      *                             is not allowed
@@ -1207,7 +1216,8 @@ class AIConversationAgentService extends Service implements AgentModelCallRunner
         ?RunSettingsOverride $runSettingsOverride = null,
         ?OwnerDevice $ownerDevice = null,
         bool $messageWrittenByPlatform = false,
-        ?string $entryPointKey = null
+        ?string $entryPointKey = null,
+        ?AgentClientContext $clientContext = null
     ): AIConversation {
         /** @var AIConversationMessagesService $aIConversationMessagesService */
         $aIConversationMessagesService = DDDService::instance()->getService(AIConversationMessagesService::class);
@@ -1227,6 +1237,10 @@ class AIConversationAgentService extends Service implements AgentModelCallRunner
         $aIConversationTurnEventsService = DDDService::instance()->getService(AIConversationTurnEventsService::class);
         $driveRequest = AIConversationDriveRequest::buildFor($scope, $message, $startSignalText);
         $driveRequest->assertTheCustomerSentSomethingToDrive();
+        // the client context is refused over a cap before anything is resolved or stored (HTTP 400, never cut)
+        /** @var AgentClientContextService $agentClientContextService */
+        $agentClientContextService = DDDService::instance()->getService(AgentClientContextService::class);
+        $driveRequest->clientContext = $agentClientContextService->prepareClientContextForStorage($clientContext);
         $driveTarget = $aIConversationsService->findConversationToDrive($driveRequest->isAdmin, $aiConversationId, $agentSpace, $runAsAccount, $purposeName, $entryPointKey);
         $existingConversation = $driveTarget->existingConversation;
         $account = $driveTarget->account;
@@ -1500,7 +1514,9 @@ class AIConversationAgentService extends Service implements AgentModelCallRunner
                     (string)$driveRequest->sanitizedStartSignalText,
                     $startSignalSource ?? AIConversationMessage::SIGNAL_SOURCE_DASHBOARD_WIDGET_CONTEXT,
                     loadedCapabilities: $kickoffPurpose instanceof AIConversationPurpose ? $aIConversationPurposeRunsService->buildPurposeKickoffCapabilities($conversation, $kickoffPurpose) : null,
-                    isStartSignal: true
+                    isStartSignal: true,
+                    // a signal-only start: the start signal is the owner's input, so it carries the client context
+                    clientContext: $driveRequest->hasOwnerText() ? null : $driveRequest->clientContext
                 );
             }
 
@@ -1519,6 +1535,8 @@ class AIConversationAgentService extends Service implements AgentModelCallRunner
                 // the platform at append (the request's header / user agent, or the platform's own channel), never
                 // by the model; the wire renders it inside the message's time bracket.
                 $userMessage->ownerDevice = $ownerDevice;
+                // what the owner's client showed — read by the model as the `[SIGNAL:client-context]` tail entry
+                $userMessage->clientContext = $driveRequest->clientContext;
                 if (isset($conversation->id)) {
                     // update(0) — the user message IS the target; own columns (incl. aiConversationId,
                     // delegatedConversationId) are written at depth 0. Never re-upsert the loaded conversation tree.
@@ -1577,6 +1595,8 @@ class AIConversationAgentService extends Service implements AgentModelCallRunner
             // continued child IDLE — the exact state every activity read counts as "executable".
             // the audited support override (admin run setting) applies to the SYNC drive below; the async
             // path activates it inside the turn worker from the persisted run settings.
+            // the application's data on the conversation, between its creation (or load) and the turn's dispatch
+            $this->beforeTurnOfDriveIsDispatched($conversation, $driveRequest, !$existingConversation instanceof AIConversation);
             $priorSupportOverrideNote = $this->activateEligibilitySupportOverrideIfSet($conversation);
             $driveAsync = !$driveRequest->isAdmin || $async || $conversation->runState !== AIConversationRunState::IDLE || $conversation->isDelegation();
 
@@ -1634,6 +1654,21 @@ class AIConversationAgentService extends Service implements AgentModelCallRunner
      * @param AIConversationTurnEventsService $aIConversationTurnEventsService The turn-event recorder of the drive
      * @return AIConversation
      */
+    /**
+     * Override point: called by {@see driveConversation()} once the conversation is created (or loaded) and the drive's
+     * rows are appended, right before the turn is dispatched to the worker or run synchronously — the place for an
+     * application's own data on the conversation (a column it stores from the request, e.g. from the client context
+     * of the drive, `$driveRequest->clientContext`). The account the drive runs as is authenticated; the rights are
+     * the drive's. A throw ends the drive before any turn runs. Base: nothing.
+     *
+     * @param AIConversation $conversation the conversation the turn runs in
+     * @param AIConversationDriveRequest $driveRequest what the drive was asked for (scope, texts, client context)
+     * @param bool $isNewConversation whether this drive created the conversation
+     */
+    protected function beforeTurnOfDriveIsDispatched(AIConversation $conversation, AIConversationDriveRequest $driveRequest, bool $isNewConversation): void
+    {
+    }
+
     protected function generateSynchronousReplyInsideEnvelope(
         AIConversation $conversation,
         ?string $aiModelName,

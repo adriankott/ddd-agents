@@ -40,6 +40,7 @@ use DDD\Domain\AI\Entities\Conversations\Messages\Maintenance\AIConversationLoad
 use DDD\Domain\AI\Entities\Conversations\Messages\Maintenance\AIConversationRequestSnapshotDebugPayloadRemovalReport;
 use DDD\Domain\AI\Entities\Conversations\Messages\ToolCallStoredOutcome;
 use DDD\Domain\AI\Entities\Conversations\Messages\OwnerDevice;
+use DDD\Domain\AI\Entities\Conversations\Messages\AgentClientContext;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessages;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessageIndexLock;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessageWritePublication;
@@ -1493,7 +1494,7 @@ class AIConversationMessagesService extends EntitiesService
             // this bound (100×50 = 5000 rows ≫ any token-bounded tail).
             ->setMaxResults(self::CONTEXT_MESSAGE_WINDOW * self::MAX_CONTEXT_WINDOWS);
         // hydrate the CONTEXT column profile (the heavy columns a path does not read are not hydrated), cache-bypassed.
-        return $this->hydrateLoadedCapabilitiesChain($aiConversation, $this->findMessagesWithColumnProfile($queryBuilder, AIConversationMessage::CONTEXT_LOAD_COLUMNS));
+        return $this->hydrateLoadedCapabilitiesChain($aiConversation, $this->findMessagesWithColumnProfile($queryBuilder, $this->getContextLoadColumns()));
     }
 
     /**
@@ -1649,6 +1650,20 @@ class AIConversationMessagesService extends EntitiesService
      *
      * @param string[] $loadColumns
      */
+    /**
+     * The columns of the context load: {@see AIConversationMessage::getContextLoadColumns()} of the message class the
+     * application uses (its class of the same path, else the module's), so a column the application's message class
+     * adds and lists rides every context load.
+     *
+     * @return string[]
+     */
+    public function getContextLoadColumns(): array
+    {
+        /** @var class-string<AIConversationMessage> $messageClassName */
+        $messageClassName = DDDService::instance()->getContainerServiceClassNameForClass(AIConversationMessage::class) ?? AIConversationMessage::class;
+        return $messageClassName::getContextLoadColumns();
+    }
+
     protected function findMessagesWithColumnProfile(DoctrineQueryBuilder $queryBuilder, array $loadColumns): ?AIConversationMessages
     {
         AIConversationMessages::setDefaultQueryOptionsSnapshot();
@@ -1806,7 +1821,7 @@ class AIConversationMessagesService extends EntitiesService
             ->setParameter('turnInitiatorIndex', $turnInitiatorIndex)
             ->orderBy("$baseModelAlias.indexInConversation", 'ASC')
             ->setMaxResults($limit);
-        $turnMessages = $this->rebuildChronologicalMessageSet($this->findMessagesWithColumnProfile($queryBuilder, AIConversationMessage::CONTEXT_LOAD_COLUMNS)?->getElements() ?? []);
+        $turnMessages = $this->rebuildChronologicalMessageSet($this->findMessagesWithColumnProfile($queryBuilder, $this->getContextLoadColumns())?->getElements() ?? []);
         $this->bindLoadedMessagesToConversation($conversation, $turnMessages);
         return $turnMessages;
     }
@@ -1914,7 +1929,7 @@ class AIConversationMessagesService extends EntitiesService
             ->setParameter('toolNames', array_values($toolNames))
             ->orderBy("$baseModelAlias.indexInConversation", 'DESC')
             ->setMaxResults($limit);
-        $newestFirstToolCallMessages = $this->findMessagesWithColumnProfile($queryBuilder, AIConversationMessage::CONTEXT_LOAD_COLUMNS);
+        $newestFirstToolCallMessages = $this->findMessagesWithColumnProfile($queryBuilder, $this->getContextLoadColumns());
         return $this->rebuildChronologicalMessageSet(array_reverse($newestFirstToolCallMessages?->getElements() ?? []));
     }
 
@@ -2014,7 +2029,7 @@ class AIConversationMessagesService extends EntitiesService
             ->setParameter('newestInitiatorIndex', $this->findNewestTurnInitiatorIndex($conversation) ?? -1)
             ->orderBy("$baseModelAlias.indexInConversation", 'DESC')
             ->setMaxResults($limit);
-        $newestFirstReports = $this->findMessagesWithColumnProfile($queryBuilder, AIConversationMessage::CONTEXT_LOAD_COLUMNS);
+        $newestFirstReports = $this->findMessagesWithColumnProfile($queryBuilder, $this->getContextLoadColumns());
         return $this->rebuildChronologicalMessageSet(array_reverse($newestFirstReports?->getElements() ?? []));
     }
 
@@ -2035,7 +2050,7 @@ class AIConversationMessagesService extends EntitiesService
                 ->setParameter('beforeIndex', $beforeIndex);
         }
         // hydrate the CONTEXT column profile (the heavy columns a path does not read are not hydrated), cache-bypassed.
-        return $this->findMessagesWithColumnProfile($queryBuilder, AIConversationMessage::CONTEXT_LOAD_COLUMNS);
+        return $this->findMessagesWithColumnProfile($queryBuilder, $this->getContextLoadColumns());
     }
 
     /**
@@ -3560,7 +3575,8 @@ class AIConversationMessagesService extends EntitiesService
      * owner-authored signal only when the text is the same (a doubled click): two different clicks are two answers and land
      * as two rows. A conversation's START signal (`$isStartSignal`: the drive's invisible start
      * context, the phone kickoff) is always written index-safe and carries no device. `$loadedCapabilities`: the purpose's
-     * kickoff capabilities the row carries. The caller passes the text already sanitized and capped. Returns the appended
+     * kickoff capabilities the row carries. `$clientContext`: what the owner's client showed, stored on the row (the
+     * caller checked its caps). The caller passes the text already sanitized and capped. Returns the appended
      * SIGNAL message (after a merge it carries the waiting row's id and index).
      *
      * @throws MessageIndexLockUnavailableException
@@ -3572,7 +3588,8 @@ class AIConversationMessagesService extends EntitiesService
         string $signalSource,
         ?OwnerDevice $ownerDevice = null,
         ?LoadedCapabilities $loadedCapabilities = null,
-        bool $isStartSignal = false
+        bool $isStartSignal = false,
+        ?AgentClientContext $clientContext = null
     ): AIConversationMessage {
         $signalMessage = AIConversationMessage::newInstance();
         $conversation->appendMessage(
@@ -3591,6 +3608,10 @@ class AIConversationMessagesService extends EntitiesService
         }
         if ($loadedCapabilities !== null) {
             $signalMessage->loadedCapabilities = $loadedCapabilities;
+        }
+        // what the owner's client showed with this signal (the caller checked its caps)
+        if ($clientContext !== null) {
+            $signalMessage->clientContext = $clientContext;
         }
         if (!isset($conversation->id)) {
             return $signalMessage;

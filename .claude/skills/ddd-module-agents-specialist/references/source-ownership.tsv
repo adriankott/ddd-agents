@@ -136,6 +136,8 @@ src/Domain/AI/Entities/Conversations/Messages/PersistedLoadedCapabilitiesState.p
 src/Domain/AI/Entities/Conversations/Messages/ContextRetentionSettings.php	context
 src/Domain/AI/Entities/Conversations/Messages/ContextRetentionSettingsOverride.php	context
 src/Domain/AI/Entities/Conversations/Messages/OwnerDevice*	context
+src/Domain/AI/Entities/Conversations/Messages/AgentClientContext*	context
+src/Domain/AI/Services/Conversations/Agent/AgentClientContextService.php	context
 src/Domain/AI/Entities/Conversations/Messages/ToolResultRetention.php	context
 src/Domain/AI/Entities/Conversations/Messages/AIConversationMessageWindow.php	context
 src/Domain/AI/Entities/Conversations/Messages/Maintenance/AIConversationLoadedCapabilitiesRewrite*	context

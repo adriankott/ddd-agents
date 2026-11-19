@@ -136,7 +136,11 @@ every class with a `SUMMARY`, with the skills that bring its data — the skill 
 (`AISkill::$providesWidgetTypes`) and every skill whose MCP packages name the widget in their code. A match of at least
 `ConversationWidgetCatalog::MIN_SCORE_TO_LOAD_A_SKILL` loads that skill in the same call; a weaker one is listed.
 `findWidgets` is offered on screen surfaces only (a root conversation in the chat or an in-app call), never on the phone
-line or in a sub-agent. Widgets with `IS_WRITABLE_WITHOUT_A_SKILL` and the kit are taught by the generated kit section
+line or in a sub-agent, and only while a skill the conversation can reach (its reachable catalog, or a loaded skill)
+brings the data of a catalog widget (`AIConversation::hasWidgetsBroughtByReachableSkills()`,
+`ConversationWidgetCatalog::hasEntryProvidedByOneOfSkills()`); the widgets written without a skill or by a meta tool do
+not count. The reachable set is the same for a whole epoch, so the tool does not come and go with a skill load; a
+catalog that cannot be built keeps it offered. Widgets with `IS_WRITABLE_WITHOUT_A_SKILL` and the kit are taught by the generated kit section
 instead (see the composed-view nodes reference). How a skill file declares `providesWidgetTypes` is
 `ddd-module-agents-skills-and-purposes-specialist`.
 

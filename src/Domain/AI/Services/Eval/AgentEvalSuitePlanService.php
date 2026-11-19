@@ -373,7 +373,8 @@ class AgentEvalSuitePlanService extends Service
     /**
      * Sets the scope of `$agentEvalSuiteTask` from the case and returns whether it has one (a case without a scope is
      * not planned). The module's scope is the agent space: the case's `agentSpaceId`, else — when `$withFallback` — the
-     * options' fallback agent space.
+     * options' fallback agent space, else — when `$withFallback` and the run names an account — the account level of
+     * that account ({@see AgentEvalSuitePlanOptions::$fallbackAccountId}, {@see AgentEvalSuiteTask::$accountId}).
      *
      * An application whose fixtures name the scope by a key of its own overrides this method and sets that value on its
      * subclass of the task ({@see AgentEvalSuiteTask::getScopeId()}).
@@ -392,7 +393,9 @@ class AgentEvalSuitePlanService extends Service
     ): bool {
         $agentSpaceId = $agentEvalCase->getAgentSpaceId() ?? ($withFallback ? $agentEvalSuitePlanOptions->fallbackAgentSpaceId : null);
         $agentEvalSuiteTask->agentSpaceId = $agentSpaceId;
-        return $agentSpaceId !== null;
+        // no space at all: a run that names an account plans the case at account level for it
+        $agentEvalSuiteTask->accountId = $agentSpaceId === null && $withFallback ? $agentEvalSuitePlanOptions->fallbackAccountId : null;
+        return $agentSpaceId !== null || $agentEvalSuiteTask->accountId !== null;
     }
 
     /**

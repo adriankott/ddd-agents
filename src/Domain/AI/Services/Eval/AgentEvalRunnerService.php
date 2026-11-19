@@ -111,6 +111,24 @@ class AgentEvalRunnerService extends Service
     }
 
     /**
+     * The scope of a run of `$agentEvalCase` that may name an account (`--accountId`): without one
+     * {@see resolveEvalScope()}; with one the hooks' {@see AgentEvalRunHooksService::resolveEvalScopeWithFallbackAccount()}
+     * (a run at account level, or in a space without an owner).
+     *
+     * @param AgentEvalCase $agentEvalCase
+     * @param int|null $fallbackAgentSpaceId the agent space the caller names for cases that name none
+     * @param int|null $fallbackAccountId the account the caller names
+     * @return AgentEvalScope
+     */
+    public function resolveEvalScopeWithFallbackAccount(AgentEvalCase $agentEvalCase, ?int $fallbackAgentSpaceId, ?int $fallbackAccountId): AgentEvalScope
+    {
+        if ($fallbackAccountId === null) {
+            return $this->resolveEvalScope($agentEvalCase, $fallbackAgentSpaceId);
+        }
+        return $this->getAgentEvalRunHooksService()->resolveEvalScopeWithFallbackAccount($agentEvalCase, $fallbackAgentSpaceId, $fallbackAccountId);
+    }
+
+    /**
      * Authenticates the account that owns the scope: every read and model call of the run runs in its name.
      *
      * @param AgentEvalScope $agentEvalScope
@@ -1570,6 +1588,30 @@ class AgentEvalRunnerService extends Service
     {
         try {
             $agentEvalScope = $this->resolveEvalScope($agentEvalCase, $fallbackAgentSpaceId);
+        } catch (Throwable $scopeResolutionError) {
+            $this->reportFailedApplicabilityCheck($scopeResolutionError, $agentEvalRunOptions);
+            return null;
+        }
+        return $this->findNotApplicableReasonForCase($agentEvalScope, $agentEvalCase, $agentEvalRunOptions);
+    }
+
+    /**
+     * {@see resolveScopeAndFindNotApplicableReasonForCase()} for a run that may name an account (`--accountId`): the
+     * scope is {@see resolveEvalScopeWithFallbackAccount()}'s. Without an account it is the method above, unchanged.
+     *
+     * @param AgentEvalCase $agentEvalCase
+     * @param int|null $fallbackAgentSpaceId
+     * @param int|null $fallbackAccountId the account of a run at account level or in a space without an owner
+     * @param AgentEvalRunOptions $agentEvalRunOptions
+     * @return AgentEvalNotApplicableReason|null
+     */
+    public function resolveScopeWithFallbackAccountAndFindNotApplicableReasonForCase(AgentEvalCase $agentEvalCase, ?int $fallbackAgentSpaceId, ?int $fallbackAccountId, AgentEvalRunOptions $agentEvalRunOptions): ?AgentEvalNotApplicableReason
+    {
+        if ($fallbackAccountId === null) {
+            return $this->resolveScopeAndFindNotApplicableReasonForCase($agentEvalCase, $fallbackAgentSpaceId, $agentEvalRunOptions);
+        }
+        try {
+            $agentEvalScope = $this->resolveEvalScopeWithFallbackAccount($agentEvalCase, $fallbackAgentSpaceId, $fallbackAccountId);
         } catch (Throwable $scopeResolutionError) {
             $this->reportFailedApplicabilityCheck($scopeResolutionError, $agentEvalRunOptions);
             return null;

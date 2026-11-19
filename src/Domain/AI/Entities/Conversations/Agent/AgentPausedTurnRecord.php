@@ -296,8 +296,8 @@ class AgentPausedTurnRecord extends ValueObject
     }
 
     /**
-     * The arguments without the presentation keys and without the arguments the conversation's space fills
-     * ({@see AgentSpacesService::getDescriptionPrefixesOfToolArgumentsFilledFromAgentSpace()} names them), as one
+     * The arguments without the presentation keys and without the arguments that name the target of the call
+     * ({@see AgentSpacesService::getToolArgumentNamesLeftOutOfTheReadDedupLine()} names them), as one
      * short sorted line (the dedup key of a read).
      *
      * @param array<string, mixed> $arguments
@@ -308,7 +308,7 @@ class AgentPausedTurnRecord extends ValueObject
         unset($arguments['noCache'], $arguments['outputFormat']);
         /** @var AgentSpacesService $agentSpacesService */
         $agentSpacesService = DDDService::instance()->getService(AgentSpacesService::class);
-        foreach (array_keys($agentSpacesService->getDescriptionPrefixesOfToolArgumentsFilledFromAgentSpace()) as $argumentNameFilledFromAgentSpace) {
+        foreach ($agentSpacesService->getToolArgumentNamesLeftOutOfTheReadDedupLine() as $argumentNameFilledFromAgentSpace) {
             unset($arguments[$argumentNameFilledFromAgentSpace]);
         }
         if ($arguments === []) {

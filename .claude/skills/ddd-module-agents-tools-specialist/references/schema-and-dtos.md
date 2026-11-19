@@ -108,11 +108,13 @@ itself; on the HTTP path no zone is set.
   (`ToolDefinitions::$usesQueryOptions`), in the HTTP `initialize` instructions (`QueryOptionsSyntax`). Never write
   the grammar into a property description.
 - `expand` lists relation names only on the MCP side.
-- Properties marked `SharedRequestParameter` (`noCache` on every request DTO, the paging parameters) STAY on every
-  tool's schema with their name and type; only their explanation is shared — the per-tool property carries no
-  description, and `SharedRequestParametersSyntax` explains them once (agent system context, HTTP `initialize`).
-  `outputFormat` is the exception: it is left out of the MCP schema entirely, so the model cannot switch a tool to the
-  structured shape. Do not mark a property of a host DTO `SharedRequestParameter`: the schema drops its description,
+- Properties marked `SharedRequestParameter` (the paging parameters) STAY on every tool's schema with their name and
+  type; only their explanation is shared — the per-tool property carries no description, and
+  `SharedRequestParametersSyntax` explains them once (agent system context, HTTP `initialize`).
+  `MCPObjectProperty::MCP_HIDDEN_SHARED_PARAMETERS` are the exceptions, left out of the MCP schema entirely:
+  `outputFormat` (the model cannot switch a tool to the structured shape) and `noCache` (no tool call reads it — the
+  framework reads the HTTP request's own query parameter —, so it only cost tokens on every tool and let a model flip
+  it to repeat a read). A value a client still sends is hydrated and ignored. Do not mark a property of a host DTO `SharedRequestParameter`: the schema drops its description,
   but the shared block lists only the marked properties of `RequestDto` and `DtoQueryOptionsTrait`
   (`SharedRequestParametersSyntax`), so the model would see the parameter with no explanation at all. A parameter
   that is genuinely universal belongs on the framework's `RequestDto` — a change of `mgamadeus/ddd`.

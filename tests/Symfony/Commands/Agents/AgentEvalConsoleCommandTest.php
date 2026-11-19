@@ -70,6 +70,20 @@ class AgentEvalConsoleCommandTest extends IntegrationTestCase
         self::assertSame([], array_slice($probeCommand->childArguments, 5));
     }
 
+    public function testTheAccountOptionNamesTheAccountOfARunWithoutASpaceAndReachesAChild(): void
+    {
+        $probeCommand = $this->buildProbeCommand();
+        $this->runProbeCommand($probeCommand, ['--' . AgentEvalConsoleCommand::OPTION_EVAL_ACCOUNT_ID => '40']);
+
+        self::assertSame(40, $probeCommand->fallbackAccountId);
+        self::assertNull($probeCommand->fallbackAgentSpaceId);
+        self::assertSame(['--accountId=40'], array_slice($probeCommand->childArguments, 5));
+
+        $probeCommand = $this->buildProbeCommand();
+        $this->runProbeCommand($probeCommand, []);
+        self::assertNull($probeCommand->fallbackAccountId);
+    }
+
     public function testProgressGoesToTheErrorOutputAndTheStandardOutputStaysPure(): void
     {
         $consoleOutput = new ConsoleOutput(OutputInterface::VERBOSITY_NORMAL, false);

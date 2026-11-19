@@ -259,7 +259,7 @@ class AgentEvalGuardCommand extends AgentEvalConsoleCommand
     protected function resolveScopeOfRun(InputInterface $input): AgentEvalScope
     {
         $agentEvalRunnerService = $this->getAgentEvalRunnerService();
-        $agentEvalScope = $agentEvalRunnerService->resolveEvalScope(AgentEvalCase::fromArray([]), $this->resolveFallbackAgentSpaceId($input));
+        $agentEvalScope = $agentEvalRunnerService->resolveEvalScopeWithFallbackAccount(AgentEvalCase::fromArray([]), $this->resolveFallbackAgentSpaceId($input), $this->resolveFallbackAccountId($input));
         $agentEvalRunnerService->authenticateOwnerOfScope($agentEvalScope);
         return $agentEvalScope;
     }

@@ -69,6 +69,7 @@ trait AgentConversationReadsTrait
         AIConversationsService $aiConversationsService
     ): AIConversationsGetResponseDto {
         $this->authorizeConversationAccess();
+        $requestDto = $this->resolveRequestDtoOfRoutedMethod(__FUNCTION__, $requestDto);
         return $this->buildAllConversationsListResponse($requestDto, $aiConversationsService);
     }
 
@@ -116,6 +117,7 @@ trait AgentConversationReadsTrait
         AIConversationMessagesService $aiConversationMessagesService
     ): AIConversationMessagesGetResponseDto {
         $this->authorizeConversationAccess();
+        $requestDto = $this->resolveRequestDtoOfRoutedMethod(__FUNCTION__, $requestDto);
         return $this->buildConversationMessagesPageResponse($requestDto, $aiConversationsService, $aiConversationMessagesService);
     }
 
@@ -201,6 +203,7 @@ trait AgentConversationReadsTrait
         AgentActivityLinesService $agentActivityLinesService
     ): AIConversationActivityGetResponseDto {
         $this->authorizeConversationAccess();
+        $requestDto = $this->resolveRequestDtoOfRoutedMethod(__FUNCTION__, $requestDto);
         $aIUsageEnvelopeContext = $this->openConversationEnvelopeIfNoneIsOpen(AgentAIUsageScope::ENVELOPE_AI_CONVERSATION_ACTIVITY);
         try {
             return $this->buildConversationActivityResponse($requestDto, $aiConversationsService, $aiConversationMessagesService, $agentActivityLinesService);
@@ -258,6 +261,7 @@ trait AgentConversationReadsTrait
         SemanticSearchService $semanticSearchService
     ): AIConversationMessageSearchGetResponseDto {
         $this->authorizeConversationAccess();
+        $requestDto = $this->resolveRequestDtoOfRoutedMethod(__FUNCTION__, $requestDto);
         $aIUsageEnvelopeContext = $this->openConversationEnvelopeIfNoneIsOpen(self::AGENT_CONVERSATION_SEARCH_ENVELOPE_SCOPE);
         try {
             return $this->buildConversationMessageSearchResponse($requestDto, $aiConversationsService, $semanticSearchService);
@@ -306,6 +310,7 @@ trait AgentConversationReadsTrait
         AIConversationMessagesService $aiConversationMessagesService
     ): AIConversationMessageContextGetResponseDto {
         $this->authorizeConversationAccess();
+        $requestDto = $this->resolveRequestDtoOfRoutedMethod(__FUNCTION__, $requestDto);
         return $this->buildConversationMessageContextResponse($requestDto, $aiConversationMessagesService);
     }
 
@@ -346,6 +351,7 @@ trait AgentConversationReadsTrait
         SemanticSearchService $semanticSearchService
     ): AIConversationSearchGetResponseDto {
         $this->authorizeConversationAccess();
+        $requestDto = $this->resolveRequestDtoOfRoutedMethod(__FUNCTION__, $requestDto);
         $aIUsageEnvelopeContext = $this->openConversationEnvelopeIfNoneIsOpen(self::AGENT_CONVERSATION_SEARCH_ENVELOPE_SCOPE);
         try {
             return $this->buildConversationsSearchResponse($requestDto, $semanticSearchService);
@@ -400,6 +406,7 @@ trait AgentConversationReadsTrait
         AgentReasoningEffortDecisionsService $agentReasoningEffortDecisionsService
     ): AIConversationGetResponseDto {
         $this->authorizeConversationAccess();
+        $requestDto = $this->resolveRequestDtoOfRoutedMethod(__FUNCTION__, $requestDto);
         return $this->buildConversationResponse($requestDto, $aiConversationsService, $agentReasoningEffortDecisionsService);
     }
 
@@ -461,6 +468,7 @@ trait AgentConversationReadsTrait
         AIConversationMessagesService $aiConversationMessagesService
     ): AIConversationRunStateGetResponseDto {
         $this->authorizeConversationAccess();
+        $requestDto = $this->resolveRequestDtoOfRoutedMethod(__FUNCTION__, $requestDto);
         return $this->buildConversationRunStateResponse($requestDto, $aiConversationsService, $aiConversationMessagesService);
     }
 

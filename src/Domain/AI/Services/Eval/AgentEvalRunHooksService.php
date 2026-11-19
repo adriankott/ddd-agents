@@ -21,6 +21,7 @@ use DDD\Domain\AI\Interfaces\AIConversationProgressReporterInterface;
 use DDD\Domain\AI\Services\AgentSpaces\AgentSpacesService;
 use DDD\Domain\Base\Entities\Entity;
 use DDD\Domain\Common\Entities\Accounts\Account;
+use DDD\Domain\Common\Services\AccountsService;
 use DDD\Infrastructure\Base\DateTime\DateTime;
 use DDD\Infrastructure\Services\DDDService;
 use DDD\Infrastructure\Services\Service;
@@ -62,7 +63,8 @@ class AgentEvalRunHooksService extends Service
      * @param int|null $fallbackAgentSpaceId the agent space the caller names for cases that name none
      * @return AgentEvalScope
      * @throws RuntimeException when the case and the caller name no agent space, the space is not stored, or its owner
-     *                          is not known
+     *                          is not known — a run that names an account goes through
+     *                          {@see resolveEvalScopeWithFallbackAccount()} instead
      */
     public function resolveEvalScope(AgentEvalCase $agentEvalCase, ?int $fallbackAgentSpaceId = null): AgentEvalScope
     {
@@ -85,6 +87,59 @@ class AgentEvalRunHooksService extends Service
             throw new RuntimeException("Could not resolve the account that owns agent space {$agentSpaceId}");
         }
         return AgentEvalScope::forAgentSpace($agentSpace, $ownerAccount);
+    }
+
+    /**
+     * The scope of a run of `$agentEvalCase` for a run that names an account (`--accountId`): a case without a space
+     * (neither its own nor `$fallbackAgentSpaceId`) runs at account level for that account; a case in a space works in
+     * the space, for the account that owns it, or — a space without an owner, shared by several accounts — for
+     * `$fallbackAccountId`. Without `$fallbackAccountId` it is {@see resolveEvalScope()} unchanged (an application's
+     * override of that method keeps deciding). Reads only, with the rights restrictions lifted (the harness is an
+     * operator).
+     *
+     * @param AgentEvalCase $agentEvalCase the case to run
+     * @param int|null $fallbackAgentSpaceId the agent space the caller names for cases that name none
+     * @param int|null $fallbackAccountId the account the caller names for a run at account level or in a space without an owner
+     * @return AgentEvalScope
+     * @throws RuntimeException when the named space or account is not stored, or the space has no owner and no account is named
+     */
+    public function resolveEvalScopeWithFallbackAccount(AgentEvalCase $agentEvalCase, ?int $fallbackAgentSpaceId, ?int $fallbackAccountId): AgentEvalScope
+    {
+        if ($fallbackAccountId === null) {
+            return $this->resolveEvalScope($agentEvalCase, $fallbackAgentSpaceId);
+        }
+        $agentSpaceId = $agentEvalCase->getAgentSpaceId() ?? $fallbackAgentSpaceId;
+        $agentSpacesService = $this->getAgentSpacesService();
+        DDDService::instance()->deactivateEntityRightsRestrictions();
+        try {
+            $fallbackAccount = $this->findAccountOfEvalScope($fallbackAccountId);
+            $agentSpace = $agentSpaceId !== null ? $agentSpacesService->find($agentSpaceId) : null;
+            $ownerAccount = $agentSpace instanceof AgentSpace ? $agentSpacesService->findOwnerAccountOfAgentSpace($agentSpace) : null;
+        } finally {
+            DDDService::instance()->restoreEntityRightsRestrictionsStateSnapshot();
+        }
+        if (!$fallbackAccount instanceof Account) {
+            throw new RuntimeException("Account {$fallbackAccountId} not found");
+        }
+        if ($agentSpaceId === null) {
+            return AgentEvalScope::forAgentSpace(null, $fallbackAccount);
+        }
+        if (!$agentSpace instanceof AgentSpace) {
+            throw new RuntimeException("Agent space {$agentSpaceId} not found");
+        }
+        return AgentEvalScope::forAgentSpace($agentSpace, $ownerAccount instanceof Account ? $ownerAccount : $fallbackAccount);
+    }
+
+    /**
+     * The account a run names (`--accountId`), read as the caller reads it (the rights are lifted by the caller). An
+     * application whose account class is its own overrides it. Null for an id without an account.
+     */
+    protected function findAccountOfEvalScope(int $accountId): ?Account
+    {
+        /** @var AccountsService $accountsService */
+        $accountsService = DDDService::instance()->getService(AccountsService::class);
+        $account = $accountsService->find($accountId);
+        return $account instanceof Account ? $account : null;
     }
 
     /**

@@ -63,6 +63,9 @@ class DBAIConversationMessageModel extends DoctrineModel
 	public mixed $ownerDevice;
 
 	#[ORM\Column(type: 'json')]
+	public mixed $clientContext;
+
+	#[ORM\Column(type: 'json')]
 	public mixed $taskPlanSnapshot;
 
 	#[ORM\Column(type: 'string')]

@@ -129,6 +129,8 @@ use DDD\Infrastructure\Exceptions\InternalErrorException;
 use Psr\Cache\InvalidArgumentException;
 use ReflectionException;
 use DDD\Domain\AI\Entities\Conversations\Agent\Tools\LoadToolTool;
+use DDD\Domain\AI\Services\Conversations\Agent\AgentClientContextService;
+use DDD\Domain\AI\Entities\Conversations\Widgets\Catalog\ConversationWidgetCatalog;
 
 /**
  * @method static AIConversationsService getService()
@@ -952,7 +954,7 @@ class AIConversation extends Entity
 
     /**
      * What the model reads in front of the tool arguments the executor fills from this conversation's space
-     * ({@see AgentSpacesService::getDescriptionPrefixesOfToolArgumentsFilledFromAgentSpace()}); none for a
+     * ({@see AgentSpacesService::getDescriptionPrefixesOfToolArgumentsFilledFromAgentSpaceOfConversation()}); none for a
      * conversation without a space — nothing would fill them, so the tool schema keeps them as declared.
      *
      * @return string[] description prefix by argument name
@@ -964,7 +966,9 @@ class AIConversation extends Entity
         }
         /** @var AgentSpacesService $agentSpacesService */
         $agentSpacesService = DDDService::instance()->getService(AgentSpacesService::class);
-        return $agentSpacesService->getDescriptionPrefixesOfToolArgumentsFilledFromAgentSpace();
+        // the space as far as it is loaded: isset() never triggers the lazy load
+        $agentSpace = isset($this->agentSpace) && $this->agentSpace instanceof AgentSpace ? $this->agentSpace : null;
+        return $agentSpacesService->getDescriptionPrefixesOfToolArgumentsFilledFromAgentSpaceOfConversation($this, $agentSpace);
     }
 
     /**
@@ -1339,8 +1343,11 @@ class AIConversation extends Entity
         $ownerPresence = $this->getOwnerPresence();
         $agentOfferedToolsInputs->ownerIsOnThePhoneLine = $ownerPresence === OwnerPresence::PRESENT_ON_THE_PHONE;
         // the widget search on a screen surface only — the chat, or an in-app call with the chat open
+        // — and only while a skill this conversation can reach brings a widget's data: a catalog without such a widget
+        // answers every search with "no match"
         $agentOfferedToolsInputs->offersFindWidgets = !$this->isDelegation()
-            && in_array($ownerPresence, [OwnerPresence::PRESENT_IN_CHAT, OwnerPresence::PRESENT_IN_APP_VOICE_CALL], true);
+            && in_array($ownerPresence, [OwnerPresence::PRESENT_IN_CHAT, OwnerPresence::PRESENT_IN_APP_VOICE_CALL], true)
+            && $this->hasWidgetsBroughtByReachableSkills($anchorLoadedCapabilities);
         // The plan this conversation's purpose seeded is worked, never rewritten — no update_task_plan
         $agentOfferedToolsInputs->offersUpdateTaskPlan = $this->getTaskPlan() === null || !($this->findPurpose()?->seedsTaskPlan() ?? false);
         $agentOfferedToolsInputs->finishedTaskPlanCount = $this->getAgentWorkingState()?->countFinishedTaskPlans() ?? 0;
@@ -1374,6 +1381,26 @@ class AIConversation extends Entity
             }
         }
         return AgentOfferedTools::buildFor($enumSkillCatalog, $agentOfferedToolsInputs);
+    }
+
+    /**
+     * Whether a skill this conversation can reach ({@see buildReachableSkillCatalog()}) or holds loaded brings the data
+     * of a widget of the widget catalog ({@see ConversationWidgetCatalog::hasEntryProvidedByOneOfSkills()}) — the
+     * condition of offering `findWidgets`. Reachable, not offered: the reachable set is the same for a whole epoch, so
+     * the tool does not come and go with a skill load. A catalog that cannot be built answers true (the tool stays
+     * offered as before).
+     */
+    public function hasWidgetsBroughtByReachableSkills(?LoadedCapabilities $anchorLoadedCapabilities): bool
+    {
+        try {
+            $skillNames = $this->buildReachableSkillCatalog()->getSkillNames();
+            foreach ($anchorLoadedCapabilities?->getLoadedSkillNames() ?? [] as $loadedSkillName) {
+                $skillNames[] = (string)$loadedSkillName;
+            }
+            return ConversationWidgetCatalog::getBuiltCatalog()->hasEntryProvidedByOneOfSkills(array_values(array_unique($skillNames)));
+        } catch (Throwable) {
+            return true;
+        }
     }
 
     /**
@@ -2377,6 +2404,7 @@ class AIConversation extends Entity
         $agentModelInputHistory = $this->buildModelInputHistoryUpToAndIncludingMessage($anchorMessage, $onlyCompactionsBefore);
         $this->putHistoryIntoContext($agentContext, $agentModelInputHistory);
         $this->putOwnerPresenceAndVariantsIntoContext($agentContext);
+        $this->putClientContextIntoContext($agentContext);
         // The owner messages the injection check blocked — the egress shows the model a notice instead.
         $agentContext->securityFilteredOwnerMessageIndexes = $this->getAgentWorkingState()->securityFilteredOwnerMessageIndexes ?? [];
         // The skill CATALOG the model may load from — the SAME offer the `load_skills` enum is built from,
@@ -2920,6 +2948,27 @@ class AIConversation extends Entity
             $agentContext->ownerPresence = OwnerPresence::PRESENT_ON_THE_PHONE;
             $this->mergeSurfaceVariantIntoContext($agentContext, true);
         }
+    }
+
+    /**
+     * Phase G2: the `[SIGNAL:client-context]` tail entry — the client context stored on the owner's newest input of the
+     * history ({@see AgentModelInput::findNewestOwnerInputMessage()}), rendered by
+     * {@see AgentClientContextService::buildClientContextTailText()}. Roots only (a delegation child works on a task,
+     * not on the owner's screen). A failure of the application's rendering renders no entry, never a failed call.
+     */
+    protected function putClientContextIntoContext(AgentModelInput $agentContext): void
+    {
+        if ($agentContext->isDelegation) {
+            return;
+        }
+        $newestOwnerInputMessage = $agentContext->findNewestOwnerInputMessage();
+        $agentClientContext = $newestOwnerInputMessage !== null && isset($newestOwnerInputMessage->clientContext) ? $newestOwnerInputMessage->clientContext : null;
+        if ($agentClientContext === null || $agentClientContext->isEmpty()) {
+            return;
+        }
+        /** @var AgentClientContextService $agentClientContextService */
+        $agentClientContextService = DDDService::instance()->getService(AgentClientContextService::class);
+        $agentContext->clientContextTailText = $agentClientContextService->findClientContextTailText($this, $agentClientContext);
     }
 
     /** Phase I: the conversation's own creation-time snapshots — never for a delegation child. */

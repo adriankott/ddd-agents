@@ -361,7 +361,8 @@ class AgentEvalSuiteCommand extends AgentEvalConsoleCommand
     /**
      * Override point: the options one suite is planned with, created by the planning service (the application's class
      * when it has one). The default sets the vision capabilities, the job-queue cases, the skill and case filters and
-     * the fallback agent space (`--agentSpaceId`, as given: the suite only forwards it, it never reads the space).
+     * the fallback agent space (`--agentSpaceId`, as given: the suite only forwards it, it never reads the space) and
+     * the account of cases without a space (`--accountId`).
      *
      * @param InputInterface $input
      * @param array $modelNames model names; null = the conversation default
@@ -378,6 +379,8 @@ class AgentEvalSuiteCommand extends AgentEvalConsoleCommand
         $agentEvalSuitePlanOptions->caseFilter = $this->stringOption($input, 'case');
         $agentSpaceIdValue = $input->hasOption(static::OPTION_AGENT_SPACE_ID) ? $input->getOption(static::OPTION_AGENT_SPACE_ID) : null;
         $agentEvalSuitePlanOptions->fallbackAgentSpaceId = is_numeric($agentSpaceIdValue) ? (int)$agentSpaceIdValue : null;
+        // `--accountId`: cases without a space are planned at account level for it (forwarded to every child)
+        $agentEvalSuitePlanOptions->fallbackAccountId = $this->resolveFallbackAccountId($input);
         return $agentEvalSuitePlanOptions;
     }
 

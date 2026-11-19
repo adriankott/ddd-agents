@@ -40,6 +40,12 @@ class AgentEvalSuitePlanOptions extends ValueObject
     public ?int $fallbackAgentSpaceId = null;
 
     /**
+     * @var int|null The account a run names (`--accountId`): a case that names no space and has no fallback space is
+     * planned at account level for it ({@see AgentEvalSuiteTask::$accountId}); null = such a case is not planned
+     */
+    public ?int $fallbackAccountId = null;
+
+    /**
      * Options for the models and flavors of a run.
      *
      * @param array $modelNames model names; null = the conversation default

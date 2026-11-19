@@ -236,6 +236,21 @@ class AIConversationSchedulesService extends EntitiesService
     }
 
     /**
+     * The badge of {@see countUnseenFinishedRunsOfAgentSpace()} over the schedules `$account` holds in `$agentSpace` —
+     * for a space several accounts work in, where each sees the runs of its own schedules. AUTHORIZATION IS THE
+     * CALLER'S.
+     *
+     * @param AgentSpace $agentSpace
+     * @param Account $account
+     * @return int
+     * @throws InternalErrorException when the account is not stored
+     */
+    public function countUnseenFinishedRunsOfAgentSpaceOfAccount(AgentSpace $agentSpace, Account $account): int
+    {
+        return $this->countUnseenFinishedRunsInAgentSpacePartition(AgentSpaceSqlCondition::forAgentSpaceOfAccount($agentSpace, $account));
+    }
+
+    /**
      * The count of {@see countUnseenFinishedRunsOfAgentSpace()} over the schedules `$agentSpaceSqlCondition`
      * selects. Fail-soft: 0 when the statement fails.
      *
@@ -341,6 +356,21 @@ class AIConversationSchedulesService extends EntitiesService
     }
 
     /**
+     * The daily-creation counter of {@see countAgentRecurringSchedulesCreatedForAgentSpaceSince()} over the schedules
+     * `$account` created in `$agentSpace` — for a space several accounts work in, where the cap holds per account.
+     *
+     * @param AgentSpace $agentSpace
+     * @param Account $account
+     * @param DateTime $since
+     * @return int
+     * @throws InternalErrorException when the account is not stored
+     */
+    public function countAgentRecurringSchedulesCreatedForAgentSpaceOfAccountSince(AgentSpace $agentSpace, Account $account, DateTime $since): int
+    {
+        return $this->countAgentRecurringSchedulesCreatedInAgentSpacePartitionSince(AgentSpaceSqlCondition::forAgentSpaceOfAccount($agentSpace, $account), $since);
+    }
+
+    /**
      * The count of {@see countAgentRecurringSchedulesCreatedForAgentSpaceSince()} over the schedules
      * `$agentSpaceSqlCondition` selects.
      *
@@ -388,6 +418,20 @@ class AIConversationSchedulesService extends EntitiesService
     public function buildMonthlyCostEstimateForActiveRecurringSchedulesOfAccountWithoutAgentSpace(Account $account): RecurringScheduleMonthlyCostEstimate
     {
         return $this->buildMonthlyCostEstimateForActiveRecurringSchedulesInAgentSpacePartition(AgentSpaceSqlCondition::forAccountWithoutAgentSpace($account));
+    }
+
+    /**
+     * The projected monthly cost of the active recurring schedules `$account` holds in `$agentSpace` (its run history
+     * read from the runs of those schedules only) — for a space several accounts work in, where each pays its own.
+     *
+     * @param AgentSpace $agentSpace
+     * @param Account $account
+     * @return RecurringScheduleMonthlyCostEstimate
+     * @throws InternalErrorException when the account is not stored
+     */
+    public function buildMonthlyCostEstimateForActiveRecurringSchedulesOfAgentSpaceOfAccount(AgentSpace $agentSpace, Account $account): RecurringScheduleMonthlyCostEstimate
+    {
+        return $this->buildMonthlyCostEstimateForActiveRecurringSchedulesInAgentSpacePartition(AgentSpaceSqlCondition::forAgentSpaceOfAccount($agentSpace, $account));
     }
 
     /**

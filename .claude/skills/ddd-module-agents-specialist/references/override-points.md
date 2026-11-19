@@ -111,7 +111,9 @@ Each is a public service with a working default. The owning topic skill explains
 | `DDD\Domain\AI\Services\Eval\AgentEvalSuiteRunsService`, `DDD\Domain\AI\Services\Eval\AgentEvalSuiteCasesService` (with their entities and repositories) | stored evaluation runs and cases; an admin with access to all resources reads every row, every other account none | store the rows through the host's entity; decide who reads every row (`AgentAccountRightsService::isAccountReaderOfAllEvaluationRows()`, or `isAuthenticatedAccountReaderOfEveryRow()` of the same-path repositories) | `ddd-module-agents-observability-specialist` |
 | `DDD\Domain\AI\Services\Conversations\RunReports\AIConversationRunReportService` | no decision-model cost (no usage-log id), no skill section prefix dropped | name the usage-log id of a conversation (`findUsageLogScopeIdOfConversation()`), read the cost (`findModelCostInUsageLog()`), drop the host's prefix of skill section ids (`getSkillSectionIdPrefixToDrop()`) | `ddd-module-agents-observability-specialist` |
 | `DDD\Domain\AI\Services\Texts\Embeddings\AITextEmbeddingsService` | no provider (throws `TextEmbeddingNotGeneratedException`) | generate embeddings | `ddd-module-agents-context-specialist` |
-| `DDD\Presentation\Mcp\Services\MCPToolExecutorService` | no admin audit; a failed tool answers the framework's client error text, anything else an issue id only; no write lock | record admin tool calls (`recordAdminAudienceToolCall()`), change the failure text (`buildToolFailureText()`), lock the environment for writes (`isEnvironmentWideWriteLockActive()`, `buildEnvironmentWideWriteLockRefusalText()`) | `ddd-module-agents-tools-specialist` |
+| `DDD\Presentation\Mcp\Services\MCPToolExecutorService` | no admin audit; a failed tool answers the framework's client error text (with the violations of a validation failure), anything else an issue id only; no write lock | record admin tool calls with their call context (`recordAdminAudienceToolCallWithCallContext()`, the conversation id through `findConversationIdOfCallContext()`; the earlier `recordAdminAudienceToolCall()` keeps being called by its default), change the failure text (`buildToolFailureText()`), lock the environment for writes (`isEnvironmentWideWriteLockActive()`, `buildEnvironmentWideWriteLockRefusalText()`) | `ddd-module-agents-tools-specialist` |
+| `DDD\Domain\AI\Services\Conversations\Agent\AgentClientContextService` | renders the client context of the owner's newest input plainly (`[SIGNAL:client-context]`, keys `page`, `page parameters`, `record`, `tab`) | name the record on screen (`describeRecordOfClientContext()`), label the keys (`getClientContextKeyLabel()`) or write the whole line (`buildClientContextTailText()`) | `ddd-module-agents-context-specialist` |
+| `DDD\Domain\AI\Services\Conversations\AIConversationAgentService` | the drive appends the owner's rows and dispatches the turn | write the host's own data onto the conversation between its creation and the turn's dispatch (`beforeTurnOfDriveIsDispatched()`, with the drive request and its client context) | `ddd-module-agents-loop-specialist` |
 
 The console printer is fetched by its interface `DDD\Domain\AI\Services\Conversations\AgentMessagePrinterInterface`, a public alias of
 `DDD\Presentation\Mcp\Agent\AgentConsolePrinter`; a host aliases the id to its own printer (`ddd-module-agents-observability-specialist`).
@@ -185,9 +187,16 @@ with `X::newInstance()` or asks the container for the class name:
 | `isAdminSession()` | a validated admin acts (impersonation) | the host's admin session |
 | `readOwnerDeviceFromRequest()` | the client header, else the user agent | the host's device signal |
 | `afterMessagePosted()` | queues the conversation for a base-prompt warm-up, which the host's terminate subscriber builds ([host-duties.md](host-duties.md)); the start route calls no such hook | add host work after a post |
+| `getRequestDtoClassOfRoutedMethod()` | the host's request DTO at the same path, else the module's | read a routed method's request into the host's subclass of the module's DTO (an extra request parameter) without redeclaring the route |
+| `findConversationOfInjectedSignal()` | `findVisibleConversation()`: the request's conversation under the read rights | find the conversation of an injected signal the host's own way |
+| `isRequestSnapshotStoredForStartRequest()` | the start's `storeRequestSnapshot`, honoured in an admin session only | store request snapshots (`RunSettings::$storeRequestSnapshot`) for the conversations the host's debug sessions start |
 
 A routed trait method that needs another attribute (a quota, an envelope scope) is redeclared by the host, which
-calls the trait's protected `build…Response()` body.
+calls the trait's protected `build…Response()` body. A routed method that needs one more request parameter keeps the
+route: every routed method reads its request into the class `getRequestDtoClassOfRoutedMethod()` names (hydrated and
+validated as any request DTO; a class that does not extend the module's DTO is an `InternalErrorException`). The API
+document of the route still names the module's DTO, so a parameter the generated client must know belongs on a
+redeclared route.
 
 ## The words of the host
 
@@ -198,6 +207,27 @@ from `config/app/AI/agentApplicationNames.php`, the persona from `config/app/AI/
 
 ## Rules for every override
 
+- A subclass of the conversation (`AIConversation`) repeats the class-level attributes of the module's class: PHP does
+  not inherit attributes, and the framework's model generator reads the indexes and the repository from the class it
+  generates (whether the generator should read a parent's attributes is a question for `mgamadeus/ddd`). Without them
+  the host's model has none of the module's indexes. Copy them verbatim (the package test
+  `ConversationClassAttributesDocumentedForHostSubclassesTest` keeps this list equal to the class), with
+  `#[LazyLoadRepo]` naming the host's repository:
+
+  ```php
+  #[DatabaseIndex(DatabaseIndex::TYPE_INDEX, ['runState', 'runHeartbeatAt'])]
+  #[DatabaseIndex(DatabaseIndex::TYPE_INDEX, ['delegationBatchId', 'runState'])]
+  #[DatabaseIndex(DatabaseIndex::TYPE_INDEX, ['finalizedAt', 'lastInboundMessageAt'])]
+  #[DatabaseIndex(DatabaseIndex::TYPE_INDEX, ['finalizedAt', 'finalizeCompactedAt'])]
+  #[DatabaseIndex(DatabaseIndex::TYPE_INDEX, ['runState', 'agentTurnOwedAt'])]
+  #[DatabaseIndex(DatabaseIndex::TYPE_INDEX, ['reportDeliveredAt', 'reportOwedAt'])]
+  #[DatabaseIndex(DatabaseIndex::TYPE_INDEX, ['agentSpaceId', 'accountId', 'entryPointKey'])]
+  #[DatabaseIndex(DatabaseIndex::TYPE_INDEX, ['purposeName', 'created'])]
+  #[LazyLoadRepo(LazyLoadRepo::DB, repoClass: DBAIConversation::class)]
+  ```
+- A subclass of the message (`AIConversationMessage`) with a column of its own lists it in its context load:
+  `public const array CONTEXT_LOAD_COLUMNS = [...parent::CONTEXT_LOAD_COLUMNS, 'itsColumn'];` — the messages service
+  reads `getContextLoadColumns()` of the class the host uses, so the column rides every context load.
 - A subclass of a filterable entity or set repeats `use QueryOptionsTrait;`: the framework looks for the trait on the
   class itself; without it the host's repository applies no filter, order or `top`.
 - A request DTO whose `DtoQueryOptions` names a module class a host may derive uses

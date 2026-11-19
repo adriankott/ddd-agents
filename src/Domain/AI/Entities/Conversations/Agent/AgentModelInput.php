@@ -222,6 +222,14 @@ class AgentModelInput extends ValueObject
     public ?string $localSituation = null;
 
     /**
+     * The `[SIGNAL:client-context]` tail entry: what the owner's client showed with the newest owner input, rendered by
+     * {@see \DDD\Domain\AI\Services\Conversations\Agent\AgentClientContextService::buildClientContextTailText()}.
+     * Resolved by the loop's build phase from the stored row ({@see \DDD\Domain\AI\Entities\Conversations\AIConversation::buildModelInputUpToAndIncludingMessage()}),
+     * never here; null = no entry.
+     */
+    public ?string $clientContextTailText = null;
+
+    /**
      * The product-capabilities awareness block — what the customer's plan includes, what is available, and
      * which upgrades unlock the rest. Pre-rendered by the loop service from the agent space's applied flags (NOT resolved
      * here: it touches the flag/skill services, and this VO is built in container-less contexts too). Part of the
@@ -1313,6 +1321,19 @@ class AgentModelInput extends ValueObject
         return -1;
     }
 
+    /** The owner's newest input among {@see $messages} ({@see findNewestOwnerInputPosition()}); null without one. Pure. */
+    public function findNewestOwnerInputMessage(): ?AIConversationMessage
+    {
+        $newestOwnerInputPosition = $this->findNewestOwnerInputPosition();
+        return $newestOwnerInputPosition >= 0 ? $this->messages[$newestOwnerInputPosition] : null;
+    }
+
+    /** The `[SIGNAL:client-context]` tail entry ({@see $clientContextTailText}); null renders none. Pure. */
+    public function clientContextTailHint(): ?string
+    {
+        return $this->clientContextTailText !== null && trim($this->clientContextTailText) !== '' ? $this->clientContextTailText : null;
+    }
+
     /**
      * Whether a COMPLETED call of `$toolName` stands after `$messagePosition` (the owner's newest input): the answer
      * step after a question recorded in this turn ({@see AskOwnerTool}) writes the closed items' results, never the
@@ -1655,6 +1676,13 @@ class AgentModelInput extends ValueObject
         $timeZoneUnconfirmedTailHint = $this->stateDelivery === null ? $this->timeZoneUnconfirmedTailHint() : null;
         if ($timeZoneUnconfirmedTailHint !== null) {
             $agentModelInputTailEntry = AgentModelInputTailEntry::ofText(AgentModelInputTailEntry::KIND_TIME_ZONE, AgentContextSegmentType::SIGNAL, $timeZoneUnconfirmedTailHint);
+            $agentModelInputTailEntries->add($agentModelInputTailEntry);
+        }
+        // Client context: what the owner's client showed with the newest owner input — next to the clock, never in
+        // the cached prefix, never a transcript row.
+        $clientContextTailHint = $this->clientContextTailHint();
+        if ($clientContextTailHint !== null) {
+            $agentModelInputTailEntry = AgentModelInputTailEntry::ofText(AgentModelInputTailEntry::KIND_CLIENT_CONTEXT, AgentContextSegmentType::SIGNAL, $clientContextTailHint);
             $agentModelInputTailEntries->add($agentModelInputTailEntry);
         }
         // Clock signal: the ONE captured "now" of this call in the space's zone — volatile by nature.

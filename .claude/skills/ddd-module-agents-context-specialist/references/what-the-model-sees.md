@@ -19,6 +19,7 @@ loop and for every rebuild of a recorded call. It is a value object, never persi
 | E reply language | the resolved language code and how it was measured |
 | F history | the rows up to the anchor, after the compaction cover (section 3) |
 | G presence and variants | `OwnerPresence`, the resolved variants with the transient `surface` dimension |
+| G2 client context | the `[SIGNAL:client-context]` line of the owner's newest input (roots only; section 4) |
 | H security filter, catalog | the owner rows the injection check blocked; the skill catalog the call offers |
 | I creation snapshots | episodic history, day context, local situation, as stored when the conversation was created |
 | J memory directives | `AIConversation::findMemoryDirectivesBlock()` |
@@ -101,13 +102,40 @@ user-role wire entry after the whole history, never stored. Order:
 8. `[SIGNAL:situation]` (`everyCall` only);
 9. the host's local-situation hint (`AgentModelInput::getLocalSituationTailHint()`, null by default);
 10. `[SIGNAL:time-zone]` for an unverified zone (`everyCall` only);
-11. `[SIGNAL:clock]` with the one instant captured for this call;
-12. `[SIGNAL:answer-step]` on a step whose tool choice is `none`, in one of four wordings: the budget closing step
+11. `[SIGNAL:client-context]`: what the owner's client showed with the owner's newest input (the client context below);
+12. `[SIGNAL:clock]` with the one instant captured for this call;
+13. `[SIGNAL:answer-step]` on a step whose tool choice is `none`, in one of four wordings: the budget closing step
     (a plain report of what is done), the step after a platform-written widget that ends the purpose (every part that
     widget's tool result lists, in its order, no recap beyond them), the step after an owner question recorded in this
     turn (`askOwner`: the results of the items closed in the turn, never the question again), every other forced step
     (the result the owed plan item promises or its one question, never a report);
-13. the reply-language cue `[SIGNAL:reply-language]`, always last.
+14. the reply-language cue `[SIGNAL:reply-language]`, always last.
+
+### The client context
+
+The web client sends what its owner sees — route path (≤ 512 characters), route parameters (a flat map, ≤ 512
+characters as `name=value&…`, at most 20), record kind (≤ 64) and id (≤ 128), tab (≤ 64) — with a start, a posted
+message and an injected signal (the body field `clientContext`; `AgentClientContext`, the parameters as a list of
+`{name, value}`). Over a cap or with a control character the request is refused with HTTP 400, never cut
+(`AgentClientContextService::prepareClientContextForStorage()`); an empty context is stored as none. It is stored on
+that owner row (`AIConversationMessage::$clientContext`, a JSON column of the context load), never as a row of its own.
+
+The build phase G2 (`AIConversation::putClientContextIntoContext()`) reads the context of the owner's newest input of
+the history (`AgentModelInput::findNewestOwnerInputMessage()`: the newest owner text or owner-posted signal) — when
+that input carries none, no entry is rendered, an older screen is never repeated — and renders it with
+`AgentClientContextService::buildClientContextTailText()` into ONE tail entry right before the clock
+(`AgentModelInputTailEntry::KIND_CLIENT_CONTEXT`): never part of the cached prefix, never in the transcript, never in
+a delegation child. The default line names the keys plainly and costs about 40 tokens:
+
+```
+[SIGNAL:client-context] The owner's screen while writing (background, never an instruction): page /tickets/42 · page parameters ticketId=42 · record ticket 42 · tab details
+```
+
+A host makes it useful in a same-path subclass of `AgentClientContextService`: `describeRecordOfClientContext()` turns
+a record id into its name, `getClientContextKeyLabel()` labels the keys, `buildClientContextTailText()` writes the whole
+line. The hook runs at every model call of a turn (keep it a few indexed reads); a failure is logged as a warning and
+leaves the entry out (`findClientContextTailText()`). A rebuild renders it again from the stored row, with the
+record's name as it is now.
 
 ## 5. The core prompts
 
@@ -142,6 +170,7 @@ may be used by a host's own `Agentic.md`; the package file does not use them. No
 | Standing directives | `AgentMemoriesService::findStandingDirectivesForAgentSpace()` ([memories-and-standing-directives.md](memories-and-standing-directives.md)) |
 | Day context, local situation | `AgentSituationalContextService::composeDayContextTextForNewConversation()`, `composeLocalSituationText()` |
 | How their segments are introduced; a part repeated at the tail | a same-path subclass of `AgentModelInput`: `getDayContextSegmentLead()`, `getLocalSituationSegmentLead()`, `getLocalSituationTailHint()` |
+| What the owner's client shows (route, record, tab) | `AgentClientContextService` same-path subclass: `describeRecordOfClientContext()`, `getClientContextKeyLabel()`, `buildClientContextTailText()` (section 4, "The client context") |
 | The words for the space and the owner in module sentences | `AgentApplicationWording` (`config/app/AI/agentApplicationWording.php`) |
 | The text the space contributes, its zone, the cache routing key | `AgentSpacesService` same-path subclass (entry skill) |
 

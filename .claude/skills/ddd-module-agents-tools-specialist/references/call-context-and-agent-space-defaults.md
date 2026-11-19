@@ -42,19 +42,33 @@ The package's tools name the space with the argument `agentSpaceId`
 
 1. The executor fills the argument when the model left it out, or sent 0 or an empty string, before the gates and the
    hydration (`MCPToolExecutorService::applyAgentSpaceDefaultsToToolArguments()` →
+   `AgentSpacesService::applyAgentSpaceDefaultsToToolArgumentsOfCall()` →
    `AgentSpacesService::applyAgentSpaceDefaultsToToolArguments()`). It fills it only when a request DTO of the tool
    declares the property. An argument the model passed always wins — work on another space stays possible.
-2. The agent's tool schema puts `DESCRIPTION_PREFIX_OF_TOOL_ARGUMENT_FILLED_FROM_AGENT_SPACE` ("OPTIONAL — omit it …")
+2. **"Do not narrow"**: a filled argument the model passes as `"none"`
+   (`AgentSpacesService::TOOL_ARGUMENT_VALUE_NOT_NARROWED_TO_AGENT_SPACE`, any case;
+   `AgentSpacesService::isToolArgumentValueNotNarrowedToAgentSpace()` decides) is left out and never filled, in a
+   conversation with a space and without one: the tool runs as without the argument (the DTO keeps its default), and
+   the gates check the conversation's space. Only a positive id names a space; 0 and '' still mean "this
+   conversation's". The default prefix does not offer the value; a host whose tools read across spaces returns
+   `DESCRIPTION_PREFIX_OF_TOOL_ARGUMENT_FILLED_FROM_AGENT_SPACE_OR_NOT_NARROWED` for those arguments.
+3. The agent's tool schema puts `DESCRIPTION_PREFIX_OF_TOOL_ARGUMENT_FILLED_FROM_AGENT_SPACE` ("OPTIONAL — omit it …")
    in front of the argument's description (`ToolDefinition::toOpenAiToolSchema()` with
-   `AgentSpacesService::getDescriptionPrefixesOfToolArgumentsFilledFromAgentSpace()`). It would also drop the argument
-   from a required list, but the generated schema carries none.
+   `AgentSpacesService::getDescriptionPrefixesOfToolArgumentsFilledFromAgentSpaceOfConversation()`, asked with the
+   conversation and its loaded space; its default is `getDescriptionPrefixesOfToolArgumentsFilledFromAgentSpace()`).
+   It would also drop the argument from a required list, but the generated schema carries none.
+4. The read dedup line of a paused turn leaves out the arguments
+   `AgentSpacesService::getToolArgumentNamesLeftOutOfTheReadDedupLine()` names (default: the filled ones), its own
+   list apart from the prefixes.
 
 In a conversation without a space and on the HTTP path nothing is filled and the schema stays as declared.
 
 **A host whose tools name the space by an id of its own entity** overrides, in its subclass of
 `AgentSpacesService`, `applyAgentSpaceDefaultsToToolArguments()` (fill its argument from the space),
-`getDescriptionPrefixesOfToolArgumentsFilledFromAgentSpace()` (name its argument) and `findAgentSpaceOfToolCall()`
-(resolve its argument to a space, with the same usability check). How the package finds such a subclass:
+`getDescriptionPrefixesOfToolArgumentsFilledFromAgentSpace()` (name its argument; per conversation and space:
+`getDescriptionPrefixesOfToolArgumentsFilledFromAgentSpaceOfConversation()`, for spaces that fill different arguments
+by kind), `getToolArgumentNamesLeftOutOfTheReadDedupLine()` (when the dedup line strips other arguments than the
+prefixes name) and `findAgentSpaceOfToolCall()` (resolve its argument to a space, with the same usability check). How the package finds such a subclass:
 `ddd-module-agents-specialist`, override points. How the space maps onto the
 host's entity is the entry skill's (`ddd-module-agents-specialist`).
 

@@ -30,6 +30,8 @@ use DDD\Domain\AI\Services\Conversations\AIConversationMessagesService;
 use DDD\Domain\AI\Services\Conversations\AIConversationAgentService;
 use DDD\Domain\AI\Services\Conversations\AIConversationRealtimeSignalService;
 use DDD\Domain\AI\Entities\Conversations\Messages\OwnerDevice;
+use DDD\Domain\AI\Entities\Conversations\Messages\AgentClientContext;
+use DDD\Domain\AI\Entities\MCPPackages\ToolResultUntrustedSegments;
 use DDD\Domain\AI\Entities\Conversations\SignalSources\ConversationSignalSource;
 use DDD\Domain\AI\Entities\Conversations\SignalSources\ConversationSignalSources;
 use DDD\Domain\AI\Services\Conversations\AIConversationRunClaimsService;
@@ -92,6 +94,9 @@ class AIConversationTurnSignalsService extends Service
      *
      * The text is sanitized ({@see AIConversationMessage::sanitizeUserText}) and capped to
      * {@see AIConversationMessage::MAX_SIGNAL_TEXT_CHARS} so a widget can never push an unbounded blob into the context.
+     * A text that holds third-party passages in marks ({@see ToolResultUntrustedSegments::wrapSingleLine()}) gets the
+     * reading rule of the marks appended once. `$clientContext` (what the owner's client showed) is refused over a cap
+     * (HTTP 400) before the row is written, then stored on it.
      * Returns the appended SIGNAL message.
      *
      * A signal of a source a running turn takes over ({@see ConversationSignalSource::isPickedUpByRunningTurn()}, e.g.
@@ -104,10 +109,17 @@ class AIConversationTurnSignalsService extends Service
         string $signalText,
         string $signalSource = AIConversationMessage::SIGNAL_SOURCE_FRONTEND_WIDGET_CLICK,
         bool $async = true,
-        ?OwnerDevice $ownerDevice = null
+        ?OwnerDevice $ownerDevice = null,
+        ?AgentClientContext $clientContext = null
     ): AIConversationMessage {
+        // the client context is refused over a cap before the row is written (HTTP 400, never cut)
+        /** @var AgentClientContextService $agentClientContextService */
+        $agentClientContextService = DDDService::instance()->getService(AgentClientContextService::class);
+        $clientContextToStore = $agentClientContextService->prepareClientContextForStorage($clientContext);
         $sanitizedSignalText = mb_substr(AIConversationMessage::sanitizeUserText($signalText), 0, AIConversationMessage::MAX_SIGNAL_TEXT_CHARS);
-        $signalMessage = $this->messagesService()->appendInboundSignal($conversation, $sanitizedSignalText, $signalSource, $ownerDevice);
+        // a signal that carries third-party text in marks gets the reading rule of the marks once
+        $sanitizedSignalText = ToolResultUntrustedSegments::appendReadingRuleWhenMarked($sanitizedSignalText);
+        $signalMessage = $this->messagesService()->appendInboundSignal($conversation, $sanitizedSignalText, $signalSource, $ownerDevice, clientContext: $clientContextToStore);
 
         // A signal that owes no work (the frontend's widget render report) is a stored fact for the next
         // turn's wire — it never pings "running" and never resumes, so a render report can never drive a turn.

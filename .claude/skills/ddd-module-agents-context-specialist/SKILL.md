@@ -1,6 +1,6 @@
 ---
 name: ddd-module-agents-context-specialist
-description: "Explains and tunes what the ddd-agents model sees on each call and how that input stays small, stable and prompt-cached. Covers the model input (AgentModelInput system segments, volatile tail, core prompts), prompt cache and stable prefix (breakpoints, Chat Completions vs Responses, append-only skill loading, prefix epochs, reasoning carry-over, cached base prompt), context reduction (compaction tree, absolute threshold, preserved facts, tool-result stubbing), skill and tool eviction, state epochs and once-per-change notes, recall and conversation search, embeddings, memories and standing directives, owner presence, device and time zones, tool-call efficiency, contextRetention.php. Use when cached tokens drop to zero, a skill load costs the whole prompt, the context grows too large, compaction never fires or loses an id, a skill unloads too early, the agent re-loads a skill or repeats a read, the time or zone is wrong, search returns nothing, or a host adds memories or embeddings."
+description: "Explains and tunes what the ddd-agents model sees on each call and how that input stays small, stable and prompt-cached. Covers the model input (AgentModelInput system segments, volatile tail, core prompts), prompt cache and stable prefix (breakpoints, Chat Completions vs Responses, append-only skill loading, prefix epochs, reasoning carry-over, cached base prompt), context reduction (compaction tree, absolute threshold, preserved facts, tool-result stubbing), skill and tool eviction, state epochs and once-per-change notes, recall and conversation search, embeddings, memories and standing directives, owner presence, device, time zones, client context (page, record), tool-call efficiency, contextRetention.php. Use when cached tokens drop to zero, a skill load costs the whole prompt, the context grows too large, compaction never fires or loses an id, a skill unloads too early, the agent re-loads a skill or repeats a read, the time or zone is wrong, search returns nothing, or a host adds memories or embeddings."
 metadata:
   author: mgamadeus
   version: "0.1.0"
@@ -19,6 +19,7 @@ the tools and their results to the tools skill.
 | This skill owns | Main classes |
 |---|---|
 | The per-call model input: system segments, history, volatile tail | `AgentModelInput`, `AgentContextSegmentType`, `AgentModelInputTailEntries` |
+| The client context of the owner's newest input (`[SIGNAL:client-context]`) | `AgentClientContext`, `AgentClientContextService` |
 | The core prompts and the cached base prompt | `AgentAIPromptNames`, `AgentBaseSystemPromptCacheService` |
 | Wire APIs, append-only skill loading, prefix epochs, reasoning carry-over | `AgentWireConfiguration`, `AgentPrefixEpoch`, `AgentAppendOnlyCall`, `AgentPreviousReasoningCut` |
 | Context reduction (compaction tree, tool-result stubbing) | `AIConversationCompactionService`, `CompactionBudgets`, `CompactionModelLimits`, `ToolResultRetention` |
@@ -39,7 +40,8 @@ the tools and their results to the tools skill.
    then the history. The order of the system segments is fixed and roughly most to least stable; what matters is
    that every segment is stable within the conversation, except LOADED_SKILLS (the loaded set, or the epoch) and
    COMPACTION_SUMMARY (the cover), which come last. Everything that changes per call rides the volatile tail AFTER the history
-   and is never stored (`AgentModelInput::buildTailEntries()`); the reply-language cue is always its last entry.
+   and is never stored (`AgentModelInput::buildTailEntries()`); the reply-language cue is always its last entry. The
+   client context of the owner's newest input rides there too, right before the clock (`[SIGNAL:client-context]`).
 3. **No volatile value in the prefix.** The clock, the unconfirmed-zone note, the situation provenance, the task plan
    and the "already fetched" hint are tail entries. A new value you add goes to the tail or becomes a state note; a
    new system segment must be stable for the whole conversation.
@@ -167,7 +169,7 @@ purpose sets them in its `contextRetention:` map. The purpose file format belong
 
 | Task or symptom | Reference |
 |---|---|
-| What exactly is sent on a call; which segment says what; adding a day context or local situation | [what-the-model-sees.md](references/what-the-model-sees.md) |
+| What exactly is sent on a call; which segment says what; adding a day context or local situation; the client context (route, record, tab) and its host hook | [what-the-model-sees.md](references/what-the-model-sees.md) |
 | Cached tokens are 0 or low; a deploy or a load costs the whole prompt; choosing the wire API | [prompt-cache-and-stable-prefix.md](references/prompt-cache-and-stable-prefix.md) |
 | The context grows past the model's reliable length; compaction never fires; an id is lost after compaction; old tool results disappear | [context-reduction.md](references/context-reduction.md) |
 | A skill or tool leaves too early or never; tuning `unloadGranularity`, pins, the hard cap | [skill-and-tool-eviction.md](references/skill-and-tool-eviction.md) |

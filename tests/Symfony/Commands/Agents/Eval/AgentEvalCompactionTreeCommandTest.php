@@ -56,6 +56,7 @@ class AgentEvalCompactionTreeCommandTest extends UnitTestCase
             [
                 AgentConsoleCommand::OPTION_AGENT_SPACE_ID,
                 AgentSpacesServiceConsoleScopeDouble::SCOPE_OPTION_NAME,
+                AgentEvalConsoleCommand::OPTION_EVAL_ACCOUNT_ID,
                 AgentEvalCompactionTreeCommand::OPTION_CASE_FILE,
                 'agent-model', 'judge-model', 'driver-model', 'max-turns', 'segment-messages', 'keep-messages', 'fan-in', 'retention', 'trigger-tokens',
                 AgentConsoleCommand::OPTION_IGNORE_BUDGET,

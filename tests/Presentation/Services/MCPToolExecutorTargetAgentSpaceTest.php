@@ -189,6 +189,36 @@ class MCPToolExecutorTargetAgentSpaceTest extends UnitTestCase
         );
     }
 
+    public function testTheValueNoneSaysDoNotNarrow(): void
+    {
+        $provenance = $this->buildProvenance($this->buildAgentSpace(self::AGENT_SPACE_ID_OF_CONVERSATION, self::ACCOUNT_ID), self::ACCOUNT_ID);
+        $executor = new TargetAgentSpaceObservingToolExecutor();
+        $listMandatesMethod = new ReflectionMethod(AgentMandatesMCPPackage::class, 'listMandates');
+
+        foreach (['none', ' None '] as $notNarrowedValue) {
+            self::assertSame(
+                [],
+                $executor->callApplyAgentSpaceDefaultsToToolArguments($listMandatesMethod, ['agentSpaceId' => $notNarrowedValue], $provenance),
+                'the argument is left out and never filled from the space'
+            );
+        }
+        self::assertSame(
+            [],
+            $executor->callApplyAgentSpaceDefaultsToToolArguments($listMandatesMethod, ['agentSpaceId' => 'none'], $this->buildProvenance(null, self::ACCOUNT_ID)),
+            'without a space the marker is left out as well'
+        );
+        self::assertSame(
+            ['agentSpaceId' => self::AGENT_SPACE_ID_OF_CONVERSATION],
+            $executor->callApplyAgentSpaceDefaultsToToolArguments($listMandatesMethod, ['agentSpaceId' => 0], $provenance),
+            '0 still means the conversation\'s space'
+        );
+        self::assertSame(
+            ['agentSpaceId' => 'none'],
+            $executor->callApplyAgentSpaceDefaultsToToolArguments($listMandatesMethod, ['agentSpaceId' => 'none'], null),
+            'the HTTP path keeps the arguments as they are'
+        );
+    }
+
     public function testNothingIsFilledWithoutASpaceOrWithoutAConversation(): void
     {
         $executor = new TargetAgentSpaceObservingToolExecutor();

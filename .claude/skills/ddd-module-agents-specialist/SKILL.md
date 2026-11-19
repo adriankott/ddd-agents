@@ -71,6 +71,12 @@ their DTOs, the naming, wording, persona and egress configs, and `examples/`. Th
   every class it replaces in its `services.yaml` and binds tool packages by class
   ([references/override-points.md](references/override-points.md)).
 - **`QueryOptionsTrait` is not inherited.** A host subclass of a filterable entity or set repeats it.
+- **Class attributes are not inherited either.** A host subclass of the conversation repeats the module's
+  `#[DatabaseIndex]` lines and `#[LazyLoadRepo]` verbatim, or its model has none of the module's indexes (the exact
+  list: [references/override-points.md](references/override-points.md), "Rules for every override").
+- **One more request parameter needs no redeclared route.** A host's same-path subclass of the request DTO is what the
+  routed trait methods read (`getRequestDtoClassOfRoutedMethod()`); only the generated API document keeps the module's
+  DTO.
 - **The finalize and schedule scans are not environment-scoped.** Several environments on one database run those
   commands in one environment only.
 - **`AuthService::setAccount()` takes its argument by reference:** pass a variable, never a literal `null`.

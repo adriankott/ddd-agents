@@ -23,8 +23,10 @@ use DDD\Infrastructure\Exceptions\InternalErrorException;
 use DDD\Infrastructure\Exceptions\NotFoundException;
 use DDD\Infrastructure\Services\AuthService;
 use DDD\Infrastructure\Services\DDDService;
+use DDD\Presentation\Api\Agents\Conversations\Dtos\AIConversationInjectSignalPostRequestDto;
 use DDD\Presentation\Api\Agents\Conversations\Dtos\AIConversationPostMessagePostRequestDto;
 use DDD\Presentation\Api\Agents\Conversations\Dtos\AIConversationStartWithMessagePostRequestDto;
+use DDD\Presentation\Base\Dtos\RequestDto;
 
 /**
  * The override points of the agent conversation controller traits ({@see AgentConversationReadsTrait},
@@ -34,7 +36,9 @@ use DDD\Presentation\Api\Agents\Conversations\Dtos\AIConversationStartWithMessag
  *
  * The routed methods of the traits are a complete chat surface for an application that only `use`s them; an
  * application that needs extra attributes on a route (a quota, its own envelope scope) or its own route order redeclares
- * the routed method and calls the trait's protected body (`build…Response()`).
+ * the routed method and calls the trait's protected body (`build…Response()`). An application that only adds a request
+ * parameter keeps the route: its subclass of the request DTO (at the same path under its root namespace, or named by
+ * {@see self::getRequestDtoClassOfRoutedMethod()}) is what every routed method hydrates and hands to its body.
  */
 trait AgentConversationControllerHooksTrait
 {
@@ -89,6 +93,79 @@ trait AgentConversationControllerHooksTrait
             throw new ForbiddenException($agentSpacesService::NO_ACCESS_TO_AGENT_SPACE_MESSAGE);
         }
         return $agentSpace;
+    }
+
+    /**
+     * Override point: the request DTO class the routed method `$routedMethodName` (`postMessage`, `injectSignal`, …)
+     * reads its request into. The default: the application's class of the same path as the module's DTO, else the
+     * module's ({@see self::getClassNameTheApplicationUsesFor()}). An application that adds a request parameter
+     * declares a subclass of the module's DTO with the parameter and keeps the route; the route's documentation (the
+     * generated API document and client) still names the module's DTO, so a parameter the API document must show
+     * belongs on a redeclared route.
+     *
+     * @param string $routedMethodName the name of the trait's routed method
+     * @param class-string<RequestDto> $moduleRequestDtoClassName the DTO class the routed method declares
+     * @return class-string<RequestDto> the module's class or a subclass of it
+     */
+    protected function getRequestDtoClassOfRoutedMethod(string $routedMethodName, string $moduleRequestDtoClassName): string
+    {
+        return $this->getClassNameTheApplicationUsesFor($moduleRequestDtoClassName);
+    }
+
+    /**
+     * The request of a routed method in the class {@see self::getRequestDtoClassOfRoutedMethod()} names: `$requestDto`
+     * itself when that is its class, else a DTO of that class read from the main request (hydrated and validated like
+     * every request DTO; an invalid request is HTTP 400). Called first by every routed method of the traits.
+     *
+     * @template T of RequestDto
+     * @param string $routedMethodName
+     * @param T $requestDto the DTO the framework resolved from the declared type
+     * @return T
+     * @throws InternalErrorException when the named class does not extend the declared one
+     * @throws BadRequestException when the request is invalid for the named class
+     */
+    protected function resolveRequestDtoOfRoutedMethod(string $routedMethodName, RequestDto $requestDto): RequestDto
+    {
+        $requestDtoClassName = $this->getRequestDtoClassOfRoutedMethod($routedMethodName, $requestDto::class);
+        if ($requestDtoClassName === $requestDto::class) {
+            return $requestDto;
+        }
+        if (!is_a($requestDtoClassName, $requestDto::class, true)) {
+            throw new InternalErrorException("The request DTO of {$routedMethodName}() must extend " . $requestDto::class . ", got {$requestDtoClassName}.");
+        }
+        $request = DDDService::instance()->getRequestService()?->getRequestStack()?->getMainRequest();
+        if ($request === null) {
+            return $requestDto;
+        }
+        $applicationRequestDto = new $requestDtoClassName();
+        $applicationRequestDto->setPropertiesFromRequest($request);
+        return $applicationRequestDto;
+    }
+
+    /**
+     * Override point: the conversation an injected signal goes into ({@see AgentConversationWritesTrait::injectSignal()}).
+     * The default: the request's conversation under the caller's read rights and customer visibility
+     * ({@see self::findVisibleConversation()}). An application whose signals reach a conversation another way (a
+     * conversation it keeps per screen, a narrower visibility for signals) overrides this method alone.
+     *
+     * @throws NotFoundException for an unknown, foreign or hidden id when the service throws errors
+     */
+    protected function findConversationOfInjectedSignal(
+        AIConversationInjectSignalPostRequestDto $requestDto,
+        AIConversationsService $aIConversationsService
+    ): AIConversation {
+        return $this->findVisibleConversation($aIConversationsService, (int)$requestDto->aiConversationId);
+    }
+
+    /**
+     * Override point: whether a conversation the start request creates stores the full sent payload and the raw model
+     * response of every model call (`RunSettings::$storeRequestSnapshot`; read with `app:ai-agent:inspect --snapshots`).
+     * The default: the request's `storeRequestSnapshot`, honoured only in an admin session ({@see self::isAdminSession()}).
+     * An application that records a debug session of its own answers true for it.
+     */
+    protected function isRequestSnapshotStoredForStartRequest(AIConversationStartWithMessagePostRequestDto $requestDto): bool
+    {
+        return ($requestDto->storeRequestSnapshot ?? false) === true && $this->isAdminSession();
     }
 
     /** Whether a validated admin acts in this session (impersonation): the forensic fields stay on the wire then. */

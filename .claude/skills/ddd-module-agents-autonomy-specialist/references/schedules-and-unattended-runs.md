@@ -158,6 +158,12 @@ owner's resume of a platform-paused row and of a row whose scope is not eligible
 - `buildMonthlyCostEstimateForActiveRecurringSchedulesOfAgentSpace()` (and the account-level twin) estimate the month
   of the active recurring schedules: firings in 30 days times the average cost per run (the schedule's own, else the
   space's, else an assumed one). Information for a tool that creates a schedule; nothing enforces it.
+- A space several accounts work in (a space without one owner) uses the forms keyed by space AND account, which read
+  only the rows of that account (`AgentSpaceSqlCondition::forAgentSpaceOfAccount()`):
+  `buildMonthlyCostEstimateForActiveRecurringSchedulesOfAgentSpaceOfAccount()`,
+  `countAgentRecurringSchedulesCreatedForAgentSpaceOfAccountSince()` (the daily creation cap per account),
+  `countUnseenFinishedRunsOfAgentSpaceOfAccount()` and `AIConversationsService::findNewestOpenCustomerChatIdOfAgentSpaceAndAccount()`
+  (the chat a background run relays its question to). The forms keyed by the space alone are unchanged.
 
 ## Time zones
 

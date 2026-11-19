@@ -29,6 +29,8 @@ class AgentEvalConsoleProbeCommand extends AgentEvalConsoleCommand
 
     public ?int $fallbackAgentSpaceId = null;
 
+    public ?int $fallbackAccountId = null;
+
     public ?bool $rightsAppliedDuringScopeRead = null;
 
     /** @var string[] */
@@ -55,6 +57,7 @@ class AgentEvalConsoleProbeCommand extends AgentEvalConsoleCommand
         $output->writeln(self::PRINTED_LINE);
         $this->getProgressReporter()->reportProgress(self::PROGRESS_LINE);
         $this->fallbackAgentSpaceId = $this->resolveFallbackAgentSpaceId($input);
+        $this->fallbackAccountId = $this->resolveFallbackAccountId($input);
         $this->childArguments = array_merge(
             $this->buildChildConsoleCommandLine($this->getChildCommandName()),
             $this->buildScopeArgumentsForChild($input),

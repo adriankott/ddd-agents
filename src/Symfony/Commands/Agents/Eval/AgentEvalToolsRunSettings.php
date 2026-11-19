@@ -86,8 +86,11 @@ class AgentEvalToolsRunSettings extends ValueObject
     /** @var AgentEvalArms The arms of the run as the conversations are built with them */
     public AgentEvalArms $agentEvalArms;
 
-    /** @var int|null The agent space of the cases that name none; null = such a case is skipped */
+    /** @var int|null The agent space of the cases that name none; null = such a case is skipped (unless an account is named) */
     public ?int $fallbackAgentSpaceId = null;
+
+    /** @var int|null The account the run names (`--accountId`): cases without a space run at account level for it; a space without an owner runs for it */
+    public ?int $fallbackAccountId = null;
 
     /** @var bool Whether the model under test can see images (the default model cannot) */
     public bool $modelCanSeeImages = false;

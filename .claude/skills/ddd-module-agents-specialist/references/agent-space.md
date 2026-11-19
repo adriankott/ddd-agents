@@ -35,6 +35,15 @@ named modes so that no statement writes the condition by hand:
 | `forAgentSpace()` | conversations, schedules: the rows of this space | `agentSpaceId = :id` | `agentSpaceId IS NULL` (the statement carries its own account condition) |
 | `forAgentSpaceOrAccountWide()` | mandates: the rows that apply to this space | bound to it, or account-wide | account-wide only |
 | `forAccountWithoutAgentSpace()` | the rows one account holds without a space | — | `agentSpaceId IS NULL AND accountId = :accountId` |
+| `forAgentSpaceOfAccount()` | the rows one account holds in a space several accounts share | `agentSpaceId = :id AND accountId = :accountId` | as `forAccountWithoutAgentSpace()` |
+
+**A space several accounts share** (a space without one owner, several operators work in it): the reads keyed by the
+space alone count the rows of every account in it. Where that matters the module offers a form keyed by space and
+account — `AIConversationsService::findNewestOpenCustomerChatIdOfAgentSpaceAndAccount()`,
+`AIConversationSchedulesService::countAgentRecurringSchedulesCreatedForAgentSpaceOfAccountSince()`,
+`countUnseenFinishedRunsOfAgentSpaceOfAccount()` and `buildMonthlyCostEstimateForActiveRecurringSchedulesOfAgentSpaceOfAccount()`
+(`ddd-module-agents-autonomy-specialist`). An evaluation run in such a space names its account with `--accountId`
+(`ddd-module-agents-observability-specialist`).
 
 "No space" never selects the rows of all spaces of an account; a read across spaces carries no space condition and
 says so in its name. A space object without an id (not stored) matches no row

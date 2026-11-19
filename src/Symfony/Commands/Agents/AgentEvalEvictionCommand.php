@@ -103,6 +103,7 @@ class AgentEvalEvictionCommand extends AgentEvalConsoleCommand
         $this->printSettings($contextRetentionSettings, $output);
 
         $fallbackAgentSpaceId = $this->resolveFallbackAgentSpaceId($input);
+        $this->rememberFallbackAccountIdOfRun($input);
         $onlyTrajectoryName = $input->getOption('trajectory');
         $onlyTrajectoryName = $onlyTrajectoryName !== null ? (string)$onlyTrajectoryName : null;
         $trajectoriesRun = 0;
@@ -147,7 +148,7 @@ class AgentEvalEvictionCommand extends AgentEvalConsoleCommand
         OutputInterface $output
     ): ?AgentEvalEvictionTurns {
         $scopeCase = $agentEvalEvictionTrajectory->buildScopeCase();
-        if ((!$this->trajectoryNamesItsScope($scopeCase) && $fallbackAgentSpaceId === null) || !$agentEvalEvictionTrajectory->hasPrompts()) {
+        if ((!$this->trajectoryNamesItsScope($scopeCase) && $fallbackAgentSpaceId === null && $this->fallbackAccountIdOfRun === null) || !$agentEvalEvictionTrajectory->hasPrompts()) {
             $output->writeln(sprintf('<comment>SKIP</comment> %s — no %s / no prompts', $agentEvalEvictionTrajectory->name, $this->getScopeWordOfSkipLine()));
             return null;
         }
@@ -158,7 +159,7 @@ class AgentEvalEvictionCommand extends AgentEvalConsoleCommand
             $agentEvalRunOptions = AgentEvalRunOptions::forArms();
             $agentEvalRunOptions->aiModelName = $modelName;
             $agentEvalRunOutcome = $agentEvalRunnerService->runEvictionTrajectory(
-                $agentEvalRunnerService->resolveEvalScope($scopeCase, $fallbackAgentSpaceId),
+                $agentEvalRunnerService->resolveEvalScopeWithFallbackAccount($scopeCase, $fallbackAgentSpaceId, $this->fallbackAccountIdOfRun),
                 $agentEvalEvictionTrajectory->prompts,
                 $contextRetentionSettings,
                 $agentEvalRunOptions

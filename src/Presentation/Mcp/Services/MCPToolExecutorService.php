@@ -37,6 +37,7 @@ use DDD\Domain\AI\Entities\Mandates\AgentMandateGrantArguments;
 use DDD\Domain\AI\Services\Mandates\AgentMandatesService;
 use DDD\Domain\AI\Entities\MCPPackages\ToolResult;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolResponsePlatformNoteProvider;
+use DDD\Domain\AI\Entities\MCPPackages\ToolResultUntrustedSegments;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolResponseDictatedWidgetTypeProvider;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolImageBudget;
 use DDD\Domain\AI\Entities\MCPPackages\ToolCallImageReference;
@@ -125,6 +126,12 @@ class MCPToolExecutorService extends Service
 
     /** @var int Aggregate DECODED-byte budget of all images in one result (the per-image ceiling is on ToolResultImage) — excess degrades to a text note. */
     public const int MAX_IMAGE_BYTES_PER_TOOL_CALL = 6_291_456; // 6 MB
+
+    /** @var int The most validation violations a failed call's text lists ({@see buildValidationViolationsText()}) */
+    public const int MAX_VALIDATION_VIOLATIONS_IN_FAILURE_TEXT = 10;
+
+    /** @var int The longest message of one listed violation, in characters */
+    public const int MAX_VALIDATION_VIOLATION_MESSAGE_CHARS = 200;
 
     /**
      * @deprecated read the tool's own budget via {@see imageBudgetForTool()}; kept as the default's alias for callers
@@ -237,12 +244,32 @@ class MCPToolExecutorService extends Service
         $toolResult->images = $toolResultImages;
         $toolResult->refusalKind = $response->refusalKind;
         $toolResult->refusalIsFinal = $response->isFinalRefusal();
-        $toolResult->platformNoteForModel = $response->getPlatformNoteForModel();
+        // a result that holds third-party passages in marks carries the reading rule of the marks in its platform note
+        $toolResult->platformNoteForModel = ToolResultUntrustedSegments::buildPlatformNoteWithReadingRule(
+            $response->getPlatformNoteForModel(),
+            $this->joinTextContentParts($nonImageContentParts)
+        );
         $toolResult->dictatedWidgetType = $response->isError ? null : $response->getDictatedWidgetType();
         if ($toolResult->isError) {
             $this->logToolFailure($toolName, $arguments ?? [], $toolResult->content, null, $logContext);
         }
         return $toolResult;
+    }
+
+    /**
+     * The text parts of an MCP content list, joined by a blank line (the other parts are left out).
+     *
+     * @param array<int, mixed> $contentParts
+     */
+    protected function joinTextContentParts(array $contentParts): string
+    {
+        $texts = [];
+        foreach ($contentParts as $contentPart) {
+            if (is_array($contentPart) && ($contentPart['type'] ?? null) === 'text' && is_string($contentPart['text'] ?? null)) {
+                $texts[] = $contentPart['text'];
+            }
+        }
+        return implode("\n\n", $texts);
     }
 
     /**
@@ -532,13 +559,14 @@ class MCPToolExecutorService extends Service
             $exceptionClass = $throwable::class;
             throw $throwable;
         } finally {
-            $this->recordAdminAudienceToolCall(
+            $this->recordAdminAudienceToolCallWithCallContext(
                 $toolName,
                 is_array($arguments) ? $arguments : [],
                 $candidatePackageClasses,
                 (int)((hrtime(true) - $startedAtNanoseconds) / 1000000),
                 $mcpToolResponse,
-                $exceptionClass
+                $exceptionClass,
+                $serverProvidedInput
             );
         }
     }
@@ -620,6 +648,37 @@ class MCPToolExecutorService extends Service
         ?MCPToolResponse $mcpToolResponse,
         ?string $exceptionClass
     ): void {
+    }
+
+    /**
+     * Override point: records one tool call made on the admin audience together with what the server knows about the
+     * call — in the agent loop its provenance ({@see AgentToolCallProvenance}: the conversation, its root, the tool
+     * call id; {@see findConversationIdOfCallContext()} reads the conversation id), null for a call over HTTP. Called in a
+     * `finally` block after every call, successful or not. Base: {@see recordAdminAudienceToolCall()} (an application's
+     * override of that method keeps working).
+     *
+     * @param array<array-key, mixed> $arguments
+     * @param array<int, class-string> $candidatePackageClasses
+     */
+    protected function recordAdminAudienceToolCallWithCallContext(
+        string $toolName,
+        array $arguments,
+        array $candidatePackageClasses,
+        int $durationMs,
+        ?MCPToolResponse $mcpToolResponse,
+        ?string $exceptionClass,
+        ?MCPServerProvidedInput $serverProvidedInput
+    ): void {
+        $this->recordAdminAudienceToolCall($toolName, $arguments, $candidatePackageClasses, $durationMs, $mcpToolResponse, $exceptionClass);
+    }
+
+    /** The id of the conversation a call runs in, read off its call context; null for a call outside the agent loop. */
+    protected function findConversationIdOfCallContext(?MCPServerProvidedInput $serverProvidedInput): ?int
+    {
+        if (!$serverProvidedInput instanceof AgentToolCallProvenance || $serverProvidedInput->conversationId === null) {
+            return null;
+        }
+        return (int)$serverProvidedInput->conversationId;
     }
 
     /**
@@ -915,12 +974,51 @@ class MCPToolExecutorService extends Service
     protected function buildToolFailureText(string $toolName, Throwable $throwable, ?MCPServerProvidedInput $serverProvidedInput): string
     {
         if ($this->isToolFailureMessageWrittenForTheCaller($throwable)) {
-            return "Execution failed for Tool '$toolName': {$throwable->getMessage()}";
+            return "Execution failed for Tool '$toolName': {$throwable->getMessage()}" . $this->buildValidationViolationsText($throwable);
         }
         $issueId = $this->logInternalToolFailure($toolName, $throwable);
         return "Execution failed for Tool '$toolName': an internal error occurred"
             . ($issueId !== null ? " (issue id $issueId)" : '')
             . '. The error was logged; retrying with the same arguments will most likely fail again.';
+    }
+
+    /**
+     * The violations a validation failure carries (a {@see BadRequestException} with `validationErrors`: an entity's
+     * `update()` or a request that did not validate), as the lines the caller reads after the failure message — the
+     * property and the message of each, the received value left out (it can be large or private). At most
+     * {@see MAX_VALIDATION_VIOLATIONS_IN_FAILURE_TEXT} violations, each message cut at
+     * {@see MAX_VALIDATION_VIOLATION_MESSAGE_CHARS} characters, a count of the rest; '' without violations.
+     */
+    protected function buildValidationViolationsText(Throwable $throwable): string
+    {
+        if (!$throwable instanceof BadRequestException || !isset($throwable->validationErrors)) {
+            return '';
+        }
+        $violationLines = [];
+        $violationCount = 0;
+        foreach ($throwable->validationErrors->getElements() as $validationError) {
+            foreach ($validationError->getElements() as $validationResult) {
+                $violationCount++;
+                if (count($violationLines) >= static::MAX_VALIDATION_VIOLATIONS_IN_FAILURE_TEXT) {
+                    continue;
+                }
+                // the path of the object (`.` at the root, `.address.` below) and the property inside it
+                $objectPath = trim((string)($validationError->jsonPath ?? ''), '.');
+                $propertyName = (string)($validationResult->propertyName ?? '');
+                $propertyLabel = $objectPath !== '' ? $objectPath . ($propertyName !== '' ? '.' . $propertyName : '') : $propertyName;
+                $violationMessage = trim((string)preg_replace('/\s+/u', ' ', (string)($validationResult->errorMessage ?? '')));
+                if (mb_strlen($violationMessage) > static::MAX_VALIDATION_VIOLATION_MESSAGE_CHARS) {
+                    $violationMessage = mb_substr($violationMessage, 0, static::MAX_VALIDATION_VIOLATION_MESSAGE_CHARS - 1) . '…';
+                }
+                $violationLines[] = '- ' . ($propertyLabel !== '' ? $propertyLabel : '(object)') . ': ' . $violationMessage;
+            }
+        }
+        if ($violationLines === []) {
+            return '';
+        }
+        $remainingViolationCount = $violationCount - count($violationLines);
+        return "\nViolations:\n" . implode("\n", $violationLines)
+            . ($remainingViolationCount > 0 ? "\n- … and {$remainingViolationCount} more" : '');
     }
 
     /**
@@ -1512,7 +1610,9 @@ class MCPToolExecutorService extends Service
      * argument the model passed always wins, so work on another space stays fully possible. Nothing is filled in a
      * conversation WITHOUT a space and on the HTTP-MCP path (no provenance): the arguments stay as they are, and a
      * required argument stays a required input of the caller. This removes the dead end of an omitted argument for
-     * every tool that works on the conversation's space.
+     * every tool that works on the conversation's space. An argument the model passed as
+     * {@see AgentSpacesService::TOOL_ARGUMENT_VALUE_NOT_NARROWED_TO_AGENT_SPACE} ("none") is left out and never filled:
+     * the explicit "do not narrow" ({@see AgentSpacesService::applyAgentSpaceDefaultsToToolArgumentsOfCall()}).
      *
      * MULTI-DTO tools are fully covered: the class names of ALL parameters are handed over, and because
      * {@see buildMethodArguments()} hydrates EVERY RequestDto from the SAME flat arguments map, a filled argument
@@ -1530,7 +1630,7 @@ class MCPToolExecutorService extends Service
         array $arguments,
         ?MCPServerProvidedInput $serverProvidedInput
     ): array {
-        if (!$serverProvidedInput instanceof AgentToolCallProvenance || $serverProvidedInput->agentSpace === null) {
+        if (!$serverProvidedInput instanceof AgentToolCallProvenance) {
             return $arguments;
         }
         $parameterClassNames = [];
@@ -1547,7 +1647,8 @@ class MCPToolExecutorService extends Service
         }
         /** @var AgentSpacesService $agentSpacesService */
         $agentSpacesService = DDDService::instance()->getService(AgentSpacesService::class);
-        return $agentSpacesService->applyAgentSpaceDefaultsToToolArguments($arguments, $parameterClassNames, $serverProvidedInput->agentSpace);
+        // an argument the model passed as "none" is left out and never filled ("do not narrow"); without a space nothing is filled
+        return $agentSpacesService->applyAgentSpaceDefaultsToToolArgumentsOfCall($arguments, $parameterClassNames, $serverProvidedInput->agentSpace);
     }
 
     /**

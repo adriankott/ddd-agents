@@ -214,8 +214,9 @@ class AgentEvalCompactionTreeCommand extends AgentEvalConsoleCommand
     }
 
     /**
-     * The scope of the run: the case file's space, else the space of the scope options, with its owner
-     * ({@see AgentEvalJudgedRunService::resolveEvalScope()}).
+     * The scope of the run: the case file's space, else the space of the scope options, with its owner; with
+     * `--accountId` the account level of that account, or that account in a space without an owner
+     * ({@see AgentEvalJudgedRunService::resolveEvalScopeWithFallbackAccount()}).
      *
      * @param InputInterface $input
      * @param AgentEvalCompactionTreeCaseFile $agentEvalCompactionTreeCaseFile
@@ -225,7 +226,7 @@ class AgentEvalCompactionTreeCommand extends AgentEvalConsoleCommand
     protected function resolveTreeEvalScope(InputInterface $input, AgentEvalCompactionTreeCaseFile $agentEvalCompactionTreeCaseFile): AgentEvalScope
     {
         $agentEvalJudgedRunService = $this->getJudgedRunService();
-        return $agentEvalJudgedRunService->resolveEvalScope($agentEvalCompactionTreeCaseFile->buildEvalCase(), $this->resolveFallbackAgentSpaceId($input));
+        return $agentEvalJudgedRunService->resolveEvalScopeWithFallbackAccount($agentEvalCompactionTreeCaseFile->buildEvalCase(), $this->resolveFallbackAgentSpaceId($input), $this->resolveFallbackAccountId($input));
     }
 
     /**

@@ -205,6 +205,29 @@ class ConversationWidgetCatalog
     }
 
     /**
+     * Whether one of `$skillNames` brings the data of an entry ({@see ConversationWidgetCatalogEntry::$providingSkillNames}):
+     * the widget catalog of those skills is not empty. Entries the model writes without a skill or a meta tool writes
+     * do not count — the base prompt and the meta tools teach them.
+     *
+     * @param string[] $skillNames
+     */
+    public function hasEntryProvidedByOneOfSkills(array $skillNames): bool
+    {
+        if ($skillNames === []) {
+            return false;
+        }
+        $skillNameLookup = array_fill_keys($skillNames, true);
+        foreach ($this->getEntries()->getElements() as $conversationWidgetCatalogEntry) {
+            foreach ($conversationWidgetCatalogEntry->providingSkillNames as $providingSkillName) {
+                if (isset($skillNameLookup[$providingSkillName])) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
      * The entries the query matches, best first (score descending, then wire type), at most `$maxEntries`; empty when the
      * query matches no widget — then none exists for it.
      */

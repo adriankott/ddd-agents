@@ -28,8 +28,8 @@ Do not repeat in any tool what is already sent once:
 
 - the query-options grammar (`QueryOptionsSyntax`) — a query-option property carries only its allowed properties and
   a pointer;
-- the shared request parameters (`SharedRequestParametersSyntax`) — `noCache` and the paging parameters carry no
-  description per tool; `outputFormat` is not in the MCP schema at all;
+- the shared request parameters (`SharedRequestParametersSyntax`) — the paging parameters carry no description per
+  tool; `outputFormat` and `noCache` are not in the MCP schema at all (`MCPObjectProperty::MCP_HIDDEN_SHARED_PARAMETERS`);
 - `expand` lists relation names only, without nested filter lists;
 - the provenance and every injected service are left out.
 

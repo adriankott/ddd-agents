@@ -34,7 +34,10 @@ response before parsing) are written only while the conversation stores full sna
 - `ContextRetentionSettings::$storeRequestSnapshot` on the conversation (an admin start passes the settings,
   `driveConversation()` stores them on a continue), or
 - `RunSettings::$storeRequestSnapshot` (the measurement setting an eval runner stamps on every conversation it
-  creates; delegation children read the run settings of their tree).
+  creates; delegation children read the run settings of their tree). A conversation started over HTTP gets it when
+  the start trait's hook `isRequestSnapshotStoredForStartRequest()` answers true — by default for the start's query
+  parameter `storeRequestSnapshot=true` in an admin session (the console's `--store-snapshot` sets the retention
+  setting instead).
 
 Switch it on **before** the call you want to see; a call already made has no payload. The raw response tells "the
 model returned nothing" apart from "the model returned a call the loop failed to parse". The tool-call journal of

@@ -80,6 +80,12 @@ class AgentEvalSuiteTask extends ValueObject
     /** @var int|null The agent space the case works on; null when the task names none. */
     public ?int $agentSpaceId = null;
 
+    /**
+     * @var int|null The account a task without a space works for at account level (the run's `--accountId`); null when
+     * the task works in a space or names no scope.
+     */
+    public ?int $accountId = null;
+
     /** @var string One of the `ACCESS_*` constants. */
     public string $access = self::ACCESS_READ;
 
@@ -153,11 +159,15 @@ class AgentEvalSuiteTask extends ValueObject
 
     /**
      * The scope the task shares live state in: two tasks with the same scope id are scheduled against each other.
-     * Null for a task without a scope (it shares nothing). The module's scope is the agent space.
+     * Null for a task without a scope (it shares nothing). The module's scope is the agent space; a task at account
+     * level ({@see $accountId}) has the scope id of its account negated, so it never meets a space's id.
      */
     public function getScopeId(): ?int
     {
-        return $this->agentSpaceId;
+        if ($this->agentSpaceId !== null) {
+            return $this->agentSpaceId;
+        }
+        return $this->accountId !== null ? -$this->accountId : null;
     }
 
     /**
