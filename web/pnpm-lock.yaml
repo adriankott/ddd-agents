@@ -191,7 +191,7 @@ importers:
         specifier: 19.2.0
         version: 19.2.0(@types/react@19.2.0)
       apexcharts:
-        specifier: ^3.35.0
+        specifier: ^3.41.0
         version: 3.54.1
       axios:
         specifier: ^0.28.0
@@ -218,8 +218,8 @@ importers:
         specifier: ^19.2.0
         version: 19.3.1
       react-apexcharts:
-        specifier: ^1.4.0
-        version: 1.9.0(apexcharts@3.54.1)(react@19.3.1)
+        specifier: ~1.5.0
+        version: 1.5.0(apexcharts@3.54.1)(react@19.3.1)
       react-dom:
         specifier: ^19.2.0
         version: 19.3.1(react@19.3.1)
@@ -1890,11 +1890,11 @@ packages:
     resolution: {integrity: sha512-vYt7UD1U9Wg6138shLtLOvdAu+8DsC/ilFtEVHcH+wydcSpNE20AfSOduf6MkRFahL5FY7X1oU7nKVZFtfq8Fg==}
     engines: {node: '>=6'}
 
-  react-apexcharts@1.9.0:
-    resolution: {integrity: sha512-DDBzQFuKdwyCEZnji1yIcjlnV8hRr4VDabS5Y3iuem/WcTq6n4VbjWPzbPm3aOwW4I+rf/gA3zWqhws4z9CwLw==}
+  react-apexcharts@1.5.0:
+    resolution: {integrity: sha512-RwIqhYee8tT6WsDR9I15bhDuPitM+z/P092QPttFR5D57M21/WtYKHE9JQMbcz9bmF35rfDSym1SZuZ7AhidhQ==}
     peerDependencies:
-      apexcharts: '>=4.0.0'
-      react: '>=16.8.0'
+      apexcharts: ^3.41.0
+      react: '>=0.13'
 
   react-dom@19.3.1:
     resolution: {integrity: sha512-Y0bARz53lhEC1NMCASs0/j+faB/zqt3R8hpvg1e8+61ZVJ4UL0UdC4cBbXfZMcIuhrfgeILTLe+ZeBCavQPtKQ==}
@@ -3970,7 +3970,7 @@ snapshots:
 
   punycode@2.3.1: {}
 
-  react-apexcharts@1.9.0(apexcharts@3.54.1)(react@19.3.1):
+  react-apexcharts@1.5.0(apexcharts@3.54.1)(react@19.3.1):
     dependencies:
       apexcharts: 3.54.1
       prop-types: 15.8.1

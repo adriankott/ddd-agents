@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.1
+
+- Fixed: the Composer requirement on `mgamadeus/ddd-ai` is `^3.4.0` (was `^3.2.1`). `app:agents:eval-tools` uses
+  `ModelTierOptionTrait`, which ddd-ai has from 3.4.0; with 3.3.x the first `cache:clear` failed with "Trait not found".
+- Fixed: the npm peer ranges fit together. `react-apexcharts` is `>=1.4.0 <1.6.0` (1.6.0 and later need apexcharts 4)
+  and `apexcharts` `^3.41.0` (the floor react-apexcharts 1.4/1.5 asks for). A package manager that installs peers no
+  longer reports an unmet peer.
+- Docs: the npm README names the peer set in one install line and says where the agent skills come from.
+
 ## 0.1.0
 
 - First stable release, the state of 0.1.0-alpha.70 unchanged. Composer `mgamadeus/ddd-agents` 0.1.0 and npm
