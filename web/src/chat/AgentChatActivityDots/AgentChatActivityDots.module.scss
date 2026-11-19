@@ -1,0 +1,79 @@
+@import "../../styles/spacings";
+
+$activity-dots-bounce-duration: 500ms;
+$activity-dots-pulse-duration: 1400ms;
+$activity-dot-size: $x1;
+
+.dots {
+  display: flex;
+  align-items: center;
+  gap: ($x0_5 + $x0_25);
+}
+
+.dots span {
+  width: $activity-dot-size;
+  height: $activity-dot-size;
+  border-radius: 50%;
+  background-color: var(--agents-fg-light);
+}
+
+.bounce span {
+  animation: activityDotBounce $activity-dots-bounce-duration infinite ease-in-out;
+}
+
+.bounce span:nth-child(2) {
+  animation-delay: $activity-dots-bounce-duration * 0.15;
+}
+
+.bounce span:nth-child(3) {
+  animation-delay: $activity-dots-bounce-duration * 0.3;
+}
+
+.pulse span {
+  opacity: 0.35;
+  animation: activityDotPulse $activity-dots-pulse-duration infinite ease-in-out;
+}
+
+.pulse span:nth-child(2) {
+  animation-delay: $activity-dots-pulse-duration * 0.2;
+}
+
+.pulse span:nth-child(3) {
+  animation-delay: $activity-dots-pulse-duration * 0.4;
+}
+
+@keyframes activityDotBounce {
+  0%,
+  80%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.5;
+  }
+
+  40% {
+    transform: translateY(-1 * ($x0_5 + $x0_25));
+    opacity: 1;
+  }
+}
+
+// no movement in space: the dot only brightens and grows a little, then settles
+@keyframes activityDotPulse {
+  0%,
+  70%,
+  100% {
+    transform: scale(0.85);
+    opacity: 0.35;
+  }
+
+  35% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dots span {
+    animation: none;
+    opacity: 0.6;
+  }
+}

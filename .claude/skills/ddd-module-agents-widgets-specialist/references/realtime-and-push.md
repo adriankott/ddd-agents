@@ -119,6 +119,17 @@ per chat (`AgentChat activityTiming`) or for every chat (`AgentsEnvironment.chat
 back to the next and then to the package (`resolveAgentChatActivityTiming()`). With a realtime push that writes
 `activityUpdatedAt` when the narrator finishes, a lower read window shows a narrated line at once.
 
+**The client's components.** `AgentChat` shows the activity through its `ThinkingIndicator` (`AgentChatActivityProps`,
+with the resolved `activityTiming`). The default `AgentChatActivityIndicator` shows the dots and the current sentence
+(`dotsVariant`: `bounce` by default, the calm `pulse`). `AgentChatActivityStack` (`ThinkingIndicator={AgentChatActivityStack}`)
+is the stacked feed: one sentence per tool call, the newest at the bottom at full size, the older ones drifting up,
+smaller and fainter under a top mask (`ACTIVITY_STACK_VISIBLE_LINES`, about three readable ranks); the calm dots and
+"Working on it…" before the first sentence, only sentences after; it fades out over the success beat. The moving layer
+is `aria-hidden`, a polite status region carries the newest sentence; its motion follows `linePaceMs` and
+`successBeatMs`, stays still under `prefers-reduced-motion`, and its colours are the `--agents-*` variables. Within one
+turn the ticker never drops a shown sentence: a read that misses a shown step or arrives out of order merges per step
+(the later state wins); the stack resets only for another turn (`turnMessageId` changes, or a new turn starts unnamed).
+
 Without a reader nothing is narrated: console, eval, scheduled and replay runs never dispatch. A narrator failure
 leaves the lines null; the client shows the states and the next read tries again. The narrator class names a fixed
 model and endpoint; a host that uses another provider replaces it like any Argus repository of the package.

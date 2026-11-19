@@ -172,6 +172,13 @@ describe("countWorkingHelpers", () => {
 describe("activityTickerReducer", () => {
   const TURN_MESSAGE_ID = 77;
 
+  /** Every line of the elements shown at once, in order (the paces aside). */
+  const releaseAllAfterReceive = (elements: ActivityElement[]) =>
+    receiveActivityElements(EMPTY_ACTIVITY_TICKER_QUEUE, elements, T0).waitingLines.reduce(
+      (queue) => releaseNextActivityLine(queue, T0),
+      receiveActivityElements(EMPTY_ACTIVITY_TICKER_QUEUE, elements, T0),
+    );
+
   const liveState = (queue: ActivityTickerQueue): ActivityTickerState => ({
     ...INITIAL_ACTIVITY_TICKER_STATE,
     queue,
@@ -246,7 +253,34 @@ describe("activityTickerReducer", () => {
     expect(silentTurn.phase).toBe("idle");
   });
 
-  it("starts clean when a shown step is gone from the elements (another turn)", () => {
+  it("keeps every shown line when a read of the same turn misses a shown step", () => {
+    const fiveSteps = [1, 2, 3, 4, 5].map((stepId) => element(stepId, "finished", `Step ${stepId}`));
+    const queue = releaseAllAfterReceive(fiveSteps);
+    expect(shownLinesInOrder(queue)).toHaveLength(5);
+
+    const state = activityTickerReducer(liveState(queue), received([element(5, "finished", "Step 5")], true, T0 + 9000));
+
+    expect(shownLinesInOrder(state.queue).map((line) => line.line)).toEqual(["Step 1", "Step 2", "Step 3", "Step 4", "Step 5"]);
+    expect(state.turnMessageId).toBe(TURN_MESSAGE_ID);
+  });
+
+  it("lets the later state of a step win when reads arrive out of order", () => {
+    const queue = releaseAllAfterReceive([element(1, "finished", "Found A"), element(2, "running", "Looking for B")]);
+
+    const staleRead = activityTickerReducer(
+      liveState(queue),
+      received([element(1, "running", "Looking for A"), element(2, "running", "Looking for B")], true, T0 + 9000),
+    );
+    expect(staleRead.queue.shownLines[1]).toMatchObject({ state: "finished", line: "Found A" });
+    expect(staleRead.queue.waitingLines).toEqual([]);
+
+    const laterRead = activityTickerReducer(staleRead, received([element(2, "finished", "Found B")], true, T0 + 9100));
+    const releasedQueue = releaseNextActivityLine(laterRead.queue, T0 + 20_000);
+    expect(releasedQueue.shownLines[2]).toMatchObject({ state: "finished", line: "Found B" });
+    expect(shownLinesInOrder(releasedQueue).map((line) => line.line)).toEqual(["Found A", "Found B"]);
+  });
+
+  it("starts clean when the endpoint names another turn", () => {
     const queue = receiveAndRelease(EMPTY_ACTIVITY_TICKER_QUEUE, [element(1, "finished", "Found A")], T0);
     const state = activityTickerReducer(
       liveState(queue),

@@ -31,7 +31,11 @@ import type { AgentsChatState } from "../store/agents-chat-state";
 import { ConversationErrorType } from "../store/conversation-error-type";
 import type { AgentsChatStore } from "../store/create-agents-chat-store";
 import { useAgentsChatSelector } from "../store/use-agents-chat-store";
-import { type AgentChatActivityTiming, resolveAgentChatActivityTiming } from "./chat-activity-timing";
+import {
+  type AgentChatActivityTiming,
+  type ResolvedAgentChatActivityTiming,
+  resolveAgentChatActivityTiming,
+} from "./chat-activity-timing";
 import type { ChatScrollTarget } from "./chat-scroll-target";
 import { deriveAgentActivity } from "./derive-agent-activity";
 import { isChatReadyToSendPendingStartRequest, type PendingStartRequest, pickPendingStartRequest } from "./pending-start-request";
@@ -57,6 +61,8 @@ export interface AgentChatActivityProps {
   isAgentWorkingOnTask: boolean;
   /** The key of the agent space the chat is open on. */
   agentSpaceKey: number;
+  /** The chat's resolved activity timing (`activityTiming`, the environment's, the package's), for the component's motion. */
+  activityTiming?: ResolvedAgentChatActivityTiming;
 }
 
 /** What the host's activity history under a message gets: the finished turn that message started, if any. */
@@ -666,6 +672,7 @@ export const AgentChatController = (props: AgentChatControllerProps) => {
     activityTicker,
     isAgentWorkingOnTask: agentActivity.active || activityTicker.phase === "live",
     agentSpaceKey,
+    activityTiming: resolvedActivityTiming,
   };
 
   return (

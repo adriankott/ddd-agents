@@ -559,9 +559,12 @@
   },
   "./chat": {
     "values": [
+      "ACTIVITY_STACK_VISIBLE_LINES",
       "AgentChat",
+      "AgentChatActivityDots",
       "AgentChatActivityHistory",
       "AgentChatActivityIndicator",
+      "AgentChatActivityStack",
       "AgentChatController",
       "AgentsChatStateContainer",
       "AgentsChatStoreProvider",
@@ -612,7 +615,10 @@
       "ActivityTickerLine",
       "ActivityTickerTurn",
       "AgentActivity",
+      "AgentChatActivityDotsProps",
+      "AgentChatActivityDotsVariant",
       "AgentChatActivityHistoryProps",
+      "AgentChatActivityIndicatorProps",
       "AgentChatActivityProps",
       "AgentChatActivityTiming",
       "AgentChatComposerHandle",

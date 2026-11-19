@@ -14,7 +14,16 @@ export {
   useAgentsConversationClient,
   useOptionalAgentsConversationClient,
 } from "../client/AgentsConversationClientContext";
-export { AgentChatActivityIndicator } from "../chat/AgentChatActivityIndicator/AgentChatActivityIndicator";
+export {
+  AgentChatActivityIndicator,
+  type AgentChatActivityIndicatorProps,
+} from "../chat/AgentChatActivityIndicator/AgentChatActivityIndicator";
+export { AgentChatActivityStack, ACTIVITY_STACK_VISIBLE_LINES } from "../chat/AgentChatActivityStack/AgentChatActivityStack";
+export {
+  AgentChatActivityDots,
+  type AgentChatActivityDotsProps,
+  type AgentChatActivityDotsVariant,
+} from "../chat/AgentChatActivityDots/AgentChatActivityDots";
 export { AgentChatActivityHistory } from "../chat/AgentChatActivityHistory/AgentChatActivityHistory";
 export { ConversationClosedBar, type ConversationClosedBarProps } from "../chat/ConversationClosedBar/ConversationClosedBar";
 export * from "../chat/store";

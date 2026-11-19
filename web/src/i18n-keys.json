@@ -1457,6 +1457,7 @@
       "contexts": [],
       "usedIn": [
         "src/chat/AgentChatActivityIndicator/AgentChatActivityIndicator.tsx",
+        "src/chat/AgentChatActivityStack/AgentChatActivityStack.tsx",
         "src/chat/ConversationMessage/ConversationMessageWidgets/ConversationMessageThinking/ConversationMessageThinking.tsx"
       ]
     },

@@ -170,6 +170,19 @@
 
 ### Frontend (`@mgamadeus/ddd-agents`)
 
+- Fixed: the activity ticker dropped lines it had already shown within one turn. `activityTickerReducer` cleared the
+  queue whenever an activity read missed a step already on screen, so a live stack of five lines fell back to one. It
+  now merges per step (the later state wins, a read that arrives out of order never moves a step back) and starts
+  clean only for another turn: the endpoint names another `turnMessageId`, or a new turn starts before it is named.
+- Added: `AgentChatActivityStack`, a stacked activity feed for `AgentChat`'s `ThinkingIndicator`. It shows one sentence
+  per tool call: the newest at the bottom at full size, older ones drifting up, smaller and fainter under a top mask,
+  about three readable ranks (`ACTIVITY_STACK_VISIBLE_LINES`). Before the first sentence it shows the calm dots and
+  "Working on it…", afterwards only generated sentences, and it fades out over the success beat. The moving layer is
+  `aria-hidden` with a polite status region for the newest sentence. Motion follows `activityTiming`, stays still
+  under `prefers-reduced-motion`, and colours come from `--agents-*`.
+- Added: `AgentChatActivityDots` with `variant` `bounce` (the default) or `pulse` (calm, without movement in space), and
+  `AgentChatActivityIndicator`'s `dotsVariant` (default `bounce`, unchanged). `AgentChatActivityProps` carries the
+  resolved `activityTiming` (optional field).
 - Added: the timing of the activity reads and of the working indicator as host options —
   `AgentChat activityTiming` and `AgentsEnvironment.chatActivityTiming` (`AgentChatActivityTiming`:
   `activityRequestWindowMs`, `runningFloorMs`, `linePaceMs`, `backlogLinePaceMs`, `successBeatMs`; each field from the

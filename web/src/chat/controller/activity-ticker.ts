@@ -80,6 +80,12 @@ const toTickerLine = (
 const isSameLine = (shown: ActivityTickerLine | undefined, incoming: ActivityTickerLine) =>
   !!shown && shown.state === incoming.state && shown.line === incoming.line;
 
+const LINE_STATE_RANK: Record<string, number> = { queued: 0, running: 1, finished: 2, failed: 2, skipped: 2 };
+
+/** Whether the incoming line is of an earlier state than the one already told for its step (a stale read). */
+const isOlderStateThan = (told: ActivityTickerLine | undefined, incoming: ActivityTickerLine) =>
+  !!told && (LINE_STATE_RANK[incoming.state] ?? 0) < (LINE_STATE_RANK[told.state] ?? 0);
+
 /** Every shown line in the order it was told, oldest first. */
 export const shownLinesInOrder = (queue: ActivityTickerQueue): ActivityTickerLine[] =>
   [...queue.trailIds, ...(queue.currentId !== null ? [queue.currentId] : [])]
@@ -124,7 +130,9 @@ export const receiveActivityElements = (
     const waitingLine = nextQueue.waitingLines.find((line) => line.toolCallMessageId === stepId);
     const incomingLine = toTickerLine(element, waitingLine ?? nextQueue.shownLines[stepId]);
     if (!incomingLine) return;
-    if (waitingLine ? isSameLine(waitingLine, incomingLine) : isSameLine(nextQueue.shownLines[stepId], incomingLine)) {
+    const toldLine = waitingLine ?? nextQueue.shownLines[stepId];
+    // per step the later state wins: a read that arrives out of order never moves a told step back
+    if (isSameLine(toldLine, incomingLine) || isOlderStateThan(toldLine, incomingLine)) {
       return;
     }
     if (nextQueue.trailIds.includes(stepId)) {
@@ -257,12 +265,19 @@ export type ActivityTickerAction =
   | { type: "nextLineDue"; now: number }
   | { type: "doneBeatOver"; keepHistory: boolean };
 
-const hasShownStepsMissingFrom = (queue: ActivityTickerQueue, elements: ActivityElement[]) => {
-  const elementIds = new Set(elements.map((element) => element.toolCallMessageId));
-  return (
-    Object.keys(queue.shownLines).some((stepId) => !elementIds.has(Number(stepId))) ||
-    queue.waitingLines.some((line) => !elementIds.has(line.toolCallMessageId))
-  );
+/**
+ * Whether a read belongs to another turn than the one on screen: the endpoint names a different turn message, or a
+ * turn starts after the previous one left the live phase and its message is not named yet (the read hook unpins the
+ * turn on a new start, so a new turn arrives unnamed) or named differently. A read that merely misses a step already
+ * shown — a read of fewer rows, an answer that overtook a later one — is the same turn: its lines stay.
+ */
+const isReadOfAnotherTurn = (
+  state: ActivityTickerState,
+  turnMessageId: number | null,
+  turnStarted: boolean,
+): boolean => {
+  if (state.turnMessageId !== null && turnMessageId !== null && turnMessageId !== state.turnMessageId) return true;
+  return turnStarted && state.phase !== "live" && (turnMessageId === null || turnMessageId !== state.turnMessageId);
 };
 
 /**
@@ -295,7 +310,8 @@ export const activityTickerReducer = (
       const { elements, running, failed, keepHistory, now } = action;
       const turnStarted = running && !state.wasRunning;
       const turnEnded = !running && state.wasRunning;
-      const startsClean = turnStarted || hasShownStepsMissingFrom(state.queue, elements);
+      // Lines already shown in a turn are never dropped: the stack resets only for another turn.
+      const startsClean = isReadOfAnotherTurn(state, action.turnMessageId, turnStarted);
       const queue = receiveActivityElements(startsClean ? EMPTY_ACTIVITY_TICKER_QUEUE : state.queue, elements, now);
       let nextState: ActivityTickerState = {
         ...state,
