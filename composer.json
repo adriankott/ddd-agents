@@ -11,7 +11,7 @@
         }
     ],
     "require": {
-        "mgamadeus/ddd": "^3.34.3",
+        "mgamadeus/ddd": "^3.36.2",
         "mgamadeus/ddd-argus": "^1.6.0",
         "mgamadeus/ddd-ai": "^3.4.0",
         "mgamadeus/ddd-common-money": "^1.1.1",

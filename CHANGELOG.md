@@ -2,6 +2,8 @@
 
 ## 0.1.2
 
+- Requires `mgamadeus/ddd` ^3.36.2 (was ^3.34.3): the framework's Redis cache backends read a configuration without
+  `password` without the "Undefined array key" warning, which `app:mcp:clear-cache` aborted on.
 - Fixed: the module called a global function `___()` that neither the framework nor the module defines (the run report,
   the stop reason of a cut turn, the plan-less stall reply, schedule notices and the refusals of a schedule resume). A
   host without its own definition got "Call to undefined function" on a turn's failure path. Every such text now goes
