@@ -1,5 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
-import { AgentsClientError } from "../../contract/conversation";
+import { AGENTS_CLIENT_CONTEXT_LIMITS, AgentsClientError } from "../../contract/conversation";
+import { mapClientContextToWire } from "./agents-http-mappers";
 import { createAgentsHttpConversationClient, type AgentsHttpConversationClientOptions } from "./createAgentsHttpConversationClient";
 
 /**
@@ -205,6 +206,61 @@ describe("createAgentsHttpConversationClient", () => {
       "See this\n\n[Attached file: a.png — https://files.test/a.png]",
     );
     expect(posted.messages[0].id).toBe(41);
+  });
+
+  test("a start, a post and a signal carry the host's client context; the other routes and a host without one carry none", async () => {
+    const operationsAsked: string[] = [];
+    const { client, requests } = buildClient(
+      [{ body: { aiConversation: { id: 7 } } }, { body: {} }, { body: {} }, { body: {} }],
+      {
+        clientContext: (operation) => {
+          operationsAsked.push(operation);
+          return { routePath: "/tickets/42", routeParameters: { ticketId: "42", view: "compact" }, recordKind: "ticket", recordId: 42, tab: " details " };
+        },
+      },
+    );
+
+    await client.startConversation({ agentSpaceKey: 0, text: "What is this?" });
+    await client.postMessage(7, { text: "And this?" });
+    await client.injectSignal(7, { text: "Opened the ticket" });
+    await client.retryConversation(7);
+
+    const expectedClientContext = {
+      routePath: "/tickets/42",
+      routeParameters: [
+        { name: "ticketId", value: "42" },
+        { name: "view", value: "compact" },
+      ],
+      recordKind: "ticket",
+      recordId: "42",
+      tab: "details",
+    };
+    expect((requests[0].body as Record<string, unknown>).clientContext).toEqual(expectedClientContext);
+    expect((requests[1].body as Record<string, unknown>).clientContext).toEqual(expectedClientContext);
+    expect((requests[2].body as Record<string, unknown>).clientContext).toEqual(expectedClientContext);
+    expect(requests[3].body).toBeUndefined();
+    expect(operationsAsked).toEqual(["startConversation", "postMessage", "injectSignal"]);
+
+    const { client: clientWithoutContext, requests: requestsWithoutContext } = buildClient([{ body: {} }]);
+    await clientWithoutContext.postMessage(7, { text: "x" });
+    expect(requestsWithoutContext[0].body).toEqual({ aiConversationMessage: { message: "x" } });
+  });
+
+  test("a client-context field over its cap or with a control character is left out, never cut", () => {
+    const longPath = `/${"a".repeat(AGENTS_CLIENT_CONTEXT_LIMITS.routePathChars)}`;
+    const manyParameters = Object.fromEntries(
+      Array.from({ length: AGENTS_CLIENT_CONTEXT_LIMITS.routeParameterCount + 1 }, (_, position) => [`p${position}`, "1"]),
+    );
+
+    expect(mapClientContextToWire({ routePath: longPath, tab: "details" })).toEqual({ tab: "details" });
+    expect(mapClientContextToWire({ routePath: "/x", routeParameters: manyParameters })).toEqual({ routePath: "/x" });
+    expect(mapClientContextToWire({ routeParameters: { query: "q".repeat(510) } })).toBeUndefined();
+    expect(mapClientContextToWire({ recordKind: "tic\nket", recordId: "7" })).toEqual({ recordId: "7" });
+    expect(mapClientContextToWire({ routePath: "  ", routeParameters: {} })).toBeUndefined();
+    expect(mapClientContextToWire(null)).toBeUndefined();
+    expect(mapClientContextToWire({ routePath: `/${"a".repeat(AGENTS_CLIENT_CONTEXT_LIMITS.routePathChars - 1)}` })?.routePath).toHaveLength(
+      AGENTS_CLIENT_CONTEXT_LIMITS.routePathChars,
+    );
   });
 
   test("signal, retry, title, delete and the searches use their routes", async () => {

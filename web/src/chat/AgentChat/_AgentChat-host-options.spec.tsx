@@ -122,6 +122,17 @@ describe("AgentChat host options", () => {
     expect(screen.getByTestId("chat-input-textarea")).toHaveAttribute("data-placeholder", "[de] Ask anything");
   });
 
+  test("the icon-only buttons beside the composer carry accessible names from the package's texts", async () => {
+    setAgentsEnvironment({ texts: { translate: (key) => `[de] ${key}` } });
+    render(<AgentChat client={buildClient()} conversationId={1} />);
+    await screen.findByText("They grew.");
+
+    expect(screen.getByTestId("chat-input-send-button")).toHaveAttribute("aria-label", "[de] Send message");
+    expect(screen.getByRole("button", { name: "[de] Send message" })).toBe(screen.getByTestId("chat-input-send-button"));
+    // the round scroll-to-latest button the chat renders beside the composer
+    expect(screen.getByTestId("chat-scroll-to-latest-button")).toHaveAttribute("aria-label", "[de] Scroll to the latest message");
+  });
+
   test("the composer reads the texts of an AgentsProvider subtree", async () => {
     render(
       <AgentsProvider environment={{ texts: { translate: (key) => `[fr] ${key}` } }}>

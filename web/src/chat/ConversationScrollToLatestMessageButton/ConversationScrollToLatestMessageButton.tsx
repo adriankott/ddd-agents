@@ -1,4 +1,5 @@
 import { Button } from "../../provider/components";
+import { useAgentsTexts } from "../../provider/AgentsProvider";
 import { classNames } from "../../provider/class-names";
 import React from "react";
 import styles from "./ConversationScrollToLatestMessageButton.module.scss";
@@ -10,6 +11,8 @@ type ConversationScrollToLatestMessageButtonProps = {
 
 export const ConversationScrollToLatestMessageButton = (props: ConversationScrollToLatestMessageButtonProps) => {
   const { visible, onClick } = props;
+  // The button shows only an icon: its accessible name comes from the package's texts.
+  const texts = useAgentsTexts();
   return (
     <div className={classNames(styles.scrollToLatest, visible ? styles.visible : undefined)}>
       <Button
@@ -19,6 +22,8 @@ export const ConversationScrollToLatestMessageButton = (props: ConversationScrol
         blurred
         size="extraLarge"
         onClick={onClick}
+        ariaLabel={texts.translate("Scroll to the latest message")}
+        testId="chat-scroll-to-latest-button"
       />
     </div>
   );

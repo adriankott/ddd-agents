@@ -194,6 +194,21 @@ export interface WireSelectableModelsResponse {
   models?: WireSet<WireSelectableModel> | null;
 }
 
+/** One route parameter of `AgentClientContext` on the wire. */
+export interface WireClientContextRouteParameter {
+  name: string;
+  value: string;
+}
+
+/** `AgentClientContext`: the body field `clientContext` of a start, a posted message and an injected signal. */
+export interface WireClientContext {
+  routePath?: string;
+  routeParameters?: WireClientContextRouteParameter[];
+  recordKind?: string;
+  recordId?: string;
+  tab?: string;
+}
+
 /** The JSON error body of a refused request (`errorCode` on the coded exceptions, `retryAfterSeconds` on a quota). */
 export interface WireErrorBody {
   error?: string | null;

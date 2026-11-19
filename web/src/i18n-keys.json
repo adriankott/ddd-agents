@@ -843,6 +843,15 @@
       ]
     },
     {
+      "key": "Scroll to the latest message",
+      "defaultText": "Scroll to the latest message",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationScrollToLatestMessageButton/ConversationScrollToLatestMessageButton.tsx"
+      ]
+    },
+    {
       "key": "Search results for \"%query%\"",
       "defaultText": "Search results for \"%query%\"",
       "placeholders": [
@@ -870,6 +879,15 @@
       "contexts": [],
       "usedIn": [
         "src/kit/components/form/Form.composed.tsx"
+      ]
+    },
+    {
+      "key": "Send message",
+      "defaultText": "Send message",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationMessageInput/ConversationMessageInput.tsx"
       ]
     },
     {

@@ -53,18 +53,44 @@ const client = createAgentsHttpConversationClient({
 | `getSelectableModels` | `GET /selectable-models`, only with `hasSelectableModelsRoute: true` |
 
 Further options: `fetch` (default: the global one), `extraRequestParameters` (query parameters per operation),
-`polling` (the intervals of the live updates, or `false` for a host with its own push transport). Attachments travel in
+`polling` (the intervals of the live updates, or `false` for a host with its own push transport), `clientContext`
+(below). Attachments travel in
 the message text (`composeAttachmentMessageText`). Every failure rejects with `AgentsClientError`: the `errorCode` of the
 body first (`AI_BUDGET_REACHED`, `RATE_LIMIT_EXCEEDED`, `CONVERSATION_CLOSED`), then the status (429 with `Retry-After`,
 404, 401/403, 5xx), a transport failure as `network`, a cancelled request as `other` / `REQUEST_ABORTED`. The wire types
 (`Wire…`) and the mappers (`mapWireConversation`, `mapWireConversationMessage`, …) are exported for a binding of its own
 over the same routes.
 
+**Client context.** `clientContext(operation)` tells the agent what the owner sees: it is read on every start, posted
+message and injected signal and sent as the body field `clientContext` — the route path, the route parameters (a flat
+map), the record kind and id, the tab (`AgentsClientContext`). The server stores it on that owner message, and the agent
+reads the newest one as one line beside the owner's newest message (never part of the transcript). Caps
+(`AGENTS_CLIENT_CONTEXT_LIMITS`): 512 characters for the path and for the parameters as `name=value&…`, at most 20
+parameters, 64 for the kind and the tab, 128 for the id. The binding leaves out a field over its cap or with a control
+character, never cuts it (`mapClientContextToWire`), so a send never fails on it; the server refuses such a field with
+HTTP 400.
+
+```ts
+const client = createAgentsHttpConversationClient({
+  baseUrl: "/api/agents/conversations",
+  clientContext: () => ({ routePath: location.pathname, routeParameters: readRouteParameters(), recordKind: "ticket", recordId: currentTicketId, tab: currentTab }),
+});
+```
+
 **Live updates.** The client comes with the polling default over `GET /{id}/runState`, which reads at once after a post,
 a signal or a retry the server accepted. A binding of its own gets the same from `withPollingChangeSubscription(client)`;
 the port's optional `getConversationRunState` is read before `getConversationMetadata` when a binding has it.
 `useAgentsConversationClient()` (`/client`, `/chat`, the root and `/provider`) returns the client of the chat around —
 the one of `AgentsProvider`, or the `client` an `AgentChat` got as a prop.
+
+### A binding of its own (adapter)
+
+A host may serve the port from its own data layer instead (its API client, its store), with the wire types and the
+mappers above. One trap with RTK Query: a binding that reads with forced refetches and holds no subscription (a
+`initiate(…, { forceRefetch: true })` per port read, unsubscribed at once) must **not** set `keepUnusedDataFor: 0` on
+those endpoints. With 0 the store drops the cache entry the moment the first read ends and aborts a request still in
+flight when a second read of the same key arrives — the chat then shows an empty conversation after a page load with a
+conversation in the URL. Keep the default (or any value above 0) and let the forced reads refresh the entry.
 
 ## Texts and translations
 
@@ -79,7 +105,8 @@ setAgentsEnvironment({
 });
 ```
 
-In the package, `pnpm i18n-keys` rewrites the manifest from the sources; the build and the specs fail when it is stale. A
+Icon-only buttons carry their accessible name through the same function (the composer's send button: `Send message`;
+the scroll-to-latest button beside it: `Scroll to the latest message`). In the package, `pnpm i18n-keys` rewrites the manifest from the sources; the build and the specs fail when it is stale. A
 key the generator cannot see as a literal is wrapped in `textKey("…")`.
 
 ## Links, entities and default components

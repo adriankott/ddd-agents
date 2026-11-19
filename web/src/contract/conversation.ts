@@ -270,6 +270,35 @@ export interface PostedMessage {
 }
 
 /** A model-visible, owner-invisible note into a conversation (a widget click, a render report, a correction). */
+/**
+ * What the owner's client shows while the owner writes: the route, its parameters, the record on screen and the tab.
+ * Sent with a start, a posted message and an injected signal; the server stores it on that owner row and the agent reads
+ * the newest one as one line beside the owner's newest message. Each field is optional and capped
+ * ({@link AGENTS_CLIENT_CONTEXT_LIMITS}); the server refuses a request with a field over its cap (HTTP 400).
+ */
+export interface AgentsClientContext {
+  /** The path of the route the client shows, e.g. `/tickets/42`. */
+  routePath?: string | null;
+  /** The parameters of that route by name, values as text. */
+  routeParameters?: Record<string, string> | null;
+  /** The kind of the record on screen, as the application names it, e.g. `ticket`. */
+  recordKind?: string | null;
+  /** The id of the record on screen. */
+  recordId?: string | number | null;
+  /** The tab the client shows. */
+  tab?: string | null;
+}
+
+/** The caps of {@link AgentsClientContext} (characters; the route parameters as their `name=value&…` text). */
+export const AGENTS_CLIENT_CONTEXT_LIMITS = {
+  routePathChars: 512,
+  routeParametersChars: 512,
+  routeParameterCount: 20,
+  recordKindChars: 64,
+  recordIdChars: 128,
+  tabChars: 64,
+} as const;
+
 export interface ConversationSignal {
   /** generic */
   text: string;

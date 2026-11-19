@@ -182,6 +182,8 @@ export const ConversationMessageInput = (props: ConversationMessageInputProps) =
   // Through the texts of this subtree (an `AgentsProvider` environment's `texts`, else the app-wide ones).
   const texts = useAgentsTexts();
   const translatedPlaceholder = useMemo(() => texts.translate(placeholder), [texts, placeholder]);
+  // The send button shows only an icon: its accessible name comes from the package's texts.
+  const sendButtonAccessibleName = texts.translate("Send message");
   const collapsedPillSizerRef = useRef<HTMLSpanElement>(null);
   const measuresCollapsedPillWidth = compact && !!onCollapsedPillWidthChange;
 
@@ -427,6 +429,7 @@ export const ConversationMessageInput = (props: ConversationMessageInputProps) =
                     onClick={handleSendMessage}
                     icon="arrowUp"
                     testId={`${testId}-send-button`}
+                    ariaLabel={sendButtonAccessibleName}
                     disabled={!hasSendableContent || disabled || isProcessing || isMessageTooLong || sendDisabled}
                     size={hasSendableContent && !isMessageTooLong && !sendDisabled ? "medium" : undefined}
                     rounded

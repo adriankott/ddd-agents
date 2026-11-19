@@ -422,6 +422,7 @@
   },
   "./contract": {
     "values": [
+      "AGENTS_CLIENT_CONTEXT_LIMITS",
       "AGENTS_CLIENT_ERROR_CODE_REQUEST_ABORTED",
       "AgentsClientError",
       "CONVERSATION_RUN_STATES_THAT_END_THE_CONVERSATION",
@@ -430,6 +431,7 @@
       "readConversationRunStatusOfRunState"
     ],
     "types": [
+      "AgentsClientContext",
       "AgentsClientErrorKind",
       "AgentsConversation",
       "AgentsConversationMessage",
@@ -476,6 +478,7 @@
       "composeAttachmentMessageText",
       "createAgentsHttpConversationClient",
       "createPollingConversationChangeSubscription",
+      "mapClientContextToWire",
       "mapHttpFailureToAgentsClientError",
       "mapWireConversation",
       "mapWireConversationActivity",
@@ -491,6 +494,7 @@
       "withPollingChangeSubscription"
     ],
     "types": [
+      "AgentsClientContextOperation",
       "AgentsConversationClient",
       "AgentsConversationClientBindingOptions",
       "AgentsConversationClientProviderProps",
@@ -506,6 +510,8 @@
       "PollingTimers",
       "WireActivityLine",
       "WireChangeHistory",
+      "WireClientContext",
+      "WireClientContextRouteParameter",
       "WireConversation",
       "WireConversationActivityResponse",
       "WireConversationMessage",

@@ -1,5 +1,7 @@
 import {
+  AGENTS_CLIENT_CONTEXT_LIMITS,
   AgentsClientError,
+  type AgentsClientContext,
   type AgentsClientErrorKind,
   type AgentsConversation,
   type AgentsConversationMessage,
@@ -19,6 +21,8 @@ import {
 } from "../../contract/conversation";
 import type {
   WireActivityLine,
+  WireClientContext,
+  WireClientContextRouteParameter,
   WireConversation,
   WireConversationActivityResponse,
   WireConversationMessage,
@@ -275,4 +279,47 @@ export const mapHttpFailureToAgentsClientError = (
             ? "network"
             : "other");
   return new AgentsClientError(kind, { message: message ?? undefined, code, retryAfterSeconds, httpStatus });
+};
+
+// eslint-disable-next-line no-control-regex
+const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/;
+
+/** A text field of the client context as it goes out: trimmed, or left out when empty, over its cap or not one line. */
+const readClientContextText = (value: string | number | null | undefined, maxChars: number): string | undefined => {
+  if (value === null || value === undefined) return undefined;
+  const text = String(value).trim();
+  if (text === "" || text.length > maxChars || CONTROL_CHARACTERS.test(text)) return undefined;
+  return text;
+};
+
+/**
+ * The client context as the body field `clientContext` carries it (`AgentClientContext`): the route parameters as a
+ * list of `{name, value}`. A field over its cap ({@link AGENTS_CLIENT_CONTEXT_LIMITS}) or with a control character is
+ * left out — never cut — so a send never fails on the context; the route parameters go together or not at all.
+ * Undefined when nothing is left.
+ */
+export const mapClientContextToWire = (clientContext: AgentsClientContext | null | undefined): WireClientContext | undefined => {
+  if (!clientContext) return undefined;
+  const wireClientContext: WireClientContext = {};
+  const routePath = readClientContextText(clientContext.routePath, AGENTS_CLIENT_CONTEXT_LIMITS.routePathChars);
+  if (routePath !== undefined) wireClientContext.routePath = routePath;
+  const routeParameters: WireClientContextRouteParameter[] = Object.entries(clientContext.routeParameters ?? {})
+    .filter(([name, value]) => name.trim() !== "" && value !== null && value !== undefined)
+    .map(([name, value]) => ({ name, value: String(value) }));
+  const routeParametersText = routeParameters.map((routeParameter) => `${routeParameter.name}=${routeParameter.value}`).join("&");
+  if (
+    routeParameters.length > 0 &&
+    routeParameters.length <= AGENTS_CLIENT_CONTEXT_LIMITS.routeParameterCount &&
+    routeParametersText.length <= AGENTS_CLIENT_CONTEXT_LIMITS.routeParametersChars &&
+    !CONTROL_CHARACTERS.test(routeParametersText)
+  ) {
+    wireClientContext.routeParameters = routeParameters;
+  }
+  const recordKind = readClientContextText(clientContext.recordKind, AGENTS_CLIENT_CONTEXT_LIMITS.recordKindChars);
+  if (recordKind !== undefined) wireClientContext.recordKind = recordKind;
+  const recordId = readClientContextText(clientContext.recordId, AGENTS_CLIENT_CONTEXT_LIMITS.recordIdChars);
+  if (recordId !== undefined) wireClientContext.recordId = recordId;
+  const tab = readClientContextText(clientContext.tab, AGENTS_CLIENT_CONTEXT_LIMITS.tabChars);
+  if (tab !== undefined) wireClientContext.tab = tab;
+  return Object.keys(wireClientContext).length > 0 ? wireClientContext : undefined;
 };

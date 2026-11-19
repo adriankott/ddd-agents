@@ -6,6 +6,7 @@ import type {
 import {
   AGENTS_CLIENT_ERROR_CODE_REQUEST_ABORTED,
   AgentsClientError,
+  type AgentsClientContext,
   type AgentsConversation,
   type ChangedConversationMessages,
   type ChangedMessagesRequest,
@@ -26,6 +27,7 @@ import { composeAttachmentMessageText } from "../compose-attachment-message-text
 import type { PollingConversationChangeSubscriptionOptions } from "../polling/createPollingConversationChangeSubscription";
 import { withPollingChangeSubscription } from "../polling/withPollingChangeSubscription";
 import {
+  mapClientContextToWire,
   mapHttpFailureToAgentsClientError,
   mapWireConversation,
   mapWireConversationActivity,
@@ -83,7 +85,16 @@ export interface AgentsHttpConversationClientOptions extends AgentsConversationC
    * Default: polling with the default intervals.
    */
   polling?: PollingConversationChangeSubscriptionOptions | false;
+  /**
+   * What the owner's client shows, read on every start, posted message and injected signal and sent as the body field
+   * `clientContext` (the route, its parameters, the record on screen, the tab). The agent reads the newest one as one
+   * line beside the owner's newest message. A field over its cap is left out, never cut. Default: none.
+   */
+  clientContext?: (operation: AgentsClientContextOperation) => AgentsClientContext | null | undefined;
 }
+
+/** The writes that carry the client context. */
+export type AgentsClientContextOperation = "startConversation" | "postMessage" | "injectSignal";
 
 /** The page size of a changed-messages read when the request names none (as the chat sends it). */
 export const AGENTS_HTTP_DEFAULT_CHANGED_MESSAGES_PAGE_SIZE = 50;
@@ -227,6 +238,7 @@ class AgentsHttpConversationClient implements AgentsConversationClient {
         aiConversationMessage: { message: composeAttachmentMessageText(request.text, request.attachments) },
         ...(request.startSignalText ? { signalText: request.startSignalText } : {}),
         ...(request.entryPointKey ? { entryPointKey: request.entryPointKey } : {}),
+        ...this.readClientContextBody("startConversation"),
       },
     });
     const wireConversation = response.aiConversation ?? {};
@@ -247,7 +259,10 @@ class AgentsHttpConversationClient implements AgentsConversationClient {
       method: "POST",
       path: `/${conversationId}/postMessage`,
       query: { aiModelName: message.model },
-      body: { aiConversationMessage: { message: composeAttachmentMessageText(message.text, message.attachments) } },
+      body: {
+        aiConversationMessage: { message: composeAttachmentMessageText(message.text, message.attachments) },
+        ...this.readClientContextBody("postMessage"),
+      },
     });
     return { messages: readWireSetElements(response.aiConversation?.messages).map(mapWireConversationMessage) };
   };
@@ -257,7 +272,11 @@ class AgentsHttpConversationClient implements AgentsConversationClient {
       operation: "injectSignal",
       method: "POST",
       path: `/${conversationId}/injectSignal`,
-      body: { signalText: signal.text, ...(signal.source ? { signalSource: signal.source } : {}) },
+      body: {
+        signalText: signal.text,
+        ...(signal.source ? { signalSource: signal.source } : {}),
+        ...this.readClientContextBody("injectSignal"),
+      },
     });
   };
 
@@ -310,6 +329,12 @@ class AgentsHttpConversationClient implements AgentsConversationClient {
       messages: readWireSetElements(response.messages).map(mapWireConversationMessage),
       hasMoreOlder: response.hasMoreOlder === true,
     };
+  }
+
+  /** The body field `clientContext` of a write, from the host's option; nothing when it gives none. */
+  protected readClientContextBody(operation: AgentsClientContextOperation): { clientContext?: ReturnType<typeof mapClientContextToWire> } {
+    const wireClientContext = mapClientContextToWire(this.options.clientContext?.(operation));
+    return wireClientContext ? { clientContext: wireClientContext } : {};
   }
 
   /** The URL of a route: the base, the path, the binding's query parameters with the host's extra ones over them. */
