@@ -63,11 +63,29 @@ class DBAIConversationMessage extends DBEntity
      */
     public static function buildCostInUSDIncludingToolCallExecutionSql(string $messageTableAlias): string
     {
+        $toolCallExecutionCostInUSDSql = static::buildToolCallExecutionCostInUSDSql($messageTableAlias);
+        return '(COALESCE(`' . $messageTableAlias . '`.`costInUSD`, 0) + ' . $toolCallExecutionCostInUSDSql . ')';
+    }
+
+    /**
+     * The SQL of what one row's tool call booked while it ran ({@see ToolCall::$executionCosts}), 0 for a row without a
+     * tool call or without execution costs — the second half of {@see buildCostInUSDIncludingToolCallExecutionSql()},
+     * for a reader that shows the tool executions apart from the model steps.
+     *
+     * The alias is written into the statement, so it must be a plain SQL identifier (letters, digits, underscore); any
+     * other text is refused.
+     *
+     * @param string $messageTableAlias the alias of the message table in the caller's statement (`m`, `message`, …)
+     * @return string
+     * @throws InternalErrorException when the alias is no plain identifier
+     */
+    public static function buildToolCallExecutionCostInUSDSql(string $messageTableAlias): string
+    {
         if (preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $messageTableAlias) !== 1) {
             throw new InternalErrorException('The message table alias must be a plain SQL identifier.');
         }
         $toolCallExecutionCostSql = static::buildToolCallExecutionCostSql('`' . $messageTableAlias . '`.`toolCall`');
-        return '(COALESCE(`' . $messageTableAlias . '`.`costInUSD`, 0) + COALESCE(' . $toolCallExecutionCostSql . ', 0))';
+        return 'COALESCE(' . $toolCallExecutionCostSql . ', 0)';
     }
 
     /**

@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+- Added: `DBAIConversationMessage::buildToolCallExecutionCostInUSDSql()`, the SQL of what a row's tool call booked
+  while it ran (0 without one), for a reader that shows tool executions apart from the model steps.
+  `buildCostInUSDIncludingToolCallExecutionSql()` builds on it; its SQL is unchanged.
+- Fixed: `DBAIConversation::findTopConversationStats()` leaves truncated rows out (`truncatedAt IS NULL`), as the
+  conversation's own totals do.
+- Fixed: `ArgusAgentDecisions` declares its elements as `A[]|B[]|…` instead of `(A|B|…)[]`, the form the framework
+  reads when a cached set is loaded.
+- Fixed (npm): the widget image capture's `html, body { margin: 0; padding: 0 }` applies only to a page that holds a
+  capture root; loaded app-wide it removed the host page's body spacing.
+- Changed (npm): a KPI text value is shown with the `title` variant and sits on the bottom of the hero's line box, so
+  text and number values end on the same line across a row of tiles.
+
 ## 0.1.1
 
 - Fixed: the Composer requirement on `mgamadeus/ddd-ai` is `^3.4.0` (was `^3.2.1`). `app:agents:eval-tools` uses

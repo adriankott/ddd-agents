@@ -1,6 +1,9 @@
 @import "../styles/conversation-widget-container";
 
-:global(html), :global(body) {
+// Only the page that holds a capture root: the stylesheet is also loaded by applications whose own pages keep their
+// body spacing.
+:global(html):has(.root),
+:global(body):has(.root) {
   margin: 0;
   padding: 0;
 }

@@ -24,7 +24,8 @@ export interface WidgetKpiValueProps {
 /**
  * The KPI value of the chat widgets and the kit's KPI node: the hero scale (the app's dashboard scale) (48px bold,
  * tabular, scaled down to fit) re-used, never a second type scale. The label is known before the data, so it is never
- * a skeleton. A text value sits in the same hero line box, so the lines under it align across a row of KPIs.
+ * a skeleton. A text value (18px, `title`) sits on the bottom of the same hero line box as a number, so the value
+ * lines and the lines under them align across a row of KPIs.
  */
 export const WidgetKpiValue = (props: WidgetKpiValueProps) => {
   const { label, value, unit, delta, loading = false, valuePresentation = "hero", accent, meter, testId } = props;
@@ -50,7 +51,7 @@ export const WidgetKpiValue = (props: WidgetKpiValueProps) => {
         {loading ? (
           <SkeletonText width="3em" height={48} />
         ) : valuePresentation === "text" ? (
-          <WidgetText variant="headline" translate={false} className={styles.textValue}>
+          <WidgetText variant="title" translate={false} className={styles.textValue}>
             {value}
           </WidgetText>
         ) : (
