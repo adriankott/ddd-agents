@@ -11,6 +11,8 @@
   reads when a cached set is loaded.
 - Fixed (npm): the widget image capture's `html, body { margin: 0; padding: 0 }` applies only to a page that holds a
   capture root; loaded app-wide it removed the host page's body spacing.
+- Added (npm): the widget text variant `title` (`AgentsWidgetTextVariant`, 1.125rem / 500 in the default
+  components), between `headline` and `value`.
 - Changed (npm): a KPI text value is shown with the `title` variant and sits on the bottom of the hero's line box, so
   text and number values end on the same line across a row of tiles.
 

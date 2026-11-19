@@ -78,6 +78,7 @@ $agents-text-roles: (
 $agents-widget-text-variants: (
   "hero": (2rem, 700, 1.1),
   "headline": (1.25rem, 700, 1.25),
+  "title": (1.125rem, 500, 1.33),
   "gaugeValue": (1.5rem, 700, 1.15),
   "value": (1rem, 600, 1.35),
   "caption": (0.8125rem, 400, 1.4),
@@ -100,6 +101,7 @@ $agents-widget-text-variants: (
 
 .agents-widget-text--hero,
 .agents-widget-text--headline,
+.agents-widget-text--title,
 .agents-widget-text--gaugeValue,
 .agents-widget-text--value {
   color: var(--agents-fg);

@@ -347,6 +347,7 @@ export interface AgentsHeroValueProps {
 export type AgentsWidgetTextVariant =
   | "hero"
   | "headline"
+  | "title"
   | "gaugeValue"
   | "value"
   | "caption"
