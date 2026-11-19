@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { readSafeHttpUrl } from "../../../kit/components/text/shared/text-node-values";
 import { remarkDraftLineBreaks } from "../shared/remark-draft-line-breaks";
 import styles from "./WritingDraftWidget.module.scss";
+import { AgentsLink } from "../../../provider/link-navigation";
 
 interface DraftMarkdownElementProps {
   children?: ReactNode;
@@ -56,9 +57,9 @@ const SAFE_DRAFT_MARKDOWN_COMPONENTS = {
     const safeUrl = readSafeHttpUrl(props.href);
     if (safeUrl === null) return <span>{props.children}</span>;
     return (
-      <a className={styles.bodyLink} href={safeUrl} target="_blank" rel="noopener noreferrer">
+      <AgentsLink className={styles.bodyLink} href={safeUrl}>
         {props.children}
-      </a>
+      </AgentsLink>
     );
   },
 } as NonNullable<AgentsMarkdownProps["components"]>;

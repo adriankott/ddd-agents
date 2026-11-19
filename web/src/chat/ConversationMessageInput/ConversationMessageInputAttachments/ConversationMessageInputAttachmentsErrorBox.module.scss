@@ -13,7 +13,7 @@
   border-radius: $x1;
   overflow: hidden;
   // Semitransparent error fill — reads on both the light and dark chat surface.
-  background: rgba(var(--agents-danger-500-rgb), 0.1);
+  background: color-mix(in srgb, var(--agents-danger-500) 10%, transparent);
 
   // Hover pauses the countdown: the bar freezes here, the dismiss timeout via onMouseEnter — the
   // same hover boundary drives both, so they stay in sync.

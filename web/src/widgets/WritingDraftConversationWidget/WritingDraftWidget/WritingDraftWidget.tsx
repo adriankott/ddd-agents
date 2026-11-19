@@ -7,6 +7,7 @@ import { ModelText } from "../../../kit/ModelText/ModelText";
 import type { WritingDraftKind } from "../shared/writing-draft-widget-payload";
 import { WritingDraftBody } from "./WritingDraftBody";
 import styles from "./WritingDraftWidget.module.scss";
+import { textKey } from "../../../provider/text-key";
 
 /** The draft as the widget shows it — the model's draft, or the owner's edit of it. */
 export interface WritingDraftValues {
@@ -19,13 +20,13 @@ export type WritingDraftField = keyof WritingDraftValues;
 
 /** The label above the headline per kind — one translation key each, never a concatenated word. */
 export const WRITING_DRAFT_KIND_LABELS: Record<WritingDraftKind | "unknown", string> = {
-  email: "E-mail draft",
-  letter: "Letter draft",
-  post: "Post draft",
-  reply: "Reply draft",
-  message: "Message draft",
-  other: "Text draft",
-  unknown: "Text draft",
+  email: textKey("E-mail draft"),
+  letter: textKey("Letter draft"),
+  post: textKey("Post draft"),
+  reply: textKey("Reply draft"),
+  message: textKey("Message draft"),
+  other: textKey("Text draft"),
+  unknown: textKey("Text draft"),
 };
 
 export interface WritingDraftWidgetProps {
@@ -170,10 +171,10 @@ export const WritingDraftWidget = (props: WritingDraftWidgetProps) => {
             {showsRecipientRow || showsSubjectRow ? (
               <div className={styles.header}>
                 {showsRecipientRow
-                  ? renderHeaderLine("To", values.recipient, "No recipient yet", "writing-draft-recipient")
+                  ? renderHeaderLine(textKey("To"), values.recipient, textKey("No recipient yet"), "writing-draft-recipient")
                   : null}
                 {showsSubjectRow
-                  ? renderHeaderLine("Subject", values.subject, "No subject yet", "writing-draft-subject")
+                  ? renderHeaderLine(textKey("Subject"), values.subject, textKey("No subject yet"), "writing-draft-subject")
                   : null}
               </div>
             ) : null}
@@ -230,15 +231,15 @@ export const WritingDraftWidget = (props: WritingDraftWidgetProps) => {
         <div className={styles.actions}>
           {isEditing ? (
             <>
-              {renderPill("Done", "check", onFinishEditing, "writing-draft-done", true)}
-              {isEdited ? renderPill("Discard changes", "refresh", onReset, "writing-draft-reset") : null}
+              {renderPill(textKey("Done"), "check", onFinishEditing, "writing-draft-done", true)}
+              {isEdited ? renderPill(textKey("Discard changes"), "refresh", onReset, "writing-draft-reset") : null}
             </>
           ) : (
             <>
-              {renderPill(isCopied ? "Copied" : "Copy", isCopied ? "check" : "duplicate", onCopy, "writing-draft-copy")}
-              {renderPill("Edit", "edit", onStartEditing, "writing-draft-edit")}
-              {canOpenInMail ? renderPill("Open in mail", "mail", onOpenInMail, "writing-draft-open-in-mail") : null}
-              {isEdited ? renderPill("Discard changes", "refresh", onReset, "writing-draft-reset") : null}
+              {renderPill(isCopied ? textKey("Copied") : textKey("Copy"), isCopied ? "check" : "duplicate", onCopy, "writing-draft-copy")}
+              {renderPill(textKey("Edit"), "edit", onStartEditing, "writing-draft-edit")}
+              {canOpenInMail ? renderPill(textKey("Open in mail"), "mail", onOpenInMail, "writing-draft-open-in-mail") : null}
+              {isEdited ? renderPill(textKey("Discard changes"), "refresh", onReset, "writing-draft-reset") : null}
             </>
           )}
         </div>

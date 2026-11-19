@@ -9,7 +9,14 @@
 //
 // Dark: the dark set applies when the system asks for dark and the page does not pin light (`data-theme="light"` on
 // the root element), or when the page pins dark (`data-theme="dark"`). The colour scheme follows, so the `light-dark()`
-// pairs in package rules pick their dark half.
+// pairs in package rules pick their dark half. A host whose theme is a class or another attribute on the root element
+// (`class="dark"`, `data-mode="dark"`) has the package follow it with `followHostColorScheme()`, which mirrors it into
+// `data-agents-theme="dark|light"` — that attribute pins the package's scheme over both others.
+//
+// Colours with alpha: package rules mix a plain colour variable (`color-mix(in srgb, var(--agents-fg) 8%,
+// transparent)`), so an app sets plain colour tokens only. The `--agents-<name>-rgb` triplets of 0.1 stay: each plain
+// colour of the triplet list defaults to `rgb(var(--agents-<name>-rgb))`, so an app that set a triplet on the root
+// element still colours both.
 @use "sass:color";
 @use "sass:map";
 
@@ -26,6 +33,9 @@ $agents-light-colors: (
   "fg-lightest": #8b929d,
   "fg-cta": #2563eb,
   "fg-on-dark": #ffffff,
+  // Text and icons on an accent fill (a coloured bubble, a success dot): white on the light theme's deep fills, dark on
+  // the dark theme's bright ones. `fg-on-dark` stays white for text over a dark scrim (a photo, a video).
+  "fg-on-accent": #ffffff,
   "text-subtle": #8b929d,
   "neutral-200": #e3e6eb,
   "neutral-700": #374151,
@@ -71,7 +81,8 @@ $agents-light-colors: (
   "assistant-600": #4338ca,
 );
 
-// Colours emitted only as an `r, g, b` triplet (`--agents-<name>-rgb`), for `rgba(var(--agents-<name>-rgb), <alpha>)`.
+// Colours emitted as an `r, g, b` triplet (`--agents-<name>-rgb`, the 0.1 way to mix an alpha) and as the plain colour
+// `--agents-<name>` over that triplet, which package rules mix (`color-mix()`).
 $agents-light-triplets: (
   "bg": map.get($agents-light-colors, "bg"),
   "bg-disabled": map.get($agents-light-colors, "bg-disabled"),
@@ -97,6 +108,7 @@ $agents-dark-colors: (
   "fg-lightest": #7d8592,
   "fg-cta": #60a5fa,
   "fg-on-dark": #ffffff,
+  "fg-on-accent": #111418,
   "text-subtle": #7d8592,
   "neutral-200": #2e343d,
   "neutral-700": #d1d5db,
@@ -161,10 +173,13 @@ $agents-dark-triplets: (
 @mixin agents-variables($colors, $triplets, $scheme) {
   color-scheme: $scheme;
   @each $name, $colour in $colors {
-    --agents-#{$name}: #{$colour};
+    @if not map.has-key($triplets, $name) {
+      --agents-#{$name}: #{$colour};
+    }
   }
   @each $name, $colour in $triplets {
     --agents-#{$name}-rgb: #{agents-rgb-triplet($colour)};
+    --agents-#{$name}: rgb(var(--agents-#{$name}-rgb));
   }
 }
 
@@ -174,12 +189,13 @@ $agents-dark-triplets: (
   }
 
   @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
+    :root:not([data-theme="light"]):not([data-agents-theme="light"]) {
       @include agents-variables($agents-dark-colors, $agents-dark-triplets, dark);
     }
   }
 
-  :root[data-theme="dark"] {
+  :root[data-theme="dark"]:not([data-agents-theme="light"]),
+  :root[data-agents-theme="dark"] {
     @include agents-variables($agents-dark-colors, $agents-dark-triplets, dark);
   }
 }

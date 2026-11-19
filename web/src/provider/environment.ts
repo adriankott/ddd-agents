@@ -4,6 +4,7 @@ import type { ConversationWidgetStatePartition } from "../renderer/conversation-
 import type { ChatAssistantCategory } from "../chat/chat-assistant-identity";
 import type { ComposedNodeSchemaApplicationPart } from "../renderer/widget-tree/composed-node-schema";
 import type { CanvasBehaviour } from "../renderer/canvas/canvas-behaviours";
+import type { OpenEntityActionTarget } from "../renderer/canvas/entity-detail-instance";
 
 /** Translates interface copy. The key is the English source text. */
 export interface AgentsTexts {
@@ -165,6 +166,18 @@ export interface AgentsEnvironment {
    * replacements, which may read a string as markup. Default: the text unchanged.
    */
   escapePlainTextForText?: (text: string) => string;
+  /**
+   * Decides where a link of the package goes — every anchor (Markdown links, sources, kit links) and every link the
+   * package opens by code (a video's watch page, an `openUrl` action, a gallery image without a lightbox). `event` is
+   * the click, null when there is none. Return true when the host navigated itself (an in-app route; the package then
+   * does nothing), false to let the package open the link in a new tab. Default: every link opens in a new tab.
+   */
+  onNavigate?: (href: string, event: MouseEvent | null) => boolean;
+  /**
+   * Opens the entity of an `openEntity` action (a composed view's row, a map point) on a host route instead of the
+   * `entityDetail` canvas. Return true when the host opened it, false to open the canvas. Default: the canvas.
+   */
+  onOpenEntity?: (target: OpenEntityActionTarget) => boolean;
   /** Opens the images in the app's lightbox, starting at `startIndex`. Default: the start image in a new tab. */
   openImageGallery?: (images: AgentsGalleryImage[], startIndex: number) => void;
   /** Reports a widget that crashed while rendering. Default: nothing (the crash is logged to the console). */
@@ -275,7 +288,9 @@ export const openImageGallery = (images: AgentsGalleryImage[], startIndex: numbe
     return;
   }
   const startImage = images[startIndex];
-  if (startImage) window.open(startImage.url, "_blank", "noopener,noreferrer");
+  if (!startImage) return;
+  if (appEnvironment.onNavigate?.(startImage.url, null) === true) return;
+  window.open(startImage.url, "_blank", "noopener,noreferrer");
 };
 
 /** The block field of the package's backend default (`WidgetBlockFieldNames::WIDGET_SELF_HYDRATION_KEY`). */

@@ -1,15 +1,19 @@
 // The AI frame block of the app's `src/styles/_ai_variables.scss`, copied verbatim so the chat's
 // composer stylesheet compiles to the same CSS without the app alias. The names stay the app's on purpose:
 // the app and the component library declare the same block on :root.
-:root {
-  --ai-start-color: hsl(from var(--ai-base-color) calc(h + 123) 100 56);
-  --ai-start-color-lighter: hsl(from var(--ai-start-color) h s calc(l + 10));
-  --ai-end-color: hsl(from var(--ai-base-color) calc(h - 35) 93 60);
-  --ai-border-size: 4px;
-  --ai-border-size-outside: calc(var(--ai-border-size) + 2px);
-  --ai-border-radius: 16px;
-  --ai-stroke-color: rgba(from var(--agents-global-background) r g b / 0.6);
-  --ai-blur-width: 24px;
+// In the package's cascade layer: an app's own block on :root (unlayered, or in a layer ordered after
+// `agents-defaults`) wins.
+@layer agents-defaults {
+  :root {
+    --ai-start-color: hsl(from var(--ai-base-color) calc(h + 123) 100 56);
+    --ai-start-color-lighter: hsl(from var(--ai-start-color) h s calc(l + 10));
+    --ai-end-color: hsl(from var(--ai-base-color) calc(h - 35) 93 60);
+    --ai-border-size: 4px;
+    --ai-border-size-outside: calc(var(--ai-border-size) + 2px);
+    --ai-border-radius: 16px;
+    --ai-stroke-color: rgba(from var(--agents-global-background) r g b / 0.6);
+    --ai-blur-width: 24px;
+  }
 }
 
 @property --ai-bg-angle {

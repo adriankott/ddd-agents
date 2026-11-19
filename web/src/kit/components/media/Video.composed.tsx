@@ -17,6 +17,7 @@ import {
 } from "./media-values";
 import styles from "./Video.module.scss";
 import { useImageLoadState } from "./use-image-load-state";
+import { AgentsLink, useAgentsLinkNavigation } from "../../../provider/link-navigation";
 
 const readTitle = (value: unknown): string | undefined =>
   typeof value === "string" && value.trim() !== "" ? value.trim() : undefined;
@@ -43,6 +44,7 @@ const VideoNode = (props: ComposedViewComponentProps) => {
   const source = useMemo(() => readMediaSource(nodeProps.source), [nodeProps.source]);
   const isCompact = sizeClass === "compact";
   const [isPlaying, setIsPlaying] = useState(false);
+  const { openLink } = useAgentsLinkNavigation();
   const {
     loadState: thumbnailLoadState,
     imageRef: thumbnailRef,
@@ -86,7 +88,7 @@ const VideoNode = (props: ComposedViewComponentProps) => {
       setIsPlaying(true);
       return;
     }
-    if (watchUrl) window.open(watchUrl, "_blank", "noopener,noreferrer");
+    if (watchUrl) openLink(watchUrl);
   };
   const metaLine = [channel, duration].filter((metaPart): metaPart is string => metaPart !== undefined).join(" · ");
   const sourceName = source && source.name !== channel ? source.name : undefined;
@@ -170,18 +172,17 @@ const VideoNode = (props: ComposedViewComponentProps) => {
         ) : null}
       </span>
       {canOpen && watchUrl ? (
-        <a
+        <AgentsLink
           className={styles.openLink}
           href={watchUrl}
-          target="_blank"
-          rel="noopener noreferrer"
+         
           data-testid={`${testId}-open-link`}
         >
           <Text role="help" weight="medium" color="var(--agents-fg-cta)">
             {"Open video"}
           </Text>
           <Icon color="var(--agents-fg-cta)" name="arrowRight" />
-        </a>
+        </AgentsLink>
       ) : null}
     </figure>
   );

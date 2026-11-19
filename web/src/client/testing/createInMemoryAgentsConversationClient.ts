@@ -23,6 +23,7 @@ import {
   type SelectableModel,
   type StartedConversation,
 } from "../../contract/conversation";
+import { composeAttachmentMessageText } from "../compose-attachment-message-text";
 
 /** One recorded conversation handed to the in-memory client: plain data, as a fixture file holds it. */
 export interface RecordedConversation {
@@ -83,12 +84,7 @@ const textContains = (text: string | null | undefined, searchText: string): bool
   (text ?? "").toLowerCase().includes(searchText.trim().toLowerCase());
 
 /** The message text a send stores: the typed text plus one reference line per attachment (as the host application's chat sends it). */
-const buildStoredMessageText = (text: string, attachments: ConversationAttachmentReference[] | undefined): string =>
-  attachments?.length
-    ? `${text}\n\n${attachments
-        .map((attachment) => `[Attached file: ${attachment.fileName ?? "file"} — ${attachment.publicUrl ?? ""}]`)
-        .join("\n")}`
-    : text;
+const buildStoredMessageText = composeAttachmentMessageText;
 
 /**
  * The conversation client over recorded conversations, for specs, stories and the reference app

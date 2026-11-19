@@ -9,6 +9,7 @@ import type {
   ConversationMessageSearchHit,
   ConversationMessageSentPayload,
   ConversationMessagesPage,
+  ConversationRunStateRead,
   ConversationSearchGroup,
   ConversationSearchOptions,
   ConversationSignal,
@@ -33,6 +34,13 @@ import type {
 export interface AgentsConversationClient {
   /** The conversation without messages: title, run state, the owed-turn mark, purpose, initiator. */
   getConversationMetadata: (conversationId: number) => Promise<AgentsConversation>;
+
+  /**
+   * The server's lean run-state read: run state, owed turn, newest message id, title and summary. Optional: the
+   * polling default of the live updates (`withPollingChangeSubscription`) reads it instead of `getConversationMetadata`
+   * when the binding has it.
+   */
+  getConversationRunState?: (conversationId: number) => Promise<ConversationRunStateRead>;
 
   /** The newest page, each message with its delegated children's `{ id, runState }`. */
   getNewestMessagesPage: (conversationId: number, pageSize: number) => Promise<ConversationMessagesPage>;

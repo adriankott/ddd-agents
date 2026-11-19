@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { PluggableList } from "unified";
@@ -273,21 +273,61 @@ const DefaultProgressBar = (props: AgentsProgressBarProps) => {
   );
 };
 
+/** The width of an element, followed with a `ResizeObserver`; null until it is laid out. */
+const useElementWidth = (): [number | null, (element: HTMLElement | null) => void] => {
+  const [width, setWidth] = useState<number | null>(null);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
+  const observeElement = useCallback((element: HTMLElement | null) => {
+    resizeObserverRef.current?.disconnect();
+    resizeObserverRef.current = null;
+    if (element === null) return;
+    const initialWidth = element.getBoundingClientRect().width;
+    setWidth(initialWidth > 0 ? initialWidth : null);
+    if (typeof ResizeObserver === "undefined") return;
+    resizeObserverRef.current = new ResizeObserver((entries) => {
+      const entry = entries[entries.length - 1];
+      if (entry && entry.contentRect.width > 0) setWidth(entry.contentRect.width);
+    });
+    resizeObserverRef.current.observe(element);
+  }, []);
+  return [width, observeElement];
+};
+
+/**
+ * Two panes side by side. Below `coversBelowWidth` — measured on the split view's own box, so a narrow chat column in a
+ * wide window counts as narrow — the open side pane covers the main pane instead of narrowing it.
+ */
 const DefaultSplitView = (props: AgentsSplitViewProps) => {
-  const { isSideOpen, main, side, sideToggle } = props;
+  const { isSideOpen, coversBelowWidth, main, side, sideToggle } = props;
+  const [splitViewWidth, observeSplitView] = useElementWidth();
+  const coversMain = coversBelowWidth !== undefined && splitViewWidth !== null && splitViewWidth < coversBelowWidth;
   return (
-    <div className="agents-split-view" style={{ display: "flex", width: "100%", height: "100%" }}>
+    <div
+      ref={observeSplitView}
+      className={classNames("agents-split-view", coversMain && "agents-split-view--covering")}
+      style={{ display: "flex", width: "100%", height: "100%", position: "relative" }}
+    >
       <div
         className="agents-split-view__main"
-        style={{ width: isSideOpen ? (main.narrowedWidth ?? main.width) : main.width, background: main.background }}
+        style={{
+          width: isSideOpen && !coversMain ? (main.narrowedWidth ?? main.width) : main.width,
+          background: main.background,
+        }}
       >
         {main.content}
       </div>
-      {sideToggle ? (
+      {sideToggle && !coversMain ? (
         <button type="button" className="agents-split-view__toggle" onClick={sideToggle.onToggle} aria-expanded={isSideOpen} />
       ) : null}
       {isSideOpen ? (
-        <div className="agents-split-view__side" style={{ width: side.narrowedWidth ?? side.width, background: side.background }}>
+        <div
+          className="agents-split-view__side"
+          style={
+            coversMain
+              ? { position: "absolute", inset: 0, width: "100%", zIndex: 20, background: side.background }
+              : { width: side.narrowedWidth ?? side.width, background: side.background }
+          }
+        >
           {side.content}
         </div>
       ) : null}

@@ -16,12 +16,12 @@
 
   &:hover {
     .leadingIconBadge {
-      background: rgba(var(--agents-fg-cta-rgb), 0.18);
+      background: color-mix(in srgb, var(--agents-fg-cta) 18%, transparent);
     }
 
     .openAffordance {
       transform: translateX($x0_5);
-      background: rgba(var(--agents-fg-cta-rgb), 0.12);
+      background: color-mix(in srgb, var(--agents-fg-cta) 12%, transparent);
       border-color: transparent;
     }
 
@@ -72,7 +72,7 @@
   min-width: $x4;
   height: $x4;
   border-radius: $x1;
-  background: rgba(var(--agents-fg-cta-rgb), 0.12);
+  background: color-mix(in srgb, var(--agents-fg-cta) 12%, transparent);
   color: var(--agents-fg-cta);
   transition: background 0.15s ease;
 }

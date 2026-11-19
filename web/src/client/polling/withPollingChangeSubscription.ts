@@ -10,6 +10,7 @@ import type {
   ConversationMessageSearchHit,
   ConversationMessageSentPayload,
   ConversationMessagesPage,
+  ConversationRunStateRead,
   ConversationSearchGroup,
   ConversationSearchOptions,
   ConversationSignal,
@@ -38,6 +39,7 @@ class PollingAgentsConversationClient implements AgentsConversationClientWithCha
   readonly getSelectableModels?: () => Promise<SelectableModel[]>;
   readonly composeSentMessageText?: (text: string, attachments: ConversationAttachmentReference[] | undefined) => string;
   readonly getMessageSentPayload?: (conversationId: number, messageId: number) => Promise<ConversationMessageSentPayload>;
+  readonly getConversationRunState?: (conversationId: number) => Promise<ConversationRunStateRead>;
 
   constructor(
     protected readonly binding: AgentsConversationClient,
@@ -47,6 +49,7 @@ class PollingAgentsConversationClient implements AgentsConversationClientWithCha
     this.getSelectableModels = binding.getSelectableModels?.bind(binding);
     this.composeSentMessageText = binding.composeSentMessageText?.bind(binding);
     this.getMessageSentPayload = binding.getMessageSentPayload?.bind(binding);
+    this.getConversationRunState = binding.getConversationRunState?.bind(binding);
   }
 
   getConversationMetadata = (conversationId: number): Promise<AgentsConversation> =>
@@ -113,8 +116,9 @@ class PollingAgentsConversationClient implements AgentsConversationClientWithCha
 /**
  * The client with live updates: a client that brings its own `subscribeToConversationChanges` (a push
  * transport — the host application's Firebase binding) is returned as it is; any other gets the polling default over its
- * `getConversationMetadata` (`createPollingConversationChangeSubscription`, `options` tune the intervals). The default
- * `AgentChat` calls this by itself.
+ * `getConversationRunState` when it has one, else over its `getConversationMetadata`
+ * (`createPollingConversationChangeSubscription`, `options` tune the intervals). A post, a signal or a retry the server
+ * accepted reads at once. The default `AgentChat` calls this by itself.
  */
 export const withPollingChangeSubscription = (
   client: AgentsConversationClient,
@@ -123,6 +127,9 @@ export const withPollingChangeSubscription = (
   if (client.subscribeToConversationChanges) return client as AgentsConversationClientWithChangeSubscription;
   return new PollingAgentsConversationClient(
     client,
-    createPollingConversationChangeSubscription(client.getConversationMetadata.bind(client), options),
+    createPollingConversationChangeSubscription(
+      client.getConversationRunState ? client.getConversationRunState.bind(client) : client.getConversationMetadata.bind(client),
+      options,
+    ),
   );
 };

@@ -17,7 +17,7 @@ export const ConversationMessageSystemHeader = memo((props: ConversationMessageS
     <div className={styles.responseHeaderLayout}>
       <div className={styles.responseHeader}>
         <span className={styles.iconContainer}>
-          <Icon color="white" name="wizard" />
+          <Icon color="var(--agents-fg-on-accent)" name="wizard" />
         </span>
         <div>
           <Text role="help" weight="bold">

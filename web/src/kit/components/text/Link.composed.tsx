@@ -9,6 +9,7 @@ import {
   useReportTextNodeRenderState,
 } from "./shared/text-node-values";
 import styles from "./Link.module.scss";
+import { AgentsLink } from "../../../provider/link-navigation";
 
 /**
  * The `Link` node (`LinkComposedViewNode.php`): the model's text that opens an http(s) page in a new tab
@@ -40,12 +41,12 @@ const LinkNode = (props: ComposedViewComponentProps) => {
     );
   }
   return (
-    <a className={styles.link} href={safeUrl} target="_blank" rel="noopener noreferrer" data-testid={testId}>
+    <AgentsLink className={styles.link} href={safeUrl} data-testid={testId}>
       <Text role="body" translate={false} display="inline" className={styles.linkText}>
         {escapePlainTextForText(content.text)}
       </Text>
       <Icon color="var(--agents-fg-light)" className={styles.newTabIcon} pixelSize={14} name="newTab" />
-    </a>
+    </AgentsLink>
   );
 };
 

@@ -1,5 +1,55 @@
 # Changelog
 
+## 0.1.2 (frontend)
+
+npm `@mgamadeus/ddd-agents` only; every addition is opt-in, the fixes are named as such.
+
+- Added: `createAgentsHttpConversationClient` (`/client`), the conversation client over the module's own routes
+  (`AgentConversationReadsTrait`, `AgentConversationWritesTrait`, the application's start route, optionally
+  `AgentSelectableModelsTrait`): `baseUrl`, `fetchOptions` (an object or a function read per request), `fetch`,
+  `buildStartPath` (default `/start`, `/start/{agentSpaceKey}` for a key above 0), `hasSelectableModelsRoute`,
+  `polling`, `extraRequestParameters`. Failures become `AgentsClientError` (`errorCode` first, then the status). The wire
+  types (`Wire…`), the mappers (`mapWireConversation`, `mapWireConversationMessage`, `mapWireConversationRunState`,
+  `mapWireConversationActivity`, `mapWireSearchGroup`, `mapWireSearchHit`, `mapWireSelectableModel`,
+  `mapHttpFailureToAgentsClientError`, `readWireSetElements`) and `composeAttachmentMessageText` are exported.
+- Added: the port's optional `getConversationRunState` (`GET …/{id}/runState`, contract type `ConversationRunStateRead`).
+  `withPollingChangeSubscription` polls it instead of `getConversationMetadata` when a binding has it; the HTTP client
+  comes with that subscription, which also reads at once after an accepted post, signal or retry.
+- Added: `i18n-keys.json` (subpath `@mgamadeus/ddd-agents/i18n-keys.json`), every text key of the package with its
+  English default, placeholders, plural contexts and source files; `pnpm i18n-keys` regenerates it, the build and a spec
+  fail when it is stale. Texts the generator could not see are marked with `textKey()`. The composer's placeholder reads
+  the texts of an `AgentsProvider` subtree, not only the app-wide ones.
+- Added: `AgentsEnvironment.onNavigate(href, event)` for every package link, anchors and `window.open` alike (return
+  true when the host navigated); `AgentsLink` and `useAgentsLinkNavigation()`. `AgentsEnvironment.onOpenEntity(target)`
+  opens an `openEntity` target on a host route instead of the canvas. Exported: `DEFAULT_AGENTS_COMPONENTS` (root,
+  `/provider`) and `MarkdownLink` (`/renderer`).
+- Added: `AgentChat` / `AgentChatController` props `disableSplitView`, `hostHasCanvasSurface` (default: the split's
+  presence), `backgroundPaintedByHost` (default true, as before), `composerRef` (`AgentChatComposerHandle.setComposerDraft`);
+  `AgentChat` prop `showsTopBlurBand` (default false; when shown, the band follows the chat pane).
+- Added: `followHostColorScheme()` and the attribute `data-agents-theme` (pins the package's scheme over
+  `prefers-color-scheme` and `data-theme`); `--agents-fg-on-accent`; plain colour variables for every `-rgb` triplet
+  (`--agents-bg-dark`, `--agents-shadow`, `--agents-neutral-500`, `--agents-neutral-900`), each defaulting to its
+  triplet.
+- Added: `useAgentsConversationClient` / `useOptionalAgentsConversationClient` also from the root, `/provider` and
+  `/chat`; `CanvasViabilityContext`, `ElementWidthCanvasViability`, `readCanvasViable` (`/widgets`).
+- Changed: package rules mix the plain colour variables (`color-mix()`) instead of the `-rgb` triplets; a triplet set on
+  the root element still applies through the plain colour's default.
+- Changed: Markdown sets list markers, heading and bold weight and the link underline explicitly.
+- Fixed: the canvas viability is measured on the chat's own container (`ResizeObserver`), not the viewport — a 480 px
+  chat column in a wide window no longer squeezes a split into itself; the default `SplitView` honours
+  `coversBelowWidth` (measured on its own box) and covers the main pane below it.
+- Fixed: the `html, body` reset of the image render and the `:root` block of the composer's `--ai-*` variables were
+  unlayered global rules that beat a host's layered reset; both are in `agents-defaults` now.
+- Fixed: text on accent fills (the default user bubble, the started-call dot, the suggestion card, the assistant header
+  icons) used the fixed white `--agents-fg-on-dark` and lost contrast on the bright dark-mode fills; it uses
+  `--agents-fg-on-accent`. The chat gradient ends in `--agents-bg` instead of a raw `white`.
+- Fixed: `AgentChat` puts its client into context, so a chat given only the `client` prop works without
+  `AgentsConversationClientProvider` (the activity read threw before) and its children reach the client.
+- Fixed: the thread of the default chat starts at the top of the pane; it kept 168 px of clearance for a top bar it does
+  not have (`--agents-chat-top-padding` is 24 px on `AgentChat`'s chat area).
+- Fixed: the composer shows its placeholder while empty, also when focused — it disappeared once a conversation existed,
+  because the chat focuses the composer after each turn.
+
 ## 0.1.1
 
 - Fixed: the Composer requirement on `mgamadeus/ddd-ai` is `^3.4.0` (was `^3.2.1`). `app:agents:eval-tools` uses

@@ -45,6 +45,26 @@ export {
   translateText,
 } from "./environment";
 export { classNames } from "./class-names";
+// The conversation client `AgentsProvider` (or an `AgentChat` with a `client`) puts in reach of its subtree.
+export {
+  useAgentsConversationClient,
+  useOptionalAgentsConversationClient,
+} from "../client/AgentsConversationClientContext";
+// Links: the anchor every package link renders and the hook behind it (`AgentsEnvironment.onNavigate`).
+export {
+  AgentsLink,
+  type AgentsLinkNavigation,
+  type AgentsLinkProps,
+  useAgentsLinkNavigation,
+} from "./link-navigation";
+// The package's default components, for a host replacement that wraps one (`DEFAULT_AGENTS_COMPONENTS.Markdown`).
+export { DEFAULT_AGENTS_COMPONENTS } from "./components/default-components";
+// The package's colour scheme following a host theme kept as a class or an attribute on the root element.
+export {
+  AGENTS_THEME_ATTRIBUTE_NAME,
+  followHostColorScheme,
+  type HostColorSchemeSource,
+} from "./host-color-scheme";
 export * from "./components";
 // The contract of the replaceable components: `AgentsComponents` and the props each replacement receives.
 export type {

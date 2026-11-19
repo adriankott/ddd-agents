@@ -1,5 +1,5 @@
 // Package surface constants: the card paddings, radii and shadows, same values as the app's
-// `src/styles/_surfaces.scss`. The colours inside the shadows stay custom properties (`--agents-shadow-rgb`).
+// `src/styles/_surfaces.scss`. The colours inside the shadows stay custom properties (`--agents-shadow`).
 @import "spacings";
 
 // The radius of media flush inside a card (the button radius of the app's theme, 4px).
@@ -18,11 +18,11 @@ $card-radius-around-thumbnail: $card-radius-compact + $card-padding-compact;
 
 // The card shadow: top-level chat cards sit elevated; nested tiles and canvas-internal cards stay flat.
 $card-shadow:
-  0 $x0_25 $x0_25 rgba(var(--agents-shadow-rgb), 0.08),
-  0 $x0_5 $x1 rgba(var(--agents-shadow-rgb), 0.05),
-  0 $x1 $x3 rgba(var(--agents-shadow-rgb), 0.03);
+  0 $x0_25 $x0_25 color-mix(in srgb, var(--agents-shadow) 8%, transparent),
+  0 $x0_5 $x1 color-mix(in srgb, var(--agents-shadow) 5%, transparent),
+  0 $x1 $x3 color-mix(in srgb, var(--agents-shadow) 3%, transparent);
 
 // Muted icon buttons floating over a photo or card edge: a soft halo that keeps them legible on light and dark media.
 $floating-button-shadow:
-  0 0 $x0_5 0 rgba(var(--agents-shadow-rgb), 0.08),
-  0 0 $x2 $x0_5 rgba(var(--agents-shadow-rgb), 0.05);
+  0 0 $x0_5 0 color-mix(in srgb, var(--agents-shadow) 8%, transparent),
+  0 0 $x2 $x0_5 color-mix(in srgb, var(--agents-shadow) 5%, transparent);

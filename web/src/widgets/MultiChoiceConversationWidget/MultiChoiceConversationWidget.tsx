@@ -13,6 +13,7 @@ import { translateText } from "../../provider/environment";
 import styles from "./MultiChoiceConversationWidget.module.scss";
 import { parseMultiChoicePayload } from "./shared/multi-choice-widget-payload";
 import { useReportWidgetRenderStatus } from "../../renderer/render-report/widget-render-report";
+import { textKey } from "../../provider/text-key";
 
 // Convert the `{count}` template token to the `%count%` placeholder the translation
 // service replaces, so the confirm label stays one translatable key (singular, with
@@ -54,7 +55,9 @@ export const MultiChoiceConversationWidget = (props: PayloadConversationWidgetPr
 
   const { title, subtitle, options } = data;
   const selectAllLabel = data.selectAllLabel ?? "Select all";
-  const confirmLabelTemplate = data.confirmLabelTemplate ?? "Confirm {count} selection";
+  const confirmLabelKey = data.confirmLabelTemplate
+    ? toConfirmLabelKey(data.confirmLabelTemplate)
+    : textKey("Confirm %count% selection");
   const confirmAction = data.confirmAction ?? "Confirmed: {values}";
 
   const allSelected = options.length > 0 && selected.size === options.length;
@@ -189,7 +192,7 @@ export const MultiChoiceConversationWidget = (props: PayloadConversationWidgetPr
                 selected.size === 0 && data.confirmLabelTemplate === undefined
                   ? translateText("Confirm selection")
                   : translateText(
-                      toConfirmLabelKey(confirmLabelTemplate),
+                      confirmLabelKey,
                       { count: selected.size },
                       selected.size === 1 ? "one" : "other",
                     )

@@ -1,4 +1,5 @@
 import { type AgentsIconName } from "../../../provider/components";
+import { textKey } from "../../../provider/text-key";
 
 /** The component-library glyph of an entity type — what the card's icon tile shows; a type not listed here gets `details`. */
 const ENTITY_TYPE_ICONS: Record<string, AgentsIconName> = {
@@ -13,16 +14,16 @@ const ENTITY_TYPE_ICONS: Record<string, AgentsIconName> = {
 
 /** The name line for an entity without a label — one static translation key per type (no concatenated noun). */
 const ENTITY_TYPE_FALLBACK_LABELS: Record<string, string> = {
-  competitor: "This competitor",
-  review: "This review",
-  keyword: "This keyword",
-  location: "This location",
-  business: "This business",
-  post: "This post",
-  page: "This page",
+  competitor: textKey("This competitor"),
+  review: textKey("This review"),
+  keyword: textKey("This keyword"),
+  location: textKey("This location"),
+  business: textKey("This business"),
+  post: textKey("This post"),
+  page: textKey("This page"),
 };
 
-export const FALLBACK_ENTITY_LABEL = "About this entry";
+export const FALLBACK_ENTITY_LABEL = textKey("About this entry");
 
 export const entityTypeIcon = (entityType: string): AgentsIconName => ENTITY_TYPE_ICONS[entityType] ?? "details";
 

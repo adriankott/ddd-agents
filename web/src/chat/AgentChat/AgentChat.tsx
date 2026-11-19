@@ -1,9 +1,13 @@
 import { type ComponentType, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AgentsConversationClient } from "../../client/AgentsConversationClient";
-import { useOptionalAgentsConversationClient } from "../../client/AgentsConversationClientContext";
+import {
+  AgentsConversationClientProvider,
+  useOptionalAgentsConversationClient,
+} from "../../client/AgentsConversationClientContext";
 import type { PollingConversationChangeSubscriptionOptions } from "../../client/polling/createPollingConversationChangeSubscription";
 import { withPollingChangeSubscription } from "../../client/polling/withPollingChangeSubscription";
 import { useAgentsActiveAgentSpaceKey } from "../../provider/AgentsProvider";
+import { classNames } from "../../provider/class-names";
 import { AgentChatActivityHistory } from "../AgentChatActivityHistory/AgentChatActivityHistory";
 import { AgentChatActivityIndicator } from "../AgentChatActivityIndicator/AgentChatActivityIndicator";
 import { ConversationClosedBar } from "../ConversationClosedBar/ConversationClosedBar";
@@ -40,6 +44,12 @@ export interface AgentChatProps extends Omit<AgentChatControllerProps, Defaulted
   chatScrollRef?: RefObject<HTMLDivElement | null>;
   /** The agent's activity at the tail of the thread. Default: `AgentChatActivityIndicator` (dots and the ticker line). */
   ThinkingIndicator?: ComponentType<AgentChatActivityProps>;
+  /**
+   * The frosted band at the top of the message column that blurs what scrolls under a top bar floating over the chat.
+   * Shown, it follows the chat pane (`confineTopBlurBandToChatPane` defaults to true then). Default false: the default
+   * chat has no floating top bar.
+   */
+  showsTopBlurBand?: boolean;
 }
 
 const selectConversation = (state: AgentsChatState) => state.conversation;
@@ -64,8 +74,10 @@ export const AgentChat = (props: AgentChatProps) => {
     conversationId: appConversationId,
     onNewConversation,
     inputReplacementSlot,
-    chatAreaClassName = styles.chatArea,
+    chatAreaClassName,
     chatWrapClassName = styles.chatWrap,
+    showsTopBlurBand = false,
+    confineTopBlurBandToChatPane = showsTopBlurBand,
     ...controllerProps
   } = props;
 
@@ -107,21 +119,28 @@ export const AgentChat = (props: AgentChatProps) => {
   if (client === null) {
     throw new Error("AgentChat has no conversation client: pass `client`, or mount it in <AgentsProvider client={…}>.");
   }
+  // The chat's client (with its live updates) reaches every hook below — the package's and the host's slots
+  // (`useAgentsConversationClient`), also when it came as the `client` prop and not from a provider.
   return (
-    <AgentChatController
-      {...controllerProps}
-      chatStore={chatStore}
-      client={client}
-      agentSpaceKey={agentSpaceKey}
-      conversationId={conversationId}
-      onNewConversation={handleNewConversation}
-      chatScrollRef={chatScrollRef}
-      ThinkingIndicator={ThinkingIndicator}
-      ActivityHistory={ActivityHistory}
-      inputReplacementSlot={inputReplacementSlot ?? (isConversationRunEnded ? <ConversationClosedBar /> : undefined)}
-      chatAreaClassName={chatAreaClassName}
-      chatWrapClassName={chatWrapClassName}
-    />
+    <AgentsConversationClientProvider client={client}>
+      <AgentChatController
+        {...controllerProps}
+        confineTopBlurBandToChatPane={confineTopBlurBandToChatPane}
+        chatStore={chatStore}
+        client={client}
+        agentSpaceKey={agentSpaceKey}
+        conversationId={conversationId}
+        onNewConversation={handleNewConversation}
+        chatScrollRef={chatScrollRef}
+        ThinkingIndicator={ThinkingIndicator}
+        ActivityHistory={ActivityHistory}
+        inputReplacementSlot={inputReplacementSlot ?? (isConversationRunEnded ? <ConversationClosedBar /> : undefined)}
+        chatAreaClassName={
+          chatAreaClassName ?? classNames(styles.chatArea, showsTopBlurBand ? styles.chatAreaWithTopBlurBand : undefined)
+        }
+        chatWrapClassName={chatWrapClassName}
+      />
+    </AgentsConversationClientProvider>
   );
 };
 

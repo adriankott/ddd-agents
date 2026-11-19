@@ -3,6 +3,7 @@ import { getAgentDisplayName } from "../../../provider/environment";
 import React, { memo } from "react";
 import { VoiceBarsIcon } from "./VoiceBarsIcon/VoiceBarsIcon";
 import styles from "./ConversationCallMarkerChip.module.scss";
+import { textKey } from "../../../provider/text-key";
 
 export interface ConversationCallMarkerChipProps {
   /** PHONE_CALL_STARTED | PHONE_CALL_ENDED — the lifecycle signal's source. */
@@ -22,11 +23,11 @@ const formatCallDuration = (durationSeconds: number): string => {
 type CallMarkerState = "started" | "ended" | "declined" | "missed" | "notConnected";
 
 const MARKER_LABELS: Readonly<Record<CallMarkerState, { inApp: string; phoneLine: string }>> = {
-  started: { inApp: "Voice chat started", phoneLine: "Phone call started" },
-  ended: { inApp: "Voice chat ended", phoneLine: "Phone call ended" },
-  declined: { inApp: "You declined a voice chat with %agentName%", phoneLine: "Phone call declined" },
-  missed: { inApp: "You missed a voice chat with %agentName%", phoneLine: "Phone call not answered" },
-  notConnected: { inApp: "Voice chat did not connect", phoneLine: "Phone call not answered" },
+  started: { inApp: textKey("Voice chat started"), phoneLine: textKey("Phone call started") },
+  ended: { inApp: textKey("Voice chat ended"), phoneLine: textKey("Phone call ended") },
+  declined: { inApp: textKey("You declined a voice chat with %agentName%"), phoneLine: textKey("Phone call declined") },
+  missed: { inApp: textKey("You missed a voice chat with %agentName%"), phoneLine: textKey("Phone call not answered") },
+  notConnected: { inApp: textKey("Voice chat did not connect"), phoneLine: textKey("Phone call not answered") },
 };
 
 /** The agent's ring the owner turned down (DECLINED) or let run out (EXPIRED, NOT_ANSWERED) is its own mark in the chat. */

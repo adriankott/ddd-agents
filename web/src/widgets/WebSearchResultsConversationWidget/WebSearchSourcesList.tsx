@@ -3,6 +3,7 @@ import React from "react";
 import { hostnameOf, SourceFavicon } from "./SourceFavicon";
 import { toDisplayHostname } from "./shared/display-hostname";
 import { WebSearchResultSource } from "./shared/web-search-results-widget-payload";
+import { AgentsLink } from "../../provider/link-navigation";
 
 type WebSearchSourcesListProps = {
   sources: WebSearchResultSource[];
@@ -44,15 +45,14 @@ export const WebSearchSourcesList = (props: WebSearchSourcesListProps) => {
           return (
             <li key={`${index}-${source.url}`} style={sourceItemStyle}>
               <SourceFavicon hostname={hostname} />
-              <a
+              <AgentsLink
                 href={source.url}
-                target="_blank"
-                rel="noopener noreferrer"
+               
                 style={sourceLinkStyle}
                 data-testid={`${testId}-source-${index}`}
               >
                 {source.title?.trim() || toDisplayHostname(hostname)}
-              </a>
+              </AgentsLink>
             </li>
           );
         })}

@@ -43,7 +43,7 @@
   z-index: 1;
   border-radius: $card-radius;
   box-shadow: inset 0 0 0 $x0_25 var(--agents-fg-cta);
-  background: rgba(var(--agents-fg-cta-rgb), 0.08);
+  background: color-mix(in srgb, var(--agents-fg-cta) 8%, transparent);
   pointer-events: none;
 }
 

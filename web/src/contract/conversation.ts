@@ -120,6 +120,18 @@ export interface AgentsConversation {
   promptExtensionCategory?: { alias: string | null; name: string | null } | null;
 }
 
+/**
+ * What the server's run-state read answers (`GET …/{id}/runState`): the lean subset of a conversation the live updates
+ * poll. Every `AgentsConversation` is one, so a binding without the read may answer it with the metadata read.
+ */
+export type ConversationRunStateRead = Pick<
+  AgentsConversation,
+  "id" | "runState" | "agentTurnOwedAt" | "title" | "titleManuallyEdited" | "summary" | "updated"
+> & {
+  /** generic — the id of the newest stored message; null before the first */
+  lastMessageId?: number | null;
+};
+
 // ── Messages ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
 /** A sub-agent conversation a delegation started, as far as the chat reads it (`delegatedConversations(select=id,runState)`). */

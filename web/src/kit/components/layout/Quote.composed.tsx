@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import type { ComposedViewComponentDefinition, ComposedViewComponentProps } from "../../composed-view-component-types";
 import { readSourceLinkProp, readTextProp } from "./layout-props";
 import styles from "./Quote.module.scss";
+import { AgentsLink } from "../../../provider/link-navigation";
 
 /**
  * `Quote` (`QuoteComposedViewNode.php`): the quoted words (`text`, or the text nodes in the
@@ -50,17 +51,16 @@ const Quote = (props: ComposedViewComponentProps) => {
             </Text>
           ) : null}
           {sourceLabel !== undefined && canOpenSource ? (
-            <a
+            <AgentsLink
               className={styles.sourceLink}
               href={source?.url}
-              target="_blank"
-              rel="noopener noreferrer"
+             
               data-testid={`${testId}-source`}
             >
               <Text role="caption" color="var(--agents-fg-light)" translate={false}>
                 {escapePlainTextForText(sourceLabel)}
               </Text>
-            </a>
+            </AgentsLink>
           ) : null}
           {sourceLabel !== undefined && !canOpenSource ? (
             <Text role="caption" color="var(--agents-fg-light)" translate={false}>

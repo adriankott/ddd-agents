@@ -44,6 +44,7 @@ import { EmbeddedConversationWidget } from "./components/embedding/EmbeddedConve
 import { ModelText } from "./ModelText/ModelText";
 import { ComposedViewEmailDataTimes } from "../image-render/ComposedViewEmailDataTimes/ComposedViewEmailDataTimes";
 import styles from "./ComposedViewConversationWidget.module.scss";
+import { useAgentsLinkNavigation } from "../provider/link-navigation";
 
 /**
  * Renders a checked `ComposedView` tree: one state store per instance, the datasets and computed
@@ -316,6 +317,7 @@ export const ComposedViewRenderer = (props: ComposedViewRendererProps) => {
     testId = "composed-view-widget",
   } = props;
   const budgets = composedNodeSchema.budgets;
+  const { openLink } = useAgentsLinkNavigation();
   const { state, setStateValue, resetState } = useComposedViewState(tree, budgets);
   const [nodeReports, dispatchNodeReport] = useReducer(nodeReportsReducer, {});
   const [sourceValues, dispatchSourceValue] = useReducer(sourceValuesReducer, {});
@@ -373,7 +375,7 @@ export const ComposedViewRenderer = (props: ComposedViewRendererProps) => {
       if (!action || isEmailRender) return;
       if (action.type === "resetState") resetState();
       if (action.type === "openUrl" && typeof action.url === "string") {
-        window.open(action.url, "_blank", "noopener,noreferrer");
+        openLink(action.url);
       }
       if (action.type === "openEntity" && isRowBoundOpenEntityAction(action)) {
         // The entity is the row's own — never one written on the action; a row without one opens nothing.
@@ -415,6 +417,7 @@ export const ComposedViewRenderer = (props: ComposedViewRendererProps) => {
       tree.actions,
       isEmailRender,
       resetState,
+      openLink,
       onOpenEntity,
       state,
       computedValues.values,

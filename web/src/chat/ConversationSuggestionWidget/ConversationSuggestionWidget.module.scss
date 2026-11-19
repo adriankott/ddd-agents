@@ -39,7 +39,7 @@
 
   // Inset: the card root clips overflow, an outside outline would be cut off.
   &:focus-visible {
-    outline: $x0_25 solid var(--agents-fg-on-dark);
+    outline: $x0_25 solid var(--agents-fg-on-accent);
     outline-offset: -$x0_25;
     border-radius: $card-radius;
   }

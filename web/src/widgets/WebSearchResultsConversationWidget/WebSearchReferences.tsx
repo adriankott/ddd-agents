@@ -4,6 +4,7 @@ import { hostnameOf, SourceFavicon } from "./SourceFavicon";
 import { toDisplayHostname } from "./shared/display-hostname";
 import { ModelText } from "../../kit/ModelText/ModelText";
 import styles from "./WebSearchReferences.module.scss";
+import { AgentsLink } from "../../provider/link-navigation";
 
 export interface WebSearchReferencesProps {
   sources: WebSearchResultSource[];
@@ -33,11 +34,10 @@ export const WebSearchReferences = (props: WebSearchReferencesProps) => {
           const isRepeatedSite = hostnames.filter((otherHostname) => otherHostname === hostname).length > 1;
           return (
             <div role="listitem" key={`${index}-${source.url}`} className={styles.chipItem}>
-              <a
+              <AgentsLink
                 className={styles.chip}
                 href={source.url}
-                target="_blank"
-                rel="noopener noreferrer"
+               
                 title={pageTitle}
                 aria-label={pageTitle}
                 data-testid={`${testId}-source-${index}`}
@@ -57,7 +57,7 @@ export const WebSearchReferences = (props: WebSearchReferencesProps) => {
                     {displayHostname}
                   </Text>
                 )}
-              </a>
+              </AgentsLink>
             </div>
           );
         })}

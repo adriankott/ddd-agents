@@ -4,6 +4,7 @@ import { escapePlainTextForText } from "../../../../provider/environment";
 import styles from "./DataFootnote.module.scss";
 import type { ExpressionValue } from "../../../../renderer/widget-tree/expression/evaluate-expression";
 import { readObject, readText } from "../data-value-format";
+import { AgentsLink, useAgentsLinkNavigation } from "../../../../provider/link-navigation";
 
 export interface DataFootnoteProps {
   /** The model's muted line under the data (what the figures are, the period). */
@@ -59,8 +60,9 @@ interface SourceChipProps {
 /** A small flat chip: a link opening in a new tab, plain text in the e-mail capture or without a page. */
 const SourceChip = (props: SourceChipProps) => {
   const { footnoteSource, isEmailRender, appearance, testId } = props;
+  const { openLink } = useAgentsLinkNavigation();
   const openSource = () => {
-    if (footnoteSource.url) window.open(footnoteSource.url, "_blank", "noopener,noreferrer");
+    if (footnoteSource.url) openLink(footnoteSource.url);
   };
   if (appearance === "quiet") {
     return (
@@ -90,9 +92,9 @@ const SourceChip = (props: SourceChipProps) => {
   );
   if (footnoteSource.url && !isEmailRender) {
     return (
-      <a className={className} data-testid={testId} href={footnoteSource.url} target="_blank" rel="noopener noreferrer">
+      <AgentsLink className={className} data-testid={testId} href={footnoteSource.url}>
         {sourceChipContent}
-      </a>
+      </AgentsLink>
     );
   }
   return (

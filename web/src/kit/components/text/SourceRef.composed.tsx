@@ -8,6 +8,7 @@ import type { ComposedViewComponentDefinition, ComposedViewComponentProps } from
 import { SiteFavicon } from "./shared/SiteFavicon";
 import { hasAttribution, readSourceRefEntries, SourceRefEntry } from "./shared/source-ref-entries";
 import styles from "./SourceRef.module.scss";
+import { AgentsLink } from "../../../provider/link-navigation";
 
 interface SourceChipProps {
   entry: SourceRefEntry;
@@ -33,16 +34,15 @@ const SourceChip = (props: SourceChipProps) => {
       </span>
     );
   return (
-    <a
+    <AgentsLink
       className={classNames(styles.chip, styles.linkedChip)}
       href={entry.url}
-      target="_blank"
-      rel="noopener noreferrer"
+     
       title={entry.title ?? entry.name}
       data-testid={testId}
     >
       {chipContent}
-    </a>
+    </AgentsLink>
   );
 };
 
@@ -94,9 +94,9 @@ const SourceAttribution = (props: { entry: SourceRefEntry }) => {
             {part.url === null ? (
               partText
             ) : (
-              <a className={styles.licenseLink} href={part.url} target="_blank" rel="noopener noreferrer">
+              <AgentsLink className={styles.licenseLink} href={part.url}>
                 {partText}
-              </a>
+              </AgentsLink>
             )}
           </Fragment>
         );

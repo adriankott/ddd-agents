@@ -18,6 +18,7 @@ import {
 } from "../renderer/render-report/widget-render-report";
 import type { ExpressionValue } from "../renderer/widget-tree/expression/evaluate-expression";
 import { ComposedViewRenderer } from "./ComposedViewRenderer";
+import { useAgentsEnvironment } from "../provider/AgentsProvider";
 
 /**
  * The composable widget kit: the model composes a TREE of kit components — layout, text, data,
@@ -39,11 +40,15 @@ export const ComposedViewConversationWidget = (props: PayloadConversationWidgetP
   const [blockReport, setBlockReport] = useState<WidgetRenderReportEntry>({ status: "pending" });
   const onReport = useCallback((entry: WidgetRenderReportEntry) => setBlockReport(entry), []);
   const { openCanvas } = useConversationWidgetContext();
+  const { onOpenEntity: openEntityOnHostRoute } = useAgentsEnvironment();
   const numericMessageId = messageId === undefined ? Number.NaN : Number(messageId);
   const onOpenEntity = useCallback(
     (action: ComposedViewAction, currentRow?: ExpressionValue) => {
       const target = readOpenEntityActionTarget(action, currentRow);
-      if (target === undefined || !Number.isFinite(numericMessageId)) return;
+      if (target === undefined) return;
+      // The host opens the entity on a route of its own (`AgentsEnvironment.onOpenEntity`) instead of the canvas.
+      if (openEntityOnHostRoute?.(target) === true) return;
+      if (!Number.isFinite(numericMessageId)) return;
       openCanvas({
         canvasId: "entityDetail",
         instanceId: canvasInstanceIdForEntityDetail(target),
@@ -52,7 +57,7 @@ export const ComposedViewConversationWidget = (props: PayloadConversationWidgetP
         justDelivered: false,
       });
     },
-    [openCanvas, numericMessageId],
+    [openCanvas, numericMessageId, openEntityOnHostRoute],
   );
 
   useReportWidgetRenderStatus(blockReport.status, blockReport.code, blockReport.detail);

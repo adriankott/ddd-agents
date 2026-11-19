@@ -25,7 +25,7 @@ export const ConversationIntroWidget = ({
       {AssistantIconBadge ? (
         <AssistantIconBadge
           iconName={aiPromptExtensionIcon}
-          color="white"
+          color="var(--agents-fg-on-accent)"
           backgroundColor="var(--agents-assistant-400)"
           isLarge
         />

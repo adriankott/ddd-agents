@@ -7,6 +7,11 @@
   // The chat's narrow layout (a pane under 40rem: a phone, the chat beside an open canvas) pads the message column by
   // this layout input; its fallback (4px) assumes the host frames the pane itself, the default chat frames nothing.
   --agents-chat-narrow-padding: #{$x2};
+  // The thread starts at the top of the pane: the default chat has no top bar floating over the thread, so it keeps no
+  // clearance for one (the conversation view's own default, 168px, is for such a bar). A host with a floating bar sets
+  // `--agents-chat-top-padding` on the scroll container (`[data-agents-chat-scroll]`) or through its own
+  // `chatAreaClassName`.
+  --agents-chat-top-padding: #{$x3};
   position: relative;
   flex: 1;
   min-height: 0;
@@ -25,8 +30,9 @@
   }
 
   // The frosted band at the top of the message column blurs what scrolls under an app's floating top bar; the default
-  // chat has no top bar, so the band would only blur the first lines of the conversation.
-  [data-agents-chat-scroll]::before {
+  // chat has no top bar, so the band would only blur the first lines of the conversation. `showsTopBlurBand` adds
+  // `.chatAreaWithTopBlurBand`, which keeps it (following the chat pane, `confineTopBlurBandToChatPane`).
+  &:not(.chatAreaWithTopBlurBand) [data-agents-chat-scroll]::before {
     display: none;
   }
 }

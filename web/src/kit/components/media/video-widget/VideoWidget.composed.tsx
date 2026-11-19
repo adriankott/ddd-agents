@@ -20,6 +20,7 @@ import { useLayoutNesting } from "../../layout/layout-nesting-context";
 import { formatPublishedDay, formatViewCount, readViewCount } from "./video-widget-values";
 import styles from "./VideoWidget.module.scss";
 import { useImageLoadState } from "../use-image-load-state";
+import { AgentsLink, useAgentsLinkNavigation } from "../../../../provider/link-navigation";
 
 const readTitle = (value: unknown): string | undefined =>
   typeof value === "string" && value.trim() !== "" ? value.trim() : undefined;
@@ -46,6 +47,7 @@ export const VideoWidgetNode = (props: ComposedViewComponentProps) => {
   const publishedDay = formatPublishedDay(nodeProps.publishedAt, numberLocale);
   const isCompact = sizeClass === "compact";
   const [isPlaying, setIsPlaying] = useState(false);
+  const { openLink } = useAgentsLinkNavigation();
   const {
     loadState: thumbnailLoadState,
     imageRef: thumbnailRef,
@@ -105,7 +107,7 @@ export const VideoWidgetNode = (props: ComposedViewComponentProps) => {
       setIsPlaying(true);
       return;
     }
-    if (watchUrl) window.open(watchUrl, "_blank", "noopener,noreferrer");
+    if (watchUrl) openLink(watchUrl);
   };
 
   const frame =
@@ -219,18 +221,17 @@ export const VideoWidgetNode = (props: ComposedViewComponentProps) => {
         ) : null}
       </span>
       {hasControls && watchUrl ? (
-        <a
+        <AgentsLink
           className={styles.openLink}
           href={watchUrl}
-          target="_blank"
-          rel="noopener noreferrer"
+         
           data-testid={`${testId}-open-link`}
         >
           <Text role="help" weight="medium" color="var(--agents-fg-cta)">
             {"Open on YouTube"}
           </Text>
           <Icon color="var(--agents-fg-cta)" name="arrowRight" />
-        </a>
+        </AgentsLink>
       ) : null}
     </article>
   );

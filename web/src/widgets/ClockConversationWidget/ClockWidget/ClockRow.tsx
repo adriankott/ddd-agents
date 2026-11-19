@@ -16,6 +16,7 @@ import type { ClockTimeFormat } from "../shared/clock-widget-payload";
 import { AnalogClockFace } from "./AnalogClockFace";
 import { DayNightGlyph } from "./DayNightGlyph";
 import styles from "./ClockWidget.module.scss";
+import { textKey } from "../../../provider/text-key";
 
 /** One clock ready to render: a zone the browser knows and the place's label. */
 export interface ClockWidgetEntry {
@@ -38,9 +39,9 @@ export interface ClockRowProps {
 
 /** One translation key per relative day: the sentence keeps its word order in every language. */
 const RELATIVE_DAY_KEYS: Record<ClockRelativeDay, string> = {
-  today: "Today, %hourDifference% h",
-  yesterday: "Yesterday, %hourDifference% h",
-  tomorrow: "Tomorrow, %hourDifference% h",
+  today: textKey("Today, %hourDifference% h"),
+  yesterday: textKey("Yesterday, %hourDifference% h"),
+  tomorrow: textKey("Tomorrow, %hourDifference% h"),
 };
 
 /**

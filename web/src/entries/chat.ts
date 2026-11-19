@@ -5,9 +5,15 @@ export {
   AgentChatController,
   type AgentChatActivityHistoryProps,
   type AgentChatActivityProps,
+  type AgentChatComposerHandle,
   type AgentChatControllerProps,
   type AgentChatSendModelSource,
 } from "../chat/controller/AgentChatController";
+// The conversation client of the chat around (the `client` of `AgentChat` or the one `AgentsProvider` mounted).
+export {
+  useAgentsConversationClient,
+  useOptionalAgentsConversationClient,
+} from "../client/AgentsConversationClientContext";
 export { AgentChatActivityIndicator } from "../chat/AgentChatActivityIndicator/AgentChatActivityIndicator";
 export { AgentChatActivityHistory } from "../chat/AgentChatActivityHistory/AgentChatActivityHistory";
 export { ConversationClosedBar, type ConversationClosedBarProps } from "../chat/ConversationClosedBar/ConversationClosedBar";
