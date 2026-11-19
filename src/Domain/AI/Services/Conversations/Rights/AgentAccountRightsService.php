@@ -19,8 +19,19 @@ use DDD\Infrastructure\Services\Service;
  * root namespace and overrides {@see applyNonAdminAccountCondition()}; the repos resolve this service only through
  * `DDDService::instance()->getService(AgentAccountRightsService::class)`.
  *
- * Both methods return true whenever they added a condition or decided "all rows" for an admin — the expand merge of the
- * DDD rights system merges the conditions only on true.
+ * WHO READS EVERY ROW is the module's own predicate, {@see isAccountReaderOfAllAgentRows()}: by default the framework's
+ * {@see Account::isAdminWithAccessToAllResources()}, which says yes for the admin role of ANY account. An application
+ * whose scoped users (partner or reseller accounts) hold that role overrides the predicate, so the "admin reads all"
+ * rules of the module stop at those accounts. Every such rule asks it: the account read rights of the conversation
+ * tables, the admin-only rows (turn-event snapshots), the agent spaces and the use of a space, the mandates, the
+ * message embeddings, the evaluation rows, the message context of a customer-hidden conversation, the raw tool errors of
+ * the MCP route and the admin audience of the tool executor. Each table has a predicate of its own that delegates to it
+ * ({@see isAccountReaderOfAllAgentSpaces()}, {@see isAccountReaderOfAllAgentMandates()},
+ * {@see isAccountReaderOfAllMessageEmbeddings()}, {@see isAccountReaderOfAllEvaluationRows()},
+ * {@see isAccountReaderOfAllTurnEventSnapshots()}), so an application can narrow one table alone.
+ *
+ * The rights methods return true whenever they added a condition or decided "all rows" for a reader of every row — the
+ * expand merge of the DDD rights system merges the conditions only on true.
  */
 class AgentAccountRightsService extends Service
 {
@@ -28,7 +39,7 @@ class AgentAccountRightsService extends Service
      * Restricts `$queryBuilder` to the rows the authenticated account may read.
      *
      * - no authenticated account → no row (`<alias>.id is null`);
-     * - {@see Account::isAdminWithAccessToAllResources()} → every row, no condition and no join;
+     * - {@see isAccountReaderOfAllAgentRows()} → every row, no condition and no join;
      * - otherwise → {@see applyNonAdminAccountCondition()} on the account id of the row: `<alias>.<accountIdProperty>`
      *   when `$conversationRelation` is null (conversations, schedules), else the `accountId` of the related
      *   conversation, joined as `<alias>_<conversationRelation>_rights` (only in this branch).
@@ -50,7 +61,7 @@ class AgentAccountRightsService extends Service
             $queryBuilder->andWhere("$baseModelAlias.id is null");
             return true;
         }
-        if ($authAccount->isAdminWithAccessToAllResources()) {
+        if ($this->isAccountReaderOfAllAgentRows($authAccount)) {
             return true;
         }
         $accountIdExpression = $this->joinAccountIdExpression($queryBuilder, $baseModelAlias, $conversationRelation, $accountIdProperty);
@@ -59,7 +70,8 @@ class AgentAccountRightsService extends Service
     }
 
     /**
-     * Restricts `$queryBuilder` to admins with access to all resources: an admin reads every row, anyone else none.
+     * Restricts `$queryBuilder` to the readers of every turn-event snapshot ({@see isAccountReaderOfAllTurnEventSnapshots()}):
+     * such a reader reads every row, anyone else none.
      *
      * @param DoctrineQueryBuilder $queryBuilder
      * @param string $baseModelAlias
@@ -68,7 +80,7 @@ class AgentAccountRightsService extends Service
     public function applyAdminOnlyReadRights(DoctrineQueryBuilder &$queryBuilder, string $baseModelAlias): bool
     {
         $authAccount = AuthService::instance()->getAccount();
-        if ($authAccount instanceof Account && $authAccount->isAdminWithAccessToAllResources()) {
+        if ($authAccount instanceof Account && $this->isAccountReaderOfAllTurnEventSnapshots($authAccount)) {
             return true;
         }
         $queryBuilder->andWhere("$baseModelAlias.id is null");
@@ -113,5 +125,85 @@ class AgentAccountRightsService extends Service
         $queryBuilder
             ->andWhere("$accountIdExpression = :rights_user_id")
             ->setParameter('rights_user_id', $authAccount->id);
+    }
+
+    /**
+     * Whether `$account` reads every row of the agent's tables (support, debugging, the admin audience). The default is
+     * the framework's {@see Account::isAdminWithAccessToAllResources()}; an application whose scoped accounts hold the
+     * admin role narrows it here. Every "reads all" rule of the module asks this predicate or a per-table one below.
+     *
+     * @param Account $account
+     * @return bool
+     */
+    public function isAccountReaderOfAllAgentRows(Account $account): bool
+    {
+        return $account->isAdminWithAccessToAllResources();
+    }
+
+    /**
+     * {@see isAccountReaderOfAllAgentRows()} for the authenticated account; false without one.
+     *
+     * @return bool
+     */
+    public function isAuthenticatedAccountReaderOfAllAgentRows(): bool
+    {
+        $authAccount = AuthService::instance()->getAccount();
+        return $authAccount instanceof Account && $this->isAccountReaderOfAllAgentRows($authAccount);
+    }
+
+    /**
+     * Whether `$account` reads every agent space and may store rows for any space. Default: {@see isAccountReaderOfAllAgentRows()}.
+     *
+     * @param Account $account
+     * @return bool
+     */
+    public function isAccountReaderOfAllAgentSpaces(Account $account): bool
+    {
+        return $this->isAccountReaderOfAllAgentRows($account);
+    }
+
+    /**
+     * Whether `$account` reads every mandate. Default: {@see isAccountReaderOfAllAgentRows()}.
+     *
+     * @param Account $account
+     * @return bool
+     */
+    public function isAccountReaderOfAllAgentMandates(Account $account): bool
+    {
+        return $this->isAccountReaderOfAllAgentRows($account);
+    }
+
+    /**
+     * Whether `$account` reads every message embedding. Default: {@see isAccountReaderOfAllAgentRows()}.
+     *
+     * @param Account $account
+     * @return bool
+     */
+    public function isAccountReaderOfAllMessageEmbeddings(Account $account): bool
+    {
+        return $this->isAccountReaderOfAllAgentRows($account);
+    }
+
+    /**
+     * Whether `$account` reads the evaluation rows (suite runs and their cases); nobody else reads any.
+     * Default: {@see isAccountReaderOfAllAgentRows()}.
+     *
+     * @param Account $account
+     * @return bool
+     */
+    public function isAccountReaderOfAllEvaluationRows(Account $account): bool
+    {
+        return $this->isAccountReaderOfAllAgentRows($account);
+    }
+
+    /**
+     * Whether `$account` reads the turn-event snapshots; nobody else reads any. Default: {@see isAccountReaderOfAllAgentRows()}.
+     *
+     * @param Account $account
+     * @return bool
+     */
+    public function isAccountReaderOfAllTurnEventSnapshots(Account $account): bool
+    {
+        return $this->isAccountReaderOfAllAgentRows($account);
     }
 }

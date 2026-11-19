@@ -80,6 +80,7 @@ src/Domain/AI/Services/Conversations/Agent/AgentChildTurnRunnerInterface.php	aut
 src/Domain/AI/Services/Conversations/Agent/*OwnerReport*	autonomy
 src/Domain/AI/Services/Conversations/**/SupervisorCheckpoint*	autonomy
 src/Domain/AI/Services/Conversations/AIConversationSchedulesService.php	autonomy
+src/Domain/AI/Services/Conversations/AgentOwnerFacingTextTranslationService.php	autonomy
 src/Domain/AI/MessageHandlers/AIConversationReportEmailSend*	autonomy
 **/Schedules/**	autonomy
 **/Supervisor/**	autonomy

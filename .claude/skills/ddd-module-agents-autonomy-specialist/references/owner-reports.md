@@ -75,6 +75,16 @@ An abnormal stop delivers a report built **without a model call** (a model call 
 blocked items of the task plan, "will be retried" where it applies. The lines are translation keys; the words for the
 billed entity come from `agentApplicationWording.php`.
 
+**Translation.** Every text the module writes for the owner outside the model's answer (the template report, the stop
+reason, the plan-less stall reply, schedule notices and schedule refusals) goes through
+`AgentOwnerFacingTextTranslationService::translateOwnerFacingText()`. The key is the English text; a missing
+translation answers the English text with its placeholders filled; the service never throws. Default: the framework's
+`Translatable::translateKey()`; a plural line (`Translatable::CONTEXT_MANY`) is looked up by its plural English wording.
+A host with a translation layer of its own overrides `translateKeyWithApplicationTranslations()` in a same-path
+subclass. A host that defines a global function `___()` keeps it: the default calls it when it exists. The module
+never calls a global function that neither the framework nor the module defines (the contract test
+`SourceCallsOnlyDefinedGlobalFunctionsTest`).
+
 ## Late delivery
 
 A run that died before it delivered still owes. The package command
@@ -127,11 +137,12 @@ scope also closes the owed reports of its runs (`cancelRunsAndCloseReportObligat
 
 ## What a host provides
 
-Full class names of what a host extends or calls here: `DDD\Domain\AI\Services\Conversations\Agent\AgentOwnerReportEmailsService`, `DDD\Domain\AI\Services\Conversations\AIConversationsService`, `DDD\Domain\AI\Services\Conversations\AIConversationAgentService`.
+Full class names of what a host extends or calls here: `DDD\Domain\AI\Services\Conversations\Agent\AgentOwnerReportEmailsService`, `DDD\Domain\AI\Services\Conversations\AIConversationsService`, `DDD\Domain\AI\Services\Conversations\AIConversationAgentService`, `DDD\Domain\AI\Services\Conversations\AgentOwnerFacingTextTranslationService`.
 
 - `AgentOwnerReportEmailsService` (same path) — without it no report mail ever leaves.
 - The owed-reports console command and its cron line.
-- The translation keys of the template report lines, and the wording keys of `agentApplicationWording.php`.
+- The translation keys of the template report lines (or its own `AgentOwnerFacingTextTranslationService`), and the
+  wording keys of `agentApplicationWording.php`.
 - `reportChannel` and `initiatorType` on the runs it starts itself.
 
 ## Traps

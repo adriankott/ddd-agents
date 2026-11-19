@@ -48,7 +48,7 @@ question to the space or answers "not known".
 
 | Method | Default | Override on |
 |---|---|---|
-| `requireAgentSpaceUsableByAccount()` | the space's `accountId` is the account, or the account is an admin with access to all resources; else `ForbiddenException` | the service (decide by the host's rights on its entity) |
+| `requireAgentSpaceUsableByAccount()` | the space's `accountId` is the account, or the account reads every space (`AgentAccountRightsService::isAccountReaderOfAllAgentSpaces()`); else `ForbiddenException` | the service (decide by the host's rights on its entity) |
 | `findTimezoneOfConversation()`, `findTimezoneForNewSchedule()` | `AgentSpace::findTimezone()`: the stored zone, confirmed | the space (`findTimezone()`) |
 | `findOwnerAccountOfAgentSpace()` | `AgentSpace::findOwnerAccount()`: the space's account | the space |
 | `findBillingEntityOfConversation()`, `findLoadedBillingEntityOfConversation()` | none: the account is billed | the space (`findBillingEntity()`, `findLoadedBillingEntity()`; the second never loads) |
@@ -116,10 +116,21 @@ The package's tools name their target space with the argument `agentSpaceId`
 ## Read rights
 
 A direct read of a space, a list and an expand join follow the read rights of its repository
-(`DBAgentSpace::applyReadRightsQuery()`: the space's own account, or an admin with access to all resources). The
+(`DBAgentSpace::applyReadRightsQuery()`: the space's own account, or a reader of every space,
+`AgentAccountRightsService::isAccountReaderOfAllAgentSpaces()`). The
 relation of a conversation, a schedule or a mandate to its space does not: `DBAgentSpace::lazyload()` loads the
 space with the rights switched off, because a row stored for a space must not read "no space" (account level) when
 the rights on the host's entity changed later.
+
+**Who reads every row.** Every "an admin reads all" rule of the module asks one predicate,
+`AgentAccountRightsService::isAccountReaderOfAllAgentRows()`: the spaces and the use of a space, the mandates, the
+message embeddings, the evaluation rows, the turn-event snapshots, the account rights of the conversation tables, the
+message context of a customer-hidden conversation, the raw tool errors of the MCP route and the admin audience of the
+tool executor. The default is the framework's `Account::isAdminWithAccessToAllResources()`, which says yes for the admin
+role of ANY account. A host whose scoped users (partner or reseller accounts) hold that role overrides the predicate in
+a same-path subclass of the service; one table alone is narrowed through its own predicate
+(`isAccountReaderOfAllAgentSpaces()`, `isAccountReaderOfAllAgentMandates()`, `isAccountReaderOfAllMessageEmbeddings()`,
+`isAccountReaderOfAllEvaluationRows()`, `isAccountReaderOfAllTurnEventSnapshots()`), each delegating to the general one.
 
 ## Traps
 

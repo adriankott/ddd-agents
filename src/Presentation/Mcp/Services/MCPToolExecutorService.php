@@ -51,8 +51,11 @@ use DDD\Domain\AI\Services\Conversations\Eligibility\AgentAutomationEligibilityS
 use DDD\Domain\AI\Entities\Conversations\Eligibility\AgentEligibilityLogContext;
 use DDD\Domain\AI\Services\Conversations\Agent\AgentToolResultFactsService;
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
+use DDD\Domain\AI\Entities\MCPPackages\MCPToolEffect;
+use DDD\Domain\AI\Entities\MCPPackages\MCPToolEffectCatalog;
 use DDD\Infrastructure\Services\DDDService;
 use DDD\Infrastructure\Services\IssuesLogService;
+use DDD\Domain\AI\Services\Conversations\Rights\AgentAccountRightsService;
 use DDD\Infrastructure\Services\AuthService;
 use DDD\Presentation\Mcp\Dtos\JsonRpcError;
 use DDD\Presentation\Mcp\Dtos\MCPToolResponse;
@@ -559,6 +562,50 @@ class MCPToolExecutorService extends Service
     }
 
     /**
+     * Override point: whether this process is under an environment-wide write lock — it must not change data, so
+     * {@see dispatchTool()} refuses every tool that is no declared read ({@see isToolReadOnlyUnderEnvironmentWideWriteLock()})
+     * before any other gate, for every caller (the agent loop, the HTTP MCP route, a console command). Asked once per
+     * tool call. Base: no lock.
+     *
+     * @return bool
+     */
+    protected function isEnvironmentWideWriteLockActive(): bool
+    {
+        return false;
+    }
+
+    /**
+     * Whether the tool runs under the environment-wide write lock: its method declares `#[MCPToolEffect]` with the
+     * effect READ (an undeclared tool counts as a write). The effect catalog answers for a method without the attribute
+     * on its own declaration.
+     *
+     * @param string $toolName
+     * @param ReflectionMethod $method
+     * @return bool
+     */
+    protected function isToolReadOnlyUnderEnvironmentWideWriteLock(string $toolName, ReflectionMethod $method): bool
+    {
+        $toolEffectAttributes = $method->getAttributes(MCPToolEffect::class);
+        if ($toolEffectAttributes !== []) {
+            return $toolEffectAttributes[0]->newInstance()->isReadOnly();
+        }
+        return MCPToolEffectCatalog::isReadOnlyToolName($toolName);
+    }
+
+    /**
+     * Override point: the text a tool call refused by the environment-wide write lock answers with. A final refusal:
+     * the same call meets the lock again, so the agent tells the owner instead of retrying.
+     *
+     * @param string $toolName
+     * @return string
+     */
+    protected function buildEnvironmentWideWriteLockRefusalText(string $toolName): string
+    {
+        return "Tool '{$toolName}' was NOT executed: this environment is locked for changes, so only tools that read are "
+            . 'available. Nothing was changed. Do not retry; tell the user that changes are not possible here right now.';
+    }
+
+    /**
      * Override point: records one tool call made on the admin audience (an application's audit trail). Called in a
      * `finally` block after every call, successful or not. Base: records nothing.
      *
@@ -683,6 +730,16 @@ class MCPToolExecutorService extends Service
             try {
                 $reflection = new ReflectionClass($packageClass);
                 $method = $reflection->getMethod($toolName);
+
+                // THE ENVIRONMENT-WIDE WRITE LOCK, before every other gate: a process that must not change data (a
+                // read-only replica, a maintenance window, a frozen environment) refuses every tool that is no declared
+                // read, whoever calls it. Default: no lock.
+                if ($this->isEnvironmentWideWriteLockActive() && !$this->isToolReadOnlyUnderEnvironmentWideWriteLock($toolName, $method)) {
+                    return MCPToolResponse::finalRefusal(
+                        $this->buildEnvironmentWideWriteLockRefusalText($toolName),
+                        MCPToolResponse::REFUSAL_ENVIRONMENT_WRITE_LOCKED
+                    );
+                }
 
                 // THE ADMIN GATE: a package of the admin audience runs only for an admin with access to
                 // all resources — whoever calls it (the admin MCP mount, a CLI, a later in-process admin agent).
@@ -1032,13 +1089,14 @@ class MCPToolExecutorService extends Service
     /**
      * True when the authenticated account is an admin with access to ALL resources — the account-level check the
      * repository rules require for admin capabilities (`isCurrentSessionAdmin()` also says yes for a cookie admin and
-     * an impersonation token). The framework account answers it.
+     * an impersonation token). The module's predicate answers it ({@see AgentAccountRightsService::isAccountReaderOfAllAgentRows()},
+     * by default the framework account's).
      */
     protected function isCallerAdminWithAccessToAllResources(): bool
     {
-        $authAccount = AuthService::instance()->getAccount();
-        return $authAccount !== null
-            && $authAccount->isAdminWithAccessToAllResources();
+        /** @var AgentAccountRightsService $agentAccountRightsService */
+        $agentAccountRightsService = DDDService::instance()->getService(AgentAccountRightsService::class);
+        return $agentAccountRightsService->isAuthenticatedAccountReaderOfAllAgentRows();
     }
 
     /**

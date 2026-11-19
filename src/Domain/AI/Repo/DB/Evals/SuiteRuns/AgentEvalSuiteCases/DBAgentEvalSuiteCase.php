@@ -11,6 +11,8 @@ use DDD\Domain\Base\Repo\DB\DBEntity;
 use DDD\Domain\Base\Repo\DB\Doctrine\DoctrineModel;
 use DDD\Domain\Base\Repo\DB\Doctrine\DoctrineQueryBuilder;
 use DDD\Domain\Common\Entities\Accounts\Account;
+use DDD\Domain\AI\Services\Conversations\Rights\AgentAccountRightsService;
+use DDD\Infrastructure\Services\DDDService;
 use DDD\Infrastructure\Services\AuthService;
 
 /**
@@ -25,8 +27,9 @@ class DBAgentEvalSuiteCase extends DBEntity
     public const string BASE_ORM_MODEL = DBAgentEvalSuiteCaseModel::class;
 
     /**
-     * Evaluation cases are visible to an admin with access to all resources only: such an admin reads every row (no
-     * condition added), every other account and a request without an account read nothing. The evaluation commands
+     * Evaluation rows are visible to a reader of every evaluation row only ({@see isAuthenticatedAccountReaderOfEveryRow()}):
+     * such a reader reads every row (no condition added), every other account and a request without an account read
+     * nothing. The evaluation commands
      * write their record with the rights lifted (a system write). Returns true wherever a condition was added.
      */
     public static function applyReadRightsQuery(DoctrineQueryBuilder &$queryBuilder): bool
@@ -49,6 +52,11 @@ class DBAgentEvalSuiteCase extends DBEntity
     protected static function isAuthenticatedAccountReaderOfEveryRow(): bool
     {
         $authAccount = AuthService::instance()->getAccount();
-        return $authAccount instanceof Account && $authAccount->isAdminWithAccessToAllResources();
+        if (!$authAccount instanceof Account) {
+            return false;
+        }
+        /** @var AgentAccountRightsService $agentAccountRightsService */
+        $agentAccountRightsService = DDDService::instance()->getService(AgentAccountRightsService::class);
+        return $agentAccountRightsService->isAccountReaderOfAllEvaluationRows($authAccount);
     }
 }

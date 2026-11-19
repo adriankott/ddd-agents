@@ -13,6 +13,7 @@ use DDD\Domain\Base\Repo\DB\Doctrine\DoctrineQueryBuilder;
 use DDD\Domain\Common\Entities\Accounts\Account;
 use DDD\Infrastructure\Exceptions\BadRequestException;
 use DDD\Infrastructure\Exceptions\InternalErrorException;
+use DDD\Domain\AI\Services\Conversations\Rights\AgentAccountRightsService;
 use DDD\Infrastructure\Services\AuthService;
 use DDD\Infrastructure\Services\DDDService;
 use Psr\Cache\InvalidArgumentException;
@@ -72,7 +73,8 @@ class DBAgentSpace extends DBEntity
     }
 
     /**
-     * A space is visible to the account it belongs to; an admin with access to all resources sees every space. A space
+     * A space is visible to the account it belongs to; a reader of every space
+     * ({@see AgentAccountRightsService::isAccountReaderOfAllAgentSpaces()}) sees every space. A space
      * without an account (an application that anchors its spaces on an entity of its own) is visible to no one by this
      * rule: such an application overrides this method in the repository of its subclass and decides by its own entity.
      *
@@ -91,7 +93,9 @@ class DBAgentSpace extends DBEntity
             $queryBuilder->andWhere("{$alias}.id is null");
             return true;
         }
-        if ($authAccount->isAdminWithAccessToAllResources()) {
+        /** @var AgentAccountRightsService $agentAccountRightsService */
+        $agentAccountRightsService = DDDService::instance()->getService(AgentAccountRightsService::class);
+        if ($agentAccountRightsService->isAccountReaderOfAllAgentSpaces($authAccount)) {
             return false;
         }
         $queryBuilder->andWhere("{$alias}.accountId = :agentSpaceRightsAuthAccountId")

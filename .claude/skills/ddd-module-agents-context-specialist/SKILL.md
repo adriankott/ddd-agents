@@ -68,8 +68,12 @@ the tools and their results to the tools skill.
   placeholder loses the value for the whole epoch; one that adds a new volatile placeholder breaks the prefix on every
   change.
 - **A Chat Completions model silently runs `systemPromptSwap`.** The global default `conversationAppend` falls back
-  to the swap on Chat Completions (`ContextRetentionSettings::resolveDefaultSkillLoadingStrategyForAgentWireApi()`);
-  an append the start request names is refused
+  to the swap on Chat Completions (`ContextRetentionSettings::resolveDefaultSkillLoadingStrategyForAgentWireApi()`), on
+  every path: a creation that knows the model stamps the swap, a creation that does not (the console chat without a
+  catalog answer, an evaluation run) leaves the strategy unstamped and the run stamps it before its first call (also in
+  memory for an ephemeral conversation), and a run over an unstamped conversation resolves it for its wire API
+  (`ContextRetentionSettings::getSkillLoadingStrategyForAgentWireApi()`). A catalog entry without
+  `settings.agentWireApi` speaks Chat Completions. An append the start request names is refused
   (`AgentWireConfiguration::REJECTION_CONVERSATION_APPEND_NEEDS_RESPONSES`), while a purpose's wire profile the model
   cannot run is dropped at the purposed start with the trace line `purpose.agentWireProfile.fellBack`.
 - **Every skill load under the swap costs the whole prefix.** It changes the top-level tools and the LOADED_SKILLS

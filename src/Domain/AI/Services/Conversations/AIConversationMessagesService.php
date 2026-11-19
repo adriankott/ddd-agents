@@ -30,7 +30,7 @@ use DDD\Domain\AI\Entities\Conversations\Widgets\ConversationWidgetOrigin;
 use DDD\Domain\AI\Entities\Conversations\Widgets\ConversationWidgetRowChangeSignal;
 use DDD\Domain\AI\Entities\Conversations\Widgets\Composed\Bindings\ComposedViewToolCallResult;
 use DDD\Domain\AI\Exceptions\Conversations\MessageIndexLockUnavailableException;
-use DDD\Infrastructure\Services\AuthService;
+use DDD\Domain\AI\Services\Conversations\Rights\AgentAccountRightsService;
 use DDD\Domain\AI\Entities\Conversations\ControlPanel\AgentToolResponseSamples;
 use DDD\Domain\AI\Entities\Conversations\ControlPanel\AgentToolResponseStats;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
@@ -917,7 +917,9 @@ class AIConversationMessagesService extends EntitiesService
         }
         // A message of the platform's own run is no message a customer (or the agent working for one) reads back;
         // an administrator reads everything.
-        if (AuthService::instance()->getAccount()?->isAdminWithAccessToAllResources() !== true
+        /** @var AgentAccountRightsService $agentAccountRightsService */
+        $agentAccountRightsService = DDDService::instance()->getService(AgentAccountRightsService::class);
+        if (!$agentAccountRightsService->isAuthenticatedAccountReaderOfAllAgentRows()
             && AIConversation::getService()->findCustomerHiddenConversationIds([(int)$anchor->aiConversationId]) !== []) {
             return null;
         }

@@ -41,7 +41,7 @@ host provides the rest and registers the cron lines of the scheduled commands: [
    | "DB_DEFAULT_CONNECTION_DRIVER", "DB_DEFAULT_CONNECTION_HOST", "DB_DEFAULT_CONNECTION_HOST_PORT", "DB_DEFAULT_CONNECTION_DB_NAME", "DB_DEFAULT_CONNECTION_USER", "DB_DEFAULT_CONNECTION_PASSWORD", "DB_DEFAULT_CONNECTION_DB_SERVER_VERSION", "DB_DEFAULT_CONNECTION_DB_SERVER_CHARSET" | the entity manager (`EntityManagerFactory`); MariaDB 11.8 or newer (VECTOR columns) or PostgreSQL |
    | `LAZYLOAD_DEFAULT_REPO_TYPE` | the repository type of a lazy load without one (`DB`) |
    | `CACHE_APC_TTL` | the APCu cache group, the fallback of every group without configuration |
-   | "CACHE_REDIS_CACHE_GROUP" (`redis`), "CACHE_REDIS_HOST", "CACHE_REDIS_PORT", "CACHE_REDIS_PASSWORD", "CACHE_REDIS_DATABASE", "CACHE_REDIS_NAMESPACE", "CACHE_REDIS_TTL" | the Redis cache group (`Cache::CACHE_GROUP_REDIS`); the group's type comes from "CACHE_REDIS_CACHE_GROUP", without it the group is APCu. The base system prompt cache reads and writes only this group. Without Redis it falls back to the APCu of each process: the web process and every worker keep their own copy, a warm-up or an inputs-version bump in one process never reaches the turn workers, and a worker reads a stale prompt for up to an hour |
+   | "CACHE_REDIS_CACHE_GROUP" (`redis`), "CACHE_REDIS_HOST", "CACHE_REDIS_PORT", "CACHE_REDIS_PASSWORD", "CACHE_REDIS_DATABASE", "CACHE_REDIS_NAMESPACE", "CACHE_REDIS_TTL" | the Redis cache group (`Cache::CACHE_GROUP_REDIS`); the group's type comes from "CACHE_REDIS_CACHE_GROUP", without it the group is APCu; password, host, port and database are optional (a Redis without a password has no "CACHE_REDIS_PASSWORD"). The base system prompt cache reads and writes only this group. Without Redis it falls back to the APCu of each process: the web process and every worker keep their own copy, a warm-up or an inputs-version bump in one process never reaches the turn workers, and a worker reads a stale prompt for up to an hour |
    | `JWT_HASH_KEY`, `JWT_HASH_METHOD` | every outgoing Argus call is signed, the agent's model call included |
    | the provider key the model catalog names (`OPENROUTER_KEY`, `OPEN_AI_KEY`) | the egress refuses to build a request while it is empty, also under a recorded transport |
    | `DATABASE_TABLE_PREFIX` (optional) | [tables-and-persisted-names.md](tables-and-persisted-names.md) |
@@ -62,6 +62,12 @@ host provides the rest and registers the cron lines of the scheduled commands: [
    kernel's `ReferenceDemoOwnerAuthenticationSubscriber` shows the place (it acts as one fixed account; a real host
    authenticates).
 8. **An account row exists.** Conversations carry a foreign key to the account table of the framework.
+   **Who reads every row.** By default an account with the framework's admin role reads every agent space, mandate,
+   message embedding, evaluation row and turn-event snapshot, and every conversation row
+   (`Account::isAdminWithAccessToAllResources()`, true for the admin role of any account). A host whose scoped users
+   (partner or reseller accounts) hold the admin role overrides
+   `AgentAccountRightsService::isAccountReaderOfAllAgentRows()` in a same-path subclass
+   ([agent-space.md](agent-space.md), section "Read rights").
 9. **The chat controller.** A host controller extends `DDD\Presentation\Base\Controller\HttpController` and uses `DDD\Presentation\Api\Agents\Conversations\Controller\AgentConversationReadsTrait`,
    `AgentConversationWritesTrait` and `AgentConversationStartTrait` (optionally `AgentSelectableModelsTrait`). It
    declares the start route itself, opens a usage envelope around it and passes the agent space, or null for a start
@@ -125,5 +131,7 @@ framework's kernel).
 - `php bin/console debug:router` lists the chat routes.
 - `app:workers:check` compares the host's worker list with the transports and routing of the compiled container.
 - The package's transport contract (`MessengerTransportsHaveWorkerBlocksContract`, a trait for one test class of the
-  host) checks the host's `messenger.yaml` and its supervisor file against `AgentMessengerTransports`. It is test code
-  of the package and not autoloaded: `require_once` it from the package's install directory.
+  host) checks the host's `messenger.yaml` and its workers against `AgentMessengerTransports`: a consumer in the
+  framework's worker list ("config/system/workers.yaml", found beside "config/packages/messenger.yaml") or a pool in a
+  supervisor file (`supervisorConfigPath()`). A host on the worker list overrides nothing but `messengerConfigPath()`.
+  It is test code of the package and not autoloaded: `require_once` it from the package's install directory.

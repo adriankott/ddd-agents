@@ -23,6 +23,8 @@ use DDD\Domain\Common\Entities\Accounts\Account;
 use DDD\Infrastructure\Exceptions\BadRequestException;
 use DDD\Infrastructure\Exceptions\ForbiddenException;
 use DDD\Infrastructure\Exceptions\InternalErrorException;
+use DDD\Domain\AI\Services\Conversations\Rights\AgentAccountRightsService;
+use DDD\Infrastructure\Services\DDDService;
 use DDD\Infrastructure\Services\AuthService;
 use Psr\Cache\InvalidArgumentException;
 use ReflectionException;
@@ -82,7 +84,8 @@ class AgentSpacesService extends EntitiesService
      * schedule or a mandate is stored with the space (and before its space is set), never only in an endpoint: the
      * database does not enforce that the space of a row is one its account may use.
      *
-     * The default: the space belongs to the account, or the account is an admin with access to all resources. An
+     * The default: the space belongs to the account, or the account reads every space
+     * ({@see AgentAccountRightsService::isAccountReaderOfAllAgentSpaces()}). An
      * application whose spaces are anchored on an entity of its own decides by its rights on that entity.
      *
      * @param AgentSpace $agentSpace
@@ -92,7 +95,9 @@ class AgentSpacesService extends EntitiesService
      */
     public function requireAgentSpaceUsableByAccount(AgentSpace $agentSpace, Account $account): void
     {
-        if ($account->isAdminWithAccessToAllResources()) {
+        /** @var AgentAccountRightsService $agentAccountRightsService */
+        $agentAccountRightsService = DDDService::instance()->getService(AgentAccountRightsService::class);
+        if ($agentAccountRightsService->isAccountReaderOfAllAgentSpaces($account)) {
             return;
         }
         if (isset($agentSpace->accountId) && isset($account->id) && (int)$agentSpace->accountId === (int)$account->id) {

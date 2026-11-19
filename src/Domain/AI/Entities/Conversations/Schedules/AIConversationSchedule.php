@@ -7,6 +7,7 @@ namespace DDD\Domain\AI\Entities\Conversations\Schedules;
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Entities\Conversations\Messages\RunSettings;
 use DDD\Domain\AI\Repo\DB\Conversations\Schedules\DBAIConversationSchedule;
+use DDD\Domain\AI\Services\Conversations\AgentOwnerFacingTextTranslationService;
 use DDD\Domain\AI\Services\Conversations\AIConversationSchedulesService;
 use DDD\Domain\AI\Entities\Conversations\Eligibility\AgentAutomationEligibility;
 use DDD\Domain\AI\Entities\Conversations\Eligibility\AgentAutomationStateReason;
@@ -548,11 +549,12 @@ class AIConversationSchedule extends Entity
             $placeholderSearchAndReplace['%' . $placeholderName . '%'] = $placeholderValue;
         }
         try {
-            return ___(
+            /** @var AgentOwnerFacingTextTranslationService $agentOwnerFacingTextTranslationService */
+            $agentOwnerFacingTextTranslationService = DDDService::instance()->getService(AgentOwnerFacingTextTranslationService::class);
+            return $agentOwnerFacingTextTranslationService->translateOwnerFacingText(
                 $englishSourceKey,
-                languageCode: $creatingConversation->resolveUserLanguageCode(),
-                placeholders: $placeholders,
-                defaultString: $englishSourceKey
+                $creatingConversation->resolveUserLanguageCode(),
+                $placeholders
             );
         } catch (Throwable $translationError) {
             // The notice rides the run TERMINAL (including the failure and budget-pause paths) — an unreachable

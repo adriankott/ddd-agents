@@ -9,6 +9,7 @@ use DDD\Domain\AI\Entities\MCPPackages\ToolDefinitions;
 use DDD\Infrastructure\Services\DDDService;
 use DDD\Domain\Base\Entities\QueryOptions\QueryOptionsSyntax;
 use DDD\Presentation\Base\Dtos\SharedRequestParametersSyntax;
+use DDD\Domain\AI\Services\Conversations\Rights\AgentAccountRightsService;
 use DDD\Infrastructure\Services\AuthService;
 use DDD\Presentation\Mcp\Dtos\JsonRpcError;
 use DDD\Presentation\Mcp\Dtos\JsonRpcErrorDto;
@@ -160,7 +161,8 @@ abstract class MCPController extends HttpController
     /**
      * Override point: whether a tool call of this request may answer with the tool's raw exception instead of the
      * failure text (the `errors_as_json` query parameter, a debug aid: the exception and its stack leave the process).
-     * Only an admin with access to all resources may ask for it; for every other caller the parameter has no effect.
+     * Only a reader of every agent row ({@see AgentAccountRightsService::isAccountReaderOfAllAgentRows()}) may ask for it;
+     * for every other caller the parameter has no effect.
      *
      * @param Request $request
      * @return bool
@@ -170,7 +172,9 @@ abstract class MCPController extends HttpController
         if (!$request->query->has('errors_as_json')) {
             return false;
         }
-        return AuthService::instance()->getAccount()?->isAdminWithAccessToAllResources() === true;
+        /** @var AgentAccountRightsService $agentAccountRightsService */
+        $agentAccountRightsService = DDDService::instance()->getService(AgentAccountRightsService::class);
+        return $agentAccountRightsService->isAuthenticatedAccountReaderOfAllAgentRows();
     }
 
     /**

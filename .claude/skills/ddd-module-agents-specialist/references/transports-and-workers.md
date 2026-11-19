@@ -87,6 +87,10 @@ stamp). That is enough to try the agent; it holds the request for the whole turn
 - `app:workers:check` compares the worker list with the transports and routing of the compiled container;
   `app:workers:list` shows the list.
 - `MessengerTransportsHaveWorkerBlocksContract` (package test code, `require_once` it) checks a host's
-  `messenger.yaml` and supervisor file: every transport defined, every message routed, a worker pool per transport.
+  `messenger.yaml` and its workers: every transport defined, every message routed, workers per transport — a
+  consumer in the framework's worker list (`workerListConfigPath()`, default "config/system/workers.yaml" beside the
+  Messenger configuration's "config/packages/" folder; a `devOnly` entry or one without processes does not count) or a
+  `[program:<transport>]` pool consuming it in a supervisor file (`supervisorConfigPath()`, default none). Either source
+  covers a transport; a host on the worker list overrides only `messengerConfigPath()`.
 - Parallel tool calls in child processes are optional and off by default (`AI.agentToolCallChildProcess`): the
   package ships the child's command, the host names its console script (`ddd-module-agents-tools-specialist`).

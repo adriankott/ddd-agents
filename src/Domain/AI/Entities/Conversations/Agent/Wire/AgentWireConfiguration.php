@@ -74,7 +74,9 @@ class AgentWireConfiguration
 
     /**
      * The configuration of a run with `$aiModel` (null = unresolved), the conversation's run settings and its stamped
-     * context retention settings, over the direct OpenRouter egress or not. The matrix:
+     * context retention settings (a conversation without a stamped strategy takes the global default for the resolved
+     * wire API, {@see ContextRetentionSettings::getSkillLoadingStrategyForAgentWireApi()}), over the direct OpenRouter
+     * egress or not. The matrix:
      * Chat Completions + system-prompt swap → allowed (every model, both egresses); Chat Completions + append-only →
      * rejected; Responses + either strategy → allowed for an OpenAI model over the direct OpenRouter egress, rejected
      * otherwise.
@@ -87,9 +89,10 @@ class AgentWireConfiguration
     ): static {
         $agentWireConfiguration = new static();
         $agentWireConfiguration->wireApi = self::resolveWireApiFor($aiModel, $runSettings);
-        $agentWireConfiguration->skillLoadingStrategy = $contextRetentionSettings !== null
-            ? $contextRetentionSettings->getSkillLoadingStrategy()
-            : ContextRetentionSettings::resolveDefaultSkillLoadingStrategy();
+        // an unstamped conversation takes the global default for its wire API: append-only on Chat Completions would be
+        // refused, and a default must never make a model unusable
+        $agentWireConfiguration->skillLoadingStrategy = ($contextRetentionSettings ?? new ContextRetentionSettings())
+            ->getSkillLoadingStrategyForAgentWireApi($agentWireConfiguration->wireApi);
         // on by default on the Responses API; on Chat Completions only when the row asks for it (the
         // A arm stays today's request, A′ = A + `all` measures the carry-over alone)
         // the server-state arm never carries reasoning items: OpenAI keeps them in the stored conversation state

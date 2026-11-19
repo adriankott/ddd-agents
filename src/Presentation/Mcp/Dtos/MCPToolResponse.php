@@ -35,6 +35,9 @@ class MCPToolResponse extends ValueObject
     /** A tool of the admin audience was called by an account that is not an admin with access to all resources. */
     public const string REFUSAL_ADMIN_ACCESS_REQUIRED = 'ADMIN_ACCESS_REQUIRED';
 
+    /** The environment-wide write lock refused a tool that is no declared read (the process must not change data). */
+    public const string REFUSAL_ENVIRONMENT_WRITE_LOCKED = 'ENVIRONMENT_WRITE_LOCKED';
+
     /**
      * @var string|null Set when the executor's GATE refused the call BEFORE it ran (one of the REFUSAL_* consts).
      *      A gate refusal is a sanctioned "call again once the gate opens" — the loop's repeat guards must not count

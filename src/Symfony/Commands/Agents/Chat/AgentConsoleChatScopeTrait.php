@@ -10,6 +10,7 @@ use DDD\Domain\AI\Entities\Conversations\Compaction\AIConversationCompactionNode
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessages;
 use DDD\Domain\AI\Entities\Conversations\Messages\ContextRetentionSettings;
 use DDD\Domain\AI\Entities\Conversations\Usage\AgentAIUsageScope;
+use DDD\Domain\AI\Services\Conversations\Agent\AIConversationModelCallsService;
 use DDD\Domain\AI\Services\Conversations\AIConversationAgentService;
 use DDD\Domain\AI\Services\Conversations\AIConversationMessagesService;
 use DDD\Domain\AI\Services\Conversations\AIConversationsService;
@@ -182,8 +183,30 @@ trait AgentConsoleChatScopeTrait
         $conversation = AIConversation::newInstance();
         $conversation->accountId = (int)$chatScope->account?->id;
         $conversation->messages = AIConversationMessages::newInstance();
-        $conversation->contextRetentionSettings = ContextRetentionSettings::buildForNewConversation(null, $requestedSkillLoadingStrategy);
+        $conversation->contextRetentionSettings = ContextRetentionSettings::buildForNewConversation(
+            null,
+            $requestedSkillLoadingStrategy,
+            agentWireApi: $this->resolveAgentWireApiOfNewConversation()
+        );
         return $conversation;
+    }
+
+    /**
+     * The wire API of the agentic default model, which a new console conversation runs on unless a model is pinned
+     * later: a Chat Completions model is stamped with the system-prompt swap, never the append-only default it cannot
+     * run. Null when the model catalog cannot answer (the run then stamps the strategy before its first call).
+     *
+     * @return string|null
+     */
+    protected function resolveAgentWireApiOfNewConversation(): ?string
+    {
+        try {
+            /** @var AIConversationModelCallsService $aIConversationModelCallsService */
+            $aIConversationModelCallsService = DDDService::instance()->getService(AIConversationModelCallsService::class);
+            return $aIConversationModelCallsService->resolveAgentWireApi(null, null);
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     /**

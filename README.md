@@ -32,6 +32,12 @@ under `src/` and `config/` has exactly one owning skill).
 `DDD\Domain\AI\…\X`), so an application customizes a service, an entity set or a repository by a subclass at the same
 path under its own root namespace.
 
+The hooks a host usually needs first: `AgentAccountRightsService::isAccountReaderOfAllAgentRows()` (who reads every
+row of the agent's tables; by default the framework's admin role of any account), `AgentOwnerFacingTextTranslationService`
+(the translation of the texts the module writes for the owner; by default the framework's translation keys) and
+`MCPToolExecutorService::isEnvironmentWideWriteLockActive()` (refuses every tool that is no declared read; off by
+default). The entry skill's override-points reference lists every hook.
+
 ## Environment of the package test kernel (`tests/Support/kernel`)
 
 No env file is committed. `tests/Support/PackageTestEnvironment.php` sets every variable where the kernel is built

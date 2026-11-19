@@ -49,14 +49,14 @@ class DBAIConversationMessageEmbedding extends DBEntity
             return true;
         }
 
-        if ($authAccount->isAdminWithAccessToAllResources()) {
+        /** @var AgentAccountRightsService $agentAccountRightsService */
+        $agentAccountRightsService = DDDService::instance()->getService(AgentAccountRightsService::class);
+        if ($agentAccountRightsService->isAccountReaderOfAllMessageEmbeddings($authAccount)) {
             return true;
         }
 
         // Join through the 1:1 message to reach the conversation (the rights service joins the conversation).
         $queryBuilder->leftJoin("$baseModelAlias.aiConversationMessage", $messageRightsAlias);
-        /** @var AgentAccountRightsService $agentAccountRightsService */
-        $agentAccountRightsService = DDDService::instance()->getService(AgentAccountRightsService::class);
         return $agentAccountRightsService->applyAccountReadRights($queryBuilder, $messageRightsAlias, 'aiConversation');
     }
 }

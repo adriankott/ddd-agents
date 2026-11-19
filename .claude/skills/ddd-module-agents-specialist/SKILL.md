@@ -74,6 +74,10 @@ their DTOs, the naming, wording, persona and egress configs, and `examples/`. Th
 - **The finalize and schedule scans are not environment-scoped.** Several environments on one database run those
   commands in one environment only.
 - **`AuthService::setAccount()` takes its argument by reference:** pass a variable, never a literal `null`.
+- **The framework's admin role reads every agent row**, of any account (`Account::isAdminWithAccessToAllResources()`).
+  A host whose scoped users hold that role narrows the module's own predicate
+  `AgentAccountRightsService::isAccountReaderOfAllAgentRows()` (or one table's,
+  [references/agent-space.md](references/agent-space.md), "Read rights"); every "reads all" rule of the module asks it.
 
 ## Minimal template: the host's chat controller
 

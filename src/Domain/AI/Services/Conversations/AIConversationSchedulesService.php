@@ -1734,7 +1734,7 @@ class AIConversationSchedulesService extends EntitiesService
         $resumeTransition = $schedule->buildTransitionTo(AIConversationScheduleTransition::OPERATION_RESUME, $now);
         if (!$resumeTransition->isAllowed) {
             if ($resumeTransition->refusalReason === AIConversationScheduleTransition::REFUSAL_CLOSED_BY_PLATFORM_STATE) {
-                throw new BadRequestException(___(
+                throw new BadRequestException($this->translateScheduleRefusalText(
                     'Schedule %scheduleId% was paused by the platform (%reason%) and resumes by itself once the '
                     . AgentApplicationWording::current()->billingEntityName . ' or account is active again.',
                     placeholders: [
@@ -1748,7 +1748,7 @@ class AIConversationSchedulesService extends EntitiesService
                     'Schedule ' . ($schedule->id ?? '?') . ' cannot be resumed: its one-time moment has passed. Schedule a new one-time task instead.'
                 );
             }
-            throw new BadRequestException(___(
+            throw new BadRequestException($this->translateScheduleRefusalText(
                 'Schedule %scheduleId% cannot be resumed in status %status%.',
                 placeholders: ['scheduleId' => (string)($schedule->id ?? '?'), 'status' => (string)$schedule->status]
             ));
@@ -1765,7 +1765,7 @@ class AIConversationSchedulesService extends EntitiesService
                 AgentEligibilityLogContext::forSchedule($this->getScheduleIdForLog($schedule))
             )
         ) {
-            throw new BadRequestException(___(
+            throw new BadRequestException($this->translateScheduleRefusalText(
                 'Schedule %scheduleId% cannot be resumed: the ' . AgentApplicationWording::current()->billingEntityName
                 . ' or account is %state% (%reason%).',
                 placeholders: [
@@ -1832,5 +1832,20 @@ class AIConversationSchedulesService extends EntitiesService
                 . "\n" . $scheduleBookkeepingError->getTraceAsString()
             );
         }
+    }
+
+    /**
+     * A refusal text of a schedule operation in the current language
+     * ({@see AgentOwnerFacingTextTranslationService::translateOwnerFacingText()}); the key is the English text.
+     *
+     * @param string $englishSourceKey
+     * @param array<string, string> $placeholders
+     * @return string
+     */
+    protected function translateScheduleRefusalText(string $englishSourceKey, array $placeholders = []): string
+    {
+        /** @var AgentOwnerFacingTextTranslationService $agentOwnerFacingTextTranslationService */
+        $agentOwnerFacingTextTranslationService = DDDService::instance()->getService(AgentOwnerFacingTextTranslationService::class);
+        return $agentOwnerFacingTextTranslationService->translateOwnerFacingText($englishSourceKey, placeholders: $placeholders);
     }
 }

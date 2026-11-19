@@ -10,6 +10,8 @@ use DDD\Domain\Base\Repo\DB\DBEntity;
 use DDD\Domain\Base\Repo\DB\Doctrine\DoctrineModel;
 use DDD\Domain\Base\Repo\DB\Doctrine\DoctrineQueryBuilder;
 use DDD\Domain\Common\Entities\Accounts\Account;
+use DDD\Domain\AI\Services\Conversations\Rights\AgentAccountRightsService;
+use DDD\Infrastructure\Services\DDDService;
 use DDD\Infrastructure\Services\AuthService;
 
 /**
@@ -24,7 +26,8 @@ class DBAgentMandate extends DBEntity
 
     /**
      * A mandate is the OWNER's authorization record: non-admins see only mandates of their own account.
-     * Admins with access to all resources see everything (support/debug).
+     * A reader of every mandate ({@see AgentAccountRightsService::isAccountReaderOfAllAgentMandates()}) sees everything
+     * (support/debug).
      */
     public static function applyReadRightsQuery(DoctrineQueryBuilder &$queryBuilder): bool
     {
@@ -38,7 +41,9 @@ class DBAgentMandate extends DBEntity
             $queryBuilder->andWhere("{$alias}.id is null");
             return true;
         }
-        if ($authAccount->isAdminWithAccessToAllResources()) {
+        /** @var AgentAccountRightsService $agentAccountRightsService */
+        $agentAccountRightsService = DDDService::instance()->getService(AgentAccountRightsService::class);
+        if ($agentAccountRightsService->isAccountReaderOfAllAgentMandates($authAccount)) {
             return false;
         }
         $queryBuilder->andWhere("{$alias}.accountId = :mandateRightsAuthAccountId")

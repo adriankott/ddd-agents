@@ -7,6 +7,7 @@ namespace DDD\Domain\AI\Entities\Conversations\Agent;
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolAttributeCatalog;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolOwnerFacingSubject;
+use DDD\Domain\AI\Services\Conversations\AgentOwnerFacingTextTranslationService;
 use DDD\Domain\Base\Entities\Translatable\Translatable;
 use DDD\Domain\Base\Entities\ValueObject;
 use DDD\Infrastructure\Services\DDDService;
@@ -52,7 +53,7 @@ class AgentRunReport extends ValueObject
     public string $stopReason = '';
 
     /**
-     * @var string The customer's configured interface language — drives the `___()` translation of the report
+     * @var string The customer's configured interface language — drives the translation of the report ({@see AgentOwnerFacingTextTranslationService})
      * SCAFFOLD (the item paths and statusNotes are already in the conversation's language, the model wrote
      * them; a hardcoded English frame would be delivered verbatim into non-English conversations). Keys = the
      * English source strings (app translation admin); a missing key degrades to the English key itself.
@@ -352,29 +353,34 @@ class AgentRunReport extends ValueObject
             return $this->translateInContext($singularEnglishKey, $singularEnglishKey, Translatable::CONTEXT_ONE, $placeholders);
         }
         $pluralLine = $this->translateInContext($singularEnglishKey, $pluralEnglishWording, Translatable::CONTEXT_MANY, $placeholders);
-        // translateKeyRC's cached "no values" branch returns the KEY and ignores defaultString — never serve
-        // the English singular for a plural count.
+        // an application's translation layer may answer the KEY (the English singular) and ignore the fallback — never
+        // serve the English singular for a plural count.
         $englishSingularLine = Translatable::replacePlaceholders($singularEnglishKey, $placeholders);
         return $pluralLine === $englishSingularLine
             ? Translatable::replacePlaceholders($pluralEnglishWording, $placeholders)
             : $pluralLine;
     }
 
-    /** The shared ___() call of {@see translate} and {@see translatePlural}, with the failure-path degradation. */
+    /**
+     * The shared translation of {@see translate} and {@see translatePlural}
+     * ({@see AgentOwnerFacingTextTranslationService::translateOwnerFacingText()}), with the failure-path degradation for
+     * a process without the service (a container-less unit test).
+     */
     protected function translateInContext(string $englishSourceKey, string $englishFallbackText, string $translationContext, array $placeholders): string
     {
         try {
-            return ___(
+            /** @var AgentOwnerFacingTextTranslationService $agentOwnerFacingTextTranslationService */
+            $agentOwnerFacingTextTranslationService = DDDService::instance()->getService(AgentOwnerFacingTextTranslationService::class);
+            return $agentOwnerFacingTextTranslationService->translateOwnerFacingText(
                 $englishSourceKey,
-                context: $translationContext,
-                languageCode: $this->languageCode,
-                placeholders: $placeholders,
-                defaultString: $englishFallbackText
+                $this->languageCode,
+                $placeholders,
+                $englishFallbackText,
+                $translationContext
             );
         } catch (Throwable $translationError) {
-            // The report runs on the run's FAILURE path — an unreachable translation store must never take the
-            // delivered report down with it; the English text (placeholders applied) is the honest degradation.
-            // Logged in its own guard, so a permanently broken store is visible instead of silently English.
+            // The report runs on the run's FAILURE path — a missing translation service must never take the delivered
+            // report down with it; the English text (placeholders applied) is the honest degradation.
             try {
                 DDDService::instance()->getLogger()->error(
                     'AgentRunReport: translation failed, degrading to English: ' . $translationError->getMessage()
@@ -382,12 +388,12 @@ class AgentRunReport extends ValueObject
             } catch (Throwable) {
             }
 
-            // The English source with its placeholders filled — a degraded report still says "3 of 5", never "%done%".
+            // The English text with its placeholders filled — a degraded report still says "3 of 5", never "%done%".
             $placeholderMap = [];
             foreach ($placeholders as $placeholderName => $placeholderValue) {
                 $placeholderMap['%' . $placeholderName . '%'] = (string)$placeholderValue;
             }
-            return $placeholderMap === [] ? $englishSourceKey : strtr($englishSourceKey, $placeholderMap);
+            return $placeholderMap === [] ? $englishFallbackText : strtr($englishFallbackText, $placeholderMap);
         }
     }
 }

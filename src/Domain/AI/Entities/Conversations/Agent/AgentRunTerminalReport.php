@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace DDD\Domain\AI\Entities\Conversations\Agent;
 
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
+use DDD\Domain\AI\Services\Conversations\AgentOwnerFacingTextTranslationService;
 use DDD\Domain\Base\Entities\ValueObject;
+use DDD\Infrastructure\Services\DDDService;
+use Throwable;
 
 /**
  * What the report a run owes at its terminal says: the stop reason it names, whether that reason
@@ -68,17 +71,29 @@ class AgentRunTerminalReport extends ValueObject
             $userLanguageCode = $conversation->resolveUserLanguageCode();
             return $hasTaskPlan
                 ? AgentRunReport::composeFromConversation($conversation, $this->stopReason)->toChatMessageText()
-                : ___($this->replyKeyWithoutTaskPlan, languageCode: $userLanguageCode);
+                : $this->translateForOwner($this->replyKeyWithoutTaskPlan, $userLanguageCode);
         }
         if ($this->stopReasonIsTranslatedForTheOwner) {
             return AgentRunReport::composeFromConversation(
                 $conversation,
-                ___($this->stopReason, languageCode: $conversation->resolveUserLanguageCode())
+                $this->translateForOwner($this->stopReason, $conversation->resolveUserLanguageCode())
             )->toChatMessageText();
         }
         $cutTurnRecord = $this->listsWritesSavedInTheCutTurn
             ? AgentPausedTurnRecord::composeFromTurnRows($conversation->messages->buildCurrentTurn()->getRows(), $conversation->getTaskPlan())
             : null;
         return AgentRunReport::composeFromConversation($conversation, $this->stopReason, $cutTurnRecord)->toChatMessageText();
+    }
+
+    /** One owner-facing text in the owner's language ({@see AgentOwnerFacingTextTranslationService}); never throws. */
+    protected function translateForOwner(string $englishSourceKey, ?string $languageCode): string
+    {
+        try {
+            /** @var AgentOwnerFacingTextTranslationService $agentOwnerFacingTextTranslationService */
+            $agentOwnerFacingTextTranslationService = DDDService::instance()->getService(AgentOwnerFacingTextTranslationService::class);
+            return $agentOwnerFacingTextTranslationService->translateOwnerFacingText($englishSourceKey, $languageCode);
+        } catch (Throwable) {
+            return $englishSourceKey;
+        }
     }
 }

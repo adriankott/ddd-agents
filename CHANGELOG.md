@@ -1,5 +1,55 @@
 # Changelog
 
+## 0.1.2
+
+- Fixed: the module called a global function `___()` that neither the framework nor the module defines (the run report,
+  the stop reason of a cut turn, the plan-less stall reply, schedule notices and the refusals of a schedule resume). A
+  host without its own definition got "Call to undefined function" on a turn's failure path. Every such text now goes
+  through the new service `AgentOwnerFacingTextTranslationService::translateOwnerFacingText()`: the framework's
+  `Translatable::translateKey()` by default (a plural line is looked up by its plural English wording), the host's
+  `___()` when it defines one, English when a key has no translation; it never throws. A host with its own translation
+  layer overrides `translateKeyWithApplicationTranslations()`. The contract test
+  `SourceCallsOnlyDefinedGlobalFunctionsTest` fails when the source calls a global function neither the package nor its
+  dependencies define, and when it names `___` at all.
+- Fixed: the package defaults refused the first turn. `AI.contextRetention.skillLoadingStrategy` is
+  `conversationAppend`, and a catalog model without `settings.agentWireApi` speaks Chat Completions, where append-only
+  loading is refused ("Agent wire configuration rejected (chatCompletions + conversationAppend)"). The documented
+  fallback to `systemPromptSwap` now holds on every path: a run over a conversation without a stamped strategy resolves
+  the default for its wire API (`ContextRetentionSettings::getSkillLoadingStrategyForAgentWireApi()`, used by
+  `AgentWireConfiguration::resolveFor()`); a creation that does not know the wire API leaves the strategy unstamped
+  under the append-only default (`ContextRetentionSettings::resolveDefaultSkillLoadingStrategyStampForAgentWireApi()`)
+  and the run stamps it before its first call, an ephemeral conversation in memory
+  (`AIConversationsService::stampCreationSettingsOfUnstampedConversation()` no longer skips it); the console chat stamps
+  a new conversation with the wire API of the agentic default model. The model catalog is unchanged (it belongs to
+  `mgamadeus/ddd-ai`). A strategy a start, a purpose or a CLI option names is refused on Chat Completions as before.
+- Fixed: a worker turn logged `Undefined array key "password"` (and host, port, database) when the Redis cache group
+  has no password. The native Redis connection of the base system prompt cache reads every key optionally
+  (`AgentBaseSystemPromptCacheService::buildRedisConnectionDsn()`; a Sentinel connection without sentinels opens none).
+- Added: `AgentAccountRightsService::isAccountReaderOfAllAgentRows()`, the module's own "reads every row" predicate
+  (default: `Account::isAdminWithAccessToAllResources()`, true for the admin role of any account), with one predicate
+  per table that delegates to it: `isAccountReaderOfAllAgentSpaces()`, `isAccountReaderOfAllAgentMandates()`,
+  `isAccountReaderOfAllMessageEmbeddings()`, `isAccountReaderOfAllEvaluationRows()`,
+  `isAccountReaderOfAllTurnEventSnapshots()`, and `isAuthenticatedAccountReaderOfAllAgentRows()`. Every "admin reads
+  all" rule asks it: the read rights of the conversation tables, spaces, mandates, message embeddings, evaluation runs
+  and cases, turn-event snapshots, `AgentSpacesService::requireAgentSpaceUsableByAccount()`, the message context of a
+  customer-hidden conversation, the raw tool errors of `MCPController` and the admin audience of
+  `MCPToolExecutorService`. A host whose scoped users hold the admin role narrows it in a same-path subclass. Behaviour
+  is unchanged by default.
+- Changed: the repositories of agent spaces, mandates, message embeddings and evaluation runs and cases ask the rights
+  service instead of the account predicate (the evaluation repositories keep `isAuthenticatedAccountReaderOfEveryRow()`
+  as their own override point). Same conditions and parameter names as before.
+- Added: `MCPToolExecutorService::isEnvironmentWideWriteLockActive()` (default false): under it `dispatchTool()` refuses
+  every tool that is no declared read (`#[MCPToolEffect(READ)]`; a tool without a declared effect counts as a write)
+  before every other gate, for every caller, with a final refusal (`MCPToolResponse::REFUSAL_ENVIRONMENT_WRITE_LOCKED`)
+  and the text of `buildEnvironmentWideWriteLockRefusalText()`.
+- Changed: the test trait `MessengerTransportsHaveWorkerBlocksContract` accepts the framework's worker list
+  ("config/system/workers.yaml", found beside "config/packages/messenger.yaml"; `workerListConfigPath()`) as well as a
+  supervisor file. `supervisorConfigPath()` is no longer abstract (default none): a host on the worker list overrides
+  only `messengerConfigPath()`; a host with a supervisor file keeps its override.
+- Docs: the entry skill (installation checklist, override points, read rights, transport contract), the autonomy skill
+  (owner-report translation), the context skill (the strategy fallback) and the tools skill (the write lock) describe
+  the changes; the README names the three host hooks.
+
 ## 0.1.1
 
 - Fixed: the Composer requirement on `mgamadeus/ddd-ai` is `^3.4.0` (was `^3.2.1`). `app:agents:eval-tools` uses

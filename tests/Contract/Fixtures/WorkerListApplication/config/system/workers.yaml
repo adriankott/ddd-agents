@@ -1,0 +1,8 @@
+# A minimal worker list of an application without a supervisor file: one consumer per agent transport.
+consumers:
+  - {transport: ai_conversation_turn, replicas: 2, busySilentSeconds: 1830}
+  - {transport: ai_conversation_compaction, min: 0, max: 2}
+  - {transport: ai_conversation_scorecard}
+  - {transport: ai_conversation_message_embedding}
+  - {transport: ai_tool_result_screening}
+  - {transport: ai_activity_lines}

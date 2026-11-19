@@ -294,6 +294,16 @@ class ContextRetentionSettings extends ValueObject
         return self::canonicalSkillLoadingStrategy($this->skillLoadingStrategy) ?? self::resolveDefaultSkillLoadingStrategy();
     }
 
+    /**
+     * The strategy a run on `$agentWireApi` loads skills with: the stamped strategy, else the global default for that wire
+     * API ({@see resolveDefaultSkillLoadingStrategyForAgentWireApi()}) — an unstamped conversation on Chat Completions
+     * runs the system-prompt swap, never the append-only default it cannot run.
+     */
+    public function getSkillLoadingStrategyForAgentWireApi(string $agentWireApi): string
+    {
+        return self::canonicalSkillLoadingStrategy($this->skillLoadingStrategy) ?? self::resolveDefaultSkillLoadingStrategyForAgentWireApi($agentWireApi);
+    }
+
     /** Whether this conversation loads skills append-only. */
     public function usesConversationAppend(): bool
     {
@@ -421,6 +431,20 @@ class ContextRetentionSettings extends ValueObject
         return $defaultSkillLoadingStrategy;
     }
 
+    /**
+     * The creation stamp the global default gives a conversation on `$agentWireApi`: the default for that wire API, or
+     * null (no stamp yet) when the wire API is not known and the default is the append-only strategy — the one strategy
+     * a wire API can refuse.
+     */
+    public static function resolveDefaultSkillLoadingStrategyStampForAgentWireApi(?string $agentWireApi): ?string
+    {
+        $defaultSkillLoadingStrategy = self::resolveDefaultSkillLoadingStrategyForAgentWireApi($agentWireApi);
+        if ($agentWireApi === null && $defaultSkillLoadingStrategy === self::SKILL_LOADING_STRATEGY_CONVERSATION_APPEND) {
+            return null;
+        }
+        return $defaultSkillLoadingStrategy;
+    }
+
     /** The ceiling of the reachable tool set an append-only epoch offers top-level when the config names none. */
     public const int DEFAULT_APPEND_ONLY_REACHABLE_TOOL_SET_CEILING_TOKENS = 55000;
 
@@ -453,7 +477,11 @@ class ContextRetentionSettings extends ValueObject
      * global default), and {@see $stateChangeDelivery} (`$requestedStateChangeDelivery`, the settings' value, the global
      * default). `$agentWireApi` is the wire API the new conversation's model resolves to (null = not known): the global
      * default strategy is taken through {@see resolveDefaultSkillLoadingStrategyForAgentWireApi()}, so a Chat Completions
-     * model starts on the system-prompt swap. Pure; the argument is not changed.
+     * model starts on the system-prompt swap. With the wire API unknown and the append-only global default, the strategy
+     * is left unstamped: the run stamps it with the wire API of its model before its first call
+     * ({@see \DDD\Domain\AI\Services\Conversations\AIConversationsService::stampCreationSettingsOfUnstampedConversation()}),
+     * so a creation path that does not know the model (the console chat, an evaluation run) never stamps a strategy the
+     * model cannot run. Pure; the argument is not changed.
      */
     public static function buildForNewConversation(
         ?self $requestedSettings,
@@ -465,7 +493,7 @@ class ContextRetentionSettings extends ValueObject
         $settingsForNewConversation = $requestedSettings !== null ? clone $requestedSettings : new static();
         $settingsForNewConversation->skillLoadingStrategy = self::canonicalSkillLoadingStrategy($requestedSkillLoadingStrategy)
             ?? self::canonicalSkillLoadingStrategy($settingsForNewConversation->skillLoadingStrategy)
-            ?? self::resolveDefaultSkillLoadingStrategyForAgentWireApi($agentWireApi);
+            ?? self::resolveDefaultSkillLoadingStrategyStampForAgentWireApi($agentWireApi);
         $settingsForNewConversation->rebuildEpochOnSituationChange = $requestedRebuildEpochOnSituationChange
             ?? $settingsForNewConversation->rebuildEpochOnSituationChange
             ?? self::resolveDefaultRebuildEpochOnSituationChange();

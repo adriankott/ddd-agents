@@ -1889,7 +1889,8 @@ class AIConversationsService extends EntitiesService
      * a creation stamp of new conversations only): the stamp fills the column, and the
      * purposed resume heals the purpose's knobs only into an empty column, so a stamp of
      * the strategy alone would keep an older purposed conversation on the global knobs for good. An ephemeral
-     * conversation (no id) lives in one process, where the default cannot change, and is left as it is.
+     * conversation (no id) is stamped in memory only: a creation path that did not know the model left its strategy
+     * unstamped ({@see ContextRetentionSettings::buildForNewConversation()}), and its run decides it here.
      *
      * The state-change delivery is stamped by the same rule: a conversation
      * created before the state-change delivery existed gets `everyCall` when it made a model call (the shape its history has), else its stored
@@ -1903,9 +1904,6 @@ class AIConversationsService extends EntitiesService
      */
     public function stampCreationSettingsOfUnstampedConversation(AIConversation $conversation, ?string $modelNameOverride = null): void
     {
-        if (!isset($conversation->id)) {
-            return;
-        }
         $contextRetentionSettings = isset($conversation->contextRetentionSettings) ? $conversation->contextRetentionSettings : null;
         $skillLoadingStrategyStamped = $contextRetentionSettings !== null
             && ContextRetentionSettings::canonicalSkillLoadingStrategy($contextRetentionSettings->skillLoadingStrategy) !== null;

@@ -149,10 +149,16 @@ The model calls a tool by its bare method name, across every package on the wire
 
 ## The admin audience
 
-A package class marked `MCPRequiresAdminWithAccessToAllResources` runs only for an admin with access to all
-resources, on every path (`REFUSAL_ADMIN_ACCESS_REQUIRED` otherwise), is exempt from the automation-eligibility gate,
+A package class marked `MCPRequiresAdminWithAccessToAllResources` runs only for a reader of every agent row
+(`AgentAccountRightsService::isAccountReaderOfAllAgentRows()`, by default the framework's admin with access to all
+resources), on every path (`REFUSAL_ADMIN_ACCESS_REQUIRED` otherwise), is exempt from the automation-eligibility gate,
 and every call of it reaches the override point `MCPToolExecutorService::recordAdminAudienceToolCall()` in a `finally` block (the default
 records nothing).
+
+Beside it: `MCPToolExecutorService::isEnvironmentWideWriteLockActive()` (the environment-wide write lock, default off:
+under it every tool that is no declared read is refused before the admin gate) and
+`MCPToolExecutorService::buildToolFailureText()` (the failure text); see
+[results-and-their-size.md](results-and-their-size.md).
 
 ## Documentation caches
 

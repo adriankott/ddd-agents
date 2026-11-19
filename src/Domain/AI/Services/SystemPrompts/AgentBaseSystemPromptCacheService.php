@@ -648,22 +648,61 @@ class AgentBaseSystemPromptCacheService extends Service
             $cache = Cache::instance(Cache::CACHE_GROUP_REDIS);
             $cacheConfig = Cache::getCacheConfig(Cache::CACHE_GROUP_REDIS);
             if ($cache instanceof RedisSentinel) {
-                $this->nativeRedisConnection = new Client($cacheConfig['sentinels'], [
+                $sentinels = $cacheConfig['sentinels'] ?? [];
+                if ($sentinels === []) {
+                    return $this->nativeRedisConnection = null;
+                }
+                $this->nativeRedisConnection = new Client($sentinels, [
                     'replication' => 'redis-sentinel',
                     'service' => 'mymaster',
-                    'parameters' => ['database' => $cacheConfig['database'], 'password' => $cacheConfig['password']],
+                    'parameters' => array_filter(
+                        ['database' => $cacheConfig['database'] ?? null, 'password' => $cacheConfig['password'] ?? null],
+                        [self::class, 'isConfiguredRedisConnectionValue']
+                    ),
                     'ttl' => $cache->ttl,
                 ]);
             } elseif ($cache instanceof Redis) {
-                $nativeRedisConnection = RedisAdapter::createConnection(sprintf(
-                    'redis://%s@%s:%d/%d', $cacheConfig['password'], $cacheConfig['host'], $cacheConfig['port'], $cacheConfig['database']
-                ));
+                $nativeRedisConnection = RedisAdapter::createConnection(self::buildRedisConnectionDsn($cacheConfig));
                 $this->nativeRedisConnection = $nativeRedisConnection instanceof \Redis ? $nativeRedisConnection : null;
             }
         } catch (Throwable) {
             $this->nativeRedisConnection = null;
         }
         return $this->nativeRedisConnection;
+    }
+
+    /** The default host of a Redis cache group without `CACHE_REDIS_HOST`. */
+    public const string DEFAULT_REDIS_HOST = '127.0.0.1';
+
+    /** The default port of a Redis cache group without `CACHE_REDIS_PORT`. */
+    public const int DEFAULT_REDIS_PORT = 6379;
+
+    /**
+     * The DSN of the Redis cache group's configuration (`Cache::getCacheConfig()`). Every key is optional: a group
+     * without a password (`CACHE_REDIS_PASSWORD` unset) connects without one, a missing host, port or database takes
+     * the Redis default. Never reads an absent key (a worker logged "Undefined array key" on every turn).
+     *
+     * @param array<string, mixed> $cacheConfig
+     * @return string e.g. `redis://secret@127.0.0.1:6379/0`, `redis://127.0.0.1:6379/0`
+     */
+    public static function buildRedisConnectionDsn(array $cacheConfig): string
+    {
+        $password = (string)($cacheConfig['password'] ?? '');
+        $host = (string)($cacheConfig['host'] ?? '');
+        $port = (int)($cacheConfig['port'] ?? 0);
+        return sprintf(
+            'redis://%s%s:%d/%d',
+            $password !== '' ? $password . '@' : '',
+            $host !== '' ? $host : self::DEFAULT_REDIS_HOST,
+            $port > 0 ? $port : self::DEFAULT_REDIS_PORT,
+            (int)($cacheConfig['database'] ?? 0)
+        );
+    }
+
+    /** Whether a connection parameter of the configuration is set (an unset password or database is left out). */
+    public static function isConfiguredRedisConnectionValue(mixed $configurationValue): bool
+    {
+        return $configurationValue !== null && $configurationValue !== '';
     }
 
     /** The key the cache adapter stores `$cacheKey` under in Redis: the cache namespace, a colon, the escaped key. */
