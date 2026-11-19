@@ -199,11 +199,11 @@ class AgentSkillPreloadDecisionsService extends Service
     public function buildSkillPreloadTurnInputs(AIConversation $conversation, AgentDecisionModelSettings $decisionModelSettings, array $assumeLoadedSkillNames = [], ?AgentRun $agentRun = null): ?AgentSkillPreloadTurnInputs
     {
         // ONE helper resolves the site for this conversation (the env veto, the kill switch, the
-        // conversation's row); the override source stays what it was — the row applied when it is set and the env
-        // did not veto the site.
+        // conversation's row); the override source is the row whenever it is set and the global switch is not off
+        // (a row switches the site over the file in both directions).
         $siteMode = $decisionModelSettings->siteModeForConversation(AgentDecisionModelSettings::SITE_SKILL_PRELOAD, $conversation);
         $rowSwitch = isset($conversation->runSettings) ? ($conversation->runSettings->decisionModelSkillPreload ?? null) : null;
-        $overrideSource = $decisionModelSettings->siteMode(AgentDecisionModelSettings::SITE_SKILL_PRELOAD) !== AgentDecisionModelSettings::MODE_OFF
+        $overrideSource = $decisionModelSettings->mode !== AgentDecisionModelSettings::MODE_OFF
             && $rowSwitch !== null && $rowSwitch !== RunSettings::DECISION_MODEL_SKILL_PRELOAD_INHERIT
             ? AIConversationTurnEvent::OVERRIDE_SOURCE_CONVERSATION
             : AIConversationTurnEvent::OVERRIDE_SOURCE_NONE;

@@ -146,6 +146,18 @@
   boundary (`ArgusAIAgentConversation::buildOpenAiChatMessagesArray()`); within a turn the input of call N is the
   unchanged start of call N+1 (`TaskPlanCallsOfTheRunningTurnKeepTheirArgumentsTest`). A turn with many plan updates
   carries their full arguments until it ends.
+- Changed: an explicit run setting of a decision site wins over the config file in both directions (explicit run
+  setting > `AI.decisionModel` site mode > default). Before, a site the file had `off` (or left unlisted) returned
+  `off` before the conversation's row was read, so an evaluation arm could not switch it on and A/B runs needed the
+  file in `shadow`. The skill-preload, stall-recovery and reply-language rows `on` / `off` and the turn-closing rows
+  `off` / `decisionModel` / `counterThenDecisionModel` now decide over the file (`AgentDecisionModelSettings::siteModeForConversation()`,
+  `findExplicitRowSiteMode()`); a turn-closing row naming a decision-model mode also switches a `shadow` site on. The
+  global `mode: off` and the kill switch `decisionModelOff` stay absolute. The admin status toggles of these sites are
+  disabled only under the global `off`.
+- Docs: the skill preload's catalog entry is documented as the code sends it — the skill's `description` (the same
+  text the chat model reads), plus for a root the line `Loading it unlocks the sub-skills: <name> (<criteria>)`; a
+  skill's `decisionCriteria` is read only as a sub-skill's criteria in its root's entry (or for an empty
+  `description`). `criteriaVersion` hashes the criteria lines only (decisions and skills-and-purposes skills).
 - Docs: the context skill (the client context, the tail order, leaving parts of the model input out, replacing
   `Character.md`), the tools skill (the reading rule, the violations, `noCache`, "do not narrow", the admin audit, the
   meta-tool switches), the context skill's cache chapter (why the carry-over cap is 4000, the plan-call stub at the

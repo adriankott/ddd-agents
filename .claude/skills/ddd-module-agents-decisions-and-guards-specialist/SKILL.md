@@ -37,9 +37,10 @@ breaker, and the statistics that show whether a decision earns its place.
 2. **Settings come from the committed config, never from the environment.** `AgentDecisionModelSettings::current()`
    reads `AI.decisionModel`; the per-conversation row (`RunSettings`) comes last. An evaluation arm is a conversation
    row, not an environment variable.
-3. **Precedence for one conversation:** global `mode: off` vetoes everything → the site's own mode (an unlisted site is
-   `off`, except `skillPreload` and `planItemSkillPreload`, which run `on` unless listed) → the conversation's kill
-   switch `decisionModelOff` → the site's row. Ask it through
+3. **Precedence for one conversation:** global `mode: off` and the conversation's kill switch `decisionModelOff` veto
+   everything; then an explicit run setting (the site's row, which an evaluation arm writes) > the file's site mode >
+   the default (an unlisted site is `off`, except `skillPreload` and `planItemSkillPreload`, which run `on`). A row
+   switches a site in both directions: `on` over a file `off` or `shadow`, `off` over a file `on`. Ask it through
    `AgentDecisionModelSettings::siteModeForConversation()`, never by reading the config yourself.
 4. **`off` is not one call and not one changed byte; `shadow` asks and records but never acts; only `on` acts.**
    `cohort` is meaningful only for `skillPreload` (the account's arm decides) and reads as `shadow` everywhere else.

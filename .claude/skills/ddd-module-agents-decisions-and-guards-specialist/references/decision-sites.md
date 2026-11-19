@@ -121,8 +121,17 @@ answer or switched off. The constant is on `AgentDecisionModelSettings`.
   call of the chat model (`preloadSubSkillsOfSkillsLoadedByTheChatModel()`, at most
   `SKILL_PRELOAD_MAX_LOADED_SKILLS_ASKED` skills).
 - **Sees:** the offered roots (or the sub-skills a root unlocks) with each skill's decision catalog entry, the loaded
-  skills with their tool summaries, the recent turns, the task plan, the stored facts of the agent space, the meta tools,
-  and the host's facts from `DDD\Domain\AI\Services\Conversations\Agent\AgentDecisionFactsService::collectSkillPreloadFacts()`.
+  skills with their catalog entries and tool summaries, the recent turns, the task plan, the stored facts of the agent
+  space, the meta tools, and the host's facts from `DDD\Domain\AI\Services\Conversations\Agent\AgentDecisionFactsService::collectSkillPreloadFacts()`.
+  In a sub-skill pass also the unlocking root's `description` and its resident sub-skills (each by its
+  `shortDescription`, else its name).
+- **The catalog entry** (`AISkill::getDecisionCatalogEntry()`): the skill's `description` — the same text the chat
+  model reads in the `load_skills` catalog, whitespace collapsed — and, for a root with offered sub-skills,
+  ` Loading it unlocks the sub-skills: <name> (<criteria>); …` where `<criteria>` is each sub-skill's
+  `decisionCriteria`, else the first sentence of its `description` cut to 200 characters (`AISkill::getDecisionCriteria()`).
+  The whole entry is cut at `AISkill::MAX_DECISION_CATALOG_ENTRY_CHARS` (2600). A skill's own `decisionCriteria` is
+  not part of its own entry (only when its `description` is empty). `criteriaVersion` on the decision events hashes the
+  criteria lines (`AISkillsService::getDecisionCriteriaVersion()`), so an edit of a `description` alone does not move it.
 - **Returns:** a distribution over the offered skills and `none`.
 - **Consequence:** `AgentSkillPreloadDecision::resolvePreloadFromDistribution()` picks the top skill when its probability
   reaches `MINIMUM_TOP_PROBABILITY` and `none` stays at or below `MAXIMUM_NONE_PROBABILITY`. Under `on` the pick is
@@ -238,13 +247,16 @@ Outside the turn path: see [injection defence](injection-defence.md) and [owner 
 
 ## The per-conversation switches
 
-`RunSettings` holds one row per switchable site; `inherit` (or null) keeps the environment's mode.
+`RunSettings` holds one row per switchable site; `inherit` (or null) keeps the file's mode. An explicit row wins over
+the file's site mode in both directions (explicit run setting > file > default); only the global `mode: off` and the
+kill switch stand above it (`AgentDecisionModelSettings::siteModeForConversation()`, `findExplicitRowSiteMode()`). So an
+evaluation arm switches a site on that the file has `off`, without the file in `shadow`.
 
 | Row | Values | Effect |
 |---|---|---|
 | `decisionModelOff` | true / false | the kill switch: every site `off` for this conversation (owner consent then refuses) |
-| `decisionModelSkillPreload` | `inherit`, `on`, `off` | `on` lifts `shadow` to `on`, `off` silences |
-| `decisionModelTurnClosing` | `inherit`, `off`, the three turn-closing modes | `off` silences; a mode is recorded but changes no sequence today (see `turnClosing`) |
+| `decisionModelSkillPreload` | `inherit`, `on`, `off` | `on` switches the site on (over a file `off` or `shadow`), `off` silences |
+| `decisionModelTurnClosing` | `inherit`, `off`, the three turn-closing modes | `off` silences; `decisionModel` or `counterThenDecisionModel` switches the site on (also over a file `off` or `shadow`); `deterministicCounter` keeps the file's site mode; the mode itself is recorded but changes no sequence today (see `turnClosing`) |
 | `decisionModelReasoningEffort` | `inherit`, `off`, `low`, `medium`, `high` | `off` silences; a value pins a floor (applies under `shadow` too) |
 | `decisionModelStallRecovery` | `inherit`, `on`, `off` | as the preload row |
 | `decisionModelReplyLanguage` | `inherit`, `on`, `off` | as the preload row |

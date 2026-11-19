@@ -393,13 +393,21 @@ class AgentDecisionModelSettings extends ValueObject
     }
 
     /**
-     * The EFFECTIVE mode of one site for ONE conversation: the environment's site mode
-     * ({@see siteMode()} — global `off` and an unlisted or `off` site are the absolute veto), then the conversation's
-     * row: the kill switch (`RunSettings::$decisionModelOff`) silences EVERY site here, the skill-preload row lifts
-     * `shadow` to `on` or silences the site, the turn-closing row `off` silences the site (its
-     * `deterministicCounter` / `decisionModel` values are TURN-CLOSING modes, read by {@see turnClosingModeForConversation()}, never a site
-     * mode). `cohort` is resolved through the account's arm for the skill-preload site. ONE helper for every site,
-     * so no site can miss the kill switch.
+     * The EFFECTIVE mode of one site for ONE conversation. Precedence: an explicit run setting (the conversation's
+     * row, which an evaluation arm writes too) > the config file's site mode ({@see siteMode()}) > the default (an
+     * unlisted site: `on` for {@see DEFAULT_ON_SITES}, else `off`).
+     *
+     * - Absolute, before any row: the global `mode: off` of the file (the environment's master switch: no decision
+     *   model is called) and the kill switch (`RunSettings::$decisionModelOff`, every site off).
+     * - An explicit row wins over the file's site mode in both directions: the skill-preload, stall-recovery and
+     *   reply-language rows `on` / `off`; the turn-closing row `off`, and a turn-closing row naming a mode that uses
+     *   the decision model (`decisionModel`, `counterThenDecisionModel`) = `on`; the effort row `off`. So an arm
+     *   switches a site on that the file has `off` (or `shadow`), without changing the file.
+     * - No explicit row: the file's site mode (`cohort` resolved through the account's arm for the skill-preload site).
+     *
+     * The turn-closing values `deterministicCounter` / `decisionModel` are TURN-CLOSING modes, read by
+     * {@see turnClosingModeForConversation()}; an effort row with a value is a PIN, never a site mode. ONE helper for
+     * every site, so no site can miss the kill switch.
      */
     public function siteModeForConversation(string $site, AIConversation $conversation): string
     {
@@ -411,46 +419,12 @@ class AgentDecisionModelSettings extends ValueObject
         if ($runSettings === null || $this->mode === self::MODE_OFF) {
             return $siteMode;
         }
-        if ($siteMode === self::MODE_OFF && $site !== strtolower(self::SITE_PLAN_DYNAMICS)) {
-            return $siteMode; // a plan-dynamics row may switch the site on under a global on/shadow
-        }
         if ($runSettings->decisionModelOff === true) {
             return self::MODE_OFF;
         }
-        if ($site === strtolower(self::SITE_SKILL_PRELOAD)) {
-            $rowSwitch = $runSettings->decisionModelSkillPreload ?? null;
-            if ($rowSwitch === RunSettings::DECISION_MODEL_SKILL_PRELOAD_ON) {
-                return self::MODE_ON;
-            }
-            if ($rowSwitch === RunSettings::DECISION_MODEL_SKILL_PRELOAD_OFF) {
-                return self::MODE_OFF;
-            }
-            return $siteMode;
-        }
-        if ($site === strtolower(self::SITE_TURN_CLOSING) && ($runSettings->decisionModelTurnClosing ?? null) === RunSettings::DECISION_MODEL_TURN_CLOSING_OFF) {
-            return self::MODE_OFF;
-        }
-        if ($site === strtolower(self::SITE_REASONING_EFFORT) && ($runSettings->decisionModelReasoningEffort ?? null) === RunSettings::DECISION_MODEL_REASONING_EFFORT_OFF) {
-            return self::MODE_OFF; // `off` = the configured effort, no decision model; a value row is a PIN, never a site mode
-        }
-        if ($site === strtolower(self::SITE_STALL_RECOVERY)) {
-            $rowSwitch = $runSettings->decisionModelStallRecovery ?? null;
-            if ($rowSwitch === RunSettings::DECISION_MODEL_STALL_RECOVERY_ON) {
-                return self::MODE_ON;
-            }
-            if ($rowSwitch === RunSettings::DECISION_MODEL_STALL_RECOVERY_OFF) {
-                return self::MODE_OFF;
-            }
-        }
-        if ($site === strtolower(self::SITE_REPLY_LANGUAGE)) {
-            // the language row: `on` lifts `shadow` here, `off` silences the site here
-            $rowSwitch = $runSettings->decisionModelReplyLanguage ?? null;
-            if ($rowSwitch === RunSettings::DECISION_MODEL_REPLY_LANGUAGE_ON) {
-                return self::MODE_ON;
-            }
-            if ($rowSwitch === RunSettings::DECISION_MODEL_REPLY_LANGUAGE_OFF) {
-                return self::MODE_OFF;
-            }
+        $explicitRowSiteMode = $this->findExplicitRowSiteMode($site, $runSettings);
+        if ($explicitRowSiteMode !== null) {
+            return $explicitRowSiteMode;
         }
         if ($site === strtolower(self::SITE_PLAN_DYNAMICS)) {
             // each row switch overrides its environment switch (null = inherit); the pair maps to the mode.
@@ -460,6 +434,49 @@ class AgentDecisionModelSettings extends ValueObject
             return self::planDynamicsModeFromSwitches($askDecisionModel, $modelReceivesVerdict);
         }
         return $siteMode;
+    }
+
+    /**
+     * The site mode an explicit row of the conversation sets for `$site`, over the file's site mode; null when the row
+     * inherits (or the site has no switching row).
+     */
+    protected function findExplicitRowSiteMode(string $site, RunSettings $runSettings): ?string
+    {
+        if ($site === strtolower(self::SITE_SKILL_PRELOAD)) {
+            return match ($runSettings->decisionModelSkillPreload ?? null) {
+                RunSettings::DECISION_MODEL_SKILL_PRELOAD_ON => self::MODE_ON,
+                RunSettings::DECISION_MODEL_SKILL_PRELOAD_OFF => self::MODE_OFF,
+                default => null,
+            };
+        }
+        if ($site === strtolower(self::SITE_TURN_CLOSING)) {
+            $rowValue = $runSettings->decisionModelTurnClosing ?? null;
+            if ($rowValue === RunSettings::DECISION_MODEL_TURN_CLOSING_OFF) {
+                return self::MODE_OFF;
+            }
+            $rowTurnClosingMode = self::canonicalTurnClosingMode($rowValue);
+            $rowUsesDecisionModel = $rowTurnClosingMode !== null && $rowTurnClosingMode !== self::TURN_CLOSING_MODE_DETERMINISTIC_COUNTER;
+            return $rowUsesDecisionModel ? self::MODE_ON : null;
+        }
+        if ($site === strtolower(self::SITE_REASONING_EFFORT)) {
+            // `off` = the configured effort, no decision model; a value row is a PIN, never a site mode
+            return ($runSettings->decisionModelReasoningEffort ?? null) === RunSettings::DECISION_MODEL_REASONING_EFFORT_OFF ? self::MODE_OFF : null;
+        }
+        if ($site === strtolower(self::SITE_STALL_RECOVERY)) {
+            return match ($runSettings->decisionModelStallRecovery ?? null) {
+                RunSettings::DECISION_MODEL_STALL_RECOVERY_ON => self::MODE_ON,
+                RunSettings::DECISION_MODEL_STALL_RECOVERY_OFF => self::MODE_OFF,
+                default => null,
+            };
+        }
+        if ($site === strtolower(self::SITE_REPLY_LANGUAGE)) {
+            return match ($runSettings->decisionModelReplyLanguage ?? null) {
+                RunSettings::DECISION_MODEL_REPLY_LANGUAGE_ON => self::MODE_ON,
+                RunSettings::DECISION_MODEL_REPLY_LANGUAGE_OFF => self::MODE_OFF,
+                default => null,
+            };
+        }
+        return null;
     }
 
     /**

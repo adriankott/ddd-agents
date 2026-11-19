@@ -32,17 +32,20 @@ class AgentDecisionLayerStatusTest extends UnitTestCase
         return $conversation;
     }
 
-    public function testSiteOffIsTheAbsoluteVetoAndDisablesTheToggle(): void
+    public function testARowOnSwitchesOnASiteTheFileHasOffAndOnlyTheGlobalOffDisablesTheToggle(): void
     {
-        // an UNLISTED preload site runs on; the veto is the explicit `:off`
+        // an UNLISTED preload site runs on; the file's `:off` is overridden by an explicit row
         $settings = AgentDecisionModelSettings::fromValues('on', 'replyLanguage,skillPreload:off', null, null);
         $status = AgentDecisionLayerStatus::forConversation($this->conversation(1, 'on'), $settings);
 
-        self::assertSame('off', $status->skillPreloadSiteMode);
-        self::assertSame('off', $status->skillPreloadResolvedMode, 'a row on cannot lift a site the environment switched off');
-        self::assertTrue($status->skillPreloadToggleDisabled);
+        self::assertSame('off', $status->skillPreloadSiteMode, 'the file\'s site mode');
+        self::assertSame('on', $status->skillPreloadResolvedMode, 'an explicit row wins over the file');
         self::assertSame('on', $status->sites['replyLanguage']);
-        self::assertStringContainsString('resolved: off', $status->skillPreloadResolvedLine);
+        self::assertSame('off', AgentDecisionLayerStatus::forConversation($this->conversation(1, null), $settings)->skillPreloadResolvedMode, 'no row: the file decides');
+
+        $globalOff = AgentDecisionLayerStatus::forConversation($this->conversation(1, 'on'), AgentDecisionModelSettings::fromValues('off', 'skillPreload:on', null, null));
+        self::assertSame('off', $globalOff->skillPreloadResolvedMode, 'the global off stays the master switch');
+        self::assertTrue($globalOff->skillPreloadToggleDisabled);
     }
 
     public function testARowOnLiftsShadowAndARowOffSilencesOn(): void
@@ -107,14 +110,18 @@ class AgentDecisionLayerStatusTest extends UnitTestCase
 
         $shadow = AgentDecisionModelSettings::fromValues('on', 'turnClosing:shadow', null, null, 'decisionModel');
         $status = AgentDecisionLayerStatus::forConversation($this->closingConversation('decisionModel'), $shadow);
-        self::assertSame('shadow', $status->turnClosingSiteMode);
-        self::assertSame('deterministicCounter', $status->turnClosingResolvedMode, 'a turn-closing mode is not a site mode');
-        self::assertStringContainsString('resolved: inert (site shadow)', $status->turnClosingResolvedLine);
+        self::assertSame('on', $status->turnClosingSiteMode, 'a row naming a decision-model mode switches the site on over the file');
+        self::assertSame('decisionModel', $status->turnClosingResolvedMode);
 
         $off = AgentDecisionModelSettings::fromValues('on', 'replyLanguage', null, null, 'decisionModel');
         $status = AgentDecisionLayerStatus::forConversation($this->closingConversation('decisionModel'), $off);
-        self::assertTrue($status->turnClosingToggleDisabled, 'the env veto disables the control');
+        self::assertFalse($status->turnClosingToggleDisabled, 'the row switches an unlisted site: the control stays usable');
+        self::assertSame('on', $status->turnClosingSiteMode);
+        $globalOff = AgentDecisionModelSettings::fromValues('off', 'turnClosing', null, null, 'decisionModel');
+        $status = AgentDecisionLayerStatus::forConversation($this->closingConversation('decisionModel'), $globalOff);
+        self::assertTrue($status->turnClosingToggleDisabled, 'the global off disables the control');
         self::assertSame('off', $status->turnClosingSiteMode);
+        self::assertStringContainsString('resolved: inert (site off)', $status->turnClosingResolvedLine);
     }
 
     public function testTheKillSwitchShowsOnEveryLineAndSilencesEverySite(): void

@@ -16,8 +16,11 @@ A capability wired into a skill whose description does not name that intent exis
 - Name the tools when they help the model: `Demo.Notes` says "with addDemoNote … with getDemoNotes".
 - End with what the skill is NOT for when a neighbour skill shares words. The decision model's catalog entry keeps the
   end of a long description (`AISkill::MAX_DECISION_CATALOG_ENTRY_CHARS`).
-- `decisionCriteria` names SITUATIONS for the decision model, at most 200 characters. Without it the first sentence of
-  the description is used, so make that sentence a complete statement of when to load.
+- The decision model routes a skill by its `description` (its catalog entry, `AISkill::getDecisionCatalogEntry()`), the
+  same text the chat model reads. `decisionCriteria` names SITUATIONS, at most 200 characters, and the decision model
+  reads it only for a SUB-skill, in its root's entry (`Loading it unlocks the sub-skills: <name> (<criteria>)`).
+  Without it the first sentence of the description is used there, so make that sentence a complete statement of when
+  to load.
 
 ## Cutting skills
 
@@ -32,8 +35,9 @@ A capability wired into a skill whose description does not name that intent exis
 ## The hierarchy rules for authors
 
 - The root's line carries the whole discovery of its sub-tree. When a sub-skill or a tool is added, read the root's
-  `description` and `decisionCriteria` and ask whether an owner who wants exactly this would be led to the root. If
-  not, change both in the same delivery.
+  `description` (what the chat model and the decision model route by) and the new sub-skill's `decisionCriteria`
+  (its line in the root's decision entry) and ask whether an owner who wants exactly this would be led to the root.
+  If not, change them in the same delivery.
 - The root's line names intents, never a sub-skill and never a tool, and keeps a fixed length. A root whose line can
   no longer cover its sub-tree is split into two roots or gains a level.
 - A sub-skill's `description` states what its tools do and where its data is READ ("which entries exist today is

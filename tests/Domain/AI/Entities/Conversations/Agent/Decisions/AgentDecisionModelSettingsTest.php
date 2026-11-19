@@ -103,7 +103,8 @@ class AgentDecisionModelSettingsTest extends UnitTestCase
         self::assertSame('shadow', $settings->siteModeForConversation('stallRecovery', $this->conversation()));
         self::assertSame('on', $settings->siteModeForConversation('stallRecovery', $this->conversation(stallRow: 'on')), 'a row on lifts shadow');
         self::assertSame('off', $settings->siteModeForConversation('stallRecovery', $this->conversation(stallRow: 'off')));
-        self::assertSame('off', AgentDecisionModelSettings::fromValues('on', 'replyLanguage', null, null)->siteModeForConversation('stallRecovery', $this->conversation(stallRow: 'on')), 'an unlisted stall site is off — the row cannot lift it');
+        self::assertSame('on', AgentDecisionModelSettings::fromValues('on', 'replyLanguage', null, null)->siteModeForConversation('stallRecovery', $this->conversation(stallRow: 'on')), 'an unlisted stall site is off by default — an explicit row switches it on');
+        self::assertSame('off', AgentDecisionModelSettings::fromValues('on', 'replyLanguage', null, null)->siteModeForConversation('stallRecovery', $this->conversation()), 'no row: the default');
         self::assertSame(2, AgentDecisionModelSettings::reasoningEffortRank('high'));
         self::assertSame(-1, AgentDecisionModelSettings::reasoningEffortRank('xhigh'));
     }
@@ -119,9 +120,10 @@ class AgentDecisionModelSettingsTest extends UnitTestCase
     {
         $shadow = AgentDecisionModelSettings::fromValues('on', 'turnClosing:shadow', null, null, 'decisionModel');
         self::assertSame('deterministicCounter', $shadow->turnClosingModeForConversation($this->conversation()), 'a turn-closing mode is not a site mode');
-        self::assertSame('deterministicCounter', $shadow->turnClosingModeForConversation($this->conversation('decisionModel')), 'a row cannot lift shadow either');
+        self::assertSame('decisionModel', $shadow->turnClosingModeForConversation($this->conversation('decisionModel')), 'an explicit row naming the mode switches the site on');
         $unlisted = AgentDecisionModelSettings::fromValues('on', 'replyLanguage', null, null, 'decisionModel');
-        self::assertSame('deterministicCounter', $unlisted->turnClosingModeForConversation($this->conversation('decisionModel')));
+        self::assertSame('deterministicCounter', $unlisted->turnClosingModeForConversation($this->conversation()), 'no row: the unlisted site stays off');
+        self::assertSame('decisionModel', $unlisted->turnClosingModeForConversation($this->conversation('decisionModel')), 'an explicit row wins over the default');
         $off = AgentDecisionModelSettings::fromValues('off', 'turnClosing', null, null, 'decisionModel');
         self::assertSame('deterministicCounter', $off->turnClosingModeForConversation($this->conversation('decisionModel')), 'global off wins');
         $on = AgentDecisionModelSettings::fromValues('on', 'turnClosing', null, null, 'decisionModel');
@@ -153,6 +155,26 @@ class AgentDecisionModelSettingsTest extends UnitTestCase
         self::assertSame('decisionModel', $settings->turnClosingModeForConversation($alive));
     }
 
+    /** Precedence: an explicit run setting (row or arm) > the file's site mode > the default; the global off and the kill switch stay absolute. */
+    public function testAnExplicitRunSettingWinsOverTheFilesSiteModeInBothDirections(): void
+    {
+        $fileOff = AgentDecisionModelSettings::fromValues('on', 'replyLanguage,skillPreload:off,stallRecovery:off', null, null, null);
+        $fileOn = AgentDecisionModelSettings::fromValues('on', 'skillPreload:on,stallRecovery:on', null, null, null);
+        $fileUnlisted = AgentDecisionModelSettings::fromValues('on', 'replyLanguage', null, null, null);
+
+        self::assertSame('on', $fileOff->siteModeForConversation('skillPreload', $this->conversation(skillPreloadRow: 'on')), 'row on > file off');
+        self::assertSame('on', $fileOff->siteModeForConversation('stallRecovery', $this->conversation(stallRow: 'on')));
+        self::assertSame('off', $fileOn->siteModeForConversation('skillPreload', $this->conversation(skillPreloadRow: 'off')), 'row off > file on');
+        self::assertSame('off', $fileOn->siteModeForConversation('stallRecovery', $this->conversation(stallRow: 'off')));
+        self::assertSame('off', $fileOff->siteModeForConversation('skillPreload', $this->conversation()), 'no row: the file');
+        self::assertSame('on', $fileUnlisted->siteModeForConversation('skillPreload', $this->conversation()), 'unlisted: the default (on for the preload site)');
+        self::assertSame('off', $fileUnlisted->siteModeForConversation('stallRecovery', $this->conversation()), 'unlisted: the default (off)');
+        self::assertSame('on', $fileUnlisted->siteModeForConversation('turnClosing', $this->conversation('counterThenDecisionModel')), 'a turn-closing row using the decision model > the default');
+        self::assertSame('off', $fileOn->siteModeForConversation('turnClosing', $this->conversation('off')));
+        self::assertSame('off', AgentDecisionModelSettings::fromValues('off', 'skillPreload:on', null, null, null)->siteModeForConversation('skillPreload', $this->conversation(skillPreloadRow: 'on')), 'the global off is absolute');
+        self::assertSame('off', $fileOff->siteModeForConversation('stallRecovery', $this->conversation(killSwitch: true, stallRow: 'on')), 'the kill switch is absolute');
+    }
+
     public function testTheSkillPreloadRowKeepsPlan74sRulesInsideTheOneHelper(): void
     {
         $shadow = AgentDecisionModelSettings::fromValues('on', 'skillPreload:shadow', null, null, null);
@@ -165,7 +187,10 @@ class AgentDecisionModelSettingsTest extends UnitTestCase
         self::assertSame('on', $unlisted->siteMode('planItemSkillPreload'));
         self::assertSame('off', $unlisted->siteMode('reasoningEffort'), 'the other sites stay off when unlisted');
         $off = AgentDecisionModelSettings::fromValues('on', 'replyLanguage,skillPreload:off', null, null, null);
-        self::assertSame('off', $off->siteModeForConversation('skillPreload', $this->conversation(skillPreloadRow: 'on')), 'site off is the absolute veto');
+        self::assertSame('on', $off->siteModeForConversation('skillPreload', $this->conversation(skillPreloadRow: 'on')), 'an explicit row wins over the file\'s off');
+        self::assertSame('off', $off->siteModeForConversation('skillPreload', $this->conversation()), 'no row: the file\'s off');
+        self::assertSame('off', AgentDecisionModelSettings::fromValues('off', 'skillPreload:on', null, null, null)->siteModeForConversation('skillPreload', $this->conversation(skillPreloadRow: 'on')), 'the global off stays the master switch');
+        self::assertSame('off', $off->siteModeForConversation('skillPreload', $this->conversation(skillPreloadRow: 'on', killSwitch: true)), 'the kill switch still silences the site');
         $globalOff = AgentDecisionModelSettings::fromValues('off', 'skillPreload:on', null, null, null);
         self::assertSame('off', $globalOff->siteMode('skillPreload'), 'the global off vetoes the default-on sites too');
         $cohort = AgentDecisionModelSettings::fromValues('on', 'skillPreload:cohort', null, null, null);

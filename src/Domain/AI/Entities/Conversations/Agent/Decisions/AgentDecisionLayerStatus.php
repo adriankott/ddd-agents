@@ -218,7 +218,7 @@ class AgentDecisionLayerStatus extends ValueObject
         $status->turnClosingResolvedMode = $settings->turnClosingModeForConversation($conversation);
         $status->turnClosingSetByAccountId = $runSettings?->decisionModelTurnClosingSetByAccountId;
         $status->turnClosingSetAt = $runSettings?->decisionModelTurnClosingSetAt;
-        $status->turnClosingToggleDisabled = $settings->siteMode(AgentDecisionModelSettings::SITE_TURN_CLOSING) === AgentDecisionModelSettings::MODE_OFF;
+        $status->turnClosingToggleDisabled = $settings->mode === AgentDecisionModelSettings::MODE_OFF; // a row switches the site in both directions
         $status->turnClosingResolvedLine = 'site: ' . $status->turnClosingSiteMode
             . ' · env: ' . $status->turnClosingModeEnv
             . ' · row: ' . ($status->turnClosingRowSwitch ?? 'inherit')
@@ -240,7 +240,7 @@ class AgentDecisionLayerStatus extends ValueObject
         $status->stallRecoveryRowSwitch = $runSettings?->decisionModelStallRecovery;
         $status->stallRecoverySetByAccountId = $runSettings?->decisionModelStallRecoverySetByAccountId;
         $status->stallRecoverySetAt = $runSettings?->decisionModelStallRecoverySetAt;
-        $status->stallRecoveryToggleDisabled = $settings->siteMode(AgentDecisionModelSettings::SITE_STALL_RECOVERY) === AgentDecisionModelSettings::MODE_OFF;
+        $status->stallRecoveryToggleDisabled = $settings->mode === AgentDecisionModelSettings::MODE_OFF; // a row switches the site in both directions
         $status->stallRecoveryResolvedLine = 'site: ' . $settings->siteMode(AgentDecisionModelSettings::SITE_STALL_RECOVERY)
             . ' · row: ' . ($status->stallRecoveryRowSwitch ?? 'inherit')
             . ' · resolved: ' . $status->stallRecoverySiteMode
@@ -252,7 +252,7 @@ class AgentDecisionLayerStatus extends ValueObject
         $status->replyLanguageRowSwitch = $runSettings?->decisionModelReplyLanguage;
         $status->replyLanguageSetByAccountId = $runSettings?->decisionModelReplyLanguageSetByAccountId;
         $status->replyLanguageSetAt = $runSettings?->decisionModelReplyLanguageSetAt;
-        $status->replyLanguageToggleDisabled = $settings->siteMode(AgentDecisionModelSettings::SITE_REPLY_LANGUAGE) === AgentDecisionModelSettings::MODE_OFF;
+        $status->replyLanguageToggleDisabled = $settings->mode === AgentDecisionModelSettings::MODE_OFF; // a row switches the site in both directions
         $status->replyLanguageResolvedLine = 'site: ' . $settings->siteMode(AgentDecisionModelSettings::SITE_REPLY_LANGUAGE)
             . ' · row: ' . ($status->replyLanguageRowSwitch ?? 'inherit')
             . ' · resolved: ' . $status->replyLanguageSiteMode
