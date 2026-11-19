@@ -199,10 +199,10 @@ class AgentToolResultScreeningService extends Service
         $chunks = ArgusAgentToolResultInjectionDecision::splitIntoChunks(ToolResultUntrustedSegments::buildTextToScreen($toolCall));
         $screeningOutcome->chunkCount = count($chunks);
         try {
-            $decisionBatch = new ArgusAgentDecisions();
+            $decisionBatch = ArgusAgentDecisions::newInstance();
             $chunkDecisions = [];
             foreach ($chunks as $chunkIndex => $chunkText) {
-                $chunkDecision = new ArgusAgentToolResultInjectionDecision();
+                $chunkDecision = ArgusAgentToolResultInjectionDecision::newInstance();
                 $chunkDecision->toolName = (string)($toolCall->name ?? '');
                 $chunkDecision->content = $chunkText;
                 $chunkDecision->billingEntity = $billingEntity;

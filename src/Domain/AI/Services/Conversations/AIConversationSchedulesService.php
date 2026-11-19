@@ -1529,7 +1529,7 @@ class AIConversationSchedulesService extends EntitiesService
      */
     protected function judgeDoneCriteriaFulfilled(AIConversationSchedule $schedule, string $boundedRunOutcomeText): ?bool
     {
-        $argusScheduleDoneCriteriaJudgment = new ArgusScheduleDoneCriteriaJudgment();
+        $argusScheduleDoneCriteriaJudgment = ArgusScheduleDoneCriteriaJudgment::newInstance();
         $argusScheduleDoneCriteriaJudgment->task = $schedule->task;
         $argusScheduleDoneCriteriaJudgment->doneCriteria = (string)$schedule->doneCriteria;
         $argusScheduleDoneCriteriaJudgment->runOutcomeText = $boundedRunOutcomeText;

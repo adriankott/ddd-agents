@@ -167,7 +167,7 @@ class AgentJevProbeCommand extends AgentConsoleCommand
     protected function probeCase(array $case, array $fixtureQuestions, AgentJevProbeScope $probeScope, float $timeoutSeconds, float $floor): array
     {
         $caseQuestions = (array)($case['questions'] ?? $fixtureQuestions);
-        $argusDecision = new ArgusAgentProbeDecision();
+        $argusDecision = ArgusAgentProbeDecision::newInstance();
         $argusDecision->probeQuestions = $caseQuestions;
         $argusDecision->probeState = (array)($case['state'] ?? []);
         $argusDecision->billingEntity = $probeScope->billingEntity;

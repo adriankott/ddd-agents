@@ -92,7 +92,7 @@ class AIConversationModelCallsService extends Service
      */
     public function resolveAgentWireConfiguration(AIConversation $conversation, ?string $modelNameOverride): AgentWireConfiguration
     {
-        $argusAIAgentConversation = new ArgusAIAgentConversation();
+        $argusAIAgentConversation = ArgusAIAgentConversation::newInstance();
         $argusAIAgentConversation->aiModelNameOverride = $modelNameOverride ?? ($conversation->aiModelNameOverride ?? null);
         return AgentWireConfiguration::resolveFor(
             $this->findAgentModelOfEgress($argusAIAgentConversation),
@@ -109,7 +109,7 @@ class AIConversationModelCallsService extends Service
      */
     public function resolveAgentWireConfigurationForNewConversation(?string $aiModelName, ?RunSettings $runSettings, ContextRetentionSettings $contextRetentionSettings): AgentWireConfiguration
     {
-        $argusAIAgentConversation = new ArgusAIAgentConversation();
+        $argusAIAgentConversation = ArgusAIAgentConversation::newInstance();
         $argusAIAgentConversation->aiModelNameOverride = $aiModelName;
         return AgentWireConfiguration::resolveFor(
             $this->findAgentModelOfEgress($argusAIAgentConversation),
@@ -126,7 +126,7 @@ class AIConversationModelCallsService extends Service
      */
     public function resolveAgentWireApi(?string $aiModelName, ?RunSettings $runSettings): string
     {
-        $argusAIAgentConversation = new ArgusAIAgentConversation();
+        $argusAIAgentConversation = ArgusAIAgentConversation::newInstance();
         $argusAIAgentConversation->aiModelNameOverride = $aiModelName;
         return AgentWireConfiguration::resolveWireApiFor($this->findAgentModelOfEgress($argusAIAgentConversation), $runSettings);
     }
@@ -306,7 +306,7 @@ class AIConversationModelCallsService extends Service
         AgentWireConfiguration $agentWireConfiguration,
         ?AgentRun $agentRun
     ): ModelResponse {
-        $argusAIAgentConversation = new ArgusAIAgentConversation();
+        $argusAIAgentConversation = ArgusAIAgentConversation::newInstance();
         $argusAIAgentConversation->fromEntity($conversation);
         /** @var AIConversation $conversation fromEntity()'s by-ref `DefaultObject` param widens the type for PHPStan; it does not replace the object. */
         $argusAIAgentConversation->applyAgentWireConfiguration($agentWireConfiguration);
@@ -726,7 +726,7 @@ class AIConversationModelCallsService extends Service
         // had been sent). The producing context has no resolved bytes; render each persisted ToolCall image reference
         // as a visible placeholder at its wire position instead.
         $producingContext->renderImageReferencePlaceholders = true;
-        $argusAIAgentConversation = new ArgusAIAgentConversation();
+        $argusAIAgentConversation = ArgusAIAgentConversation::newInstance();
         // an append-only call's history carries the items the epoch's calls appended
         $reconstructedToolSchemas = $this->buildToolSchemasForMessage($conversation, $message);
         if ($producingContext->prefixEpoch !== null) {

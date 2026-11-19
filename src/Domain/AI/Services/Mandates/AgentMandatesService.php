@@ -299,7 +299,7 @@ class AgentMandatesService extends EntitiesService
             );
         }
 
-        $argusAgentMandateApproval = new ArgusAgentMandateApproval();
+        $argusAgentMandateApproval = ArgusAgentMandateApproval::newInstance();
         $argusAgentMandateApproval->requestedActionClass = $actionClass;
         $argusAgentMandateApproval->requestedActionClassDescription = AgentMandate::getActionClassDescription($actionClass);
         $argusAgentMandateApproval->requestedToolName = $grantArguments->requestedToolName;

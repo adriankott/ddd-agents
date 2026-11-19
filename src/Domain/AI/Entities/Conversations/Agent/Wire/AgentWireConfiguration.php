@@ -60,8 +60,13 @@ class AgentWireConfiguration
      */
     public string $previousReasoningCarryOver = RunSettings::PREVIOUS_REASONING_CARRY_OVER_OFF;
 
-    /** The built-in cap of the carry-over `capped` when the committed config names none. */
-    public const int DEFAULT_PREVIOUS_REASONING_CAP_TOKENS = 1000;
+    /**
+     * The built-in cap of the carry-over `capped` when the committed config names none. 4,000 — the value
+     * {@see AgentPreviousReasoningCut} is laid out for: its two kept steps restart the carried block well below the cap,
+     * so a cut is followed by several steps with a stable prefix. A cap the two kept steps alone exceed (at 1,000 and
+     * 300–900 reasoning tokens per step at medium effort) moves the cut on almost every call of a planning turn.
+     */
+    public const int DEFAULT_PREVIOUS_REASONING_CAP_TOKENS = 4000;
 
     /**
      * @var int The cap of the carry-over `capped` in reasoning tokens — the conversation's row, else the committed default

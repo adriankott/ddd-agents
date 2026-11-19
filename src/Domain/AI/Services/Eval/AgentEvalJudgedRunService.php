@@ -547,7 +547,7 @@ class AgentEvalJudgedRunService extends AgentEvalRunnerService
             if (!$promptMessage instanceof AIConversationMessage) {
                 throw new LogicException('The harness prompt needs its message before the model call.');
             }
-            $argusAIAgentConversation = new ArgusAIAgentConversation();
+            $argusAIAgentConversation = ArgusAIAgentConversation::newInstance();
             $argusAIAgentConversation->fromEntity($promptConversation);
             /** @var AIConversation $promptConversation fromEntity() takes it by reference; it stays the same object */
             $argusAIAgentConversation->toolSchemas = [];

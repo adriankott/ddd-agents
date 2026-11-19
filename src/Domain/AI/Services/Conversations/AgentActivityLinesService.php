@@ -699,7 +699,7 @@ class AgentActivityLinesService extends Service
         $this->lastDurationSeconds = 0.0;
         $this->lastUnparsedResults = [];
         foreach (array_chunk($pending, max(1, $this->elementsPerCall)) as $batch) {
-            $narrator = new ArgusAgentActivityLines();
+            $narrator = ArgusAgentActivityLines::newInstance();
             foreach ($batch as $element) {
                 $narrator->activityLines->add($element);
             }

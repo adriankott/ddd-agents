@@ -296,7 +296,7 @@ class AgentReasoningEffortDecisionsService extends Service
     protected function resolveConfiguredAndCeilingReasoningEffort(AIConversation $conversation): AgentReasoningEffortCatalogEfforts
     {
         try {
-            $argusAIAgentConversation = new ArgusAIAgentConversation();
+            $argusAIAgentConversation = ArgusAIAgentConversation::newInstance();
             $argusAIAgentConversation->aiModelNameOverride = $conversation->aiModelNameOverride ?? null;
             $agenticUseCase = $argusAIAgentConversation->getAIModel()?->agenticUseCase;
             $configuredEffort = $agenticUseCase?->reasoningEffort;

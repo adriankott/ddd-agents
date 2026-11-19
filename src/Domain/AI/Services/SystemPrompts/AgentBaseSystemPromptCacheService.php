@@ -213,7 +213,7 @@ class AgentBaseSystemPromptCacheService extends Service
     /** The template built from the conversation's account and prompt files (no model call, no data of its space). */
     public function buildBaseSystemPromptTemplate(AIConversation $conversation): string
     {
-        $argusAIAgentConversation = new ArgusAIAgentConversation();
+        $argusAIAgentConversation = ArgusAIAgentConversation::newInstance();
         $argusAIAgentConversation->fromEntity($conversation);
         $argusAIAgentConversation->buildsStateDeliveryTemplate = true;
         return $argusAIAgentConversation->getSystemPromptContent();
@@ -264,7 +264,7 @@ class AgentBaseSystemPromptCacheService extends Service
     /** The agent egress over `$conversation` — the prompt build's own reads (space, account, settings). */
     protected function buildArgusAgentConversationFor(AIConversation $conversation): ArgusAIAgentConversation
     {
-        $argusAIAgentConversation = new ArgusAIAgentConversation();
+        $argusAIAgentConversation = ArgusAIAgentConversation::newInstance();
         $argusAIAgentConversation->fromEntity($conversation);
         return $argusAIAgentConversation;
     }
@@ -501,7 +501,7 @@ class AgentBaseSystemPromptCacheService extends Service
     /** The base prompt built from the conversation's current space, account and prompt files (no model call). */
     public function buildBaseSystemPrompt(AIConversation $conversation): string
     {
-        $argusAIAgentConversation = new ArgusAIAgentConversation();
+        $argusAIAgentConversation = ArgusAIAgentConversation::newInstance();
         $argusAIAgentConversation->fromEntity($conversation);
         return $argusAIAgentConversation->getSystemPromptContent();
     }

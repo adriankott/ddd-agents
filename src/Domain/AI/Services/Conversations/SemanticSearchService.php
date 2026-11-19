@@ -225,7 +225,7 @@ class SemanticSearchService extends Service
             return array_keys($texts);
         }
         try {
-            $rerank = new ArgusSearchRerank();
+            $rerank = ArgusSearchRerank::newInstance();
             $rerank->query = $query;
             $rerank->candidateTexts = $texts;
             $rerank->budgetAccount = $budgetAccount;

@@ -333,7 +333,7 @@ class AgentTurnStartDecisionBatchService extends Service
         $agentTurnStartDecisionsInFlight->siteInputs = $siteInputs;
         $agentTurnStartDecisionsInFlight->decisionModelSettings = $decisionModelSettings;
         $agentTurnStartDecisionsInFlight->batchResult = new AgentTurnStartBatchResult();
-        $primaryDecision = new ArgusAgentTurnStartDecision();
+        $primaryDecision = ArgusAgentTurnStartDecision::newInstance();
         $agentTurnStartDecisionsInFlight->primaryDecision = $primaryDecision;
         // the primary request is filled BEFORE the call: a failure here is not the call's own error (no site is stamped)
         $replyLanguageQuestion = $siteInputs->replyLanguageQuestion;
@@ -430,7 +430,7 @@ class AgentTurnStartDecisionBatchService extends Service
         ArgusAgentTurnStartDecision $primaryDecision,
         AgentTurnStartBatchResult $result
     ): ArgusAgentDecisions {
-        $decisionBatch = new ArgusAgentDecisions();
+        $decisionBatch = ArgusAgentDecisions::newInstance();
         if ($siteInputs->primaryRequestCarriesASite()) {
             $decisionBatch->addChild($primaryDecision, self::PRIMARY_REQUEST_KEY);
         }

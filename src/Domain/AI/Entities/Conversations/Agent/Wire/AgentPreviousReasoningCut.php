@@ -27,7 +27,9 @@ use DDD\Domain\AI\Entities\Conversations\Messages\RequestSnapshot;
  * entries). A call whose snapshot is lost (a discarded response under the system-prompt swap) leaves the anchor of the
  * call before it; the next call derives the same cut from that anchor, since the same rows hold the same items.
  * When the two kept steps alone exceed the cap, every further step moves the cut by one step (each call a partial
- * cache miss) — at the measured 300–650 reasoning tokens per step and the 4,000 default that needs > 2,000 per step.
+ * cache miss) — at the measured 300–650 reasoning tokens per step and the 4,000 default
+ * ({@see AgentWireConfiguration::DEFAULT_PREVIOUS_REASONING_CAP_TOKENS}, `AI.contextRetention.previousReasoningCapTokens`)
+ * that needs > 2,000 per step.
  *
  * @phpstan-consistent-constructor
  */

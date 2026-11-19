@@ -161,9 +161,12 @@ from the column, it survives tool-result clearing, compaction and a worker hand-
 `ddd-module-agents-context-specialist`.
 
 Two wire rules keep the plan calls cheap and their lessons in context. Every `update_task_plan` call below the newest
-one sends its arguments stubbed as `{"superseded":true}` (`AIConversationMessage::toOpenAiToolCallEntryArray()`; call id
-and name stay, so call and result still pair) — the current plan is in the tail entry, and forensics read the persisted
-rows. The results of the plan tools are exempt from tool-result clearing: the creation result carries the maintenance
+one that belongs to an EARLIER turn sends its arguments stubbed as `{"superseded":true}`
+(`AIConversationMessage::toOpenAiToolCallEntryArray()`; call id and name stay, so call and result still pair) — the
+current plan is in the tail entry, and forensics read the persisted rows. The plan calls of the running turn keep their
+arguments: a stub there rewrote an item near the start of the turn on every plan update and moved the cached prefix
+back to the system content and the tools. The stub lands once, at the next turn boundary, like the tool-result
+clearing (`TaskPlanCallsOfTheRunningTurnKeepTheirArgumentsTest`). The results of the plan tools are exempt from tool-result clearing: the creation result carries the maintenance
 rules once per run, every tick result is a one-line count, and the clearing stub's "call again" would invite exactly the
 full-plan resend the rules forbid. `ToolCall::readTaskPlanCallOutcome()` gives the outcome of a row stored before
 `$taskPlanCallOutcome` existed (failed → refused, a no-op resend → unchanged, otherwise a full replace).

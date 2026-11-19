@@ -545,7 +545,7 @@ class AgentSkillPreloadDecisionsService extends Service
      */
     public function buildSubSkillPreloadDecisionRequest(AIConversation $conversation, AgentSkillPreloadDecisionQuestion $subSkillQuestion, AgentDecisionModelSettings $decisionModelSettings): ArgusAgentTurnStartDecision
     {
-        $argusDecision = new ArgusAgentTurnStartDecision();
+        $argusDecision = ArgusAgentTurnStartDecision::newInstance();
         $argusDecision->preloadLoadedRootSkillName = (string)$subSkillQuestion->unlockedByRootSkillName;
         $argusDecision->preloadLoadedRootSkillTools = $subSkillQuestion->unlockedByRootToolSummaries;
         $argusDecision->preloadCatalog = $subSkillQuestion->catalogCriteria;
@@ -681,7 +681,7 @@ class AgentSkillPreloadDecisionsService extends Service
             if ($this->decisionCallsService()->isCircuitBreakerOpen()) {
                 return ''; // no call, no request built
             }
-            $decisionBatch = new ArgusAgentDecisions();
+            $decisionBatch = ArgusAgentDecisions::newInstance();
             $argusSubSkillDecisions = [];
             foreach ($subSkillQuestions as $loadedSkillName => $subSkillQuestion) {
                 $argusSubSkillDecisions[$loadedSkillName] = $this->buildSubSkillPreloadDecisionRequest($conversation, $subSkillQuestion, $decisionModelSettings);

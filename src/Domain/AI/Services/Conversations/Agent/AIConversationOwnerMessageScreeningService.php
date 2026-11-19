@@ -66,7 +66,7 @@ class AIConversationOwnerMessageScreeningService extends Service
     /** The one-child request of the injection check of an owner message, screened on its owner text. */
     public function buildInjectionCheckRequest(AIConversation $conversation, AIConversationMessage $ownerMessage): ArgusAgentOwnerMessageInjectionDecision
     {
-        $argusOwnerMessageInjectionDecision = new ArgusAgentOwnerMessageInjectionDecision();
+        $argusOwnerMessageInjectionDecision = ArgusAgentOwnerMessageInjectionDecision::newInstance();
         $argusOwnerMessageInjectionDecision->ownerMessage = $ownerMessage->getOwnerTextForInjectionCheck();
         /** @var AgentSpacesService $agentSpacesService */
         $agentSpacesService = DDDService::instance()->getService(AgentSpacesService::class);

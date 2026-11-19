@@ -157,7 +157,7 @@ Keep the method a single indexed read.
 | `rebuildEpochOnSituationChange` | `true` | `false` | `ContextRetentionSettings::resolveDefaultRebuildEpochOnSituationChange()` |
 | `stateChangeDelivery` | `onceWhenChanged` | `everyCall` | `ContextRetentionSettings::resolveDefaultStateChangeDelivery()` |
 | `appendOnlyReachableToolSetCeilingTokens` | 55000 | 55000 | `ContextRetentionSettings::resolveAppendOnlyReachableToolSetCeilingTokens()` |
-| `previousReasoningCapTokens` | 1000 | 1000 | `AgentWireConfiguration::resolveDefaultPreviousReasoningCapTokens()` |
+| `previousReasoningCapTokens` | 4000 | 4000 | `AgentWireConfiguration::resolveDefaultPreviousReasoningCapTokens()` |
 
 Per conversation, every other knob lives on `ContextRetentionSettings` (tool-result window and budget, image cap,
 eviction horizons, pressure, hard cap, pins) and `CompactionSettings` (threshold override, model, fallbacks); a

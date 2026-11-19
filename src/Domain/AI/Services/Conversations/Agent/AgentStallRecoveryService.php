@@ -100,7 +100,7 @@ class AgentStallRecoveryService extends Service
                 $loadableCapabilityNames !== []
             );
 
-            $argusStallRecoveryDecision = new ArgusAgentStallRecoveryDecision();
+            $argusStallRecoveryDecision = ArgusAgentStallRecoveryDecision::newInstance();
             $argusStallRecoveryDecision->stallShape = $stallShape;
             $argusStallRecoveryDecision->noSkillLoaded = $decision->noSkillLoaded;
             $argusStallRecoveryDecision->lastAssistantText = $lastAssistantText;

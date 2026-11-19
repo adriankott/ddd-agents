@@ -133,13 +133,34 @@ compaction summarizer never see them.
 `AgentWireConfiguration::$previousReasoningCarryOver` (resolved from `RunSettings`): `all`, `currentTurn`, `capped`,
 `off`. Default `capped` on Responses, `off` on Chat Completions, always `off` on the server-state arm. Under `capped`,
 `AgentPreviousReasoningCut` keeps the previous steps' reasoning items until their sum exceeds
-`previousReasoningCapTokens` (1000), then drops all but the newest `KEPT_NEWEST_STEPS_AT_A_CUT` (2) steps' items in one
+`previousReasoningCapTokens` (4000), then drops all but the newest `KEPT_NEWEST_STEPS_AT_A_CUT` (2) steps' items in one
 block and records the cut index (`RequestSnapshot::$previousReasoningCutFromMessageIndex`): a sawtooth with a stable
 prefix between two crossings. A step's reasoning size is the provider's count (`RequestSnapshot::$wireReasoningTokens`),
 else an estimate from the items' JSON (`AgentPreviousReasoningCut::ESTIMATED_REASONING_ITEMS_JSON_OVERHEAD_BYTES`,
 1,600 bytes, plus `ESTIMATED_REASONING_ITEMS_JSON_BYTES_PER_TOKEN`, 13 bytes per token);
 `RequestSnapshot::$previousReasoningSentTokens` is the carried size of the call. A provider error naming one of `AgentWireConfiguration::CARRIED_REASONING_REJECTION_ERROR_TEXTS`
 makes the call retry without carried items (`withoutPreviousReasoningCarryOver()`).
+
+**Why the cap is 4000.** The cut keeps the two newest steps, so the cap must sit well above two steps' reasoning, or
+every further step moves the cut and the cached prefix ends at the first dropped item. At medium effort a planning step
+reasons for 300–900 tokens: with a cap of 1000 (the shipped value before 0.1.3) the cut moved on 8 of 11 call pairs of
+one planning turn, each a partial miss back to the moved item. At 4000 the two kept steps restart the block at about
+0.6–1.8k, and a cut is followed by several steps with a stable prefix; only steps above 2,000 reasoning tokens each
+cut on every call. Measured on a Responses wire with explicit breakpoints over a six-turn conversation (13–16 calls,
+two runs each):
+
+| Carry-over | Cached share | Seconds per model call |
+|---|---|---|
+| `capped`, 1000 | 95.5 % / 94.7 % | 2.05 / 1.88 |
+| `capped`, 4000 | 95.8 % / 94.4 % | 2.06 / 2.54 |
+| `all` | 95.9 % / 96.0 % | 1.89 / 1.95 |
+
+`all` drops nothing and has the best cached share, but carries every step's items for the whole conversation (the
+input grows with it); `capped` at 4000 bounds the carried block. The latency differences are inside the run-to-run
+noise: a call's duration follows its output tokens (about 1.35 s plus 0.49 s per 100 output tokens), not its uncached
+input, so the cap is a cache and cost lever, not a latency one. A host that wants `all` sets it per conversation
+(`RunSettings::$previousReasoningCarryOver`, a purpose's `runSettings`); a host that wants another cap sets
+`previousReasoningCapTokens`.
 
 ## 6. The cached base prompt
 
@@ -197,6 +218,8 @@ On both paths:
 | A deploy that edits a prompt file or a skill file | the base prompt or the item rendering it | one miss |
 | A tool result stubbed later | the history from that row | the turn window moves once per owner turn; the token budget can still stub a result within a turn |
 | A tiny result stubbed to a longer stub | that row | `ToolCall::MIN_RESULT_CHARS_TO_STUB` |
+| An older `update_task_plan` call's arguments stubbed (`{"superseded":true}`) | the history from that call | only calls of earlier turns, once at the turn boundary; the running turn's plan calls keep their arguments |
+| Carried reasoning items dropped by the `capped` cut | the history from the first dropped item | the cap (4000) well above the two kept steps; `all` drops none |
 | A picture leaving the image cap | that result | the cap keeps the newest pictures |
 
 ## 8. Host checklist

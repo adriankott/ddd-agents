@@ -123,9 +123,33 @@
 - Fixed: the evaluation teardown skipped the host's residue hook for an account-level conversation;
   `AgentEvalRunHooksService::tearDownHostResidueOfConversation()` now runs for every stored conversation (schedules and
   mandates are still closed only for a conversation of an agent space).
+- Fixed: a host's same-path subclass of an Argus repository was never reached: the agent's egress
+  `ArgusAIAgentConversation` (model calls, base prompt cache, reasoning-effort decision, evaluation harness) and the
+  decision, summary, compaction, rerank, judgment, activity-line and mandate-approval repositories were built with
+  `new`. Every one is now built with `X::newInstance()`; the contract test `ArgusRepositoriesAreNeverBuiltWithNewTest`
+  fails on a `new Argus…()` in `src`.
+- Fixed: the live path did not send the effort of the model it called. Without `--model` the egress read the agentic
+  settings of the attribute's default model, not of the model the `AGENTIC` scope pins, so browser and console turns
+  sent no `effort` (the provider's default applied). `ArgusAIAgentConversation::getArgusLanguageModelInstance()` now
+  applies `agenticUseCase.reasoningEffort` and, when the catalog sets one, `agenticUseCase.temperature` of the model
+  of the call (`findModelOfThisCall()`: the override, else the model set, else the scope's, else the default); the
+  turn's decided effort still wins. Each egress applies them to its own copy of the `#[ArgusLanguageModel]` instance,
+  so one call's settings never reach another call.
+- Changed: the default cap of the reasoning carry-over `capped` is 4000 (`AgentWireConfiguration::DEFAULT_PREVIOUS_REASONING_CAP_TOKENS`,
+  `contextRetention.php` `previousReasoningCapTokens`; was 1000, while the class documentation of the cut said 4000).
+  At 1000 the two kept steps alone exceed the cap at 300–900 reasoning tokens per step, so the cut moved on 8 of 11
+  call pairs of a planning turn, each moving the cached prefix back. A host that ships its own `contextRetention.php`
+  keeps its value; a running conversation's cut moves less often from the next call on.
+- Fixed: the arguments of an `update_task_plan` call were stubbed (`{"superseded":true}`) as soon as a newer plan call
+  followed, inside the running turn too: each plan update rewrote an item near the start of the turn and the next
+  call fell back to the system-and-tools prefix. Only plan calls of earlier turns are stubbed now, once at the turn
+  boundary (`ArgusAIAgentConversation::buildOpenAiChatMessagesArray()`); within a turn the input of call N is the
+  unchanged start of call N+1 (`TaskPlanCallsOfTheRunningTurnKeepTheirArgumentsTest`). A turn with many plan updates
+  carries their full arguments until it ends.
 - Docs: the context skill (the client context, the tail order, leaving parts of the model input out, replacing
   `Character.md`), the tools skill (the reading rule, the violations, `noCache`, "do not narrow", the admin audit, the
-  meta-tool switches), the widgets skill (the `findWidgets` offer and switches), the skills-and-purposes skill (the
+  meta-tool switches), the context skill's cache chapter (why the carry-over cap is 4000, the plan-call stub at the
+  turn boundary), the loop skill's task-plan wire rule, the widgets skill (the `findWidgets` offer and switches), the skills-and-purposes skill (the
   purpose key `modelInputOptions`), the autonomy and entry skills (shared spaces, the new hooks, the conversation's
   class attributes, sixteen config files), the loop skill (the drive hook), the observability skill (`--accountId`, the
   start's snapshot switch, record references, `forbiddenSkills` / `noSkill` / `expectedSkill: none`, the `argsContain`

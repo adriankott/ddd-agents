@@ -20,5 +20,5 @@ return [
     'rebuildEpochOnSituationChange' => true,
     'stateChangeDelivery' => 'onceWhenChanged',
     'appendOnlyReachableToolSetCeilingTokens' => 55000,
-    'previousReasoningCapTokens' => 1000,
+    'previousReasoningCapTokens' => 4000,
 ];

@@ -2070,7 +2070,7 @@ class AIConversationsService extends EntitiesService
             $conversation->getCompactionCoveredUpToIndex() ?? -1
         );
 
-        $summarizer = new ArgusAIConversationSummary();
+        $summarizer = ArgusAIConversationSummary::newInstance();
         // setParent takes `?DefaultObject &$parent` BY-REF — a throwaway local keeps $conversation's type (the
         // summarizeForCompaction pattern).
         $summarizerParent = $conversation;

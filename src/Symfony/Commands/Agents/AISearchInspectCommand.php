@@ -268,7 +268,7 @@ class AISearchInspectCommand extends AgentConsoleCommand
             foreach ($messagesRepository->findSimilarAcrossConversationsByEmbedding($account, $queryEmbedding, 8)?->getElements() ?? [] as $candidateMessage) {
                 $candidateTexts[] = $semanticSearchService->windowExcerpt((string)($candidateMessage->message ?? ''), $query, 400);
             }
-            $searchRerank = new ArgusSearchRerank();
+            $searchRerank = ArgusSearchRerank::newInstance();
             $searchRerank->query = $query;
             $searchRerank->candidateTexts = $candidateTexts;
             $searchRerank->budgetAccount = $account;

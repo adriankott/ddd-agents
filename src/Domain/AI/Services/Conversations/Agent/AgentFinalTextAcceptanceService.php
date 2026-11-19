@@ -95,7 +95,7 @@ class AgentFinalTextAcceptanceService extends Service
 
             $transportFailureReason = null;
             $rawResponseExcerpt = null;
-            $argusTurnClosingDecision = new ArgusAgentTurnClosingDecision();
+            $argusTurnClosingDecision = ArgusAgentTurnClosingDecision::newInstance();
             $argusTurnClosingDecision->assistantAnswer = $answerText;
             $argusTurnClosingDecision->openWorkItems = $openWorkItems;
             /** @var AgentSpacesService $agentSpacesService */

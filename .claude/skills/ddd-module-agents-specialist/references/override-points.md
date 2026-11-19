@@ -166,6 +166,11 @@ A host keeps an application-only field, constant or method in its own class at t
 with `X::newInstance()` or asks the container for the class name:
 
 - `RunSettings`, `TaskPlanItem`, `TaskPlanItems`, `AgentModelInput`, `AIConversationMetrics`;
+- every Argus repository: the agent's egress `ArgusAIAgentConversation` (its endpoint, routing, cache key, the effort
+  it sends) and the decision, summary, compaction, rerank and judgment repositories, always built with
+  `X::newInstance()` (`ArgusRepositoriesAreNeverBuiltWithNewTest` fails on a `new Argus…()` in `src`). The egress
+  sends the agentic settings (`agenticUseCase`: effort, temperature) of the model the call goes to: `--model`, else
+  the model the `AGENTIC` scope pins, else the attribute's default;
 - the evaluation suite's `AgentEvalSuiteTask` (the host's scope in `getScopeId()`, its own kinds),
   `AgentEvalSuitePlanOptions` (the host's own planning options) and `AgentEvalSuiteRecordSettings` (the host's key of
   the whole-scope isolation, `ISOLATE_WHOLE_SCOPE_KEY`, and its own recorded settings);

@@ -326,13 +326,13 @@ class ArgusAIAgentConversation extends ArgusAIConversation
     }
 
     /**
-     * Opt the agentic egress IN to the SELECTED model's agentic reasoning effort by injecting it onto the egress
-     * language-model instance (the established pattern — mirrors ArgusAIVisibilityOpenAISearchResult). The trait then
-     * applies it (`reasoning`/`reasoning_effort`). This scopes the override to the agent loop, and because the model
-     * is resolved dynamically (AIModelsService / --model), the config of WHATEVER model is chosen rides along.
-     *
-     * The model is resolved directly from the override name here (NOT via getAIModel(), which itself reads this
-     * instance → would recurse).
+     * Opt the agentic egress IN to the SELECTED model's agentic settings (`agenticUseCase`: the reasoning effort and,
+     * when the catalog sets one, the temperature) by injecting them onto the egress language-model instance (the
+     * established pattern — mirrors ArgusAIVisibilityOpenAISearchResult). The trait then applies them
+     * (`reasoning`/`reasoning_effort`, `temperature`). This scopes the override to the agent loop, and because the
+     * model is resolved dynamically, the config of WHATEVER model is chosen rides along: the `--model` override, else
+     * the model the attribute's scope pins (`AIModelsService::getModelForScope()`), else the attribute's default —
+     * the order {@see getAIModel()} resolves in ({@see findModelOfThisCall()}).
      */
     public function getArgusLanguageModelInstance(): ?ArgusLanguageModel
     {
@@ -340,17 +340,22 @@ class ArgusAIAgentConversation extends ArgusAIConversation
         if ($instance === null) {
             return null;
         }
-        $modelName = ($this->aiModelNameOverride !== null && $this->aiModelNameOverride !== '')
-            ? $this->aiModelNameOverride
-            : ($instance->defaultAIModelName ?? null);
-        if ($modelName !== null && $modelName !== '') {
-            /** @var AIModelsService $aiModelsService */
-            $aiModelsService = DDDService::instance()->getService(AIModelsService::class);
-            $model = $aiModelsService->getAIModelByName($modelName);
-            $effort = $model?->agenticUseCase?->reasoningEffort;
-            if ($effort !== null && $effort !== '') {
-                $instance->reasoningEffort = $effort;
-            }
+        if ($this->declaredArgusLanguageModel === null) {
+            // the attribute instance may be shared by every egress of the process: this egress sets its own copy, so
+            // one call's model settings never reach another call
+            $this->declaredArgusLanguageModel = $instance;
+            $instance = clone $instance;
+            $this->argusLanguageModel = $instance;
+        }
+        $instance->reasoningEffort = $this->declaredArgusLanguageModel->reasoningEffort;
+        $instance->temperature = $this->declaredArgusLanguageModel->temperature;
+        $agenticUseCase = $this->findModelOfThisCall($instance)?->agenticUseCase;
+        $effort = $agenticUseCase?->reasoningEffort;
+        if ($effort !== null && $effort !== '') {
+            $instance->reasoningEffort = $effort;
+        }
+        if ($agenticUseCase?->temperature !== null) {
+            $instance->temperature = $agenticUseCase->temperature;
         }
         // the turn's DECIDED effort wins over the catalog value — set by the loop from the owner turn's
         // reasoning-effort decision (already clamped to the ceiling and raised to the row's pin there). Null = the
@@ -359,6 +364,57 @@ class ArgusAIAgentConversation extends ArgusAIConversation
             $instance->reasoningEffort = $this->reasoningEffortOverride;
         }
         return $instance;
+    }
+
+    /** @var ArgusLanguageModel|null The class's declared `#[ArgusLanguageModel]`, unchanged; null until first read */
+    protected ?ArgusLanguageModel $declaredArgusLanguageModel = null;
+
+    /** @var AIModel|null The model {@see findModelOfThisCall()} resolved last, for {@see $modelOfThisCallOverrideName} */
+    protected ?AIModel $modelOfThisCall = null;
+
+    /** @var string|null The override name the model of this call was resolved for ('' = none) */
+    protected ?string $modelOfThisCallOverrideName = null;
+
+    /**
+     * The model this call is sent to, resolved in the order of {@see getAIModel()} without calling it (it reads this
+     * instance, which would recurse): {@see $aiModelNameOverride}, else the model already set on the egress, else the
+     * model the attribute's `modelScope` pins, else the attribute's `defaultAIModelName`. Remembered per override name:
+     * the language-model instance is read many times per call.
+     */
+    protected function findModelOfThisCall(ArgusLanguageModel $argusLanguageModel): ?AIModel
+    {
+        $overrideName = (string)($this->aiModelNameOverride ?? '');
+        if ($this->modelOfThisCallOverrideName === $overrideName && $this->modelOfThisCall !== null) {
+            return $this->modelOfThisCall;
+        }
+        $this->modelOfThisCallOverrideName = $overrideName;
+        $this->modelOfThisCall = $this->resolveModelOfThisCall($argusLanguageModel, $overrideName);
+        return $this->modelOfThisCall;
+    }
+
+    /** The model of this call, looked up ({@see findModelOfThisCall()}); null when none resolves. */
+    protected function resolveModelOfThisCall(ArgusLanguageModel $argusLanguageModel, string $overrideName): ?AIModel
+    {
+        /** @var AIModelsService $aiModelsService */
+        $aiModelsService = DDDService::instance()->getService(AIModelsService::class);
+        if ($overrideName !== '') {
+            $overrideModel = $aiModelsService->getAIModelByName($overrideName);
+            if ($overrideModel !== null) {
+                return $overrideModel;
+            }
+        }
+        if (isset($this->aiModel)) {
+            return $this->aiModel;
+        }
+        $modelScope = (string)($argusLanguageModel->modelScope ?? '');
+        if ($modelScope !== '') {
+            $scopeModel = $aiModelsService->getModelForScope($modelScope);
+            if ($scopeModel !== null) {
+                return $scopeModel;
+            }
+        }
+        $defaultModelName = (string)($argusLanguageModel->defaultAIModelName ?? '');
+        return $defaultModelName !== '' ? $aiModelsService->getAIModelByName($defaultModelName) : null;
     }
 
     /**
@@ -1244,9 +1300,12 @@ class ArgusAIAgentConversation extends ArgusAIConversation
             }
         }
 
-        // every `update_task_plan` call BELOW the newest one emits stubbed ARGUMENTS
+        // every `update_task_plan` call BELOW the newest one that belongs to an EARLIER turn emits stubbed ARGUMENTS
         // ({@see AIConversationMessage::toOpenAiToolCallEntryArray()}) — K plan updates would otherwise ride as K
-        // near-identical full plan copies in every later step's input. The newest call keeps its arguments verbatim.
+        // near-identical full plan copies in every later turn's input. The newest call keeps its arguments verbatim,
+        // and so does every call of the running turn: stubbing one there rewrote an item near the start of the turn
+        // and moved the cached prefix back to system + tools on each plan update. The stub lands at the turn
+        // boundary, once, like the tool-result clearing.
         $taskPlanCallPositions = [];
         foreach ($messages as $k => $candidate) {
             if ($candidate->messageType === AIConversationMessage::MESSAGE_TOOL_CALL
@@ -1271,7 +1330,8 @@ class ArgusAIAgentConversation extends ArgusAIConversation
             : null;
         $isSupersededTaskPlanCall = static fn (AIConversationMessage $callMessage): bool =>
             isset($taskPlanCallPositions[spl_object_id($callMessage)])
-            && $taskPlanCallPositions[spl_object_id($callMessage)] < $newestTaskPlanCallPosition;
+            && $taskPlanCallPositions[spl_object_id($callMessage)] < $newestTaskPlanCallPosition
+            && $taskPlanCallPositions[spl_object_id($callMessage)] < $currentTurnInitiatorPosition;
         // a send_owner_report call's ARGUMENTS (the full report body) are ALWAYS stubbed on the wire —
         // the delivered report rides as the visible OWNER_REPORT message and would otherwise be re-billed
         // every remaining step. The PERSISTED row keeps the args full (email composer + forensics).

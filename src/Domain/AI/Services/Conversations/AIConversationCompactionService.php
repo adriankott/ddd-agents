@@ -309,7 +309,7 @@ class AIConversationCompactionService extends Service
      */
     protected function summarizeForCompaction(AIConversation $conversation, string $compactionInput): AIConversationCompactionSummary
     {
-        $summarizer = new ArgusAIConversationCompaction();
+        $summarizer = ArgusAIConversationCompaction::newInstance();
         // setParent takes `?DefaultObject &$parent` BY-REF — a throwaway local keeps $conversation's AIConversation type.
         $summarizerParent = $conversation;
         $summarizer->setParent($summarizerParent);
