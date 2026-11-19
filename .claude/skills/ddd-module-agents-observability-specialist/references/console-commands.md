@@ -470,13 +470,13 @@ and a judge model). Reports per case and overall, writes the run into the result
 | `--full` | flag | tool arguments and results also for passing cases |
 | `--json` | flag | the result document instead of the report |
 | `--model` | none | the agent model; `--tier` / `--vendor` too ([model and tier options](#model-and-tier-options)) |
-| `--repeat` | `'1'` | run every case N times, each in its own child process (`<caseId>.rep<k>.json`) |
+| `--repeat` | `'1'` | run every case N times, each in its own child process (`<caseId>.rep<k>.json`); the report prints per case its passed runs of all runs and, under it, why each failed run failed (its error, else its first failure; at most 5 per case, 200 characters each, `AgentEvalCaseRepetition::$failureDetails`, not stored) |
 | `--parallel` | `'10'` | cases in child processes, N at a time; `1` = one after the other in this process |
 | `--no-save` | flag | write no run files and store no record (a child) |
 | `--no-prune` | flag | skip the retention sweep of the results folder |
 | `--judge` | flag | the judged flavor |
-| `--judge-model` | none | the judge model (default: the judged run's) |
-| `--driver-model` | none | the simulated owner model (default: the judged run's) |
+| `--judge-model` | none | the judge model (default: `AI.evalSuite.judgeModelName`, else the package's) |
+| `--driver-model` | none | the simulated owner model (default: `AI.evalSuite.driverModelName`, else the package's) |
 | `--owner-device` | none | the simulated owner's device stamped on every owner message (`OwnerDevice::SURFACES`) |
 | `--include-async` | flag | also run `executionMode: async` cases inline |
 | `--transient` | flag | store no conversations (no decision site runs); ignored when an arm option is passed |
@@ -493,6 +493,9 @@ and a judge model). Reports per case and overall, writes the run into the result
   `--no-save` or `--no-prune`.
 - **Envelope:** every agent turn `ENVELOPE.AI.CONVERSATION.TURN` for the space's owner; the driver and the judge
   `ENVELOPE.AI.AGENT.EVALUATION` (booked as `AI.AGENT.SIMULATE.OWNER` / `AI.AGENT.JUDGE.EVALUATION`).
+- **Cost lines:** `Model cost:` is the agent's alone; a judged run adds `Judge and driver cost:` (total, judge,
+  driver) from the rows' `judgeCostUsd` / `driverCostUsd`, stored as `metrics.harnessCosts`
+  ([evaluation-fixtures](evaluation-fixtures.md#the-judged-flavors-keys)).
 - **Exit codes:** `0` when every case that counts passed; `1` otherwise or when no fixture is found; `2` for a
   `--judge-model` / `--driver-model` the model catalog does not know ([the harness models](#the-harness-models)).
 - **Budget:** `--ignore-budget`, handed to every child.
@@ -622,7 +625,9 @@ harness calls.
 ### `app:ai-agent:eval-selection` — `AgentEvalSelectionCommand`
 
 The skill-selection evaluation: per case the agent answers the prompt, and the case passes when one of the expected
-skills (`expectedSkill`, `A|B` for either) was loaded. Every write tool is refused.
+skills (`expectedSkill`, `A|B` for either) was loaded — or, with `expectedSkill: "none"`, when no skill was loaded — and
+none of its `forbiddenSkills`. Record references in the prompt are resolved in the case's scope first (an unresolved one
+makes the case not applicable). Every write tool is refused.
 
 | Option | Default | Meaning |
 |---|---|---|
@@ -772,7 +777,7 @@ rates the tree from the per-turn snapshots.
 | `--agentSpaceId` and the application's space options | none | the space of a case file without `agentSpaceId`; the case file's own space wins |
 | `--case-file` | none | the JSON case file; required unless `getDefaultCaseFile()` returns one |
 | `--agent-model` | none | the agent model |
-| `--judge-model`, `--driver-model` | none | default: the judged run's |
+| `--judge-model`, `--driver-model` | none | default: `AI.evalSuite.judgeModelName` / `driverModelName`, else the package's |
 | `--max-turns` | `'14'` | owner turns |
 | `--segment-messages` | `'3'` | messages per level-0 leaf |
 | `--keep-messages` | `'3'` | recent messages kept raw |

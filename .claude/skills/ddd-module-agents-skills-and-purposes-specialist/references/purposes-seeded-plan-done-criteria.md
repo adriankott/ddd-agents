@@ -66,6 +66,7 @@ misspelt key is silently ignored.
 | `maxStepsPerTurn` | the per-turn step cap, copied into the run settings at the start |
 | `maxTurnCostUsd` | read into `AIConversationPurpose::$maxTurnCostUsd`, but no start path copies it: a starter that wants a per-turn cost cap stamps `RunSettings::$maxTurnCostUsd` itself |
 | `contextBudgetTokens`, `contextRetention` | the working-context budget and the retention knobs (context skill) |
+| `modelInputOptions` | a map of the keys of `config/app/AI/agentModelInputOptions.php` (`offersDelegationTools`, `offersTaskPlanTools`, `offersAskOwner`, `offersFindWidgets`, `teachesWidgets`, `droppedBasePromptSections`, `dropsMemorySectionWithoutMemoryTool`, `offersReachableToolsFromTheFirstCall`): each key it names wins over the host's configuration for the purpose's conversations, a key it leaves out keeps the configured value (`AgentModelInputOptionsOverride`, context skill) |
 | `runSettings` | wire API and reasoning carry-over defaults of a new conversation (`AIConversationPurposesService::buildPurposeRunSettingsFromFrontmatter()`); with the creation choices of `contextRetention` the "agent wire profile", applied whole or not at all |
 | `preferredModelName`, `reasoningEffort`, `minReasoningEffort`, `fastMode` | the model and effort of the purpose's calls |
 | `worksAutonomouslyAfterKickoff` | the run works without owner input after the kickoff |

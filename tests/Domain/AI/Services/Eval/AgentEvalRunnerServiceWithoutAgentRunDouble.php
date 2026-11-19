@@ -31,6 +31,9 @@ class AgentEvalRunnerServiceWithoutAgentRunDouble extends AgentEvalRunnerService
     /** @var string[] What happened in order: `agent run` and every executed tool, as the executor double saw them */
     public array $agentRuns = [];
 
+    /** @var AIConversation|null The conversation an agent run answers; null = one without messages */
+    public ?AIConversation $conversationOfAgentRun = null;
+
     /** @var array<int, int[]> The seeded conversation ids the options held at each driven turn */
     public array $seededConversationIdsPerDrive = [];
 
@@ -41,6 +44,9 @@ class AgentEvalRunnerServiceWithoutAgentRunDouble extends AgentEvalRunnerService
         $this->agentRuns[] = $agentEvalCase->getPrompt();
         if ($this->agentRunErrorMessage !== null) {
             throw new RuntimeException($this->agentRunErrorMessage);
+        }
+        if ($this->conversationOfAgentRun !== null) {
+            return AgentEvalRunOutcome::forConversation($this->conversationOfAgentRun);
         }
         /** @var AIConversation $conversation */
         $conversation = (new ReflectionClass(AIConversation::class))->newInstanceWithoutConstructor();

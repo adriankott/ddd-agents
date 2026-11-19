@@ -89,7 +89,7 @@ class AgentEvalCaseRowFactoriesTest extends UnitTestCase
         );
 
         self::assertSame(
-            ['skill', 'case', 'tool', 'passed', 'flavor', 'compactionFired', 'conversationId', 'failures', 'performance', 'verdict', 'turns', 'stopReason', 'loadedSkills', 'calledTools', 'finalText', 'widgetBlocks', 'toolCallCount', 'workToolCallCount', 'inputTokens', 'outputTokens', 'totalTokens', 'costUsd', 'durationMs', 'messages'],
+            ['skill', 'case', 'tool', 'passed', 'flavor', 'compactionFired', 'conversationId', 'failures', 'performance', 'verdict', 'turns', 'stopReason', 'loadedSkills', 'calledTools', 'finalText', 'widgetBlocks', 'toolCallCount', 'workToolCallCount', 'inputTokens', 'outputTokens', 'totalTokens', 'costUsd', 'judgeCostUsd', 'driverCostUsd', 'durationMs', 'messages'],
             array_keys($passedRow->toArray())
         );
         self::assertTrue($passedRow->isPassed());
@@ -182,6 +182,34 @@ class AgentEvalCaseRowFactoriesTest extends UnitTestCase
         self::assertSame([], $hitRow->getValue('failures'));
         self::assertFalse($missRow->isPassed());
         self::assertSame(["skill not loaded: expected 'Other.Skill', loaded [Catalog.Items]"], $missRow->getValue('failures'));
+    }
+
+    public function testASelectionCaseCanExpectNoSkillAndForbidSkills(): void
+    {
+        $conversation = $this->conversationWithOneToolCall();
+        $measurement = AgentEvalCaseRunMeasurement::forConversation($conversation, 5);
+        $messagesWithLoadedSkills = new MessagesWithLoadedSkillsDouble();
+        foreach ($measurement->messagesOfTree->getElements() as $message) {
+            $messagesWithLoadedSkills->add($message);
+        }
+        $measurement->messagesOfTree = $messagesWithLoadedSkills;
+        $header = AgentEvalCaseRowHeader::withoutFields()->addField('skill', 'none')->addField('case', 'selection.none');
+
+        $messagesWithLoadedSkills->loadedSkillNamesOfTest = [];
+        self::assertTrue(AgentEvalCaseRow::buildForSelectionRun($header, AgentEvalCase::EXPECTED_SKILL_NONE, $measurement)->isPassed(), 'no skill loaded: the expectation `none` holds');
+
+        $messagesWithLoadedSkills->loadedSkillNamesOfTest = ['Catalog.Items'];
+        $loadedAlthoughNoneRow = AgentEvalCaseRow::buildForSelectionRun($header, AgentEvalCase::EXPECTED_SKILL_NONE, $measurement);
+        self::assertFalse($loadedAlthoughNoneRow->isPassed());
+        self::assertSame(['skill loaded although none was expected: [Catalog.Items]'], $loadedAlthoughNoneRow->getValue('failures'));
+
+        $forbiddenRow = AgentEvalCaseRow::buildForSelectionRun($header, 'Catalog.Items', $measurement, ['Catalog.Items', 'Other.Skill']);
+        self::assertFalse($forbiddenRow->isPassed(), 'the expected skill was loaded, but it is also forbidden');
+        self::assertSame(["forbidden skill loaded: 'Catalog.Items'"], $forbiddenRow->getValue('failures'));
+
+        $case = AgentEvalCase::fromArray(['prompt' => 'p', 'expectedSkill' => 'none', 'forbiddenSkills' => [' Catalog.Items ', '']]);
+        self::assertSame(['Catalog.Items'], $case->getForbiddenSkillNames());
+        self::assertSame(['Other.Skill'], AgentEvalCase::fromArray(['forbiddenSkills' => 'Other.Skill'])->getForbiddenSkillNames());
     }
 
     public function testTheRecallRowKeepsItsKeyOrderAndItsChecks(): void

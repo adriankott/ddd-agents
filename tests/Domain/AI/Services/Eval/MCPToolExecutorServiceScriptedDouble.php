@@ -39,6 +39,7 @@ class MCPToolExecutorServiceScriptedDouble extends MCPToolExecutorService
             'blockedToolSimulatedErrors' => static::$blockedToolSimulatedErrors,
             'everyWriteToolBlocked' => static::$everyWriteToolBlocked,
             'provenance' => $serverProvidedInput,
+            'packageClasses' => $packageClasses,
         ];
         if ($toolName === $this->failingToolName) {
             throw new \RuntimeException('executor unreachable');

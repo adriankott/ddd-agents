@@ -957,4 +957,42 @@ class AgentEvalExpectationTest extends UnitTestCase
         $delegateCallRow->delegationResults = $delegationResults;
         return $delegateCallRow;
     }
+
+    public function testArgsContainReadsTheValueOfItsArgument(): void
+    {
+        $conversation = $this->conversation([['searchFigures', '{"term":"winter","note":"summer sale","filters":{"region":"north"}}', AIConversationMessage::STATUS_COMPLETED]]);
+
+        self::assertTrue($this->evaluate($conversation, ['tool' => 'searchFigures', 'argsContain' => ['term' => 'winter', 'filters.region' => 'north']])->passed);
+        $result = $this->evaluate($conversation, ['tool' => 'searchFigures', 'argsContain' => ['term' => 'summer']]);
+        self::assertSame(["argsContain[term]: 'summer' not in args {\"term\":\"winter\",\"note\":\"summer sale\",\"filters\":{\"region\":\"north\"}}"], $result->failures, 'a value of another argument does not count');
+        self::assertFalse($this->evaluate($conversation, ['tool' => 'searchFigures', 'argsContain' => ['missing' => 'winter']])->passed, 'an argument the call does not carry');
+        self::assertTrue($this->evaluate($conversation, ['tool' => 'searchFigures', 'argsContain' => ['summer sale']])->passed, 'a list without names reads the whole arguments');
+        self::assertTrue($this->evaluate($conversation, ['tool' => 'searchFigures', 'argsContain' => ['filters' => '"region":"north"']])->passed, 'an object value is read as its unescaped JSON');
+    }
+
+    public function testResultChecksReadTheUnescapedResultAsTheArgumentChecksDo(): void
+    {
+        $conversation = $this->conversation([['readFigures', '{"path":"/reports/äpfel"}', AIConversationMessage::STATUS_COMPLETED]]);
+        $this->callOf($conversation, 'readFigures')->result = json_encode(
+            ['content' => [['type' => 'text', 'text' => 'Report "Äpfel" at /reports/äpfel']], 'structuredContent' => ['count' => 3, 'path' => '/reports/äpfel']]
+        );
+
+        self::assertTrue($this->evaluate($conversation, ['tool' => 'readFigures', 'argsContain' => ['path' => '/reports/äpfel'], 'resultContains' => ['Report "Äpfel"', '"path":"/reports/äpfel"']])->passed);
+        self::assertSame(
+            ["resultNotContains: '/reports/äpfel' found in the result of 'readFigures'"],
+            $this->evaluate($conversation, ['tool' => 'readFigures', 'resultNotContains' => '/reports/äpfel'])->failures
+        );
+        self::assertFalse($this->evaluate($conversation, ['tool' => 'readFigures', 'resultContains' => '\\u00e4'])->passed, 'the JSON escapes are not compared');
+    }
+
+    public function testForbiddenSkillsAndNoSkill(): void
+    {
+        $conversationWithSkill = $this->conversation([], ['Example.Figures']);
+        $conversationWithoutSkill = $this->conversation([], []);
+
+        self::assertSame(["forbidden skill loaded: 'Example.Figures'"], $this->evaluate($conversationWithSkill, ['forbiddenSkills' => ['Example.Figures', 'Example.Documents']])->failures);
+        self::assertTrue($this->evaluate($conversationWithSkill, ['forbiddenSkills' => 'Example.Documents'])->passed);
+        self::assertSame(['skill loaded although none was expected: [Example.Figures]'], $this->evaluate($conversationWithSkill, ['noSkill' => true])->failures);
+        self::assertTrue($this->evaluate($conversationWithoutSkill, ['noSkill' => true])->passed);
+    }
 }

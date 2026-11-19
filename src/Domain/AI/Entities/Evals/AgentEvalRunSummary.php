@@ -105,6 +105,12 @@ class AgentEvalRunSummary extends ValueObject
     /** @var AgentEvalSkillPreloadRollUp|null The skill-preload figures; tools format only, when measured */
     public ?AgentEvalSkillPreloadRollUp $skillPreloadRollUp = null;
 
+    /**
+     * @var AgentEvalHarnessCosts|null What the judge's and the driver's calls of the run cost, summed over its rows;
+     * null when no row reports one (a run without judged cases). Never part of `totalCostUsd`.
+     */
+    public ?AgentEvalHarnessCosts $harnessCosts = null;
+
     /** @var AgentEvalCaseRows The rows of the run */
     public AgentEvalCaseRows $caseRows;
 
@@ -218,6 +224,8 @@ class AgentEvalRunSummary extends ValueObject
         $agentEvalRunSummary->avgWorkToolCallCount = $timedRows->averageNumber('workToolCallCount');
         $agentEvalRunSummary->costPerPassUsd = $agentEvalRunSummary->passed > 0 ? round($timedRows->sumNumber('costUsd') / $agentEvalRunSummary->passed, 6) : null;
         $agentEvalRunSummary->performanceRollUp = AgentEvalPerformanceRollUp::fromCaseRows($agentEvalCaseRows);
+        $agentEvalHarnessCosts = AgentEvalHarnessCosts::fromCaseRows($agentEvalCaseRows);
+        $agentEvalRunSummary->harnessCosts = $agentEvalHarnessCosts->hasCost() ? $agentEvalHarnessCosts : null;
         return $agentEvalRunSummary;
     }
 
@@ -246,6 +254,9 @@ class AgentEvalRunSummary extends ValueObject
             'costPerPassUsd' => $this->costPerPassUsd,
             'performance' => $this->performanceRollUp->toArray(),
         ];
+        if ($this->harnessCosts !== null) {
+            $metrics['harnessCosts'] = $this->harnessCosts->toArray();
+        }
         if ($this->format !== static::FORMAT_TOOLS) {
             return $metrics;
         }

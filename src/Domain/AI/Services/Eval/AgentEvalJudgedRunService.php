@@ -17,6 +17,7 @@ use DDD\Domain\AI\Entities\Conversations\Widgets\WidgetBlock;
 use DDD\Domain\AI\Entities\Conversations\Widgets\WidgetBlocks;
 use DDD\Domain\AI\Entities\Evals\AgentEvalCase;
 use DDD\Domain\AI\Entities\Evals\AgentEvalCompactionTreeRunResult;
+use DDD\Domain\AI\Entities\Evals\AgentEvalHarnessCosts;
 use DDD\Domain\AI\Entities\Evals\AgentEvalJudgedRunOptions;
 use DDD\Domain\AI\Entities\Evals\AgentEvalJudgeTraceMessageLines;
 use DDD\Domain\AI\Entities\Evals\AgentEvalJudgeVerdict;
@@ -37,6 +38,7 @@ use DDD\Domain\AI\Services\Conversations\Agent\AIConversationModelCallsService;
 use DDD\Domain\AI\Services\Conversations\AIConversationAuditRenderService;
 use DDD\Domain\AI\Services\Conversations\ConversationCompactionNodesService;
 use DDD\Domain\Base\Repo\DB\Doctrine\EntityManagerFactory;
+use DDD\Infrastructure\Libs\Config;
 use DDD\Infrastructure\Services\DDDService;
 use LogicException;
 use RuntimeException;
@@ -121,25 +123,45 @@ class AgentEvalJudgedRunService extends AgentEvalRunnerService
     /** @var string The refusal of a model name the catalog does not know; `%s` = the name */
     public const string UNKNOWN_MODEL_NAME_MESSAGE = 'The model catalog knows no model "%s" (neither a model nor a retired name of one); the known names are the keys of the configuration AI.models and of AIModel::RETIRED_MODEL_SUCCESSORS.';
 
+    /** @var string The configuration key of the judge model a run uses when it names none (`AI.evalSuite`) */
+    public const string CONFIG_KEY_JUDGE_MODEL_NAME = 'AI.evalSuite.judgeModelName';
+
+    /** @var string The configuration key of the driver model a run uses when it names none (`AI.evalSuite`) */
+    public const string CONFIG_KEY_DRIVER_MODEL_NAME = 'AI.evalSuite.driverModelName';
+
     /**
-     * The model that returns the verdict when the options name none.
+     * @var AgentEvalHarnessCosts|null What the harness calls of the judged run in progress cost ({@see runSim()});
+     * null outside a judged run
+     */
+    protected ?AgentEvalHarnessCosts $harnessCostsOfCurrentRun = null;
+
+    /**
+     * The model that returns the verdict when the options name none: the configured `AI.evalSuite.judgeModelName`,
+     * else the package's default.
      *
      * @return string
      */
     public function getDefaultJudgeModelName(): string
     {
-        return AIModel::MODEL_ANTHROPIC_CLAUDE_OPUS_5_5;
+        return $this->readConfiguredModelName(static::CONFIG_KEY_JUDGE_MODEL_NAME) ?? AIModel::MODEL_ANTHROPIC_CLAUDE_OPUS_5_5;
     }
 
     /**
-     * The model that plays the owner when the options name none: a short role-play that runs once per owner turn, so a
-     * smaller model than the judge's.
+     * The model that plays the owner when the options name none: the configured `AI.evalSuite.driverModelName`, else
+     * the package's default — a short role-play that runs once per owner turn, so a smaller model than the judge's.
      *
      * @return string
      */
     public function getDefaultDriverModelName(): string
     {
-        return AIModel::MODEL_ANTHROPIC_CLAUDE_SONNET_5;
+        return $this->readConfiguredModelName(static::CONFIG_KEY_DRIVER_MODEL_NAME) ?? AIModel::MODEL_ANTHROPIC_CLAUDE_SONNET_5;
+    }
+
+    /** A model name the configuration sets under `$configKey`, trimmed; null when it sets none (or an empty one). */
+    protected function readConfiguredModelName(string $configKey): ?string
+    {
+        $configuredModelName = Config::get($configKey);
+        return is_string($configuredModelName) && trim($configuredModelName) !== '' ? trim($configuredModelName) : null;
     }
 
     /**
@@ -171,18 +193,24 @@ class AgentEvalJudgedRunService extends AgentEvalRunnerService
         $this->authenticateOwnerOfScope($agentEvalScope);
         $this->refuseUnknownModelNamesOfRun($agentEvalJudgedRunOptions);
         $this->applyToolBlockOfCase($this->buildRunCaseOfSimCase($agentEvalSimCase), $agentEvalJudgedRunOptions);
+        $harnessCostsOfOuterRun = $this->harnessCostsOfCurrentRun;
+        $this->harnessCostsOfCurrentRun = AgentEvalHarnessCosts::newInstance();
         try {
             $conversation = $this->prepareConversationOfSimCase($agentEvalScope, $agentEvalSimCase, $agentEvalJudgedRunOptions);
-            return $this->driveOwnerTurnsAndJudge($conversation, $agentEvalScope, $agentEvalSimCase, $agentEvalJudgedRunOptions);
+            $agentEvalSimRunResult = $this->driveOwnerTurnsAndJudge($conversation, $agentEvalScope, $agentEvalSimCase, $agentEvalJudgedRunOptions);
+            $agentEvalSimRunResult->setHarnessCosts($this->harnessCostsOfCurrentRun);
+            return $agentEvalSimRunResult;
         } finally {
+            $this->harnessCostsOfCurrentRun = $harnessCostsOfOuterRun;
             $this->liftToolBlockOfCase($agentEvalJudgedRunOptions);
         }
     }
 
     /**
      * {@see runSim()} inside the restore bracket of the case's `restore` block: the preparation steps and the capture
-     * before the run, then — also when the run threw — the revert write, the `after` steps, the removals and the
-     * release ({@see openRestoreBracket()}, {@see closeRestoreBracket()}). Only the run in the middle is the agent under
+     * before the run, the state check the options carry after it ({@see evaluateStateAfterRunInsideRestore()}), then —
+     * also when the run threw — the revert write, the `after` steps, the removals and the release
+     * ({@see openRestoreBracket()}, {@see closeRestoreBracket()}). Only the run in the middle is the agent under
      * evaluation.
      *
      * @param AgentEvalScope $agentEvalScope
@@ -194,7 +222,9 @@ class AgentEvalJudgedRunService extends AgentEvalRunnerService
     {
         $agentEvalRestoreBracket = $this->openRestoreBracket($agentEvalScope, $this->buildRunCaseOfSimCase($agentEvalSimCase), $agentEvalJudgedRunOptions);
         try {
-            return $this->runSim($agentEvalScope, $agentEvalSimCase, $agentEvalJudgedRunOptions);
+            $agentEvalSimRunResult = $this->runSim($agentEvalScope, $agentEvalSimCase, $agentEvalJudgedRunOptions);
+            $this->evaluateStateAfterRunInsideRestore($agentEvalSimRunResult->getConversation(), $agentEvalScope, $agentEvalJudgedRunOptions);
+            return $agentEvalSimRunResult;
         } finally {
             $this->closeRestoreBracket($agentEvalRestoreBracket, $agentEvalScope, $agentEvalJudgedRunOptions);
         }
@@ -525,7 +555,9 @@ class AgentEvalJudgedRunService extends AgentEvalRunnerService
             $argusAIAgentConversation->aiModelNameOverride = $aiModelName;
             $argusAIAgentConversation->setAIUsageScope($aiUsageScope);
             $argusAIAgentConversation->modelInput = $this->buildHarnessModelInput($promptMessage);
-            return $this->loadHarnessCompletion($argusAIAgentConversation);
+            $harnessCompletion = $this->loadHarnessCompletion($argusAIAgentConversation);
+            $this->harnessCostsOfCurrentRun?->addCostOfUsageScope($aiUsageScope, $this->readCostOfHarnessCall($argusAIAgentConversation));
+            return $harnessCompletion;
         } finally {
             $aIUsageEnvelopesService->closeEnvelope($evaluationEnvelopeContext);
         }
@@ -606,6 +638,18 @@ class AgentEvalJudgedRunService extends AgentEvalRunnerService
             );
         }
         return (string)$argusAIAgentConversation->getAiGeneratedResponse();
+    }
+
+    /**
+     * The cost the provider reported for a harness model call that was just sent, in USD; 0 when it reported none. Added
+     * to the judge's or the driver's cost of the judged run in progress ({@see AgentEvalHarnessCosts}).
+     *
+     * @param ArgusAIAgentConversation $argusAIAgentConversation the sent request
+     * @return float
+     */
+    protected function readCostOfHarnessCall(ArgusAIAgentConversation $argusAIAgentConversation): float
+    {
+        return (float)($argusAIAgentConversation->getLastCostInUSD() ?? 0.0);
     }
 
     /**

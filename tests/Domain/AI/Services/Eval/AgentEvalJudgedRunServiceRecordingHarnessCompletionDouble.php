@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DDD\Tests\Agents\Domain\AI\Services\Eval;
 
+use DDD\Domain\AI\Entities\Evals\AgentEvalHarnessCosts;
 use DDD\Domain\AI\Repo\Argus\Conversations\ArgusAIAgentConversation;
 use DDD\Domain\AI\Services\AIUsageEnvelopesService;
 use DDD\Domain\AI\Services\Eval\AgentEvalJudgedRunService;
@@ -21,6 +22,9 @@ class AgentEvalJudgedRunServiceRecordingHarnessCompletionDouble extends AgentEva
 
     /** @var string|null Thrown by the completion when set */
     public ?string $completionErrorMessage = null;
+
+    /** @var float The cost every harness completion reports, in USD */
+    public float $completionCostUsd = 0.0;
 
     /** @var ArgusAIAgentConversation|null The request of the last completion */
     public ?ArgusAIAgentConversation $lastCompletionRequest = null;
@@ -43,5 +47,17 @@ class AgentEvalJudgedRunServiceRecordingHarnessCompletionDouble extends AgentEva
             throw new RuntimeException($this->completionErrorMessage);
         }
         return $this->completionAnswer;
+    }
+
+    protected function readCostOfHarnessCall(ArgusAIAgentConversation $argusAIAgentConversation): float
+    {
+        return $this->completionCostUsd;
+    }
+
+    /** Starts counting the harness costs as a judged run does; returns what is counted. */
+    public function startCountingHarnessCostsOfRun(): AgentEvalHarnessCosts
+    {
+        $this->harnessCostsOfCurrentRun = AgentEvalHarnessCosts::newInstance();
+        return $this->harnessCostsOfCurrentRun;
     }
 }

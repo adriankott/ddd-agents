@@ -81,10 +81,56 @@
   catalog widget (`AIConversation::hasWidgetsBroughtByReachableSkills()`,
   `ConversationWidgetCatalog::hasEntryProvidedByOneOfSkills()`); in a conversation without such a skill it answered
   every search with "no match". A catalog that cannot be built keeps it offered.
-- Docs: the context skill (the client context, the tail order), the tools skill (the reading rule, the violations,
-  `noCache`, "do not narrow", the admin audit), the widgets skill (the `findWidgets` offer), the autonomy and entry
-  skills (shared spaces, the new hooks, the conversation's class attributes), the loop skill (the drive hook), the
-  observability skill (`--accountId`, the start's snapshot switch), the README.
+- Added: what the model input leaves out to save tokens, per host (`config/app/AI/agentModelInputOptions.php`,
+  `AgentModelInputOptions`) and per purpose (frontmatter `modelInputOptions:`, `AIConversationPurpose::$modelInputOptions`,
+  `AgentModelInputOptionsOverride`; each key it names wins): `offersDelegationTools`, `offersTaskPlanTools`,
+  `offersAskOwner`, `offersFindWidgets` (inputs on `AgentOfferedToolsInputs`); `teachesWidgets` (false leaves out the base
+  prompt's `Widgets` section with its composed-view kit, and `findWidgets`); `droppedBasePromptSections` (headings left
+  out whole, `AgentBasePromptSections::dropSections()`, `AgentModelInput::$droppedBasePromptSections`);
+  `dropsMemorySectionWithoutMemoryTool` (the memory rules while no reachable tool writes agent memory,
+  `AIConversation::canReachToolThatWritesAgentMemory()`); `offersReachableToolsFromTheFirstCall` (false: a skill's tools
+  arrive with its load also below `appendOnlyReachableToolSetCeilingTokens`,
+  `AgentAppendOnlyToolSet::CEILING_TOKENS_OF_LOADING_BY_SKILL`). No prompt text is reworded: every switch defaults to
+  the package's behaviour and the default input is byte-identical (`AgentModelInputOptionsTest`).
+- Added: record references in evaluation fixtures — `{{ref:<kind>:<name>}}` in any string of a case, resolved once per
+  kind and name in the run's scope by the new hook `AgentEvalRunHooksService::resolveRecordReference()` (default null)
+  through `AgentEvalRunnerService::resolveRecordReferencesOfCase()` (`runCase()`, eval-tools in both flavors,
+  eval-selection); a whole-string token keeps the resolved type, an unresolved one makes the case not applicable
+  (`AgentEvalRecordReference`, `AgentEvalRecordReferences`).
+- Added: a selection case can expect no skill (`expectedSkill: "none"`, `AgentEvalCase::EXPECTED_SKILL_NONE`) and forbid
+  skills (`forbiddenSkills`, `AgentEvalCase::getForbiddenSkillNames()`; `AgentEvalCaseRow::buildForSelectionRun()` takes
+  them as a trailing optional parameter); `expect` takes `forbiddenSkills` and `noSkill: true`.
+- Added: the judge's and the driver's cost of a judged run — `judgeCostUsd` and `driverCostUsd` on the judged row (after
+  `costUsd`, the agent's own), `metrics.harnessCosts` in the summary when not zero, the report line `Judge and driver
+  cost:` (`AgentEvalHarnessCosts`, `AgentEvalSimRunResult::getHarnessCosts()`, counted in `AgentEvalJudgedRunService::callModel()`
+  from the provider-reported cost, `readCostOfHarnessCall()`).
+- Added: `AI.evalSuite.judgeModelName` and `driverModelName` — the judge and driver of a run that names none (null or
+  empty: the package's defaults as before; `AgentEvalJudgedRunService::CONFIG_KEY_JUDGE_MODEL_NAME`, `…_DRIVER_…`). A host
+  `evalSuite.php` without the keys behaves as before.
+- Added: `--repeat` prints why each failed run failed under the case's `passed/runs` line (its error, else its first
+  failure; at most 5 per case, 200 characters; `AgentEvalCaseRepetition::$failureDetails`, not stored).
+- Fixed: `expect.stateAfterRun` of a case with a `restore` block read AFTER `restore.writeTool`, so it saw the restored
+  value. It now runs inside the bracket — the agent's run, the read and the field checks, the cleanup, then the revert
+  write (`AgentEvalRunOptions::$stateAfterRunCheckInsideRestore`, `AgentEvalRunnerService::evaluateStateAfterRunInsideRestore()`,
+  also in `AgentEvalJudgedRunService::runSimWithRestore()`). Its calls get the harness's packages (every skill's,
+  `AgentEvalRunnerService::getHarnessPackageClasses()`) instead of the expected skills' only.
+- Fixed: `expect.argsContain` ignored its key and searched the whole arguments; a string key now reads that argument (a
+  string as it is, any other value as unescaped JSON, a dotted key a nested value). An integer key (a list) keeps the
+  whole-arguments search. A fixture whose text sat in another argument than the one it named now fails.
+- Fixed: `expect.resultContains` / `resultNotContains` compared against the JSON-escaped result while the argument
+  checks unescape; both now compare unescaped text (the decoded result text plus its `structuredContent` as unescaped
+  JSON).
+- Fixed: the evaluation teardown skipped the host's residue hook for an account-level conversation;
+  `AgentEvalRunHooksService::tearDownHostResidueOfConversation()` now runs for every stored conversation (schedules and
+  mandates are still closed only for a conversation of an agent space).
+- Docs: the context skill (the client context, the tail order, leaving parts of the model input out, replacing
+  `Character.md`), the tools skill (the reading rule, the violations, `noCache`, "do not narrow", the admin audit, the
+  meta-tool switches), the widgets skill (the `findWidgets` offer and switches), the skills-and-purposes skill (the
+  purpose key `modelInputOptions`), the autonomy and entry skills (shared spaces, the new hooks, the conversation's
+  class attributes, sixteen config files), the loop skill (the drive hook), the observability skill (`--accountId`, the
+  start's snapshot switch, record references, `forbiddenSkills` / `noSkill` / `expectedSkill: none`, the `argsContain`
+  and result comparisons, the state-check order, the judge and driver configuration and cost, the `--repeat` detail),
+  the README.
 
 ### Frontend (`@mgamadeus/ddd-agents`)
 

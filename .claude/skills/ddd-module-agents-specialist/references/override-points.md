@@ -106,6 +106,7 @@ Each is a public service with a working default. The owning topic skill explains
 | `DDD\Domain\AI\Services\Conversations\AIConversationRealtimeSignalService` | no realtime transport, no push | push change signals to the client | `ddd-module-agents-widgets-specialist` |
 | `DDD\Domain\AI\Services\Conversations\Quality\AgentConversationScorecardsService` | writes nothing | score a finished conversation | `ddd-module-agents-observability-specialist` |
 | `DDD\Domain\AI\Services\Conversations\Agent\AgentEvalAccountsService`, `DDD\Domain\AI\Services\Eval\AgentEvalOutboundGuardHooksService` | no eval account, no scope owner | mark eval accounts and test sinks | `ddd-module-agents-observability-specialist` |
+| `DDD\Domain\AI\Services\Eval\AgentEvalRunHooksService` | knows only the module's scope (a stored agent space), no record kinds, no host residue | the application's part of an evaluation run: scope, eligibility, harness arguments, records a fixture names by `{{ref:<kind>:<name>}}` (`resolveRecordReference()`), the teardown of what a stored conversation left — also an account-level one (`tearDownHostResidueOfConversation()`) | `ddd-module-agents-observability-specialist` |
 | `DDD\Domain\AI\Services\Eval\AgentEvalSuitePlanService` | plans the module's task kinds (tools, selection, recall cases) on the agent space a case names | plan the host's own task kinds (`buildTasksOfApplicationKind()`), name the scope of a case (`assignScopeOfCaseToTask()`), add duration priors (`getDurationPriors()`) | `ddd-module-agents-observability-specialist` |
 | `DDD\Domain\AI\Services\Eval\AgentEvalResultFilesService` | the results folder `AI.evalSuite.resultsDirectory` (default `var/agent-evals`); the sweep deletes the dated run entries older than 28 days | add the name patterns of the host's own dated folders (`getRetainedFolderNamePatterns()`), change the retention (`getRetentionDays()`) | `ddd-module-agents-observability-specialist` |
 | `DDD\Domain\AI\Services\Eval\AgentEvalSuiteRunsService`, `DDD\Domain\AI\Services\Eval\AgentEvalSuiteCasesService` (with their entities and repositories) | stored evaluation runs and cases; an admin with access to all resources reads every row, every other account none | store the rows through the host's entity; decide who reads every row (`AgentAccountRightsService::isAccountReaderOfAllEvaluationRows()`, or `isAuthenticatedAccountReaderOfEveryRow()` of the same-path repositories) | `ddd-module-agents-observability-specialist` |
@@ -203,7 +204,9 @@ redeclared route.
 The sentences the module writes for the model and the owner read the host's words from
 `config/app/AI/agentApplicationWording.php` (`AgentApplicationWording::current()`), the names outside a conversation
 from `config/app/AI/agentApplicationNames.php`, the persona from `config/app/AI/agentPersona.php`:
-[config-map.md](config-map.md).
+[config-map.md](config-map.md). The agent's voice is the prompt file `config/app/AI/Prompts/AI/Agent/Character.md`: the
+package's file is an example; a host puts its own at the same path, which replaces it whole. What the base prompt and
+the meta tools leave out is `config/app/AI/agentModelInputOptions.php` (both: `ddd-module-agents-context-specialist`).
 
 ## Rules for every override
 

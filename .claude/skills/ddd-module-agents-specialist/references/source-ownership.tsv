@@ -119,6 +119,8 @@ config/app/AI/skill*.php	skills-and-purposes
 config/app/AI/purposeRequirements.php	skills-and-purposes
 # context (ddd-module-agents-context-specialist): model input, prompts, cache, reduction, eviction, state delivery, recall, memories, presence and time
 src/Domain/AI/Entities/Conversations/Agent/AgentModelInput.php	context
+src/Domain/AI/Entities/Conversations/Agent/AgentModelInputOptions*	context
+src/Domain/AI/Entities/Conversations/Agent/AgentBasePromptSections.php	context
 src/Domain/AI/Entities/Conversations/Agent/AgentColdCapabilityUnloading.php	context
 src/Domain/AI/Entities/Conversations/Agent/AgentToolCallImageWireSelection.php	context
 src/Domain/AI/Entities/Conversations/Agent/AgentToolResultImagesOfToolCall*	context
@@ -158,6 +160,7 @@ src/Presentation/Api/Agents/Conversations/Dtos/AIConversation*Search*	context
 **/*Compaction*	context
 **/*LanguageDetection*	context
 config/app/AI/contextRetention.php	context
+config/app/AI/agentModelInputOptions.php	context
 config/app/AI/Prompts/AI/Agent/Agentic.md	context
 config/app/AI/Prompts/AI/Agent/Character.md	context
 config/app/AI/Prompts/AI/Agent/General.md	context

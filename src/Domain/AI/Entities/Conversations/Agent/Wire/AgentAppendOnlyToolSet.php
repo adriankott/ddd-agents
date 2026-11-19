@@ -25,6 +25,12 @@ class AgentAppendOnlyToolSet
     /** The epoch carries the base set's tools top-level; a skill loaded inside the epoch appends an `additional_tools` item. */
     public const string TOP_LEVEL_LOADED_SKILL_TOOLS = 'loadedSkillTools';
 
+    /**
+     * @var int The ceiling of an epoch that loads its tools by skill whatever their size
+     * (`AgentModelInputOptions::$offersReachableToolsFromTheFirstCall` false): no estimate fits under it.
+     */
+    public const int CEILING_TOKENS_OF_LOADING_BY_SKILL = -1;
+
     /** @var string {@see TOP_LEVEL_REACHABLE_TOOLS} or {@see TOP_LEVEL_LOADED_SKILL_TOOLS} */
     public string $topLevelToolSet = self::TOP_LEVEL_LOADED_SKILL_TOOLS;
 

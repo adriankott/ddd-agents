@@ -57,6 +57,16 @@ class AgentEvalRunOptions implements AIConversationProgressReporterInterface
     /** @var string[] The error text a blocked tool answers, by tool name (set with the block) */
     public array $blockedToolSimulatedErrors = [];
 
+    /**
+     * @var AgentEvalStateAfterRunCheck|null The state check (`expect.stateAfterRun`) a restore bracket runs after the
+     * agent's run and BEFORE its revert write (`restore.writeTool`), so the read sees what the agent wrote; taken when
+     * it runs. null = none.
+     */
+    public ?AgentEvalStateAfterRunCheck $stateAfterRunCheckInsideRestore = null;
+
+    /** @var string[]|null The failures of that check once it ran (empty = the state matched); null = it did not run */
+    public ?array $stateAfterRunFailuresInsideRestore = null;
+
     /** @var AIConversation|null The conversation the runner built last for this run; taken by the teardown */
     protected ?AIConversation $builtConversation = null;
 

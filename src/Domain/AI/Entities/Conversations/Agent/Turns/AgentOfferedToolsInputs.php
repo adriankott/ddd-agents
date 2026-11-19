@@ -36,6 +36,15 @@ class AgentOfferedToolsInputs extends ValueObject
      */
     public bool $offersFindWidgets = false;
 
+    /** The delegation tools may be offered (`AgentModelInputOptions::$offersDelegationTools`); false = none of the four. */
+    public bool $offersDelegationTools = true;
+
+    /** The task-plan tools may be offered (`AgentModelInputOptions::$offersTaskPlanTools`); false = none of the three. */
+    public bool $offersTaskPlanTools = true;
+
+    /** `askOwner` is offered (`AgentModelInputOptions::$offersAskOwner`). */
+    public bool $offersAskOwner = true;
+
     /**
      * `update_task_plan` is offered — not while the conversation's purpose seeded the plan it holds: a seeded plan is
      * worked, never rewritten, and the call would only be refused ({@see \DDD\Domain\AI\Entities\Conversations\Agent\Tools\UpdateTaskPlanTool::findSeededPlanRefusal()}).

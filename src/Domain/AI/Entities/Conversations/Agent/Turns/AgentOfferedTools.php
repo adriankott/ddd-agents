@@ -60,7 +60,7 @@ class AgentOfferedTools extends ValueObject
         if ($loadSkillsTool->hasLoadableSkills()) {
             $toolSchemas[] = $loadSkillsTool->toOpenAiToolSchema();
         }
-        if ($agentOfferedToolsInputs->allowThreads) {
+        if ($agentOfferedToolsInputs->allowThreads && $agentOfferedToolsInputs->offersDelegationTools) {
             $toolSchemas[] = DelegateTool::forCatalog($skillCatalog)->toOpenAiToolSchema();
             // The status read is offered from the conversation's first `delegate` row on and stays —
             // position-stable after the first spawn, one change of the cached prefix per conversation (it used to come
@@ -81,13 +81,17 @@ class AgentOfferedTools extends ValueObject
         // update_task_plan = STRUCTURE (create/rebuild, the nested shape, ~once per run); set_task_status = the
         // cheap per-step PROGRESS tick (flat updates addressed by the rendered item numbers). A plan the
         // purpose seeded is never rewritten — update_task_plan stays off the wire for it (from the seed on, stable).
-        if ($agentOfferedToolsInputs->offersUpdateTaskPlan) {
+        if ($agentOfferedToolsInputs->offersUpdateTaskPlan && $agentOfferedToolsInputs->offersTaskPlanTools) {
             $toolSchemas[] = UpdateTaskPlanTool::create()->toOpenAiToolSchema();
         }
-        $toolSchemas[] = SetTaskStatusTool::create()->toOpenAiToolSchema();
+        if ($agentOfferedToolsInputs->offersTaskPlanTools) {
+            $toolSchemas[] = SetTaskStatusTool::create()->toOpenAiToolSchema();
+        }
         // askOwner: the closed question with the model's own answer variants — universal, static,
         // position-stable like the plan tools; the platform renders the widget at turn end.
-        $toolSchemas[] = AskOwnerTool::create()->toOpenAiToolSchema($agentOfferedToolsInputs->ownerIsOnThePhoneLine);
+        if ($agentOfferedToolsInputs->offersAskOwner) {
+            $toolSchemas[] = AskOwnerTool::create()->toOpenAiToolSchema($agentOfferedToolsInputs->ownerIsOnThePhoneLine);
+        }
         // findWidgets: the widget catalog search — static and position-stable right after askOwner, on a
         // screen surface only (a widget renders nowhere else)
         if ($agentOfferedToolsInputs->offersFindWidgets) {
@@ -95,8 +99,9 @@ class AgentOfferedTools extends ValueObject
         }
         // the finished-plans read — offered only while finished plans exist AND the plan-dynamics site
         // guides the conversation (a byte-identical tool surface otherwise)
-        if (($agentOfferedToolsInputs->finishedTaskPlanCount > 0 && $agentOfferedToolsInputs->isGuidedByPlanDynamics)
-            || $agentOfferedToolsInputs->offersConditionalMetaToolsFromTheStart
+        if ($agentOfferedToolsInputs->offersTaskPlanTools
+            && (($agentOfferedToolsInputs->finishedTaskPlanCount > 0 && $agentOfferedToolsInputs->isGuidedByPlanDynamics)
+                || $agentOfferedToolsInputs->offersConditionalMetaToolsFromTheStart)
         ) {
             $toolSchemas[] = GetTaskPlansTool::create()->toOpenAiToolSchema();
         }

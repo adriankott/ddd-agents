@@ -21,7 +21,7 @@ class AgentEvalResultFilesServiceConfigurationTest extends AgentEvalResultFilesT
     {
         $evalSuiteConfiguration = require self::PACKAGE_CONFIG_FILE;
 
-        self::assertSame(['resultsDirectory' => AgentEvalResultFilesService::DEFAULT_RESULTS_DIRECTORY, 'resourceGroupByFixture' => [], 'exclusiveFixtures' => [], 'suites' => [], 'fixturePaths' => []], $evalSuiteConfiguration);
+        self::assertSame(['resultsDirectory' => AgentEvalResultFilesService::DEFAULT_RESULTS_DIRECTORY, 'resourceGroupByFixture' => [], 'exclusiveFixtures' => [], 'suites' => [], 'fixturePaths' => [], 'judgeModelName' => null, 'driverModelName' => null], $evalSuiteConfiguration);
     }
 
     public function testARelativeFolderIsBelowTheKernelProjectDirectory(): void

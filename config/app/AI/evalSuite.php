@@ -27,6 +27,12 @@ declare(strict_types=1);
  *   {@see \DDD\Domain\AI\Services\Eval\AgentEvalSuitePlanService::findFixturePath()}; relative to the kernel project
  *   directory unless absolute. `selection` names one fixture FILE (the selection evaluation reads one file); `tools`,
  *   `recall`, `guard` name a file or a folder of fixture files; `eviction` names one file. Empty in the package.
+ * `judgeModelName`: the model that gives the verdict of a judged case when the run names none (`--judge-model`), read
+ *   by {@see \DDD\Domain\AI\Services\Eval\AgentEvalJudgedRunService::getDefaultJudgeModelName()}; null or empty =
+ *   the package's default. A name the model catalog does not know is refused before the first turn.
+ * `driverModelName`: the model that plays the owner of a judged case when the run names none (`--driver-model`), read
+ *   by {@see \DDD\Domain\AI\Services\Eval\AgentEvalJudgedRunService::getDefaultDriverModelName()}; null or empty =
+ *   the package's default.
  */
 return [
     'resultsDirectory' => 'var/agent-evals',
@@ -34,4 +40,6 @@ return [
     'exclusiveFixtures' => [],
     'suites' => [],
     'fixturePaths' => [],
+    'judgeModelName' => null,
+    'driverModelName' => null,
 ];

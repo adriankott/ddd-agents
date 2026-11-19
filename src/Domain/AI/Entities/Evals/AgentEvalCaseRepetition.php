@@ -8,7 +8,8 @@ use DDD\Domain\Base\Entities\ValueObject;
 
 /**
  * How one case fared over the repeated runs of a tools evaluation: how many runs it had, how many passed, how many
- * ended in an error row (a child that crashed or timed out) and the pass rate (three decimals).
+ * ended in an error row (a child that crashed or timed out), the pass rate (three decimals) and why the runs that did
+ * not pass failed ({@see $failureDetails}, printed by the console, not stored).
  *
  * The unique key of a case's repetitions is its case id.
  *
@@ -16,6 +17,12 @@ use DDD\Domain\Base\Entities\ValueObject;
  */
 class AgentEvalCaseRepetition extends ValueObject
 {
+    /** @var int The failure details kept per case */
+    public const int MAX_FAILURE_DETAILS = 5;
+
+    /** @var int The characters a failure detail keeps */
+    public const int MAX_FAILURE_DETAIL_LENGTH = 200;
+
     /** @var string The case id */
     public string $caseId = '';
 
@@ -30,6 +37,12 @@ class AgentEvalCaseRepetition extends ValueObject
 
     /** @var float The passed runs per run, three decimals */
     public float $passRate = 0.0;
+
+    /**
+     * @var string[] Per run that did not pass (up to {@see MAX_FAILURE_DETAILS}, in the order counted): its error, else
+     * its first failure, cut to {@see MAX_FAILURE_DETAIL_LENGTH} characters. Not part of {@see toArray()}.
+     */
+    public array $failureDetails = [];
 
     /** The repetitions of the case `$caseId`, before any run was counted. */
     public static function forCase(string $caseId): static
@@ -46,6 +59,18 @@ class AgentEvalCaseRepetition extends ValueObject
         $this->passed += $agentEvalCaseRow->isPassed() ? 1 : 0;
         $this->errors += $agentEvalCaseRow->hasError() ? 1 : 0;
         $this->passRate = round($this->passed / $this->runs, 3);
+        if (!$agentEvalCaseRow->isPassed() && count($this->failureDetails) < static::MAX_FAILURE_DETAILS) {
+            $this->failureDetails[] = static::buildFailureDetailOfRow($agentEvalCaseRow);
+        }
+    }
+
+    /** Why a run did not pass: its error, else its first failure, else `failed`; one line, cut to the kept length. */
+    public static function buildFailureDetailOfRow(AgentEvalCaseRow $agentEvalCaseRow): string
+    {
+        $failures = $agentEvalCaseRow->getValue('failures');
+        $firstFailure = is_array($failures) && $failures !== [] ? (string)reset($failures) : null;
+        $failureDetail = trim((string)preg_replace('/\s+/', ' ', $agentEvalCaseRow->getError() ?? $firstFailure ?? 'failed'));
+        return mb_strlen($failureDetail) > static::MAX_FAILURE_DETAIL_LENGTH ? mb_substr($failureDetail, 0, static::MAX_FAILURE_DETAIL_LENGTH - 1) . '…' : $failureDetail;
     }
 
     /**

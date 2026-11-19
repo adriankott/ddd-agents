@@ -1,4 +1,4 @@
-# Config map: the fifteen config files and who explains them
+# Config map: the sixteen config files and who explains them
 
 **Reader:** host developer
 
@@ -10,11 +10,11 @@ The package's config root is `config/app/` (`AgentsModule::getConfigPath()`). Th
 application's config roots first, then the modules' (`Config::get()`), so a file the host puts at the same path
 **replaces the package's file whole**: keys are never merged. A host that changes one key copies the whole file.
 Readers that fall back per key to their class default: `AgentApplicationWording::current()`,
-`AgentApplicationNames`, `ContextRetentionSettings`, `SupervisorSettings` and `AgentDecisionModelSettings` (a site the
+`AgentApplicationNames`, `AgentModelInputOptions`, `ContextRetentionSettings`, `SupervisorSettings` and `AgentDecisionModelSettings` (a site the
 file does not list is off, except `AgentDecisionModelSettings::DEFAULT_ON_SITES`). The other readers take the file as
 it is.
 
-Besides the fifteen PHP files the package ships prompts (`config/app/AI/Prompts/`), purposes
+Besides the sixteen PHP files the package ships prompts (`config/app/AI/Prompts/`), purposes
 (`config/app/AI/Purposes/`) and two agent skill files (`config/app/AI/Skills/`); a host's file at the same path
 replaces each of them the same way. Prompts: `ddd-module-agents-context-specialist` and
 `ddd-module-agents-decisions-and-guards-specialist`; purposes and skills: `ddd-module-agents-skills-and-purposes-specialist`
@@ -27,12 +27,13 @@ and `ddd-module-agents-autonomy-specialist`.
 | `agentApplicationNames.php` | `AI.agentApplicationNames` | `AgentApplicationNames` | trace line prefix, console label, further environment variable names | `[agent:trace]`, `agent`, none | this file |
 | `agentApplicationWording.php` | `AI.agentApplicationWording` | `AgentApplicationWording::current()` | the host's words in the module's sentences | neutral words (`workspace`, `subscription`, empty examples) | this file |
 | `agentEgress.php` | `AI.agentEgress` | `ArgusAIAgentConversation` | the HTTP transfer of the agent's model call | stall abort off, no proxy | this file |
+| `agentModelInputOptions.php` | `AI.agentModelInputOptions` | `AgentModelInputOptions::resolveFor()` (per model call; a purpose's `modelInputOptions:` map wins per key) | what the model input leaves out to save tokens: groups of meta tools, the widget part of the base prompt, base prompt sections by name, the memory rules without a memory tool, the reachable tool schemas from the first call | everything as before (byte-identical input) | `ddd-module-agents-context-specialist` |
 | `agentPersona.php` | `AI.agentPersona` | `ArgusAIAgentConversation::findAgentPersonaNames()`, `AISkillsService::getAgentPersona()` | the agent's name and the product name in the prompts and in the skill and purpose texts | `Assistant`, `this product` | this file |
 | `agentToolCallChildProcess.php` | `AI.agentToolCallChildProcess` | `AgentToolCallForkJoinService` | the host's console script that starts a child process for one tool call, and the command the child runs | no console script, so every call runs inline; command `app:ai-agent:execute-tool-call` | `ddd-module-agents-tools-specialist` |
 | `contextRetention.php` | `AI.contextRetention` | `ContextRetentionSettings` | skill unloading, skill loading strategy, state delivery | skill granularity, append loading | `ddd-module-agents-context-specialist` |
 | `decisionModel.php` | `AI.decisionModel` | `AgentDecisionModelSettings::current()` | the decision layer's mode and sites | mode `off` | `ddd-module-agents-decisions-and-guards-specialist` |
 | `evalOutboundRecipients.php` | `AI.evalOutboundRecipients` | `EvalOutboundRecipientsService` | the test sinks an eval run may send to | none | `ddd-module-agents-observability-specialist` |
-| `evalSuite.php` | `AI.evalSuite` | `AgentEvalResultFilesService::getResultsDirectory()`; the suite planning (`AgentEvalSuitePlanService`: `getSuiteDefinitions()`, `findFixturePath()`); the evaluation commands | the results folder of the evaluation runs; the resource group per fixture and the fixtures whose write cases run alone on their agent space; the suites a suite run plans (`suites`) and the default fixture of each evaluation command (`fixturePaths`) | `var/agent-evals`, no groups, no exclusive fixtures, no suites, no fixture paths | `ddd-module-agents-observability-specialist` |
+| `evalSuite.php` | `AI.evalSuite` | `AgentEvalResultFilesService::getResultsDirectory()`; the suite planning (`AgentEvalSuitePlanService`: `getSuiteDefinitions()`, `findFixturePath()`); the evaluation commands | the results folder of the evaluation runs; the resource group per fixture and the fixtures whose write cases run alone on their agent space; the suites a suite run plans (`suites`), the default fixture of each evaluation command (`fixturePaths`), the default judge and driver models of a judged case (`judgeModelName`, `driverModelName`) | `var/agent-evals`, no groups, no exclusive fixtures, no suites, no fixture paths, the package's judge and driver | `ddd-module-agents-observability-specialist` |
 | `purposeRequirements.php` | `AI.purposeRequirements` | `AIConversationPurposesService::getPurposeByName()` | feature flags a purpose requires | none | `ddd-module-agents-skills-and-purposes-specialist` |
 | `skillNamespaceGroups.php` | `AI.skillNamespaceGroups` | `AISkillCatalogDocService` | the groups of the admin skill screen | the package's groups | `ddd-module-agents-skills-and-purposes-specialist` |
 | `skillPackages.php` | `AI.skillPackages` | `AISkillsService`, `AISkill::getPackageClassesBySkillName()` | which MCP packages each skill brings | the package's own skills | `ddd-module-agents-skills-and-purposes-specialist` |

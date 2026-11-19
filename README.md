@@ -46,6 +46,14 @@ A host turns ids into names and labels the keys in a same-path subclass of `Agen
 (`describeRecordOfClientContext()`, `getClientContextKeyLabel()`); the default renders the keys plainly. Details: the
 context skill, "What the model sees", section "The client context".
 
+**Tokens per model call.** `config/app/AI/agentModelInputOptions.php` (and a purpose's `modelInputOptions:` map) leaves
+parts of the model input out: the delegation, task-plan, `askOwner` and `findWidgets` meta tools, the widget part of
+the base prompt, base prompt sections by heading, the memory rules when no memory tool is reachable, and the reachable
+tool schemas before their skill is loaded. Every switch defaults to the package's behaviour, so the input stays
+byte-identical until a host sets one. The default character (`config/app/AI/Prompts/AI/Agent/Character.md`) is an
+example; a host replaces it with its own file at the same path. Details: the context skill, "What the model sees",
+section 5.
+
 ## Environment of the package test kernel (`tests/Support/kernel`)
 
 No env file is committed. `tests/Support/PackageTestEnvironment.php` sets every variable where the kernel is built

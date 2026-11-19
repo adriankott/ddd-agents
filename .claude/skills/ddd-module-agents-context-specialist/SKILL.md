@@ -1,6 +1,6 @@
 ---
 name: ddd-module-agents-context-specialist
-description: "Explains and tunes what the ddd-agents model sees on each call and how that input stays small, stable and prompt-cached. Covers the model input (AgentModelInput system segments, volatile tail, core prompts), prompt cache and stable prefix (breakpoints, Chat Completions vs Responses, append-only skill loading, prefix epochs, reasoning carry-over, cached base prompt), context reduction (compaction tree, absolute threshold, preserved facts, tool-result stubbing), skill and tool eviction, state epochs and once-per-change notes, recall and conversation search, embeddings, memories and standing directives, owner presence, device, time zones, client context (page, record), tool-call efficiency, contextRetention.php. Use when cached tokens drop to zero, a skill load costs the whole prompt, the context grows too large, compaction never fires or loses an id, a skill unloads too early, the agent re-loads a skill or repeats a read, the time or zone is wrong, search returns nothing, or a host adds memories or embeddings."
+description: "Explains and tunes what the ddd-agents model sees on each call and how that input stays small, stable and prompt-cached. Covers the model input (AgentModelInput segments, volatile tail, core prompts, replacing Character.md), trimming it per host or purpose (agentModelInputOptions.php: meta tools, widgets, base prompt sections, tools loaded by skill), prompt cache and stable prefix (breakpoints, wire APIs, append-only loading, prefix epochs), context reduction (compaction tree, tool-result stubbing), skill and tool eviction, state epochs, recall and search, embeddings, memories and standing directives, owner presence, device, time zones, client context, tool-call efficiency, contextRetention.php. Use when cached tokens drop to zero, a skill load costs the whole prompt, the base prompt or meta tools cost too many tokens, the context grows too large, compaction never fires or loses an id, a skill unloads too early, the agent repeats a read, the zone is wrong, search returns nothing, or a host adds memories."
 metadata:
   author: mgamadeus
   version: "0.1.0"
@@ -163,6 +163,26 @@ Per conversation, every other knob lives on `ContextRetentionSettings` (tool-res
 eviction horizons, pressure, hard cap, pins) and `CompactionSettings` (threshold override, model, fallbacks); a
 purpose sets them in its `contextRetention:` map. The purpose file format belongs to the skills-and-purposes skill.
 
+## Trimming the model input (`config/app/AI/agentModelInputOptions.php`)
+
+`AgentModelInputOptions` (`AI.agentModelInputOptions`, replaced whole; a purpose's `modelInputOptions:` map wins per
+key). Every switch defaults to the package's behaviour: a host that sets nothing sends byte-identical input. No switch
+rewrites a sentence; a section is left out whole.
+
+| Key | Default | Effect |
+|---|---|---|
+| `offersDelegationTools` | true | false: no `delegate`, `check_delegations`, `message_sub_agent`, `wait_for_sub_agents` |
+| `offersTaskPlanTools` | true | false: no `update_task_plan`, `set_task_status`, `get_task_plans` |
+| `offersAskOwner` | true | false: no `askOwner` |
+| `offersFindWidgets` | true | false: no `findWidgets` |
+| `teachesWidgets` | true | false: the base prompt's `Widgets` section and its composed-view kit are left out, and `findWidgets` with them |
+| `droppedBasePromptSections` | `[]` | headings of base prompt sections left out (the text after `## `, with or without its `[surface=…]` marker) |
+| `dropsMemorySectionWithoutMemoryTool` | false | true: the section `Owner statements: setting, automatic memory, or recall` is left out while no reachable tool writes agent memory |
+| `offersReachableToolsFromTheFirstCall` | true | false: under append-only loading the tools of a skill arrive when it is loaded, also below `appendOnlyReachableToolSetCeilingTokens` |
+
+Details, the section rule and replacing `Character.md`: [what-the-model-sees.md](references/what-the-model-sees.md)
+(section 5).
+
 ## Task or symptom → reference
 
 **Host developer**
@@ -170,6 +190,7 @@ purpose sets them in its `contextRetention:` map. The purpose file format belong
 | Task or symptom | Reference |
 |---|---|
 | What exactly is sent on a call; which segment says what; adding a day context or local situation; the client context (route, record, tab) and its host hook | [what-the-model-sees.md](references/what-the-model-sees.md) |
+| The base prompt, the meta tools or the tool schemas cost too many tokens; a consumer without widgets, delegation or memory; replacing the default character | [what-the-model-sees.md](references/what-the-model-sees.md) (section 5) |
 | Cached tokens are 0 or low; a deploy or a load costs the whole prompt; choosing the wire API | [prompt-cache-and-stable-prefix.md](references/prompt-cache-and-stable-prefix.md) |
 | The context grows past the model's reliable length; compaction never fires; an id is lost after compaction; old tool results disappear | [context-reduction.md](references/context-reduction.md) |
 | A skill or tool leaves too early or never; tuning `unloadGranularity`, pins, the hard cap | [skill-and-tool-eviction.md](references/skill-and-tool-eviction.md) |

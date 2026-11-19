@@ -7,8 +7,9 @@ namespace DDD\Domain\AI\Entities\Evals;
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
 
 /**
- * What one judged run returns: the judge's verdict, why the owner turns stopped, how many owner turns ran and the driven
- * conversation (for a stored run the conversation as read back after the last turn).
+ * What one judged run returns: the judge's verdict, why the owner turns stopped, how many owner turns ran, what the
+ * harness calls cost ({@see AgentEvalHarnessCosts}) and the driven conversation (for a stored run the conversation as
+ * read back after the last turn).
  *
  * A plain object of one run; no container service.
  *
@@ -37,6 +38,9 @@ class AgentEvalSimRunResult
     /** @var AIConversation The driven conversation */
     protected AIConversation $conversation;
 
+    /** @var AgentEvalHarnessCosts|null What the judge's and the driver's calls of the run cost; null = not counted */
+    protected ?AgentEvalHarnessCosts $harnessCosts = null;
+
     /**
      * The result of a judged run.
      *
@@ -54,6 +58,19 @@ class AgentEvalSimRunResult
         $agentEvalSimRunResult->turns = $turns;
         $agentEvalSimRunResult->conversation = $conversation;
         return $agentEvalSimRunResult;
+    }
+
+    /** What the judge's and the driver's calls of the run cost (all zero when they were not counted). */
+    public function getHarnessCosts(): AgentEvalHarnessCosts
+    {
+        return $this->harnessCosts ?? AgentEvalHarnessCosts::newInstance();
+    }
+
+    /** Sets what the judge's and the driver's calls of the run cost. */
+    public function setHarnessCosts(?AgentEvalHarnessCosts $agentEvalHarnessCosts): static
+    {
+        $this->harnessCosts = $agentEvalHarnessCosts;
+        return $this;
     }
 
     /** The judge's verdict. */

@@ -50,6 +50,7 @@ use DDD\Symfony\Commands\AI\ModelTierOptionTrait;
 use InvalidArgumentException;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Formatter\OutputFormatter;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -500,26 +501,74 @@ class AgentEvalToolsCommand extends AgentEvalConsoleCommand
     }
 
     /**
-     * Checks the case's state after the run and cleans up what the agent created ({@see AgentEvalRunnerService::evaluateStateAfterRun()});
-     * the judged flavor runs the cleanup half only. No check without `expect.stateAfterRun`.
+     * Replaces the record references of the run's case (`{{ref:<kind>:<name>}}`) with the values the application
+     * resolves in the scope ({@see AgentEvalRunnerService::resolveRecordReferencesOfCase()}), on the case run itself: the
+     * agent's prompt, the expectation and the harness calls all read the resolved case.
+     *
+     * @throws AgentEvalPreconditionNotEstablishedException when a reference does not resolve (the case is not applicable)
+     */
+    protected function resolveRecordReferencesOfCaseRun(AgentEvalToolsCaseRun $agentEvalToolsCaseRun, AgentEvalScope $agentEvalScope): AgentEvalCase
+    {
+        $agentEvalToolsCaseRun->agentEvalCase = $this->getRunnerService()->resolveRecordReferencesOfCase($agentEvalScope, $agentEvalToolsCaseRun->agentEvalCase);
+        return $agentEvalToolsCaseRun->agentEvalCase;
+    }
+
+    /**
+     * The state check of the case (`expect.stateAfterRun`), null without one; the judged flavor keeps the cleanup half
+     * only.
+     */
+    protected function buildStateAfterRunCheckOfCase(AgentEvalToolsCaseRun $agentEvalToolsCaseRun, bool $cleanupOnly): ?AgentEvalStateAfterRunCheck
+    {
+        $stateAfterRunBlock = $agentEvalToolsCaseRun->agentEvalCase->getStateAfterRun();
+        if ($stateAfterRunBlock === null) {
+            return null;
+        }
+        if ($cleanupOnly) {
+            $stateAfterRunBlock = ['cleanup' => $stateAfterRunBlock['cleanup'] ?? null] + array_intersect_key($stateAfterRunBlock, ['argsFromToolResult' => 1]);
+        }
+        return AgentEvalStateAfterRunCheck::fromStateAfterRunBlock($stateAfterRunBlock);
+    }
+
+    /**
+     * Hands the case's state check to its restore bracket (a case with a `restore` block): the runner runs it after the
+     * agent's run and before the revert write ({@see AgentEvalRunnerService::evaluateStateAfterRunInsideRestore()}).
+     */
+    protected function handStateAfterRunCheckToRestoreBracket(AgentEvalToolsCaseRun $agentEvalToolsCaseRun, bool $cleanupOnly): void
+    {
+        $agentEvalToolsCaseRun->runOptions->stateAfterRunFailuresInsideRestore = null;
+        $agentEvalToolsCaseRun->runOptions->stateAfterRunCheckInsideRestore = $agentEvalToolsCaseRun->agentEvalCase->getRestore() !== null
+            ? $this->buildStateAfterRunCheckOfCase($agentEvalToolsCaseRun, $cleanupOnly)
+            : null;
+    }
+
+    /**
+     * Checks the case's state after the run and cleans up what the agent created ({@see AgentEvalRunnerService::evaluateStateAfterRun()}),
+     * with the harness's packages ({@see AgentEvalRunnerService::getHarnessPackageClasses()}); the judged flavor runs the
+     * cleanup half only. A case with a `restore` block was checked inside its bracket, before the revert write: its
+     * failures are taken from there. No check without `expect.stateAfterRun`.
      *
      * @return string[] the failures of the check
      */
     protected function evaluateStateAfterRunOfCase(AgentEvalToolsCaseRun $agentEvalToolsCaseRun, AIConversation $conversation, AgentEvalScope $agentEvalScope, bool $cleanupOnly): array
     {
-        $stateAfterRunBlock = $agentEvalToolsCaseRun->agentEvalCase->getStateAfterRun();
-        if ($stateAfterRunBlock === null) {
+        $agentEvalRunOptions = $agentEvalToolsCaseRun->runOptions;
+        $agentEvalRunOptions->stateAfterRunCheckInsideRestore = null;
+        if ($agentEvalRunOptions->stateAfterRunFailuresInsideRestore !== null) {
+            $stateAfterRunFailures = $agentEvalRunOptions->stateAfterRunFailuresInsideRestore;
+            $agentEvalRunOptions->stateAfterRunFailuresInsideRestore = null;
+            return $stateAfterRunFailures;
+        }
+        $agentEvalStateAfterRunCheck = $this->buildStateAfterRunCheckOfCase($agentEvalToolsCaseRun, $cleanupOnly);
+        if ($agentEvalStateAfterRunCheck === null) {
             return [];
         }
-        if ($cleanupOnly) {
-            $stateAfterRunBlock = ['cleanup' => $stateAfterRunBlock['cleanup'] ?? null] + array_intersect_key($stateAfterRunBlock, ['argsFromToolResult' => 1]);
-        }
-        return $this->getRunnerService()->evaluateStateAfterRun(
+        $agentEvalRunnerService = $this->getRunnerService();
+        return $agentEvalRunnerService->evaluateStateAfterRun(
             $conversation,
             $agentEvalScope,
-            AgentEvalStateAfterRunCheck::fromStateAfterRunBlock($stateAfterRunBlock),
-            $this->getCasePackagesService()->findPackageClassesOfCase($agentEvalToolsCaseRun->agentEvalCase),
-            $agentEvalToolsCaseRun->runOptions
+            $agentEvalStateAfterRunCheck,
+            $agentEvalRunnerService->getHarnessPackageClasses(),
+            $agentEvalRunOptions
         );
     }
 
@@ -536,8 +585,10 @@ class AgentEvalToolsCommand extends AgentEvalConsoleCommand
         $agentEvalCase = $agentEvalToolsCaseRun->agentEvalCase;
         try {
             $agentEvalScope = $agentEvalRunnerService->resolveEvalScopeWithFallbackAccount($agentEvalCase, $runSettings->fallbackAgentSpaceId, $runSettings->fallbackAccountId);
+            $agentEvalCase = $this->resolveRecordReferencesOfCaseRun($agentEvalToolsCaseRun, $agentEvalScope);
             $agentEvalSimCase = AgentEvalSimCase::fromEvaluatedCase($agentEvalCase, AgentEvalJudgedCaseTexts::forCase($agentEvalCase));
             $agentEvalJudgedRunService = $this->getJudgedRunService();
+            $this->handStateAfterRunCheckToRestoreBracket($agentEvalToolsCaseRun, true);
             $agentEvalSimRunResult = $agentEvalCase->getRestore() !== null
                 ? $agentEvalJudgedRunService->runSimWithRestore($agentEvalScope, $agentEvalSimCase, $agentEvalToolsCaseRun->runOptions)
                 : $agentEvalJudgedRunService->runSim($agentEvalScope, $agentEvalSimCase, $agentEvalToolsCaseRun->runOptions);
@@ -618,6 +669,8 @@ class AgentEvalToolsCommand extends AgentEvalConsoleCommand
         $agentEvalCase = $agentEvalToolsCaseRun->agentEvalCase;
         try {
             $agentEvalScope = $agentEvalRunnerService->resolveEvalScopeWithFallbackAccount($agentEvalCase, $runSettings->fallbackAgentSpaceId, $runSettings->fallbackAccountId);
+            $agentEvalCase = $this->resolveRecordReferencesOfCaseRun($agentEvalToolsCaseRun, $agentEvalScope);
+            $this->handStateAfterRunCheckToRestoreBracket($agentEvalToolsCaseRun, false);
             $agentEvalRunOutcome = $agentEvalRunnerService->runCase($agentEvalScope, $agentEvalCase, $agentEvalToolsCaseRun->runOptions);
             $conversation = $agentEvalRunOutcome->getConversation();
             // a call that leaves out an argument the platform fills counts as carrying the run's value
@@ -985,6 +1038,9 @@ class AgentEvalToolsCommand extends AgentEvalConsoleCommand
                     $agentEvalCaseRepetition->runs,
                     $agentEvalCaseRepetition->errors > 0 ? sprintf(' · %d errors', $agentEvalCaseRepetition->errors) : ''
                 ));
+                foreach ($agentEvalCaseRepetition->failureDetails as $failureDetail) {
+                    $output->writeln('    <comment>✗</comment> ' . OutputFormatter::escape($failureDetail));
+                }
             }
         }
         $agentEvalPlanDynamicsRollUp = $agentEvalRunSummary->planDynamicsRollUp;
@@ -1085,6 +1141,14 @@ class AgentEvalToolsCommand extends AgentEvalConsoleCommand
             $agentEvalRunSummary->totalTokens,
             (string)$agentEvalRunSummary->modelName
         ));
+        if ($agentEvalRunSummary->harnessCosts !== null) {
+            $output->writeln(sprintf(
+                'Judge and driver cost: <info>$%.4f</info> total · judge <info>$%.4f</info> · driver <info>$%.4f</info>',
+                $agentEvalRunSummary->harnessCosts->getTotalCostUsd(),
+                $agentEvalRunSummary->harnessCosts->judgeCostUsd,
+                $agentEvalRunSummary->harnessCosts->driverCostUsd
+            ));
+        }
         $performanceRollUp = $agentEvalRunSummary->performanceRollUp;
         $output->writeln(sprintf(
             'Performance: <info>%.2f</info> model calls/case · <info>%.2f</info> owner turns/case · <info>%.1f s</info>/owner turn (median %.1f, p90 %.1f) · %.1f s agent time/case',

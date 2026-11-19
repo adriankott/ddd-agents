@@ -26,6 +26,8 @@ use DDD\Domain\AI\Entities\Evals\AgentEvalEvictionTurns;
 use DDD\Domain\AI\Entities\Evals\AgentEvalHarnessToolCall;
 use DDD\Domain\AI\Entities\Evals\AgentEvalHarnessToolCalls;
 use DDD\Domain\AI\Entities\Evals\AgentEvalNotApplicableReason;
+use DDD\Domain\AI\Entities\Evals\AgentEvalRecordReference;
+use DDD\Domain\AI\Entities\Evals\AgentEvalRecordReferences;
 use DDD\Domain\AI\Entities\Evals\AgentEvalRestoreBracket;
 use DDD\Domain\AI\Entities\Evals\AgentEvalRestorePlan;
 use DDD\Domain\AI\Entities\Evals\AgentEvalRunOptions;
@@ -37,6 +39,7 @@ use DDD\Domain\AI\Entities\Skills\AISkill;
 use DDD\Domain\AI\Entities\Skills\AISkills;
 use DDD\Domain\AI\Entities\UsageLogs\AIBudgetBypassGrant;
 use DDD\Domain\AI\Entities\UsageLogs\Enums\AIUsageInitiator;
+use DDD\Domain\AI\Exceptions\Evals\AgentEvalPreconditionNotEstablishedException;
 use DDD\Domain\AI\Services\AgentSpaces\AgentSpacesService;
 use DDD\Domain\AI\Services\AIUsageEnvelopesService;
 use DDD\Domain\AI\Services\Conversations\Agent\AIConversationPurposeRunsService;
@@ -150,10 +153,92 @@ class AgentEvalRunnerService extends Service
      */
     public function runCase(AgentEvalScope $agentEvalScope, AgentEvalCase $agentEvalCase, AgentEvalRunOptions $agentEvalRunOptions): AgentEvalRunOutcome
     {
+        $agentEvalCase = $this->resolveRecordReferencesOfCase($agentEvalScope, $agentEvalCase);
         if ($agentEvalCase->getRestore() !== null) {
             return $this->runWithRestore($agentEvalScope, $agentEvalCase, $agentEvalRunOptions);
         }
         return $this->run($agentEvalScope, $agentEvalCase, $agentEvalRunOptions);
+    }
+
+    /**
+     * The case with every record reference `{{ref:<kind>:<name>}}` of its strings replaced by the value the application
+     * resolves in the scope ({@see AgentEvalRunHooksService::resolveRecordReference()}, once per kind and name): a
+     * string that is only the token takes the value as resolved, a longer text takes it as text. The case itself when it
+     * has no reference. Idempotent: a resolved case has no token left.
+     *
+     * @param AgentEvalScope $agentEvalScope the scope the case runs in
+     * @param AgentEvalCase $agentEvalCase
+     * @return AgentEvalCase
+     * @throws AgentEvalPreconditionNotEstablishedException when a reference does not resolve in the scope (the case is not applicable)
+     */
+    public function resolveRecordReferencesOfCase(AgentEvalScope $agentEvalScope, AgentEvalCase $agentEvalCase): AgentEvalCase
+    {
+        $caseFields = $agentEvalCase->toArray();
+        $encodedCaseFields = json_encode($caseFields, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if (!is_string($encodedCaseFields) || !str_contains($encodedCaseFields, '{{ref:')) {
+            return $agentEvalCase;
+        }
+        $resolvedRecordReferences = AgentEvalRecordReferences::newInstance();
+        return $agentEvalCase::fromArray((array)$this->substituteRecordReferencesInValue($caseFields, $agentEvalScope, $resolvedRecordReferences));
+    }
+
+    /**
+     * `$value` with its record references replaced, walking arrays (values only, never keys).
+     *
+     * @param mixed $value
+     * @param AgentEvalScope $agentEvalScope
+     * @param AgentEvalRecordReferences $resolvedRecordReferences the references resolved so far for this case
+     * @return mixed
+     * @throws AgentEvalPreconditionNotEstablishedException
+     */
+    protected function substituteRecordReferencesInValue(mixed $value, AgentEvalScope $agentEvalScope, AgentEvalRecordReferences $resolvedRecordReferences): mixed
+    {
+        if (is_array($value)) {
+            foreach ($value as $key => $nestedValue) {
+                $value[$key] = $this->substituteRecordReferencesInValue($nestedValue, $agentEvalScope, $resolvedRecordReferences);
+            }
+            return $value;
+        }
+        if (!is_string($value)) {
+            return $value;
+        }
+        foreach (AgentEvalRecordReferences::fromText($value)->getElements() as $agentEvalRecordReference) {
+            $resolvedRecordReference = $this->resolveRecordReference($agentEvalRecordReference, $agentEvalScope, $resolvedRecordReferences);
+            if ($resolvedRecordReference->isWholeText($value)) {
+                return $resolvedRecordReference->resolvedValue;
+            }
+            $value = str_replace($resolvedRecordReference->token, (string)$resolvedRecordReference->resolvedValue, $value);
+        }
+        return $value;
+    }
+
+    /**
+     * The reference resolved: from the references resolved so far for the case, else through the hook (and kept).
+     *
+     * @throws AgentEvalPreconditionNotEstablishedException when the application resolves no value
+     */
+    protected function resolveRecordReference(
+        AgentEvalRecordReference $agentEvalRecordReference,
+        AgentEvalScope $agentEvalScope,
+        AgentEvalRecordReferences $resolvedRecordReferences
+    ): AgentEvalRecordReference {
+        $heldRecordReference = $resolvedRecordReferences->getByUniqueKey($agentEvalRecordReference->uniqueKey());
+        if ($heldRecordReference instanceof AgentEvalRecordReference) {
+            $agentEvalRecordReference->resolvedValue = $heldRecordReference->resolvedValue;
+            return $agentEvalRecordReference;
+        }
+        $resolvedValue = $this->getAgentEvalRunHooksService()->resolveRecordReference($agentEvalScope, $agentEvalRecordReference->recordKind, $agentEvalRecordReference->recordName);
+        if ($resolvedValue === null) {
+            throw new AgentEvalPreconditionNotEstablishedException(sprintf(
+                "record reference %s: no %s named '%s' in this scope",
+                $agentEvalRecordReference->token,
+                $agentEvalRecordReference->recordKind,
+                $agentEvalRecordReference->recordName
+            ));
+        }
+        $agentEvalRecordReference->resolvedValue = $resolvedValue;
+        $resolvedRecordReferences->add($agentEvalRecordReference);
+        return $agentEvalRecordReference;
     }
 
     /**
@@ -341,7 +426,9 @@ class AgentEvalRunnerService extends Service
      * run, never these calls ({@see executeHarnessToolCall()}).
      *
      * The bracket is opened by {@see openRestoreBracket()} and closed by {@see closeRestoreBracket()}; a run of
-     * another shape (a subclass's own run of a case) takes the same bracket around it.
+     * another shape (a subclass's own run of a case) takes the same bracket around it. A state check the options carry
+     * ({@see AgentEvalRunOptions::$stateAfterRunCheckInsideRestore}) runs after the agent's run and before the revert
+     * write ({@see evaluateStateAfterRunInsideRestore()}).
      *
      * @param AgentEvalScope $agentEvalScope
      * @param AgentEvalCase $agentEvalCase a case with a `restore` block
@@ -352,7 +439,9 @@ class AgentEvalRunnerService extends Service
     {
         $agentEvalRestoreBracket = $this->openRestoreBracket($agentEvalScope, $agentEvalCase, $agentEvalRunOptions);
         try {
-            return $this->run($agentEvalScope, $agentEvalCase, $agentEvalRunOptions);
+            $agentEvalRunOutcome = $this->run($agentEvalScope, $agentEvalCase, $agentEvalRunOptions);
+            $this->evaluateStateAfterRunInsideRestore($agentEvalRunOutcome->getConversation(), $agentEvalScope, $agentEvalRunOptions);
+            return $agentEvalRunOutcome;
         } finally {
             $this->closeRestoreBracket($agentEvalRestoreBracket, $agentEvalScope, $agentEvalRunOptions);
         }
@@ -677,6 +766,45 @@ class AgentEvalRunnerService extends Service
     }
 
     /**
+     * Runs the state check the options carry for a restore bracket ({@see AgentEvalRunOptions::$stateAfterRunCheckInsideRestore})
+     * on the driven conversation, with the harness's packages ({@see getHarnessPackageClasses()}), and stores its
+     * failures on the options ({@see AgentEvalRunOptions::$stateAfterRunFailuresInsideRestore}). Called after the
+     * agent's run and before the bracket's revert write: the read sees what the agent wrote, then the cleanup runs, then
+     * the restore. Nothing without a check.
+     *
+     * @param AIConversation $conversation the driven conversation
+     * @param AgentEvalScope $agentEvalScope
+     * @param AgentEvalRunOptions $agentEvalRunOptions
+     * @return void
+     */
+    public function evaluateStateAfterRunInsideRestore(AIConversation $conversation, AgentEvalScope $agentEvalScope, AgentEvalRunOptions $agentEvalRunOptions): void
+    {
+        $agentEvalStateAfterRunCheck = $agentEvalRunOptions->stateAfterRunCheckInsideRestore;
+        if ($agentEvalStateAfterRunCheck === null) {
+            return;
+        }
+        $agentEvalRunOptions->stateAfterRunCheckInsideRestore = null;
+        $agentEvalRunOptions->stateAfterRunFailuresInsideRestore = $this->evaluateStateAfterRun(
+            $conversation,
+            $agentEvalScope,
+            $agentEvalStateAfterRunCheck,
+            $this->getHarnessPackageClasses(),
+            $agentEvalRunOptions
+        );
+    }
+
+    /**
+     * The tool packages the harness calls reach (preparation, capture, restore, state check): every tool package of
+     * every skill.
+     *
+     * @return array<int, class-string>
+     */
+    public function getHarnessPackageClasses(): array
+    {
+        return $this->getPackageClassesOfEverySkill();
+    }
+
+    /**
      * Closes what the conversation the run built last (and its delegation children) left in the agent space and
      * nothing else restores — the call of a case's `finally`, so a case that threw mid-run is cleaned as well.
      *
@@ -694,7 +822,8 @@ class AgentEvalRunnerService extends Service
      * (a schedule would keep firing), the standing permissions it was granted (a mandate would authorize the next
      * case's writes, and what it replaced stands again), then what the application's tools left
      * ({@see AgentEvalRunHooksService::tearDownHostResidueOfConversation()}). Every step is reported as a
-     * `restore teardown:` line and never fails the case. A conversation outside an agent space has nothing to close; a
+     * `restore teardown:` line and never fails the case. Schedules and mandates belong to an agent space: an
+     * account-level conversation (no space) has none to close, but the application's hook is called for it as well. A
      * TRANSIENT conversation has no id, so nothing it created carries its mark: its residue stays, which the report says.
      *
      * @param AIConversation $conversation
@@ -703,27 +832,26 @@ class AgentEvalRunnerService extends Service
      */
     public function tearDownResidueOfConversation(AIConversation $conversation, AgentEvalRunOptions $agentEvalRunOptions): array
     {
-        if (!isset($conversation->agentSpaceId)) {
-            return [];
-        }
         if (!isset($conversation->id)) {
             $agentEvalRunOptions->reportProgress(static::TEARDOWN_REPORT_LINE_PREFIX . 'skipped — a transient conversation leaves no mark on what it created');
             return [];
         }
         $conversationIdsOfTree = $this->collectConversationIdsOfTree($conversation);
         $closedLines = [];
-        DDDService::instance()->deactivateEntityRightsRestrictions();
-        try {
-            $agentSpacesService = $this->getAgentSpacesService();
-            $agentSpace = $agentSpacesService->find((int)$conversation->agentSpaceId);
-            if ($agentSpace instanceof AgentSpace) {
-                $closedLines = array_merge(
-                    $this->closeSchedulesCreatedByTree($agentSpace, $conversationIdsOfTree, $agentEvalRunOptions),
-                    $this->closeMandatesGrantedToTree($conversation, $agentSpace, $conversationIdsOfTree, $agentEvalRunOptions)
-                );
+        if (isset($conversation->agentSpaceId)) {
+            DDDService::instance()->deactivateEntityRightsRestrictions();
+            try {
+                $agentSpacesService = $this->getAgentSpacesService();
+                $agentSpace = $agentSpacesService->find((int)$conversation->agentSpaceId);
+                if ($agentSpace instanceof AgentSpace) {
+                    $closedLines = array_merge(
+                        $this->closeSchedulesCreatedByTree($agentSpace, $conversationIdsOfTree, $agentEvalRunOptions),
+                        $this->closeMandatesGrantedToTree($conversation, $agentSpace, $conversationIdsOfTree, $agentEvalRunOptions)
+                    );
+                }
+            } finally {
+                DDDService::instance()->restoreEntityRightsRestrictionsStateSnapshot();
             }
-        } finally {
-            DDDService::instance()->restoreEntityRightsRestrictionsStateSnapshot();
         }
         return array_merge(
             $closedLines,

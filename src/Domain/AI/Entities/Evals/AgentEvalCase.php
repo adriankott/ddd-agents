@@ -47,6 +47,12 @@ class AgentEvalCase extends ValueObject
     /** @var string The key that names the skill a selection case expects */
     public const string KEY_EXPECTED_SKILL = 'expectedSkill';
 
+    /** @var string The `expectedSkill` of a selection case that expects the agent to load no skill at all */
+    public const string EXPECTED_SKILL_NONE = 'none';
+
+    /** @var string The key that names the skills a selection case must not see loaded */
+    public const string KEY_FORBIDDEN_SKILLS = 'forbiddenSkills';
+
     /** @var string The execution mode of a case whose flow exists only on the job queue */
     public const string EXECUTION_MODE_ASYNC = 'async';
 
@@ -383,6 +389,19 @@ class AgentEvalCase extends ValueObject
     {
         $expectedSkillName = $this->caseFields[static::KEY_EXPECTED_SKILL] ?? null;
         return $expectedSkillName !== null ? (string)$expectedSkillName : null;
+    }
+
+    /**
+     * `forbiddenSkills` of a selection case: skills the agent must not load (a list or one name); empty when it names
+     * none.
+     *
+     * @return string[]
+     */
+    public function getForbiddenSkillNames(): array
+    {
+        $forbiddenSkillNames = $this->caseFields[static::KEY_FORBIDDEN_SKILLS] ?? [];
+        $forbiddenSkillNames = is_array($forbiddenSkillNames) ? $forbiddenSkillNames : [$forbiddenSkillNames];
+        return array_values(array_filter(array_map(static fn(mixed $skillName): string => trim((string)$skillName), $forbiddenSkillNames), static fn(string $skillName): bool => $skillName !== ''));
     }
 
     /**

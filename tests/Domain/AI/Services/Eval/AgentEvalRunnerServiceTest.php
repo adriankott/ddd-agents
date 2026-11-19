@@ -509,6 +509,58 @@ class AgentEvalRunnerServiceTest extends IntegrationTestCase
         self::assertNotContains('findOrStoreAgentSpaceForHarnessToolCalls', $this->hooksDouble->hookCalls, 'a case without harness calls stores no agent space');
     }
 
+    public function testARecordReferenceIsResolvedOnceByTheHostAndKeepsANumberWhereItIsTheWholeString(): void
+    {
+        $this->hooksDouble->recordReferenceValues = ['entry:Spring opening' => 41, 'site:Main' => 'main-site'];
+        $agentEvalCase = AgentEvalCase::fromArray([
+            'id' => 'entry.ref',
+            'prompt' => 'Rename entry {{ref:entry:Spring opening}} on {{ref:site:Main}}.',
+            'expect' => ['tool' => 'renameEntry', 'argsContain' => ['entryId' => '{{ref:entry: Spring opening }}']],
+            'restore' => ['readTool' => 'getEntry', 'readArgs' => ['entryId' => '{{ref:entry:Spring opening}}']],
+        ]);
+
+        $resolvedCase = (new AgentEvalRunnerService())->resolveRecordReferencesOfCase($this->buildScope(), $agentEvalCase);
+
+        self::assertSame('Rename entry 41 on main-site.', $resolvedCase->getPrompt());
+        self::assertSame(['entryId' => 41], $resolvedCase->getExpect()['argsContain'], 'a whole-string token keeps the number');
+        self::assertSame(41, $resolvedCase->getRestore()['readArgs']['entryId']);
+        self::assertSame(['resolveRecordReference', 'resolveRecordReference'], $this->hooksDouble->hookCalls, 'one resolution per kind and name');
+
+        $caseWithoutReference = AgentEvalCase::fromArray(['id' => 'plain', 'prompt' => 'No reference.']);
+        self::assertSame($caseWithoutReference, (new AgentEvalRunnerService())->resolveRecordReferencesOfCase($this->buildScope(), $caseWithoutReference));
+    }
+
+    public function testARecordReferenceTheHostCannotResolveMakesTheCaseNotApplicable(): void
+    {
+        $this->expectException(AgentEvalPreconditionNotEstablishedException::class);
+        $this->expectExceptionMessage("record reference {{ref:entry:Gone}}: no entry named 'Gone' in this scope");
+
+        (new AgentEvalRunnerService())->resolveRecordReferencesOfCase($this->buildScope(), AgentEvalCase::fromArray(['prompt' => 'Open {{ref:entry:Gone}}.']));
+    }
+
+    public function testTheStateCheckInsideARestoreBracketReadsBeforeTheRevertWriteWithTheHarnessPackages(): void
+    {
+        $this->scriptRestoreCaseResults();
+        $this->executorDouble->scriptResult('getEntry', '{"structuredContent":{"entry":{"id":9,"title":"After"}}}');
+        $agentEvalRunnerService = $this->buildRunnerWithoutAgentRun();
+        $agentEvalRunnerService->conversationOfAgentRun = $this->buildConversation();
+        $agentEvalRunOptions = $this->buildOptions();
+        $agentEvalRunOptions->stateAfterRunCheckInsideRestore = AgentEvalStateAfterRunCheck::fromStateAfterRunBlock([
+            'readTool' => 'getEntry',
+            'args' => ['entryId' => 9],
+            'fields' => ['entry.title' => ['equals' => 'Before']],
+        ]);
+
+        $agentEvalRunnerService->runWithRestore($this->buildScope(), AgentEvalCase::fromArray($this->buildRestoreCaseFields()), $agentEvalRunOptions);
+
+        self::assertSame(['createEntry', 'createEntry', 'getEntry', 'getEntry', 'restoreEntry', 'rebuildSite', 'deleteEntry', 'deleteEntry'], $this->executorDouble->getExecutedToolNames(), 'capture, agent, state read, then the revert write');
+        self::assertSame([MCPToolExecutorService::class], $this->executorDouble->executedCalls[3]['packageClasses'], 'the harness packages: every skill\'s');
+        self::assertNotNull($agentEvalRunOptions->stateAfterRunFailuresInsideRestore);
+        self::assertCount(1, $agentEvalRunOptions->stateAfterRunFailuresInsideRestore, 'the read saw what the agent wrote, not the restored value');
+        self::assertStringContainsString('After', $agentEvalRunOptions->stateAfterRunFailuresInsideRestore[0]);
+        self::assertNull($agentEvalRunOptions->stateAfterRunCheckInsideRestore, 'the check is taken when it runs');
+    }
+
     public function testTheStateCheckLiftsTheCaseBlockForItsReadAndCleanupAndAlwaysCleansUp(): void
     {
         MCPToolExecutorService::$blockedToolNames = ['getEntry', 'deleteEntry'];
@@ -646,18 +698,20 @@ class AgentEvalRunnerServiceTest extends IntegrationTestCase
         self::assertContains('tearDownHostResidueOfConversation', $this->hooksDouble->hookCalls);
     }
 
-    public function testATransientConversationLeavesNoMarkAndAConversationWithoutASpaceNothingToClose(): void
+    public function testATransientConversationLeavesNoMarkAndAnAccountLevelConversationReachesOnlyTheHostsTeardown(): void
     {
         $transientConversation = $this->buildConversation();
         $transientConversation->agentSpaceId = 17;
-        $accountLevelConversation = $this->buildConversation();
-        $accountLevelConversation->id = 901;
         $agentEvalRunnerService = new AgentEvalRunnerService();
 
         self::assertSame([], $agentEvalRunnerService->tearDownResidueOfConversation($transientConversation, $this->buildOptions()));
-        self::assertSame([], $agentEvalRunnerService->tearDownResidueOfConversation($accountLevelConversation, $this->buildOptions()));
         self::assertSame(['restore teardown: skipped — a transient conversation leaves no mark on what it created'], $this->progressLinesRecorder->progressLines);
         self::assertNotContains('tearDownHostResidueOfConversation', $this->hooksDouble->hookCalls);
+
+        $accountLevelConversation = $this->buildConversation();
+        $accountLevelConversation->id = 901;
+        self::assertSame([], $agentEvalRunnerService->tearDownResidueOfConversation($accountLevelConversation, $this->buildOptions()), 'no space: no schedules or mandates to close');
+        self::assertSame(['tearDownHostResidueOfConversation'], array_values(array_intersect($this->hooksDouble->hookCalls, ['tearDownHostResidueOfConversation'])), 'the host\'s teardown runs for an account-level conversation');
     }
 
     public function testAFailedApplicabilityCheckLeavesTheCaseApplicableAndTheAccountAsItWas(): void

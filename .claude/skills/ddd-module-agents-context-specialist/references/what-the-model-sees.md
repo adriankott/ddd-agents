@@ -163,6 +163,47 @@ Placeholders of the package's `Agentic.md` (ten): `{%AGENT_NAME%}`, `{%PRODUCT_N
 may be used by a host's own `Agentic.md`; the package file does not use them. None of them is a moment: the base prompt carries no clock. A host prompt keeps
 `{%AGENT_SPACE_CONTEXT%}` and `{%OWNER_ADDRESSING%}` (filled per state epoch) and the `[surface=…]` section markers.
 
+### Replacing the default character
+
+`Agent/Character.md` is the package's default voice: an example written for one kind of business, with sample words
+and situations of its own. A host replaces it whole with its own file at the same path,
+`config/app/AI/Prompts/AI/Agent/Character.md` under the host's config root (`AgentAIPromptNames::APP_AI_AGENT_CHARACTER`
+= `AI.Agent.Character`). The text fills `{%AGENT_CHARACTER%}` of the base prompt (`ArgusAIAgentConversation`); a file
+that cannot be read leaves the placeholder empty instead of failing the call. The cached base prompt keys on the
+character file (`AgentBaseSystemPromptCacheService::buildPromptFilesFingerprint()`), so a new file takes effect on the
+next build without a cache flush. A host with its own `Agentic.md` may drop the placeholder and write its character
+inline.
+
+### Leaving parts out (`AgentModelInputOptions`)
+
+`config/app/AI/agentModelInputOptions.php` (`AgentModelInputOptions::CONFIG_KEY` = `AI.agentModelInputOptions`; a host
+file replaces the package's whole, a missing key keeps its default), then the purpose's `modelInputOptions:` map
+(`AIConversationPurpose::$modelInputOptions`, an `AgentModelInputOptionsOverride`; each key it names wins). Read at every
+model call (`AIConversation::getModelInputOptions()`), never stored: the values of one conversation stay put while the
+configuration does, so the cached prefix holds.
+
+- **Meta tools** (`AgentOfferedTools::buildFor()`, inputs on `AgentOfferedToolsInputs`): `offersDelegationTools`,
+  `offersTaskPlanTools`, `offersAskOwner`, `offersFindWidgets`. A switch only takes tools away; where the loop would
+  not offer a tool anyway, nothing changes.
+- **Widgets:** `teachesWidgets: false` leaves out the section `## [surface=screen] Widgets`
+  (`AgentModelInputOptions::BASE_PROMPT_SECTION_WIDGETS`) with its `{%COMPOSED_VIEW_KIT%}`
+  (`AgentModelInput::$teachesWidgets`, `teachesComposedViewKit()`), and `findWidgets` is not offered
+  (`offersFindWidgetsWithWidgetsTaught()`).
+- **Sections by name:** `droppedBasePromptSections` (`AgentModelInput::$droppedBasePromptSections`, applied by
+  `AgentBasePromptSections::dropSections()` before the surface render). A section runs from its `## ` heading to the
+  next `## ` heading outside a code fence; it is left out whole, every other byte stays. `findSectionHeadings()` lists
+  the names of a prompt text. A heading the prompt does not have drops nothing. A sentence elsewhere that still names a
+  dropped tool is the host's to drop with it (another section) or to replace (its own prompt file).
+- **Memory rules:** `dropsMemorySectionWithoutMemoryTool: true` leaves out `BASE_PROMPT_SECTION_MEMORY` while no tool
+  the conversation can reach declares `MCPToolWritesAgentMemoryOnly` (`AIConversation::canReachToolThatWritesAgentMemory()`).
+  Off by default, so the default prompt stays as it is.
+- **Tool schemas loaded by skill:** `offersReachableToolsFromTheFirstCall: false` passes
+  `AgentAppendOnlyToolSet::CEILING_TOKENS_OF_LOADING_BY_SKILL` (-1) as the ceiling: the reachable tool set never rides
+  top-level from the first call, each skill's tools arrive with its load (an `additional_tools` item), as above
+  `appendOnlyReachableToolSetCeilingTokens`. Fewer tokens on short conversations, one more prefix extension per load.
+
+The default output is byte-identical with every switch at its default; `AgentModelInputOptionsTest` asserts it.
+
 ## 6. Host hooks
 
 | Need | Hook |

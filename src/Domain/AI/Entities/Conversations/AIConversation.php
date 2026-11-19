@@ -130,6 +130,7 @@ use Psr\Cache\InvalidArgumentException;
 use ReflectionException;
 use DDD\Domain\AI\Entities\Conversations\Agent\Tools\LoadToolTool;
 use DDD\Domain\AI\Services\Conversations\Agent\AgentClientContextService;
+use DDD\Domain\AI\Entities\Conversations\Agent\AgentModelInputOptions;
 use DDD\Domain\AI\Entities\Conversations\Widgets\Catalog\ConversationWidgetCatalog;
 
 /**
@@ -1345,9 +1346,15 @@ class AIConversation extends Entity
         // the widget search on a screen surface only — the chat, or an in-app call with the chat open
         // — and only while a skill this conversation can reach brings a widget's data: a catalog without such a widget
         // answers every search with "no match"
+        $agentModelInputOptions = $this->getModelInputOptions();
         $agentOfferedToolsInputs->offersFindWidgets = !$this->isDelegation()
             && in_array($ownerPresence, [OwnerPresence::PRESENT_IN_CHAT, OwnerPresence::PRESENT_IN_APP_VOICE_CALL], true)
+            && $agentModelInputOptions->offersFindWidgetsWithWidgetsTaught()
             && $this->hasWidgetsBroughtByReachableSkills($anchorLoadedCapabilities);
+        // the meta tool groups the host's or the purpose's options switch off (default: all offered)
+        $agentOfferedToolsInputs->offersDelegationTools = $agentModelInputOptions->offersDelegationTools;
+        $agentOfferedToolsInputs->offersTaskPlanTools = $agentModelInputOptions->offersTaskPlanTools;
+        $agentOfferedToolsInputs->offersAskOwner = $agentModelInputOptions->offersAskOwner;
         // The plan this conversation's purpose seeded is worked, never rewritten — no update_task_plan
         $agentOfferedToolsInputs->offersUpdateTaskPlan = $this->getTaskPlan() === null || !($this->findPurpose()?->seedsTaskPlan() ?? false);
         $agentOfferedToolsInputs->finishedTaskPlanCount = $this->getAgentWorkingState()?->countFinishedTaskPlans() ?? 0;
@@ -1422,10 +1429,13 @@ class AIConversation extends Entity
         if ($blockedToolNames !== []) {
             $reachableToolDefinitions = $reachableToolDefinitions->withoutNames($blockedToolNames);
         }
+        // an option that keeps the reachable set off the first call compares with a ceiling nothing fits under
         $appendOnlyToolSet = AgentAppendOnlyToolSet::decideFor(
             $reachableToolDefinitions,
             $this->getDescriptionPrefixesOfToolArgumentsFilledFromAgentSpace(),
-            ContextRetentionSettings::resolveAppendOnlyReachableToolSetCeilingTokens()
+            $this->getModelInputOptions()->offersReachableToolsFromTheFirstCall
+                ? ContextRetentionSettings::resolveAppendOnlyReachableToolSetCeilingTokens()
+                : AgentAppendOnlyToolSet::CEILING_TOKENS_OF_LOADING_BY_SKILL
         );
         if ($agentRun !== null) {
             $agentRun->appendOnlyToolSetsByConversationKey[$memoKey] = $appendOnlyToolSet;
@@ -2405,6 +2415,7 @@ class AIConversation extends Entity
         $this->putHistoryIntoContext($agentContext, $agentModelInputHistory);
         $this->putOwnerPresenceAndVariantsIntoContext($agentContext);
         $this->putClientContextIntoContext($agentContext);
+        $this->putModelInputOptionsIntoContext($agentContext);
         // The owner messages the injection check blocked — the egress shows the model a notice instead.
         $agentContext->securityFilteredOwnerMessageIndexes = $this->getAgentWorkingState()->securityFilteredOwnerMessageIndexes ?? [];
         // The skill CATALOG the model may load from — the SAME offer the `load_skills` enum is built from,
@@ -2969,6 +2980,57 @@ class AIConversation extends Entity
         /** @var AgentClientContextService $agentClientContextService */
         $agentClientContextService = DDDService::instance()->getService(AgentClientContextService::class);
         $agentContext->clientContextTailText = $agentClientContextService->findClientContextTailText($this, $agentClientContext);
+    }
+
+    /**
+     * Phase G3: what the host's and the purpose's model-input options leave out of the base prompt
+     * ({@see getModelInputOptions()}): the named sections, the widget section and its kit without widgets, the memory
+     * section when asked and no memory tool is reachable. Nothing set: nothing left out.
+     */
+    protected function putModelInputOptionsIntoContext(AgentModelInput $agentContext): void
+    {
+        $agentModelInputOptions = $this->getModelInputOptions();
+        $agentContext->teachesWidgets = $agentModelInputOptions->teachesWidgets;
+        $agentContext->droppedBasePromptSections = $agentModelInputOptions->buildDroppedBasePromptSections(
+            $agentModelInputOptions->dropsMemorySectionWithoutMemoryTool && $this->canReachToolThatWritesAgentMemory()
+        );
+    }
+
+    /**
+     * The model-input options of this conversation: the host's configuration, then the `modelInputOptions:` map of its
+     * purpose ({@see AgentModelInputOptions::resolveFor()}). A purpose that cannot be read leaves the host's options.
+     */
+    public function getModelInputOptions(): AgentModelInputOptions
+    {
+        try {
+            $purposeOverride = $this->findPurpose()?->modelInputOptions;
+        } catch (Throwable) {
+            $purposeOverride = null;
+        }
+        return AgentModelInputOptions::resolveFor($purposeOverride);
+    }
+
+    /**
+     * Whether a tool this conversation can reach (a tool of its reachable skills, {@see buildReachableSkillCatalog()})
+     * declares `MCPToolWritesAgentMemoryOnly`. Asked only by the memory-section option; a catalog that cannot be read
+     * answers true (the section stays).
+     */
+    public function canReachToolThatWritesAgentMemory(): bool
+    {
+        try {
+            $memoryToolNames = MCPToolAttributeCatalog::getToolNamesDeclaringAttribute(MCPToolWritesAgentMemoryOnly::class);
+            if ($memoryToolNames === []) {
+                return false;
+            }
+            foreach (ToolDefinitions::forPackages($this->buildReachableSkillCatalog()->skills->getPackages())->getElements() as $toolDefinition) {
+                if (in_array($toolDefinition->name, $memoryToolNames, true)) {
+                    return true;
+                }
+            }
+            return false;
+        } catch (Throwable) {
+            return true;
+        }
     }
 
     /** Phase I: the conversation's own creation-time snapshots — never for a delegation child. */

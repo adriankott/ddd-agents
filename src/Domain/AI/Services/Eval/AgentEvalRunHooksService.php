@@ -32,11 +32,12 @@ use RuntimeException;
  * when its agent space is stored, what the application's tools left behind and still hold, what it knows about whether
  * a case applies, the arguments the platform fills on a tool call of the space, the channel of a simulated owner
  * device, the memory curation after a turn, the tools that write to a real external profile, the entity a probe call
- * of the scope is billed to and how a schedule an evaluation creates is attached to the scope.
+ * of the scope is billed to, how a schedule an evaluation creates is attached to the scope and the records a fixture
+ * names by reference ({@see resolveRecordReference()}).
  *
  * The defaults know only what the module knows: the scope is a stored agent space named by the case or the caller,
  * a conversation gets the scope's stored space, the module never creates a space, a harness tool call gets no argument
- * of the platform's (the space rides on its provenance), every scope is eligible, a withheld skill is described by the
+ * of the platform's (the space rides on its provenance), no record reference resolves, every scope is eligible, a withheld skill is described by the
  * offer step that withheld it, no requirement is unmet, nothing is torn down, released, prepared or curated, and the
  * external-write tools are the tools that declare an outward action.
  *
@@ -229,11 +230,30 @@ class AgentEvalRunHooksService extends Service
     }
 
     /**
+     * The value of a record a fixture names by `{{ref:<kind>:<name>}}` ({@see \DDD\Domain\AI\Entities\Evals\AgentEvalRecordReference}),
+     * in the scope of the run: typically the id of the record of that kind with that name in the scope's agent space
+     * (or account). An int stays an int where the token is a whole string of the case; inside a longer text it is
+     * written as text. Called once per kind and name per case, before the case runs.
+     *
+     * The default: null — the module knows no record kinds, so a case with a reference is not applicable until the
+     * application resolves it.
+     *
+     * @param AgentEvalScope $agentEvalScope the scope the case runs in
+     * @param string $recordKind the kind the token names (the application's word)
+     * @param string $recordName the name the token names, trimmed
+     * @return string|int|null the value; null = no such record in this scope
+     */
+    public function resolveRecordReference(AgentEvalScope $agentEvalScope, string $recordKind, string $recordName): string|int|null
+    {
+        return null;
+    }
+
+    /**
      * Closes what a STORED conversation of the run (and its delegation children) left of the application's own work
      * and nothing else restores: records it opened that hold a resource for every later conversation, objects it
-     * created. Called by the runner's teardown after it closed the schedules and mandates of the tree, only for a
-     * stored conversation of an agent space (a transient one leaves no mark on what it created). Never fails the
-     * case: a failed step is reported and the next one runs.
+     * created. Called by the runner's teardown after it closed the schedules and mandates of the tree, for every
+     * stored conversation — of an agent space or account-level (`agentSpaceId` unset) — never for a transient one (it
+     * leaves no mark on what it created). Never fails the case: a failed step is reported and the next one runs.
      *
      * The default: nothing.
      *

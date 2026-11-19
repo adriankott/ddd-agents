@@ -35,6 +35,9 @@ class AgentEvalRunHooksServiceRecordingDouble extends AgentEvalRunHooksService
     /** @var string|null Thrown by {@see findIneligibleScopeReason()} when set */
     public ?string $ineligibleScopeErrorMessage = null;
 
+    /** @var array<string, string|int> What {@see resolveRecordReference()} answers, by `<kind>:<name>` */
+    public array $recordReferenceValues = [];
+
     /** @var string[] The hook calls in their order, by method name */
     public array $hookCalls = [];
 
@@ -51,6 +54,12 @@ class AgentEvalRunHooksServiceRecordingDouble extends AgentEvalRunHooksService
     {
         $this->hookCalls[] = 'getExternalWriteToolNames';
         return $this->externalWriteToolNames;
+    }
+
+    public function resolveRecordReference(AgentEvalScope $agentEvalScope, string $recordKind, string $recordName): string|int|null
+    {
+        $this->hookCalls[] = 'resolveRecordReference';
+        return $this->recordReferenceValues[$recordKind . ':' . $recordName] ?? null;
     }
 
     public function getHarnessToolCallArguments(AgentEvalScope $agentEvalScope): array

@@ -13,9 +13,11 @@ use DDD\Domain\AI\Services\AIUsageEnvelopesService;
 use DDD\Domain\AI\Services\Eval\AgentEvalJudgedRunService;
 use DDD\Domain\AI\Services\Eval\AgentEvalRunHooksService;
 use DDD\Domain\Common\Entities\Accounts\Account;
+use DDD\Infrastructure\Libs\Config;
 use DDD\Infrastructure\Services\DDDService;
 use DDD\Tests\Agents\Support\IntegrationTestCase;
 use ReflectionMethod;
+use ReflectionProperty;
 use RuntimeException;
 
 /**
@@ -78,6 +80,45 @@ class AgentEvalJudgedRunServiceHarnessModelCallTest extends IntegrationTestCase
         self::assertSame(5, $agentEvalJudgedRunService->envelopeAccountIdDuringCompletion, 'billed to the scope\'s owner');
         self::assertSame($openEnvelopeBefore, $this->getUsageEnvelopesService()->getCurrentEnvelopeId(), 'the envelope is closed after the call');
         self::assertSame(['attachNewConversationToScope'], $this->hooksDouble->hookCalls, 'the prompt conversation is attached to the scope');
+    }
+
+    public function testTheHarnessCallsOfAJudgedRunAreCountedAsJudgeAndDriverCost(): void
+    {
+        $agentEvalJudgedRunService = new AgentEvalJudgedRunServiceRecordingHarnessCompletionDouble();
+        $agentEvalJudgedRunService->completionCostUsd = 0.25;
+        $agentEvalJudgedRunService->callModel($this->buildScope(), self::JUDGE_MODEL_NAME, 'Judge this run.', AgentAIUsageScope::AI_AGENT_JUDGE_EVALUATION);
+
+        $agentEvalHarnessCosts = $agentEvalJudgedRunService->startCountingHarnessCostsOfRun();
+        $agentEvalJudgedRunService->callModel($this->buildScope(), self::DRIVER_MODEL_NAME, 'Write the next owner message.', AgentAIUsageScope::AI_AGENT_SIMULATE_OWNER);
+        $agentEvalJudgedRunService->callModel($this->buildScope(), self::DRIVER_MODEL_NAME, 'Write the next owner message.', AgentAIUsageScope::AI_AGENT_SIMULATE_OWNER);
+        $agentEvalJudgedRunService->completionCostUsd = 1.5;
+        $agentEvalJudgedRunService->callModel($this->buildScope(), self::JUDGE_MODEL_NAME, 'Judge this run.', AgentAIUsageScope::AI_AGENT_JUDGE_EVALUATION);
+
+        self::assertSame(1.5, $agentEvalHarnessCosts->judgeCostUsd, 'a call outside a judged run is not counted');
+        self::assertSame(0.5, $agentEvalHarnessCosts->driverCostUsd);
+        self::assertSame(['judgeCostUsd' => 1.5, 'driverCostUsd' => 0.5, 'totalCostUsd' => 2.0], $agentEvalHarnessCosts->toArray());
+    }
+
+    public function testTheDefaultJudgeAndDriverModelsComeFromTheConfigurationElseFromThePackage(): void
+    {
+        $agentEvalJudgedRunService = new AgentEvalJudgedRunServiceRecordingHarnessCompletionDouble();
+
+        $configTree = new ReflectionProperty(Config::class, 'configTree');
+        $configValuesBefore = $configTree->isInitialized() ? (array)$configTree->getValue() : [];
+        try {
+            $configValues = $configValuesBefore;
+            $configValues['AI']['evalSuite'] = ['judgeModelName' => '  ', 'driverModelName' => null];
+            $configTree->setValue(null, $configValues);
+            self::assertSame(AIModel::MODEL_ANTHROPIC_CLAUDE_OPUS_5_5, $agentEvalJudgedRunService->getDefaultJudgeModelName(), 'an empty name: the package default');
+            self::assertSame(AIModel::MODEL_ANTHROPIC_CLAUDE_SONNET_5, $agentEvalJudgedRunService->getDefaultDriverModelName());
+
+            $configValues['AI']['evalSuite'] = ['judgeModelName' => ' ' . self::JUDGE_MODEL_NAME . ' ', 'driverModelName' => self::DRIVER_MODEL_NAME];
+            $configTree->setValue(null, $configValues);
+            self::assertSame(self::JUDGE_MODEL_NAME, $agentEvalJudgedRunService->getDefaultJudgeModelName(), 'the configured judge, trimmed');
+            self::assertSame(self::DRIVER_MODEL_NAME, $agentEvalJudgedRunService->getDefaultDriverModelName());
+        } finally {
+            $configTree->setValue(null, $configValuesBefore);
+        }
     }
 
     public function testTheDriversCallIsBookedAsTheSimulatedOwner(): void

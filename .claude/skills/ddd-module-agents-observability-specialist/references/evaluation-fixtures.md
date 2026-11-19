@@ -2,9 +2,10 @@
 
 **Reader:** host developer and package maintainer
 
-Contents: where the fixtures come from · the fixture file · the case (top-level keys) · the expect block · the restore
-block · the state check after the run · reading a value out of a tool result · the judged flavor's keys · how a suite
-plans a case · examples · the other fixture files · the configuration `AI.evalSuite` · result files · full class names
+Contents: where the fixtures come from · the fixture file · record references · the case (top-level keys) · the expect
+block · the restore block · the state check after the run · reading a value out of a tool result · the judged flavor's
+keys · how a suite plans a case · examples · the other fixture files · the configuration `AI.evalSuite` · result files ·
+full class names
 
 The package ships no fixtures. The evaluation commands ([console-commands](console-commands.md#evaluation)) read JSON
 files the application keeps and names in its configuration. A fixture file is decoded as it is; every key the code below
@@ -40,6 +41,19 @@ A suite folder keeps only the files that decode to an object with a `cases` list
 The file name (without `.json`) is the fixture's name: the key of `AI.evalSuite.resourceGroupByFixture` and
 `AI.evalSuite.exclusiveFixtures`.
 
+## Record references
+
+A fixture names a record of the run's scope by kind and name instead of hard-coding its id: `{{ref:<kind>:<name>}}`
+in any string of a case — the prompt, follow-ups, `expect`, `restore`, `stateAfterRun` (`AgentEvalRecordReference`,
+`AgentEvalRecordReferences`). Kind: letters, digits, `_`, `-`, `.`; name: any text without `}`, trimmed. Before the
+case runs, after its scope is resolved, the runner asks the application once per kind and name
+(`AgentEvalRunHooksService::resolveRecordReference($scope, $recordKind, $recordName)`, default null) and replaces the
+token (`AgentEvalRunnerService::resolveRecordReferencesOfCase()`, called by `runCase()`, eval-tools in both flavors and
+eval-selection): a string that is only the token takes the value as resolved (an int stays an int, so
+`"entryId": "{{ref:entry:Spring opening}}"` becomes `"entryId": 41`), a token inside a longer text takes its text. A
+reference that resolves to null ends the case before the agent runs as not applicable ("record reference … no entry
+named … in this scope"). The kinds are the application's; the module resolves none.
+
 ## The case (top-level keys)
 
 `AgentEvalCase` (`src/Domain/AI/Entities/Evals/AgentEvalCase.php`). "tools" = eval-tools both flavors, eval-suite
@@ -73,7 +87,8 @@ children of kind `toolsCase`; "runner" = `AgentEvalRunnerService`.
 | `turns` | list of strings | none | planning: marks a scripted multi-turn flow (it writes, exclusively); the package's runner does not drive it — an application's `runCaseOfOwnShape()` does |
 | `expect` | object | `{}` | [the expect block](#the-expect-block) |
 | `restore` | object | none | [the restore block](#the-restore-block) |
-| `expectedSkill` | string, `A\|B` for either | none | eval-selection: passes when one of the skills was loaded; planning: the resource group of a selection case |
+| `expectedSkill` | string, `A\|B` for either, `none` | none | eval-selection: passes when one of the skills was loaded; `none` (`AgentEvalCase::EXPECTED_SKILL_NONE`): passes when no skill was loaded; planning: the resource group of a selection case |
+| `forbiddenSkills` | string or list | `[]` | eval-selection: fails when one of them was loaded, also beside the expected skill |
 | `expectPlan` | `direct` or `required` | none | eval-tools on a stored run: the plan-dynamics verdict (`planOnDirect`, `missingOnRequired`); reported, not judged |
 | `expectMentions` | list of strings | `[]` | eval-recall: every entry must appear in the final answer (case-insensitive) |
 | `seedConversations` | list of `{messages: [{role, text}]}` | `[]` | eval-recall: the past conversations stored and embedded before the drive; `role` `ASSISTANT` (any case) = the agent, else the owner; blank texts skipped |
@@ -92,12 +107,14 @@ does not know at all stays a failure.
 |---|---|---|
 | `skill` | string | this skill must have been loaded |
 | `skills` | list | all of them loaded |
+| `forbiddenSkills` | string or list | none of them loaded |
+| `noSkill` | `true` | no skill loaded at all |
 | `anyOfSkills` | list | applicability only: the case applies while one of them is offered (not a pass check) |
 | `tool` | string or list | a call of one of them must exist; the checked call: a COMPLETED one carrying every `argsContain` text, else any COMPLETED one, else the first |
 | `status` | string | the checked call's terminal status; default `COMPLETED`. Without it a call the run's own tool block refused counts as made |
-| `argsContain` | object argument → text or list | the checked call's arguments (as unescaped JSON) contain each text; an argument the platform fills when the model leaves it out (e.g. the run's agent space) counts as passed |
+| `argsContain` | object argument → text or list | the named argument of the checked call contains each text: a string argument as it is, any other value as unescaped JSON, a dotted key reads a nested value, a missing argument is empty; an integer key (a JSON list) reads the whole arguments as unescaped JSON. An argument the platform fills when the model leaves it out (e.g. the run's agent space) counts as passed |
 | `argsAbsent` | object argument → text or list | the arguments as the model sent them contain none |
-| `resultContains` | string or list | the checked call's result contains each (a `delegate` call: its spawn answer plus the sub-agent's run ends) |
+| `resultContains` | string or list | the checked call's result contains each, compared as unescaped text: the result's decoded text plus its `structuredContent` as unescaped JSON (a `delegate` call: its spawn answer plus the sub-agent's run ends) |
 | `resultNotContains` | string or list | contains none |
 | `requiredTools` | string or list | each has a COMPLETED call |
 | `forbiddenTools` | string or list | none of them was called (works without `tool`) |
@@ -136,7 +153,14 @@ order. Restore cases run in both flavors.
 ## The state check after the run
 
 `expect.stateAfterRun` (`AgentEvalStateAfterRunCheck`), eval-tools: reads back what the agent wrote and checks fields
-without a model.
+without a model. Its calls are harness calls with the harness's packages (`AgentEvalRunnerService::getHarnessPackageClasses()`:
+every tool package of every skill, as for `restore`).
+
+Order in a case with a `restore` block: preparation and capture, the agent's run, then the read and the field checks,
+then `cleanup`, then `restore.writeTool`, the `after` steps and the removals
+(`AgentEvalRunOptions::$stateAfterRunCheckInsideRestore`, run by `AgentEvalRunnerService::evaluateStateAfterRunInsideRestore()`).
+The read sees what the agent wrote, never the restored value. A case without `restore` is checked after its run. The
+judged flavor runs the cleanup half only, in the same place.
 
 | Key | Type | Meaning |
 |---|---|---|
@@ -170,7 +194,11 @@ the keys below ride along; every other key of the case stays.
 | `followUpPrompts`, `followUpIdleMinutes`, `purposeName`, `reportChannel`, `scheduledRun` | as above | scripted owner turns come before the driver takes over |
 
 The driver ends a run with `[DONE]` or `[GIVE-UP]`. A judged case that writes needs `access: write` in a suite, or every
-write tool is refused.
+write tool is refused. The judge and the driver run `AI.evalSuite.judgeModelName` / `driverModelName` unless the run
+names its own (`--judge-model`, `--driver-model`), else the package's defaults. Their cost is not the agent's: a judged
+row carries it as `judgeCostUsd` and `driverCostUsd` (the provider-reported cost of each harness call,
+`AgentEvalHarnessCosts`), the summary sums it under `metrics.harnessCosts` (only when not zero) and eval-tools prints a
+`Judge and driver cost:` line below `Model cost:`.
 
 ## How a suite plans a case
 
@@ -271,6 +299,8 @@ Full (a write with preparation, restore, state check and judged texts; neutral c
 | `exclusiveFixtures` | list of fixture names | `[]` | their write cases run alone on their space |
 | `suites` | object suite name → `{folder, kind, default?, flavors?}` | `[]` | `kind`: `toolsCase`, `selectionCase`, `recallCase` or the application's own; `default` (true when absent): taken by a run without `--suites`; `flavors` (every flavor when absent); an entry without `folder` or `kind` is skipped |
 | `fixturePaths` | object name → path | `[]` | `tools`, `recall`, `guard`: a file or a folder; `selection`, `eviction`: one file |
+| `judgeModelName` | string or null | `null` | the judge of a judged case when the run names none; null or empty = the package's default (`AgentEvalJudgedRunService::CONFIG_KEY_JUDGE_MODEL_NAME`) |
+| `driverModelName` | string or null | `null` | the driver of a judged case when the run names none; null or empty = the package's default |
 
 ## Result files
 
@@ -289,7 +319,7 @@ adds its own dated folders through `getRetainedFolderNamePatterns()`.
 
 ## Full class names
 
-`DDD\Domain\AI\Entities\Evals\{AgentEvalFixture, AgentEvalCase, AgentEvalExpectation, AgentEvalRestorePlan, AgentEvalHarnessToolCall, AgentEvalStateAfterRunCheck, AgentEvalToolResultExtraction, AgentEvalPerformanceBudget, AgentEvalSimCase, AgentEvalJudgedCaseTexts, AgentEvalApplicabilityFacts, AgentEvalSuiteDefinition, AgentEvalEvictionFixture, AgentEvalPlanDynamicsSummary, AgentEvalCaseRowHeader}` ·
+`DDD\Domain\AI\Entities\Evals\{AgentEvalFixture, AgentEvalCase, AgentEvalExpectation, AgentEvalRecordReference, AgentEvalRecordReferences, AgentEvalHarnessCosts, AgentEvalRestorePlan, AgentEvalHarnessToolCall, AgentEvalStateAfterRunCheck, AgentEvalToolResultExtraction, AgentEvalPerformanceBudget, AgentEvalSimCase, AgentEvalJudgedCaseTexts, AgentEvalApplicabilityFacts, AgentEvalSuiteDefinition, AgentEvalEvictionFixture, AgentEvalPlanDynamicsSummary, AgentEvalCaseRowHeader}` ·
 `DDD\Domain\AI\Entities\Evals\Guard\AgentEvalGuardCells` ·
 `DDD\Domain\AI\Services\Eval\{AgentEvalRunnerService, AgentEvalJudgedRunService, AgentEvalSuitePlanService, AgentEvalResultFilesService, AgentEvalRunHooksService}` ·
 `DDD\Symfony\Commands\Agents\Eval\AgentEvalCompactionTreeCaseFile` · `DDD\Symfony\Commands\Agents\DecisionFixtures\AgentDecisionFixture`

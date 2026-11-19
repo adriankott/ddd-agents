@@ -181,7 +181,8 @@ class AgentEvalCaseRow extends ValueObject
      * the run and the performance budget holds), `flavor: judge`, `compactionFired`, `conversationId`, `failures` (of
      * the performance budget), `performance`, `verdict`, `turns`, `stopReason`, `loadedSkills`, `calledTools`,
      * `finalText`, `widgetBlocks`, `toolCallCount`, `workToolCallCount`, `inputTokens`, `outputTokens`, `totalTokens`,
-     * `costUsd`, `durationMs`, `messages`, and `error` when the judge gave no verdict
+     * `costUsd` (the agent's own), `judgeCostUsd` and `driverCostUsd` (the harness calls, {@see AgentEvalHarnessCosts}),
+     * `durationMs`, `messages`, and `error` when the judge gave no verdict
      * ({@see AgentEvalJudgeVerdict::findEvaluationError()}).
      *
      * @param AgentEvalCaseRowHeader $agentEvalCaseRowHeader
@@ -219,6 +220,8 @@ class AgentEvalCaseRow extends ValueObject
             'outputTokens' => $messagesOfTree->getTotalOutputTokens(),
             'totalTokens' => $messagesOfTree->getTotalTokens(),
             'costUsd' => $messagesOfTree->getTotalCostUsd(),
+            'judgeCostUsd' => round($agentEvalSimRunResult->getHarnessCosts()->judgeCostUsd, 6),
+            'driverCostUsd' => round($agentEvalSimRunResult->getHarnessCosts()->driverCostUsd, 6),
             'durationMs' => $agentEvalCaseRunMeasurement->durationMs,
             'messages' => $agentEvalCaseRunMeasurement->messagesTrace,
         ]);
@@ -231,25 +234,41 @@ class AgentEvalCaseRow extends ValueObject
 
     /**
      * The row of a skill-selection case: the header (`skill` — the expected skills as the fixture names them, `A|B`
-     * for either — and `case`), then `passed` (one of the expected skills was loaded), `conversationId`, `failures`,
-     * `loadedSkills`, `calledTools`, `toolCallCount`, `workToolCallCount`, `totalTokens`, `costUsd`, `durationMs`,
-     * `performance`.
+     * for either, `none` for no skill at all — and `case`), then `passed` (one of the expected skills was loaded — with
+     * `none`: no skill was loaded — and none of `$forbiddenSkillNames`), `conversationId`, `failures`, `loadedSkills`,
+     * `calledTools`, `toolCallCount`, `workToolCallCount`, `totalTokens`, `costUsd`, `durationMs`, `performance`.
      *
      * @param AgentEvalCaseRowHeader $agentEvalCaseRowHeader
-     * @param string $expectedSkills the expected skills, `|`-separated
+     * @param string $expectedSkills the expected skills, `|`-separated; `none` ({@see AgentEvalCase::EXPECTED_SKILL_NONE}) = no skill
      * @param AgentEvalCaseRunMeasurement $agentEvalCaseRunMeasurement the measured run
+     * @param string[] $forbiddenSkillNames skills the run must not load (the case's `forbiddenSkills`)
      * @return static
      */
-    public static function buildForSelectionRun(AgentEvalCaseRowHeader $agentEvalCaseRowHeader, string $expectedSkills, AgentEvalCaseRunMeasurement $agentEvalCaseRunMeasurement): static
-    {
+    public static function buildForSelectionRun(
+        AgentEvalCaseRowHeader $agentEvalCaseRowHeader,
+        string $expectedSkills,
+        AgentEvalCaseRunMeasurement $agentEvalCaseRunMeasurement,
+        array $forbiddenSkillNames = []
+    ): static {
         $messagesOfTree = $agentEvalCaseRunMeasurement->messagesOfTree;
         $toolCallHistory = $messagesOfTree->buildToolCallHistory();
         $loadedSkillNames = $messagesOfTree->getLoadedSkillNames();
-        $selectionHit = array_intersect(array_map('trim', explode('|', $expectedSkills)), $loadedSkillNames) !== [];
+        $selectionFailures = [];
+        if (trim($expectedSkills) === AgentEvalCase::EXPECTED_SKILL_NONE) {
+            if ($loadedSkillNames !== []) {
+                $selectionFailures[] = sprintf('skill loaded although none was expected: [%s]', implode(', ', $loadedSkillNames));
+            }
+        } elseif (array_intersect(array_map('trim', explode('|', $expectedSkills)), $loadedSkillNames) === []) {
+            $selectionFailures[] = sprintf("skill not loaded: expected '%s', loaded [%s]", $expectedSkills, implode(', ', $loadedSkillNames));
+        }
+        foreach (array_values(array_intersect($forbiddenSkillNames, $loadedSkillNames)) as $forbiddenSkillName) {
+            $selectionFailures[] = sprintf("forbidden skill loaded: '%s'", $forbiddenSkillName);
+        }
+        $selectionHit = $selectionFailures === [];
         return static::fromArray($agentEvalCaseRowHeader->toArray() + [
             'passed' => $selectionHit,
             'conversationId' => $agentEvalCaseRunMeasurement->getConversationId(),
-            'failures' => $selectionHit ? [] : [sprintf("skill not loaded: expected '%s', loaded [%s]", $expectedSkills, implode(', ', $loadedSkillNames))],
+            'failures' => $selectionFailures,
             'loadedSkills' => $loadedSkillNames,
             'calledTools' => $toolCallHistory->getCalledToolNames(),
             'toolCallCount' => $toolCallHistory->countToolCalls(),

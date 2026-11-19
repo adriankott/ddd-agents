@@ -230,6 +230,15 @@ class AgentModelInput extends ValueObject
     public ?string $clientContextTailText = null;
 
     /**
+     * @var string[] Headings of base prompt sections this call leaves out ({@see AgentModelInputOptions}, resolved by
+     * the loop's build phase); empty = the base prompt as it is, byte for byte.
+     */
+    public array $droppedBasePromptSections = [];
+
+    /** @var bool The base prompt teaches widgets ({@see AgentModelInputOptions::$teachesWidgets}); false = no composed-view kit either. */
+    public bool $teachesWidgets = true;
+
+    /**
      * The product-capabilities awareness block — what the customer's plan includes, what is available, and
      * which upgrades unlock the rest. Pre-rendered by the loop service from the agent space's applied flags (NOT resolved
      * here: it touches the flag/skill services, and this VO is built in container-less contexts too). Part of the
@@ -621,18 +630,21 @@ class AgentModelInput extends ValueObject
      */
     public function teachesComposedViewKit(): bool
     {
-        return !$this->isDelegation && !$this->isOwnerOnThePhoneLine()
+        return $this->teachesWidgets && !$this->isDelegation && !$this->isOwnerOnThePhoneLine()
             && in_array($this->ownerPresence, self::OWNER_PRESENCES_TAUGHT_THE_COMPOSED_VIEW_KIT, true);
     }
 
     /**
-     * The base prompt for this call: its `[surface=screen|phone]` sections rendered for the current surface
+     * The base prompt for this call: the sections the options leave out dropped ({@see $droppedBasePromptSections}),
+     * its `[surface=screen|phone]` sections rendered for the current surface
      * and the generated kit section filled in where the kit is taught, else removed ({@see teachesComposedViewKit()}).
      * Stable per conversation — the prompt-cache prefix holds.
      */
     public function buildBasePromptForThisCall(): string
     {
-        $basePrompt = AISkillSections::renderSurfaceSectionsOf($this->fillStateDeliveryPlaceholdersOf($this->systemPrompt), $this->isOwnerOnThePhoneLine());
+        // the sections the host's or the purpose's options leave out, before anything else reads the text (no name: unchanged)
+        $basePrompt = AgentBasePromptSections::dropSections($this->fillStateDeliveryPlaceholdersOf($this->systemPrompt), $this->droppedBasePromptSections);
+        $basePrompt = AISkillSections::renderSurfaceSectionsOf($basePrompt, $this->isOwnerOnThePhoneLine());
         $kitPlaceholder = '{%' . ComposedViewKitSpec::PROMPT_PARAMETER_NAME . '%}';
         if (!str_contains($basePrompt, $kitPlaceholder)) {
             return $basePrompt;

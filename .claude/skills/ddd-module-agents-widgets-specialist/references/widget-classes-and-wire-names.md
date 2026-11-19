@@ -140,7 +140,9 @@ line or in a sub-agent, and only while a skill the conversation can reach (its r
 brings the data of a catalog widget (`AIConversation::hasWidgetsBroughtByReachableSkills()`,
 `ConversationWidgetCatalog::hasEntryProvidedByOneOfSkills()`); the widgets written without a skill or by a meta tool do
 not count. The reachable set is the same for a whole epoch, so the tool does not come and go with a skill load; a
-catalog that cannot be built keeps it offered. Widgets with `IS_WRITABLE_WITHOUT_A_SKILL` and the kit are taught by the generated kit section
+catalog that cannot be built keeps it offered. A host or a purpose switches it off with `offersFindWidgets: false`;
+`teachesWidgets: false` (a consumer that renders no widgets) also leaves out the base prompt's `Widgets` section and
+the generated kit (`config/app/AI/agentModelInputOptions.php`, context skill). Widgets with `IS_WRITABLE_WITHOUT_A_SKILL` and the kit are taught by the generated kit section
 instead (see the composed-view nodes reference). How a skill file declares `providesWidgetTypes` is
 `ddd-module-agents-skills-and-purposes-specialist`.
 

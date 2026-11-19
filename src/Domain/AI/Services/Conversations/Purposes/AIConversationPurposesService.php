@@ -15,6 +15,8 @@ use DDD\Infrastructure\Exceptions\NotFoundException;
 use DDD\Infrastructure\Libs\Config;
 use DDD\Infrastructure\Services\DDDService;
 use DDD\Infrastructure\Services\Service;
+use DDD\Domain\AI\Entities\Conversations\Agent\AgentModelInputOptionsOverride;
+
 
 /**
  * Loads {@see AIConversationPurpose}s from their `.md` config, mirroring
@@ -274,6 +276,9 @@ class AIConversationPurposesService extends Service
             }
             $aIConversationPurpose->contextRetentionSettings = $contextRetentionSettings;
         }
+        // the purpose's model-input options (a `modelInputOptions:` map): meta tool groups, base prompt sections, widgets
+        $modelInputOptionsMap = $frontmatter['modelInputOptions'] ?? null;
+        $aIConversationPurpose->modelInputOptions = is_array($modelInputOptionsMap) ? AgentModelInputOptionsOverride::fromOptionsMap($modelInputOptionsMap) : null;
         // the run settings a NEW conversation of this purpose starts with (a `runSettings:` map)
         $runSettingsMap = $frontmatter['runSettings'] ?? null;
         $aIConversationPurpose->runSettings = is_array($runSettingsMap) ? $this->buildPurposeRunSettingsFromFrontmatter($runSettingsMap) : null;

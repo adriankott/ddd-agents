@@ -143,7 +143,9 @@ A meta tool (`load_skills`, `askOwner`, `delegate` … — `AgentMetaTools::TOOL
 `AgentMetaToolCallAnswer` or a work request, asks for loop work through an `AgentAfterStepRequest`, never touches the
 loop itself, is listed in `AIConversationMessage::META_TOOL_NAMES`, has its own branch in
 `AgentToolCallDispatchService::dispatchToolCall()` and its schema in `AgentOfferedTools`. A meta tool is never forked.
-Details:
+A host or purpose takes groups of them off the offer to save tokens (`offersDelegationTools`, `offersTaskPlanTools`,
+`offersAskOwner`, `offersFindWidgets` in `config/app/AI/agentModelInputOptions.php`, inputs on
+`AgentOfferedToolsInputs`; context skill). Details:
 [loop-control fields and tool-written messages](references/loop-control-fields-and-tool-written-messages.md).
 
 ## Task or symptom → reference

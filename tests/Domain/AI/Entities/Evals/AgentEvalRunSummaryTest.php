@@ -154,6 +154,26 @@ class AgentEvalRunSummaryTest extends UnitTestCase
         self::assertSame(0.0, AgentEvalRunSummary::buildForSuite($this->rows(['case' => 'a', 'passed' => false]), 'm', 'call')->avgCostPerCaseUsd, 'no timed row');
     }
 
+    public function testTheJudgeAndDriverCostIsSummedBesideTheAgentsCost(): void
+    {
+        $summary = AgentEvalRunSummary::buildForToolsRun(
+            $this->rows(
+                ['case' => 'a', 'passed' => true, 'durationMs' => 10, 'costUsd' => 0.5, 'judgeCostUsd' => 0.2, 'driverCostUsd' => 0.05],
+                ['case' => 'b', 'passed' => false, 'durationMs' => 10, 'costUsd' => 0.5, 'judgeCostUsd' => 0.3, 'driverCostUsd' => 0.05]
+            ),
+            null,
+            'judge',
+            [],
+            1,
+            'default',
+            'default'
+        );
+
+        self::assertSame(1.0, $summary->totalCostUsd, 'the agent\'s cost leaves the harness out');
+        self::assertSame(['judgeCostUsd' => 0.5, 'driverCostUsd' => 0.1, 'totalCostUsd' => 0.6], $summary->toArray()['metrics']['harnessCosts']);
+        self::assertSame(['judgeCostUsd' => 0.5, 'driverCostUsd' => 0.1, 'totalCostUsd' => 0.6], AgentEvalRunSummary::fromArray($summary->toArray())->harnessCosts?->toArray(), 'read back from the rows');
+    }
+
     /**
      * A recall row keeps its trace in the result file its child writes (the parent writes it into the case file): the
      * suite format carries the traces with the flag, and its summary file never does. The rows without a trace (a

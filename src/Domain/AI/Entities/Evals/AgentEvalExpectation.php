@@ -18,15 +18,19 @@ use DDD\Domain\Base\Entities\ValueObject;
  * the conversation, the messages of its tree (delegation children included) and their aggregate accessors.
  *
  * Supported keys, one check method per group, joined by {@see evaluateConversation()} in this order:
- * - `skill` (one name) and `skills` (a list, all of them): every named skill must have been loaded
- *   ({@see buildSkillFailures()});
+ * - `skill` (one name) and `skills` (a list, all of them): every named skill must have been loaded; `forbiddenSkills`
+ *   (a name or a list): none of them may have been loaded; `noSkill` (true): no skill may have been loaded at all
+ *   ({@see buildSkillFailures()}, {@see buildForbiddenSkillFailures()});
  * - `tool` (a name or a list, any of them): a matching call must exist; the call that is checked is chosen by
  *   {@see findExpectedToolCallRow()}. `status` is the checked call's terminal status, default `COMPLETED`; without a
  *   stated status a call the evaluation run's own tool block refused counts as made ({@see buildExpectedToolFailures()});
- * - `argsContain` / `argsAbsent` (argument name → substring or list of substrings): the checked call's arguments as
- *   JSON must / must not contain them ({@see buildArgumentFailures()});
- * - `resultContains` / `resultNotContains` (a substring or a list): the checked call's result must / must not contain
- *   them ({@see buildResultContainsFailures()}, {@see buildResultNotContainsFailures()});
+ * - `argsContain` (argument name → substring or list of substrings): the value of THAT argument must contain them (a
+ *   value that is no string is read as its unescaped JSON; a dotted name reaches into an object; a list without names
+ *   checks the whole arguments); `argsAbsent` (the same shape): the arguments as unescaped JSON must not contain them
+ *   ({@see buildArgumentFailures()});
+ * - `resultContains` / `resultNotContains` (a substring or a list): the checked call's result as unescaped text — the
+ *   words of the result and, for a structured result, its data as unescaped JSON, as the argument checks read
+ *   arguments — must / must not contain them ({@see buildResultContainsFailures()}, {@see buildResultNotContainsFailures()});
  * - `requiredTools` (a name or a list, all of them): each must have a COMPLETED call in the tree; `forbiddenTools`
  *   (a name or a list): the case fails when any of them was called ({@see buildRequiredToolFailures()},
  *   {@see buildForbiddenToolFailures()});
@@ -132,6 +136,7 @@ class AgentEvalExpectation extends ValueObject
         $expectedToolCallRow = $this->findExpectedToolCallRow($messages, $toolArgumentsFilledByThePlatform);
         return array_merge(
             $this->buildSkillFailures($messages),
+            $this->buildForbiddenSkillFailures($messages),
             $this->buildExpectedToolFailures($conversation, $messages, $expectedToolCallRow),
             $this->buildArgumentFailures($expectedToolCallRow, $toolArgumentsFilledByThePlatform),
             $this->buildResultContainsFailures($messages, $expectedToolCallRow),
@@ -216,6 +221,27 @@ class AgentEvalExpectation extends ValueObject
     }
 
     /**
+     * `forbiddenSkills` and `noSkill`: one failure per forbidden skill that was loaded anywhere in the tree, and one when
+     * `noSkill` is true and any skill was loaded.
+     *
+     * @return string[]
+     */
+    public function buildForbiddenSkillFailures(AIConversationMessages $messages): array
+    {
+        $loadedSkillNames = $messages->getLoadedSkillNames();
+        $forbiddenSkillFailures = [];
+        foreach ($this->getStringListOfKey('forbiddenSkills') as $forbiddenSkillName) {
+            if (in_array($forbiddenSkillName, $loadedSkillNames, true)) {
+                $forbiddenSkillFailures[] = sprintf("forbidden skill loaded: '%s'", $forbiddenSkillName);
+            }
+        }
+        if (($this->expectBlock['noSkill'] ?? false) === true && $loadedSkillNames !== []) {
+            $forbiddenSkillFailures[] = sprintf('skill loaded although none was expected: [%s]', implode(', ', $loadedSkillNames));
+        }
+        return $forbiddenSkillFailures;
+    }
+
+    /**
      * `tool` and `status`: a failure when none of the expected tools was called, or when the checked call ended in
      * another status than the expected one. Without a stated `status`, a call the evaluation run's own tool block
      * refused is no failure of the agent: it made the call the case asks for and the run did not let it happen.
@@ -294,8 +320,10 @@ class AgentEvalExpectation extends ValueObject
         $arguments = $this->buildToolCallArgumentsAsUnescapedJson($toolCallRow, $toolArgumentsFilledByThePlatform);
         $argsContainFailures = [];
         foreach ($this->expectBlock['argsContain'] as $argumentKey => $needles) {
+            // a named key reads the value of that argument; a list without names reads the whole arguments
+            $searchedText = is_string($argumentKey) ? $this->buildArgumentValueAsUnescapedText($arguments, $argumentKey) : $arguments;
             foreach ((array)$needles as $needle) {
-                if (!str_contains($arguments, (string)$needle)) {
+                if (!str_contains($searchedText, (string)$needle)) {
                     $argsContainFailures[] = sprintf("argsContain[%s]: '%s' not in args %s", (string)$argumentKey, (string)$needle, $arguments);
                 }
             }
@@ -315,7 +343,7 @@ class AgentEvalExpectation extends ValueObject
             return [];
         }
         $resultFailures = [];
-        $callOutcomeText = $messages->buildDelegateCallOutcomeText($expectedToolCallRow);
+        $callOutcomeText = $this->buildCallOutcomeAsUnescapedText($messages, $expectedToolCallRow);
         foreach ($this->getStringListOfKey('resultContains') as $resultNeedle) {
             if ($resultNeedle !== '' && !str_contains($callOutcomeText, $resultNeedle)) {
                 $resultFailures[] = sprintf(
@@ -340,7 +368,7 @@ class AgentEvalExpectation extends ValueObject
             return [];
         }
         $resultFailures = [];
-        $callOutcomeText = $messages->buildDelegateCallOutcomeText($expectedToolCallRow);
+        $callOutcomeText = $this->buildCallOutcomeAsUnescapedText($messages, $expectedToolCallRow);
         foreach ($this->getStringListOfKey('resultNotContains') as $forbiddenNeedle) {
             if ($forbiddenNeedle !== '' && str_contains($callOutcomeText, $forbiddenNeedle)) {
                 $resultFailures[] = sprintf("resultNotContains: '%s' found in the result of '%s'", $forbiddenNeedle, (string)$expectedToolCallRow->toolCall->name);
@@ -788,6 +816,52 @@ class AgentEvalExpectation extends ValueObject
             }
         }
         return json_encode($decodedArguments, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: $toolCallRow->toolCall->argumentsAsJson();
+    }
+
+    /**
+     * The value of the argument `$argumentKey` in the unescaped JSON `$argumentsAsJson`: a string as it is, any other
+     * value as its unescaped JSON; a dotted key reaches into objects when no argument carries the whole key; '' for an
+     * argument the call does not carry.
+     */
+    public function buildArgumentValueAsUnescapedText(string $argumentsAsJson, string $argumentKey): string
+    {
+        $decodedArguments = json_decode($argumentsAsJson, true);
+        if (!is_array($decodedArguments)) {
+            return '';
+        }
+        if (array_key_exists($argumentKey, $decodedArguments)) {
+            $argumentValue = $decodedArguments[$argumentKey];
+        } else {
+            $argumentValue = $decodedArguments;
+            foreach (explode('.', $argumentKey) as $keySegment) {
+                if (!is_array($argumentValue) || !array_key_exists($keySegment, $argumentValue)) {
+                    return '';
+                }
+                $argumentValue = $argumentValue[$keySegment];
+            }
+        }
+        if (is_string($argumentValue)) {
+            return $argumentValue;
+        }
+        return (string)json_encode($argumentValue, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+
+    /**
+     * The checked call's outcome as unescaped text: for a `delegate` call its spawn answer and the sub-agent's run ends
+     * ({@see AIConversationMessages::buildDelegateCallOutcomeText()}); for any other call the words of its result
+     * (`content[].text`, or a plain result) and its `structuredContent` as unescaped JSON, never the stored MCP envelope
+     * with its JSON escapes.
+     */
+    public function buildCallOutcomeAsUnescapedText(AIConversationMessages $messages, AIConversationMessage $toolCallRow): string
+    {
+        if ($toolCallRow->isDelegationCall() || !isset($toolCallRow->toolCall)) {
+            return $messages->buildDelegateCallOutcomeText($toolCallRow);
+        }
+        $decodedResult = $toolCallRow->toolCall->getDecodedResult();
+        if ($decodedResult->structuredContent === null || $decodedResult->structuredContent === []) {
+            return $decodedResult->contentText;
+        }
+        return trim($decodedResult->contentText . "\n" . (string)json_encode($decodedResult->structuredContent, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
     }
 
     /**

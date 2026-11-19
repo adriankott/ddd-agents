@@ -10,10 +10,12 @@ use DDD\Domain\AI\Entities\Evals\AgentEvalCaseRowHeader;
 use DDD\Domain\AI\Entities\Evals\AgentEvalCaseRows;
 use DDD\Domain\AI\Entities\Evals\AgentEvalCaseRunMeasurement;
 use DDD\Domain\AI\Entities\Evals\AgentEvalCases;
+use DDD\Domain\AI\Entities\Evals\AgentEvalNotApplicableReason;
 use DDD\Domain\AI\Entities\Evals\AgentEvalRunOptions;
 use DDD\Domain\AI\Entities\Evals\AgentEvalRunSummary;
 use DDD\Domain\AI\Entities\Evals\AgentEvalStoredRunOptions;
 use DDD\Domain\AI\Entities\Evals\AgentEvalSuiteTask;
+use DDD\Domain\AI\Exceptions\Evals\AgentEvalPreconditionNotEstablishedException;
 use DDD\Domain\AI\Services\Eval\AgentEvalSuiteRunsService;
 use DDD\Infrastructure\Services\DDDService;
 use DDD\Presentation\Mcp\Services\MCPToolExecutorService;
@@ -185,13 +187,19 @@ class AgentEvalSelectionCommand extends AgentEvalConsoleCommand
             // the prompt only: no follow-ups, purpose or channel
             $promptOnlyCase = AgentEvalCase::fromArray($this->buildScopeFieldsOfCase($agentEvalCase) + ['prompt' => $prompt]);
             $agentEvalScope = $agentEvalRunnerService->resolveEvalScopeWithFallbackAccount($promptOnlyCase, $this->fallbackAgentSpaceId, $this->fallbackAccountIdOfRun);
+            // a record the prompt names by reference is resolved in the scope; an unknown record makes the case not applicable
+            $promptOnlyCase = $agentEvalRunnerService->resolveRecordReferencesOfCase($agentEvalScope, $promptOnlyCase);
             $conversation = $agentEvalRunnerService->run($agentEvalScope, $promptOnlyCase, $agentEvalRunOptions)->getConversation();
+        } catch (AgentEvalPreconditionNotEstablishedException $preconditionNotEstablished) {
+            $agentEvalNotApplicableReason = AgentEvalNotApplicableReason::buildPreconditionNotEstablishedReason($preconditionNotEstablished->getMessage());
+            $this->printCaseLine($output, sprintf('  [%d] <comment>N/A </comment> %s', $casePosition, $agentEvalNotApplicableReason->getDetail()));
+            return AgentEvalCaseRow::buildNotApplicableOfCase($this->buildRowHeader($expectedSkills, $caseId)->addFlavor(static::FLAVOR), $agentEvalNotApplicableReason);
         } catch (Throwable $throwable) {
             $this->printCaseLine($output, sprintf('  [%d] <error>ERROR</error> %s', $casePosition, $throwable->getMessage()));
             return AgentEvalCaseRow::buildFailedOfCase($this->buildRowHeader($expectedSkills, $caseId), null, $throwable->getMessage());
         }
         $agentEvalCaseRunMeasurement = AgentEvalCaseRunMeasurement::forConversation($conversation, AgentEvalCaseRunMeasurement::measureDurationMsSince($startedAtMicrotime));
-        $agentEvalCaseRow = AgentEvalCaseRow::buildForSelectionRun($this->buildRowHeader($expectedSkills, $caseId), $expectedSkills, $agentEvalCaseRunMeasurement);
+        $agentEvalCaseRow = AgentEvalCaseRow::buildForSelectionRun($this->buildRowHeader($expectedSkills, $caseId), $expectedSkills, $agentEvalCaseRunMeasurement, $agentEvalCase->getForbiddenSkillNames());
         $this->printCaseLine($output, sprintf(
             '  [%d] %s expected=%s loaded=[%s] — %s',
             $casePosition,

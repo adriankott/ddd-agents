@@ -25,6 +25,9 @@ use DDD\Domain\AI\Services\Conversations\AIConversationCompactionService;
 use DDD\Domain\AI\Services\Conversations\Purposes\AIConversationPurposesService;
 use DDD\Domain\Base\Entities\Entity;
 use DDD\Infrastructure\Services\DDDService;
+use DDD\Domain\AI\Entities\Conversations\Agent\AgentModelInputOptions;
+use DDD\Domain\AI\Entities\Conversations\Agent\AgentModelInputOptionsOverride;
+
 
 /**
  * A CONVERSATION PURPOSE — file-based config, mirrored from {@see \DDD\Domain\AI\Entities\Skills\AISkill}.
@@ -437,6 +440,13 @@ class AIConversationPurpose extends Entity
      * eviction sweep as data; the sweep logic itself is untouched.
      */
     public ?ContextRetentionSettings $contextRetentionSettings = null;
+
+    /**
+     * @var AgentModelInputOptionsOverride|null The purpose's `modelInputOptions:` map: meta tool groups, the widget part
+     * and named sections of the base prompt, the first-call tool set ({@see AgentModelInputOptions}); each field it
+     * names wins over the host's configuration. Null = the host's options.
+     */
+    public ?AgentModelInputOptionsOverride $modelInputOptions = null;
 
     /**
      * @var int|null The WORKING-CONTEXT budget in tokens for every conversation of this purpose (frontmatter
