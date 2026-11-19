@@ -95,7 +95,7 @@
   max-width: calc(100% - #{$x2});
   padding: $x0_25 $x1;
   border-radius: $x2;
-  background: rgba(var(--agents-bg-dark-rgb), 0.72);
+  background: color-mix(in srgb, var(--agents-bg-dark) 72%, transparent);
   pointer-events: none;
 }
 

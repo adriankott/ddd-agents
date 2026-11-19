@@ -8,7 +8,7 @@
   // clips to the border-radius by itself, and the thumbnail rounds its own corners.
   // Semitransparent neutral fill so the card reads as a tile on both the light and dark
   // chat surface (same recipe as the selection chip's pill).
-  background: rgba(var(--agents-neutral-500-rgb), 0.1);
+  background: color-mix(in srgb, var(--agents-neutral-500) 10%, transparent);
 }
 
 .cardFailed {
@@ -50,8 +50,8 @@
 .uploadStatusCaption {
   // Black shadow so the white caption stays readable over any thumbnail.
   text-shadow:
-    0 1px 3px rgba(var(--agents-neutral-900-rgb), 0.8),
-    0 0 $x1 rgba(var(--agents-neutral-900-rgb), 0.6);
+    0 1px 3px color-mix(in srgb, var(--agents-neutral-900) 80%, transparent),
+    0 0 $x1 color-mix(in srgb, var(--agents-neutral-900) 60%, transparent);
 }
 
 .failedCaption {

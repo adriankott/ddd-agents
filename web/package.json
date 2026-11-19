@@ -146,6 +146,7 @@
     "./chat/Conversation.module.scss": "./dist/files/chat/Conversation.module.scss",
     "./chat/ConversationViewBody/ConversationViewBody.module.scss": "./dist/files/chat/ConversationViewBody/ConversationViewBody.module.scss",
     "./image-render/WidgetImageRender.module.scss": "./dist/files/image-render/WidgetImageRender.module.scss",
+    "./i18n-keys.json": "./dist/files/i18n-keys.json",
     "./package.json": "./package.json"
   },
   "files": [
@@ -155,8 +156,9 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "node scripts/clean.mjs && vite build && tsc -p tsconfig.build.json && node scripts/check-package.mjs .",
+    "build": "node scripts/clean.mjs && node scripts/i18n-keys.mjs --check && vite build && tsc -p tsconfig.build.json && node scripts/check-package.mjs .",
     "check-package": "node scripts/check-package.mjs .",
+    "i18n-keys": "node scripts/i18n-keys.mjs --write",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.build.json --noEmit --declaration false --emitDeclarationOnly false"
   },

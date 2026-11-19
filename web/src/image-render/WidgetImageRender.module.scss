@@ -1,8 +1,13 @@
 @import "../styles/conversation-widget-container";
 
-:global(html), :global(body) {
-  margin: 0;
-  padding: 0;
+// The capture page owns its document; the reset sits in the package's layer so a host page that shows the render
+// keeps its own (unlayered or later-layered) rules for `html` and `body`.
+@layer agents-defaults {
+  :global(html),
+  :global(body) {
+    margin: 0;
+    padding: 0;
+  }
 }
 
 .root {

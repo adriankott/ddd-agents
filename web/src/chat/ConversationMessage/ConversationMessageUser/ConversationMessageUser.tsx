@@ -35,7 +35,7 @@ export const ConversationMessageUser = (props: ConversationMessageUserProps) => 
       ? "var(--agents-fg)"
       : theme === "dark"
         ? "var(--agents-chat-user-bubble-text)"
-        : "var(--agents-fg-on-dark)";
+        : "var(--agents-fg-on-accent)";
 
   return (
     <div className={classNames(styles.message, bubbleClass)} data-testid="chat-message-user">

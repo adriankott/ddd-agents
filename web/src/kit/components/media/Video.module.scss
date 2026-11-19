@@ -57,7 +57,7 @@
   width: $x6;
   height: $x6;
   border-radius: 50%;
-  background: rgba(var(--agents-bg-dark-rgb), 0.72);
+  background: color-mix(in srgb, var(--agents-bg-dark) 72%, transparent);
   color: var(--agents-fg-on-dark);
   transform: translate(-50%, -50%);
   pointer-events: none;
@@ -75,7 +75,7 @@
   z-index: 2;
   padding: $x0_25 $x1;
   border-radius: $x2;
-  background: rgba(var(--agents-bg-dark-rgb), 0.72);
+  background: color-mix(in srgb, var(--agents-bg-dark) 72%, transparent);
   pointer-events: none;
 }
 

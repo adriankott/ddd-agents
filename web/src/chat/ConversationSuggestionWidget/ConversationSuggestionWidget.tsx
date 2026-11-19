@@ -21,19 +21,19 @@ export const ConversationSuggestionWidget = (props: ConversationSuggestionWidget
         {AssistantIconBadge ? (
           <AssistantIconBadge
             iconName={suggestion.iconClass ?? ""}
-            color="white"
-            backgroundColor="rgba(var(--agents-neutral-000-rgb, white), 0.2)"
+            color="var(--agents-fg-on-accent)"
+            backgroundColor="color-mix(in srgb, var(--agents-neutral-000) 20%, transparent)"
           />
         ) : null}
         <div>
-          <Text role="help" weight="bold" color={"white"}>
+          <Text role="help" weight="bold" color="var(--agents-fg-on-accent)">
             {suggestion.name}
           </Text>
-          <Text role="caption" color={"white"}>
+          <Text role="caption" color="var(--agents-fg-on-accent)">
             {suggestion.description}
           </Text>
         </div>
-        <Icon color="white" className={styles.arrowIcon} name="arrowRight" />
+        <Icon color="var(--agents-fg-on-accent)" className={styles.arrowIcon} name="arrowRight" />
       </button>
     </InteractiveSurface>
   );

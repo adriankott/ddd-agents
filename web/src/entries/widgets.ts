@@ -31,7 +31,14 @@ export * from "../widgets/_shared/modern";
 // The primitives an app's own widgets build on beside the modern look: the label, the footer, the done pill, the
 // skeleton shapes, payload validation, the canvas-body update channel, visibility, and the canvas viability.
 export type { CanvasLauncherWidgetCanvas } from "../widgets/CanvasLauncherWidget/CanvasLauncherWidget";
-export { CANVAS_VIABLE_MIN_WIDTH, useCanvasViable } from "../widgets/CanvasLauncherWidget/use-canvas-viable";
+export {
+  CANVAS_VIABLE_MIN_WIDTH,
+  CanvasViabilityContext,
+  type CanvasViabilitySource,
+  ElementWidthCanvasViability,
+  readCanvasViable,
+  useCanvasViable,
+} from "../widgets/CanvasLauncherWidget/use-canvas-viable";
 export { WidgetLabel } from "../widgets/_shared/WidgetLabel";
 export { WidgetFooter } from "../widgets/_shared/WidgetFooter";
 /** @deprecated Renamed to `WidgetFooter`. */

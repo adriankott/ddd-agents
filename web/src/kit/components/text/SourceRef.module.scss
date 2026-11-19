@@ -55,7 +55,7 @@
   border-radius: 999px;
   // A translucent tint of the text colour, not a surface token: the chip sits on the chat background as well as on
   // a Surface, and must differ from both (two background levels, never a third surface).
-  background: rgba(var(--agents-fg-rgb), 0.06);
+  background: color-mix(in srgb, var(--agents-fg) 6%, transparent);
   color: var(--agents-fg);
   font: inherit;
   text-decoration: none;
@@ -119,5 +119,5 @@
   display: block;
   padding: $x1;
   border-radius: $x1_5;
-  background: rgba(var(--agents-fg-rgb), 0.04);
+  background: color-mix(in srgb, var(--agents-fg) 4%, transparent);
 }

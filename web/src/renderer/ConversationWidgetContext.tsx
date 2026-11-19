@@ -1,4 +1,4 @@
-import React, { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useAgentsEnvironment, useAgentsStateDispatch, useAgentsStateSelector } from "../provider/AgentsProvider";
 import type { ConversationWidgetStatePartition } from "./conversation-widget-state-partition";
 import { createAgentsChatStore } from "../chat/store/create-agents-chat-store";
@@ -6,7 +6,7 @@ import type { AgentsChatEvent } from "../chat/store/agents-chat-state";
 import type { AgentsChatStore } from "../chat/store/create-agents-chat-store";
 import { useAgentsChatSelector } from "../chat/store/use-agents-chat-store";
 import type { CanvasState, LastClosedCanvas } from "./canvas/canvas-state";
-import { CANVAS_VIABLE_MIN_WIDTH } from "../widgets/CanvasLauncherWidget/use-canvas-viable";
+import { CanvasViabilityContext, readCanvasViable } from "../widgets/CanvasLauncherWidget/use-canvas-viable";
 import { ConversationComposerWidget } from "./conversation-composer-widget";
 import type { CanvasCreatedEntity } from "./canvas/canvas-reducers";
 import { clearStoredCanvas, storeOpenCanvas } from "./canvas/canvasStorage";
@@ -168,6 +168,10 @@ const ConversationWidgetProviderBody = ({
   dispatchCanvasEventRef.current = chatState.dispatchCanvasEvent;
   const hostHasCanvasSurfaceRef = useRef(hostHasCanvasSurface);
   hostHasCanvasSurfaceRef.current = hostHasCanvasSurface;
+  // The width of the chat's own container when the chat measures it (`AgentChatController`), else the viewport.
+  const canvasViability = useContext(CanvasViabilityContext);
+  const canvasViabilityRef = useRef(canvasViability);
+  canvasViabilityRef.current = canvasViability;
 
   // An agentic chat surface is open: the app hears it through its action (e.g. a flag every connect/create/verify flow
   // launched from inside the chat reads to stay in-widget instead of navigating away).
@@ -255,7 +259,7 @@ const ConversationWidgetProviderBody = ({
   }, [publishComposerWidgets]);
 
   // The one way to open a canvas (all four origins). The provider supplies what only it knows — the split's viability
-  // (measured on the window, like `useCanvasViable`) and whether this host has a canvas surface — and the reducer
+  // (the chat container's width, like `useCanvasViable`) and whether this host has a canvas surface — and the reducer
   // applies the opening rule. Ignored requests change nothing.
   const openCanvas = useCallback(
     (request: CanvasOpenRequestFromOpener) => {
@@ -263,7 +267,7 @@ const ConversationWidgetProviderBody = ({
         type: "canvasOpened",
         request: {
           ...request,
-          viewportViable: window.innerWidth >= CANVAS_VIABLE_MIN_WIDTH,
+          viewportViable: readCanvasViable(canvasViabilityRef.current),
           hostHasCanvasSurface: hostHasCanvasSurfaceRef.current,
         },
       });
@@ -293,7 +297,7 @@ const ConversationWidgetProviderBody = ({
         anchor: last.anchor,
         origin: "widgetClick",
         justDelivered: false,
-        viewportViable: window.innerWidth >= CANVAS_VIABLE_MIN_WIDTH,
+        viewportViable: readCanvasViable(canvasViabilityRef.current),
         hostHasCanvasSurface: hostHasCanvasSurfaceRef.current,
         ...(last.createdEntityId !== undefined ? { createdEntityId: last.createdEntityId } : {}),
       },

@@ -2,10 +2,13 @@
   ".": {
     "values": [
       "AGENTS_ICON_NAMES",
+      "AGENTS_THEME_ATTRIBUTE_NAME",
+      "AgentsLink",
       "AgentsProvider",
       "Button",
       "Checkbox",
       "ConversationSearchResultsList",
+      "DEFAULT_AGENTS_COMPONENTS",
       "DEFAULT_AGENTS_TEXTS",
       "DEFAULT_WIDGET_IMAGE_CAPTURE_READ_PATH_PREFIX",
       "DEFAULT_WIDGET_SELF_HYDRATION_KEY_FIELD_NAME",
@@ -43,6 +46,7 @@
       "buildWidgetOfAnotherAgentSpaceExplanation",
       "classNames",
       "escapePlainTextForText",
+      "followHostColorScheme",
       "getAgentDisplayName",
       "getAgentsEnvironment",
       "getEntityDetailBody",
@@ -70,12 +74,15 @@
       "useAgentsActiveAgentSpaceKey",
       "useAgentsBudgetLimit",
       "useAgentsComponents",
+      "useAgentsConversationClient",
       "useAgentsEnvironment",
+      "useAgentsLinkNavigation",
       "useAgentsMapsLoader",
       "useAgentsOwnerSettings",
       "useAgentsStateDispatch",
       "useAgentsStateSelector",
-      "useAgentsTexts"
+      "useAgentsTexts",
+      "useOptionalAgentsConversationClient"
     ],
     "types": [
       "AgentsAssistantBackgroundProps",
@@ -100,6 +107,8 @@
       "AgentsIconProps",
       "AgentsIconSize",
       "AgentsInteractiveSurfaceProps",
+      "AgentsLinkNavigation",
+      "AgentsLinkProps",
       "AgentsLoadingSpinnerProps",
       "AgentsMapMarkerProps",
       "AgentsMapPosition",
@@ -146,7 +155,8 @@
       "ComposedViewDataSourceFetcher",
       "ConceptExplainerTypeDefinition",
       "ConversationWidgetEntry",
-      "EntityDetailBodyDefinition"
+      "EntityDetailBodyDefinition",
+      "HostColorSchemeSource"
     ]
   },
   "./renderer": {
@@ -167,6 +177,8 @@
       "ConversationWidgetHost",
       "ConversationWidgetRenderContext",
       "DEFAULT_CANVAS_WIDTH_PERCENT",
+      "LEGACY_CARD_CLICK_ORIGIN",
+      "MarkdownLink",
       "ReadOnlyConversationWidgetProvider",
       "StandaloneConversationWidgetProvider",
       "WIDGET_RENDER_REPORT_SIGNAL_SOURCE",
@@ -244,8 +256,7 @@
       "useWidgetHydration",
       "useWidgetMemory",
       "useWidgetRenderReporter",
-      "withConversationWidgetVariant",
-      "LEGACY_CARD_CLICK_ORIGIN"
+      "withConversationWidgetVariant"
     ],
     "types": [
       "AgentsWidgetHydrationState",
@@ -279,6 +290,7 @@
       "ConversationWidgetVariant",
       "InjectSignalOptions",
       "LastClosedCanvas",
+      "MarkdownLinkProps",
       "OpenEngagementEditConversationWidgetPayload",
       "OpenEntityActionTarget",
       "PackageCanvasId",
@@ -337,14 +349,17 @@
       "CANVAS_VIABLE_MIN_WIDTH",
       "CUSTOM_VISUALIZATION_SANDBOX_CONFIG",
       "CanvasLauncherWidget",
+      "CanvasViabilityContext",
+      "CanvasWidgetCard",
       "CanvasWidgetSwitch",
-      "WidgetFooter",
+      "CardFooter",
       "ClockConversationWidget",
       "ConceptExplainerConversationWidget",
       "ConversationSearchResultsConversationWidget",
       "CurrencyConverterConversationWidget",
       "CustomVisualizationConversationWidget",
       "DonePill",
+      "ElementWidthCanvasViability",
       "EntityMentionConversationWidget",
       "HeroValue",
       "MultiChoiceConversationWidget",
@@ -356,6 +371,7 @@
       "SuggestedActions",
       "ToolTraceConversationWidget",
       "WebSearchResultsConversationWidget",
+      "WidgetFooter",
       "WidgetKpiValue",
       "WidgetLabel",
       "WidgetListRow",
@@ -374,17 +390,19 @@
       "pickSafeAlias",
       "pickSafeAliases",
       "pickText",
+      "readCanvasViable",
       "readConceptExplainerNumber",
       "readConceptExplainerValue",
       "resolveCustomVisualizationFrameUrl",
       "useCanvasViable",
-      "useElementVisible",
-      "CanvasWidgetCard",
-      "CardFooter"
+      "useElementVisible"
     ],
     "types": [
       "CanvasLauncherWidgetCanvas",
       "CanvasLauncherWidgetProps",
+      "CanvasViabilitySource",
+      "CanvasWidgetCardCanvas",
+      "CanvasWidgetCardProps",
       "ConceptExplainerStep",
       "ConceptExplainerStepsInput",
       "ConceptExplainerText",
@@ -399,9 +417,7 @@
       "WidgetStatusTone",
       "WidgetSurfaceLevel",
       "WidgetSurfaceProps",
-      "WidgetSurfaceSkeletonProps",
-      "CanvasWidgetCardProps",
-      "CanvasWidgetCardCanvas"
+      "WidgetSurfaceSkeletonProps"
     ]
   },
   "./contract": {
@@ -435,6 +451,7 @@
       "ConversationMessagesPage",
       "ConversationProgressStep",
       "ConversationRunState",
+      "ConversationRunStateRead",
       "ConversationRunStatus",
       "ConversationSearchGroup",
       "ConversationSearchOptions",
@@ -450,13 +467,25 @@
   },
   "./client": {
     "values": [
+      "AGENTS_HTTP_DEFAULT_CHANGED_MESSAGES_PAGE_SIZE",
       "AgentsConversationClientProvider",
       "POLLING_IDLE_INTERVAL_MS",
       "POLLING_LOCAL_ACTIVITY_WINDOW_MS",
       "POLLING_MAX_BACKOFF_MS",
       "POLLING_RUNNING_INTERVAL_MS",
+      "composeAttachmentMessageText",
+      "createAgentsHttpConversationClient",
       "createPollingConversationChangeSubscription",
+      "mapHttpFailureToAgentsClientError",
+      "mapWireConversation",
+      "mapWireConversationActivity",
+      "mapWireConversationMessage",
+      "mapWireConversationRunState",
+      "mapWireSearchGroup",
+      "mapWireSearchHit",
+      "mapWireSelectableModel",
       "readPolledRunStatus",
+      "readWireSetElements",
       "useAgentsConversationClient",
       "useOptionalAgentsConversationClient",
       "withPollingChangeSubscription"
@@ -468,11 +497,36 @@
       "AgentsConversationClientWithChangeSubscription",
       "AgentsConversationOperation",
       "AgentsExtraRequestParameters",
+      "AgentsHttpConversationClientOptions",
+      "AgentsHttpFetchOptions",
       "ConversationMetadataReader",
       "PollingConversationChangeSubscription",
       "PollingConversationChangeSubscriptionOptions",
       "PollingDocumentVisibility",
-      "PollingTimers"
+      "PollingTimers",
+      "WireActivityLine",
+      "WireChangeHistory",
+      "WireConversation",
+      "WireConversationActivityResponse",
+      "WireConversationMessage",
+      "WireConversationMessageSearchResponse",
+      "WireConversationMessagesResponse",
+      "WireConversationResponse",
+      "WireConversationRunStateResponse",
+      "WireConversationSearchGroup",
+      "WireConversationSearchResponse",
+      "WireConversationStartResponse",
+      "WireConversationSummary",
+      "WireConversationsResponse",
+      "WireCustomerProgressStep",
+      "WireDelegationSubAgentRecord",
+      "WireDelegationSubAgentRun",
+      "WireErrorBody",
+      "WireSelectableModel",
+      "WireSelectableModelsResponse",
+      "WireSemanticSearchHit",
+      "WireSet",
+      "WireToolCall"
     ]
   },
   "./client/testing": {
@@ -509,8 +563,9 @@
       "CanvasRestoreOnMount",
       "ConversationClosedBar",
       "ConversationDeepLinkedWidget",
-      "ConversationErrorWidget",
+      "ConversationErrorCard",
       "ConversationErrorType",
+      "ConversationErrorWidget",
       "ConversationMessageInput",
       "ConversationMessageInputAttachmentsErrorBox",
       "ConversationMessageInputAttachmentsPreviewStrip",
@@ -537,11 +592,12 @@
       "useAgentsChatSelector",
       "useAgentsChatState",
       "useAgentsChatStore",
+      "useAgentsConversationClient",
       "useAgentsConversationRunStatus",
       "useConversationMessageSearch",
       "useConversationsSearch",
       "useOptionalAgentsChatStore",
-      "ConversationErrorCard"
+      "useOptionalAgentsConversationClient"
     ],
     "types": [
       "ActivityTicker",
@@ -550,6 +606,7 @@
       "AgentActivity",
       "AgentChatActivityHistoryProps",
       "AgentChatActivityProps",
+      "AgentChatComposerHandle",
       "AgentChatControllerProps",
       "AgentChatProps",
       "AgentChatSendModelSource",
@@ -566,6 +623,7 @@
       "ChatScrollTarget",
       "ConversationClosedBarProps",
       "ConversationDeepLinkedWidgetProps",
+      "ConversationErrorCardProps",
       "ConversationErrorWidgetProps",
       "ConversationMessageInputAttachmentPreview",
       "ConversationMessageInputAttachmentUploadStatus",
@@ -580,8 +638,7 @@
       "ConversationWidgetProviderProps",
       "ConversationsSearchState",
       "SendMessageHandler",
-      "SendMessageOptions",
-      "ConversationErrorCardProps"
+      "SendMessageOptions"
     ]
   },
   "./preview": {
@@ -652,10 +709,13 @@
   "./provider": {
     "values": [
       "AGENTS_ICON_NAMES",
+      "AGENTS_THEME_ATTRIBUTE_NAME",
+      "AgentsLink",
       "AgentsProvider",
       "Button",
       "Checkbox",
       "ConversationSearchResultsList",
+      "DEFAULT_AGENTS_COMPONENTS",
       "DEFAULT_AGENTS_TEXTS",
       "DEFAULT_WIDGET_IMAGE_CAPTURE_READ_PATH_PREFIX",
       "DEFAULT_WIDGET_SELF_HYDRATION_KEY_FIELD_NAME",
@@ -693,6 +753,7 @@
       "buildWidgetOfAnotherAgentSpaceExplanation",
       "classNames",
       "escapePlainTextForText",
+      "followHostColorScheme",
       "getAgentDisplayName",
       "getAgentsEnvironment",
       "getFurtherCanvasBehaviours",
@@ -710,12 +771,15 @@
       "useAgentsActiveAgentSpaceKey",
       "useAgentsBudgetLimit",
       "useAgentsComponents",
+      "useAgentsConversationClient",
       "useAgentsEnvironment",
+      "useAgentsLinkNavigation",
       "useAgentsMapsLoader",
       "useAgentsOwnerSettings",
       "useAgentsStateDispatch",
       "useAgentsStateSelector",
-      "useAgentsTexts"
+      "useAgentsTexts",
+      "useOptionalAgentsConversationClient"
     ],
     "types": [
       "AgentsAssistantBackgroundProps",
@@ -740,6 +804,8 @@
       "AgentsIconProps",
       "AgentsIconSize",
       "AgentsInteractiveSurfaceProps",
+      "AgentsLinkNavigation",
+      "AgentsLinkProps",
       "AgentsLoadingSpinnerProps",
       "AgentsMapMarkerProps",
       "AgentsMapPosition",
@@ -782,7 +848,8 @@
       "AgentsWidgetFeatureGateProps",
       "AgentsWidgetTextProps",
       "AgentsWidgetTextTone",
-      "AgentsWidgetTextVariant"
+      "AgentsWidgetTextVariant",
+      "HostColorSchemeSource"
     ]
   }
 }

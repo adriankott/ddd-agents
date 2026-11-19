@@ -1,6 +1,6 @@
 import {
-  type AgentsConversation,
   type ConversationChangeSignal,
+  type ConversationRunStateRead,
   type ConversationRunStatus,
   type ConversationSubscriptionEndReason,
   CONVERSATION_RUN_STATES_THAT_END_THE_CONVERSATION,
@@ -20,8 +20,11 @@ export const POLLING_MAX_BACKOFF_MS = 60_000;
  */
 export const POLLING_LOCAL_ACTIVITY_WINDOW_MS = 10_000;
 
-/** Reads a conversation's metadata — the port's `getConversationMetadata`. */
-export type ConversationMetadataReader = (conversationId: number) => Promise<AgentsConversation>;
+/**
+ * Reads a conversation's run state — the port's `getConversationRunState`, or its `getConversationMetadata` (every
+ * conversation carries the fields the poller reads).
+ */
+export type ConversationMetadataReader = (conversationId: number) => Promise<ConversationRunStateRead>;
 
 /** The timer functions the poller uses; a spec hands in fake ones. */
 export interface PollingTimers {
@@ -100,7 +103,9 @@ class BrowserDocumentVisibility implements PollingDocumentVisibility {
  * The three-value run status a polled read reports: the stored run state, and "running" for an idle conversation the
  * server owes a turn (`agentTurnOwedAt`), as the chat's own derivation does.
  */
-export const readPolledRunStatus = (conversation: AgentsConversation): ConversationRunStatus | null => {
+export const readPolledRunStatus = (
+  conversation: Pick<ConversationRunStateRead, "runState" | "agentTurnOwedAt">,
+): ConversationRunStatus | null => {
   const runStatus = readConversationRunStatusOfRunState(conversation.runState);
   return runStatus === "idle" && conversation.agentTurnOwedAt ? "running" : runStatus;
 };
@@ -182,7 +187,7 @@ class ConversationMetadataPoller {
   };
 
   protected async readMetadataOnce(): Promise<void> {
-    let conversation: AgentsConversation;
+    let conversation: ConversationRunStateRead;
     try {
       conversation = await this.readMetadata(this.conversationId);
     } catch (failure) {
@@ -197,7 +202,7 @@ class ConversationMetadataPoller {
     this.continueAfterRead(this.readIntervalMs());
   }
 
-  protected receiveConversation(conversation: AgentsConversation): void {
+  protected receiveConversation(conversation: ConversationRunStateRead): void {
     const runStatus = readPolledRunStatus(conversation);
     const reportsLastMessageId = conversation.lastMessageId !== undefined;
     const changeFingerprint = JSON.stringify([runStatus, conversation.lastMessageId ?? null, conversation.updated]);

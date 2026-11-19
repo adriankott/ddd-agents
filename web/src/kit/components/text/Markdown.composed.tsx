@@ -10,6 +10,7 @@ import {
   useReportTextNodeRenderState,
 } from "./shared/text-node-values";
 import styles from "./Markdown.module.scss";
+import { AgentsLink } from "../../../provider/link-navigation";
 
 interface MarkdownElementProps {
   children?: ReactNode;
@@ -64,9 +65,9 @@ const SAFE_MARKDOWN_COMPONENTS = {
     const safeUrl = readSafeHttpUrl(props.href);
     if (safeUrl === null) return <span>{props.children}</span>;
     return (
-      <a className={styles.link} href={safeUrl} target="_blank" rel="noopener noreferrer">
+      <AgentsLink className={styles.link} href={safeUrl}>
         {props.children}
-      </a>
+      </AgentsLink>
     );
   },
 } as NonNullable<AgentsMarkdownProps["components"]>;

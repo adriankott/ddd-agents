@@ -10,7 +10,7 @@
   background-color: var(--agents-assistant-400, #3C28CC);
 
   path {
-    fill: white !important;
+    fill: var(--agents-fg-on-accent) !important;
   }
 }
 

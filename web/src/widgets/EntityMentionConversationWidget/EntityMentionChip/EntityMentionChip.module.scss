@@ -9,7 +9,7 @@
   max-width: 100%;
   padding: $x0_25 $x0_25 $x0_25 $x1;
   border-radius: $x2;
-  background: rgba(var(--agents-neutral-500-rgb), 0.1);
+  background: color-mix(in srgb, var(--agents-neutral-500) 10%, transparent);
 }
 
 .icon,

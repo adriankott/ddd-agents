@@ -15,6 +15,7 @@ import { ComposedViewRenderer } from "../ComposedViewRenderer";
 import { findMapNodeInMarkdown, readMapNodeKeyOfInstanceId } from "../components/map/map-full-screen-instance";
 import { MapPresentationContext } from "../components/map/map-presentation-context";
 import mapStyles from "../components/map/Map.module.scss";
+import { useAgentsEnvironment } from "../../provider/AgentsProvider";
 
 /** The body reports nothing of its own: the inline block already reported this map to the model. */
 const ignoreRenderReport = () => {};
@@ -31,6 +32,7 @@ const ignoreRenderReport = () => {};
 export const MapFullScreenCanvasBody = (props: CanvasBodyProps) => {
   const { canvas, anchorMessageMarkdown, agentSpaceKey } = props;
   const { openCanvas } = useConversationWidgetContext();
+  const { onOpenEntity: openEntityOnHostRoute } = useAgentsEnvironment();
   const mapNodeKey = readMapNodeKeyOfInstanceId(canvas.instanceId);
 
   const mapTree = useMemo<ComposedViewTree | undefined>(() => {
@@ -46,7 +48,10 @@ export const MapFullScreenCanvasBody = (props: CanvasBodyProps) => {
   const onOpenEntity = useCallback(
     (action: ComposedViewAction, currentRow?: ExpressionValue) => {
       const target = readOpenEntityActionTarget(action, currentRow);
-      if (target === undefined || anchor.kind !== "message") return;
+      if (target === undefined) return;
+      // The host opens the entity on a route of its own (`AgentsEnvironment.onOpenEntity`) instead of the canvas.
+      if (openEntityOnHostRoute?.(target) === true) return;
+      if (anchor.kind !== "message") return;
       openCanvas({
         canvasId: "entityDetail",
         instanceId: canvasInstanceIdForEntityDetail(target),
@@ -55,7 +60,7 @@ export const MapFullScreenCanvasBody = (props: CanvasBodyProps) => {
         justDelivered: false,
       });
     },
-    [openCanvas, anchor],
+    [openCanvas, anchor, openEntityOnHostRoute],
   );
 
   if (!mapTree) {

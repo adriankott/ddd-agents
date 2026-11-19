@@ -1,9 +1,11 @@
 import {
   type ComponentType,
   type ReactNode,
+  type Ref,
   type RefObject,
   useCallback,
   useEffect,
+  useImperativeHandle,
   useMemo,
   useRef,
   useState,
@@ -37,6 +39,10 @@ import { useConversationLiveUpdates } from "./use-conversation-live-updates";
 import { CONVERSATION_MESSAGE_PAGE_SIZE, useConversationMessagePages } from "./use-conversation-message-pages";
 import { useConversationScrollJump } from "./use-conversation-scroll-jump";
 import { useConversationSignals } from "./use-conversation-signals";
+import {
+  CanvasViabilityContext,
+  ElementWidthCanvasViability,
+} from "../../widgets/CanvasLauncherWidget/use-canvas-viable";
 
 /** What the host's activity components get: the turn's state and the paced lines of the activity ticker. */
 export interface AgentChatActivityProps {
@@ -54,6 +60,15 @@ export interface AgentChatActivityProps {
 /** What the host's activity history under a message gets: the finished turn that message started, if any. */
 export interface AgentChatActivityHistoryProps {
   turn: ActivityTickerTurn | null;
+}
+
+/** What a host does with the composer of a mounted chat (`AgentChat`'s `composerRef`). */
+export interface AgentChatComposerHandle {
+  /**
+   * Replaces the composer's draft with `text` (empty clears it) and puts the caret at its end — never sends. Does
+   * nothing while the composer is not shown (a closed conversation).
+   */
+  setComposerDraft: (text: string) => void;
 }
 
 /** Where the model of the next send comes from — read at send time (an admin's pick can change between renders). */
@@ -124,6 +139,25 @@ export interface AgentChatControllerProps {
   ActivityHistory?: ComponentType<AgentChatActivityHistoryProps>;
   /** Rendered inside the chat's widget provider (the host's canvas syncs). */
   children?: ReactNode;
+  /**
+   * The chat renders without the canvas split: no side pane, the message column alone. Default false. Without a canvas
+   * surface of the host's own (`hostHasCanvasSurface`), every canvas open is then ignored.
+   */
+  disableSplitView?: boolean;
+  /**
+   * Whether a canvas may open in this chat: false ignores every open request (reason `noSurface`), true lets the canvas
+   * state open while the host draws it (with `disableSplitView`: in a surface of its own, e.g. `CanvasPane`). Default:
+   * true with the split view, false without it.
+   */
+  hostHasCanvasSurface?: boolean;
+  /**
+   * The host paints the chat's background behind it (the pane stays transparent, the frosted top band of a floating
+   * top bar keeps its look). Default true; false gives the chat the package's own background
+   * (`--agents-chat-background`).
+   */
+  backgroundPaintedByHost?: boolean;
+  /** The handle of the composer: put a draft into the mounted chat without a remount (`setComposerDraft`). */
+  composerRef?: Ref<AgentChatComposerHandle>;
 }
 
 /** Returns true when the messages contain an ERROR message whose signalSource is AI_BUDGET_REACHED. */
@@ -189,10 +223,25 @@ export const AgentChatController = (props: AgentChatControllerProps) => {
     ContentOverlay,
     ActivityHistory,
     children,
+    disableSplitView = false,
+    hostHasCanvasSurface = !disableSplitView,
+    backgroundPaintedByHost = true,
+    composerRef,
   } = props;
+
+  // The canvas split fits by the width of this chat's own area, not the viewport's (a narrow chat column in a wide
+  // window covers the chat with the canvas instead of squeezing a split into it).
+  const [canvasViability] = useState(() => new ElementWidthCanvasViability());
 
   // The composer's handle: the initial prompt and a widget's `prefillComposer` put text into it without sending.
   const conversationMessageInputApiRef = useRef<ConversationMessageInputHandle>(null);
+  useImperativeHandle(
+    composerRef,
+    () => ({
+      setComposerDraft: (text: string) => conversationMessageInputApiRef.current?.insertTextIntoInput(text),
+    }),
+    [],
+  );
   useEffect(() => {
     if (!initialComposerPrompt) return;
     conversationMessageInputApiRef.current?.insertTextIntoInput(initialComposerPrompt);
@@ -600,77 +649,84 @@ export const AgentChatController = (props: AgentChatControllerProps) => {
   };
 
   return (
-    <WidgetRenderReportCollectorContext.Provider value={renderReportCollector}>
-      <ConversationWidgetProvider callbacks={widgetCallbacks} chatStore={chatStore}>
-        {/* The tool a page handed over: renders nothing in the chat itself — such a widget lives in the canvas. */}
-        <ConversationDeepLinkedWidget
-          key={deepLinkedWidget?.mountKey ?? 0}
-          widgetName={deepLinkedWidget?.name}
-          agentSpaceKey={agentSpaceKey}
-        />
-        {/* The canvas that was open in this conversation comes back once ITS messages are in. */}
-        <CanvasRestoreOnMount conversationId={liveConversationId} messages={messages} />
-        {children}
-        <div className={chatAreaClassName}>
-          <div className={chatWrapClassName}>
-            <ConversationView
-              enableCanvasToggle
-              boxCanvasBelowTopBar
-              confineTopBlurBandToChatPane={confineTopBlurBandToChatPane}
-              progressStepperSlot={progressStepperSlot}
-              enablePinQuestionAndRevealAnswer
-              isQuestionPinSuspended={isQuestionPinSuspended}
-              scrollRef={chatScrollRef}
-              scrollToBottomNonce={scrollToBottomNonce}
-              followBottomRef={followBottomRef}
-              scrollJumpActiveRef={scrollJumpActiveRef}
-              // The host paints the background at its own root; this pane keeps the transparent custom-background mode.
-              backgroundPaintedByHost
-              currentCategory={undefined}
-              aiPromptExtension={undefined}
-              suggestions={undefined}
-              messages={chatMessages}
-              aiThinking={agentActivity.active}
-              // The input never locks while the agent works: a message posted mid-turn is answered in the next turn.
-              allowSendWhileAiThinking
-              thinkingIndicator={<ThinkingIndicator {...activityProps} />}
-              // Only while the history is kept: otherwise every row would carry an empty history slot.
-              renderAfterMessage={keepActivityHistoryAfterAnswer ? renderActivityHistoryAfterMessage : undefined}
-              hideAssistantMeta
-              userMessageTheme="dark"
-              error={error}
-              rateLimitRetryAfterSeconds={rateLimitRetryAfterSeconds}
-              onRetryFailedRun={handleRetryFailedRun}
-              isDebugMode={false}
-              categoriesLoaded={true}
-              conversationId={conversationId ?? conversation?.id ?? undefined}
-              startingNewConversation={startingNewConversation}
-              showMessagesWithoutConversation
-              hasMoreOlder={hasMoreOlder}
-              loadingOlder={loadingOlder}
-              onLoadOlder={loadOlderOfLiveConversation}
-              autoScroll={!!conversationId || (messages?.length ?? 0) > 0}
-              isCompact={isCompact}
-              inputActionsSlot={inputActionsSlot}
-              inputTopSlot={inputTopSlot}
-              inputSendDisabled={inputSendDisabled}
-              inputReplacementSlot={inputReplacementSlot}
-              inputBandSlot={inputBandSlot}
-              inputPlaceholder={inputPlaceholder}
-              inputSendReplacementWhenEmpty={inputSendReplacementWhenEmpty}
-              inputGlowUnderlay={inputGlowUnderlay}
-              contentOverlaySlot={ContentOverlay ? <ContentOverlay {...activityProps} /> : undefined}
-              isContentOverlayShown={isContentOverlayShown}
-              outgoingAttachmentImages={outgoingAttachments}
-              taskInstructionMessageId={taskInstructionMessageId}
-              isConversationClosed={isConversationRunEnded}
-              conversationMessageInputApiRef={conversationMessageInputApiRef}
-              onSuggestionClick={() => {}}
-              onSendMessage={handleSendMessage}
-            />
+    <CanvasViabilityContext.Provider value={canvasViability}>
+      <WidgetRenderReportCollectorContext.Provider value={renderReportCollector}>
+        <ConversationWidgetProvider
+          callbacks={widgetCallbacks}
+          chatStore={chatStore}
+          hostHasCanvasSurface={hostHasCanvasSurface}
+        >
+          {/* The tool a page handed over: renders nothing in the chat itself — such a widget lives in the canvas. */}
+          <ConversationDeepLinkedWidget
+            key={deepLinkedWidget?.mountKey ?? 0}
+            widgetName={deepLinkedWidget?.name}
+            agentSpaceKey={agentSpaceKey}
+          />
+          {/* The canvas that was open in this conversation comes back once ITS messages are in. */}
+          <CanvasRestoreOnMount conversationId={liveConversationId} messages={messages} />
+          {children}
+          <div className={chatAreaClassName} ref={canvasViability.observe}>
+            <div className={chatWrapClassName}>
+              <ConversationView
+                enableCanvasToggle
+                boxCanvasBelowTopBar
+                disableSplitView={disableSplitView}
+                confineTopBlurBandToChatPane={confineTopBlurBandToChatPane}
+                progressStepperSlot={progressStepperSlot}
+                enablePinQuestionAndRevealAnswer
+                isQuestionPinSuspended={isQuestionPinSuspended}
+                scrollRef={chatScrollRef}
+                scrollToBottomNonce={scrollToBottomNonce}
+                followBottomRef={followBottomRef}
+                scrollJumpActiveRef={scrollJumpActiveRef}
+                // The host paints the background at its own root; this pane keeps the transparent custom-background mode.
+                backgroundPaintedByHost={backgroundPaintedByHost}
+                currentCategory={undefined}
+                aiPromptExtension={undefined}
+                suggestions={undefined}
+                messages={chatMessages}
+                aiThinking={agentActivity.active}
+                // The input never locks while the agent works: a message posted mid-turn is answered in the next turn.
+                allowSendWhileAiThinking
+                thinkingIndicator={<ThinkingIndicator {...activityProps} />}
+                // Only while the history is kept: otherwise every row would carry an empty history slot.
+                renderAfterMessage={keepActivityHistoryAfterAnswer ? renderActivityHistoryAfterMessage : undefined}
+                hideAssistantMeta
+                userMessageTheme="dark"
+                error={error}
+                rateLimitRetryAfterSeconds={rateLimitRetryAfterSeconds}
+                onRetryFailedRun={handleRetryFailedRun}
+                isDebugMode={false}
+                categoriesLoaded={true}
+                conversationId={conversationId ?? conversation?.id ?? undefined}
+                startingNewConversation={startingNewConversation}
+                showMessagesWithoutConversation
+                hasMoreOlder={hasMoreOlder}
+                loadingOlder={loadingOlder}
+                onLoadOlder={loadOlderOfLiveConversation}
+                autoScroll={!!conversationId || (messages?.length ?? 0) > 0}
+                isCompact={isCompact}
+                inputActionsSlot={inputActionsSlot}
+                inputTopSlot={inputTopSlot}
+                inputSendDisabled={inputSendDisabled}
+                inputReplacementSlot={inputReplacementSlot}
+                inputBandSlot={inputBandSlot}
+                inputPlaceholder={inputPlaceholder}
+                inputSendReplacementWhenEmpty={inputSendReplacementWhenEmpty}
+                inputGlowUnderlay={inputGlowUnderlay}
+                contentOverlaySlot={ContentOverlay ? <ContentOverlay {...activityProps} /> : undefined}
+                isContentOverlayShown={isContentOverlayShown}
+                outgoingAttachmentImages={outgoingAttachments}
+                taskInstructionMessageId={taskInstructionMessageId}
+                isConversationClosed={isConversationRunEnded}
+                conversationMessageInputApiRef={conversationMessageInputApiRef}
+                onSuggestionClick={() => {}}
+                onSendMessage={handleSendMessage}
+              />
+            </div>
           </div>
-        </div>
-      </ConversationWidgetProvider>
-    </WidgetRenderReportCollectorContext.Provider>
+        </ConversationWidgetProvider>
+      </WidgetRenderReportCollectorContext.Provider>
+    </CanvasViabilityContext.Provider>
   );
 };

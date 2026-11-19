@@ -98,7 +98,7 @@
 .pillSelected,
 .pillSelected:hover {
   box-shadow: inset 0 0 0 $x0_25 var(--agents-fg-cta);
-  background: rgba(var(--agents-fg-cta-rgb), 0.08);
+  background: color-mix(in srgb, var(--agents-fg-cta) 8%, transparent);
 }
 
 // The source and what the figures are, one line each (two long sentences do not join on one line).

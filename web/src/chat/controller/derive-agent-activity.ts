@@ -1,5 +1,6 @@
 import type { ConversationMessageStatus } from "../../contract/conversation";
 import type { ChatMessage } from "../chat-message";
+import { textKey } from "../../provider/text-key";
 
 /** Mirrors App\Domain\AI\Entities\Conversations\Agent\Tools\DelegateTool::NAME. */
 const DELEGATE_TOOL_NAME = "delegate";
@@ -127,7 +128,7 @@ export const deriveAgentActivity = (
   if (unresolvedDelegateCount > 0) {
     return {
       active: true,
-      label: "Waiting for %count% delegations...",
+      label: textKey("Waiting for %count% delegations..."),
       replacements: { count: unresolvedDelegateCount },
       context: unresolvedDelegateCount === 1 ? "one" : "other",
     };
@@ -138,7 +139,7 @@ export const deriveAgentActivity = (
   if (lastMessage?.messageType === "TOOL_CALL" && !isEffectivelyResolved(lastMessage)) {
     return {
       active: true,
-      label: "Running: %tool%...",
+      label: textKey("Running: %tool%..."),
       replacements: { tool: lastMessage.toolCall?.name ?? "Tool" },
       toolRunning: true,
     };

@@ -1,6 +1,8 @@
 // `@mgamadeus/ddd-agents/renderer` — the message renderer, the widget host and its contexts, the registry, the canvas
 // model, hydration and the render report.
 export { ConversationMarkdown, type ConversationMarkdownProps } from "../renderer/ConversationMarkdown";
+// The link of a chat message, for a host `Markdown` replacement that wraps it (`components.a`).
+export { MarkdownLink, type MarkdownLinkProps } from "../renderer/MarkdownLink";
 export { ConversationWidgetHost, type ConversationWidgetRenderProps } from "../renderer/ConversationWidgetHost";
 export { ConversationWidgetErrorBoundary } from "../renderer/ConversationWidgetErrorBoundary";
 export {

@@ -305,11 +305,11 @@ $agents-icon-glyphs: (
 }
 
 .agents-button--muted {
-  background: rgba(var(--agents-fg-rgb), 0.06);
+  background: color-mix(in srgb, var(--agents-fg) 6%, transparent);
   color: var(--agents-fg);
 
   &:hover:not(:disabled) {
-    background: rgba(var(--agents-fg-rgb), 0.1);
+    background: color-mix(in srgb, var(--agents-fg) 10%, transparent);
   }
 }
 
@@ -339,16 +339,16 @@ $agents-icon-glyphs: (
 }
 
 .agents-button--pressed {
-  background: rgba(var(--agents-fg-cta-rgb), 0.12);
+  background: color-mix(in srgb, var(--agents-fg-cta) 12%, transparent);
   color: var(--agents-fg-cta);
 }
 
 .agents-button--on-dark {
-  background: rgba(var(--agents-bg-dark-rgb), 0.55);
+  background: color-mix(in srgb, var(--agents-bg-dark) 55%, transparent);
   color: var(--agents-fg-on-dark);
 
   &:hover:not(:disabled) {
-    background: rgba(var(--agents-bg-dark-rgb), 0.7);
+    background: color-mix(in srgb, var(--agents-bg-dark) 70%, transparent);
   }
 }
 
@@ -385,18 +385,18 @@ $agents-icon-glyphs: (
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    background: rgba(var(--agents-fg-rgb), 0);
+    background: color-mix(in srgb, var(--agents-fg) 0%, transparent);
     pointer-events: none;
     transition: background-color $agents-motion;
     @include agents-reduced-motion;
   }
 
   &:hover::after {
-    background: rgba(var(--agents-fg-rgb), 0.04);
+    background: color-mix(in srgb, var(--agents-fg) 4%, transparent);
   }
 
   &:active::after {
-    background: rgba(var(--agents-fg-rgb), 0.08);
+    background: color-mix(in srgb, var(--agents-fg) 8%, transparent);
   }
 }
 
@@ -416,7 +416,7 @@ $agents-icon-glyphs: (
 
 .agents-skeleton {
   display: block;
-  background: rgba(var(--agents-fg-rgb), 0.08);
+  background: color-mix(in srgb, var(--agents-fg) 8%, transparent);
   animation: agents-skeleton-pulse 1.4s ease-in-out infinite;
   @include agents-reduced-motion;
 }
@@ -426,7 +426,7 @@ $agents-icon-glyphs: (
   box-sizing: border-box;
   width: $x2_5;
   height: $x2_5;
-  border: $x0_25 solid rgba(var(--agents-fg-rgb), 0.15);
+  border: $x0_25 solid color-mix(in srgb, var(--agents-fg) 15%, transparent);
   border-top-color: var(--agents-fg-cta);
   border-radius: 50%;
   animation: agents-spin 0.8s linear infinite;
@@ -466,10 +466,10 @@ $agents-icon-glyphs: (
   border-radius: $card-radius;
   // A frame with a `borderWidth` and no `color` (the chat's composer) draws its border in the glow's tint, not in the
   // text colour a bare `border-style` would fall back to.
-  border-color: rgba(var(--agents-fg-cta-rgb), 0.35);
+  border-color: color-mix(in srgb, var(--agents-fg-cta) 35%, transparent);
   box-shadow:
-    0 0 0 1px rgba(var(--agents-fg-cta-rgb), 0.35),
-    0 0 $x2 rgba(var(--agents-fg-cta-rgb), 0.2);
+    0 0 0 1px color-mix(in srgb, var(--agents-fg-cta) 35%, transparent),
+    0 0 $x2 color-mix(in srgb, var(--agents-fg-cta) 20%, transparent);
 }
 
 // ── Trend delta, status badge, segment bar ──────────────────────────────────────────────────────────────────────────
@@ -523,7 +523,7 @@ $agents-status-tones: (
 }
 
 .agents-segment-bar {
-  background: rgba(var(--agents-fg-rgb), 0.08);
+  background: color-mix(in srgb, var(--agents-fg) 8%, transparent);
 }
 
 // ── Form controls ───────────────────────────────────────────────────────────────────────────────────────────────────
@@ -570,7 +570,7 @@ $agents-status-tones: (
   &:focus {
     outline: none;
     border-color: var(--agents-fg-cta);
-    box-shadow: 0 0 0 $agents-focus-glow-spread rgba(var(--agents-fg-cta-rgb), 0.18);
+    box-shadow: 0 0 0 $agents-focus-glow-spread color-mix(in srgb, var(--agents-fg-cta) 18%, transparent);
   }
 
   &:disabled {
@@ -660,7 +660,7 @@ $agents-status-tones: (
 .agents-tabs__tab--selected {
   background: var(--agents-bg-surface);
   color: var(--agents-fg);
-  box-shadow: 0 1px $x0_25 rgba(var(--agents-shadow-rgb), 0.12);
+  box-shadow: 0 1px $x0_25 color-mix(in srgb, var(--agents-shadow) 12%, transparent);
 }
 
 // ── Split view ──────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -731,12 +731,32 @@ $agents-status-tones: (
     margin: 0 0 $x1_5;
   }
 
+  // Set explicitly, not left to the browser: a host's reset (`h1 { font: inherit }`, `ul { list-style: none }`,
+  // `a { text-decoration: none }`) must not flatten a reply's structure.
   h1,
   h2,
   h3,
-  h4 {
+  h4,
+  h5,
+  h6 {
     margin: $x2 0 $x1;
+    font-weight: 700;
     line-height: 1.3;
+  }
+
+  h5,
+  h6 {
+    font-size: 0.875rem;
+  }
+
+  strong,
+  b {
+    font-weight: 700;
+  }
+
+  em,
+  i {
+    font-style: italic;
   }
 
   h1 {
@@ -758,14 +778,41 @@ $agents-status-tones: (
   ul,
   ol {
     padding-left: $x3;
+    list-style-position: outside;
+  }
+
+  ul {
+    list-style-type: disc;
+  }
+
+  ul ul {
+    list-style-type: circle;
+  }
+
+  ul ul ul {
+    list-style-type: square;
+  }
+
+  ol {
+    list-style-type: decimal;
+  }
+
+  li {
+    display: list-item;
   }
 
   li + li {
     margin-top: $x0_5;
   }
 
+  li > ul,
+  li > ol {
+    margin: $x0_5 0 0;
+  }
+
   a {
     color: var(--agents-fg-cta);
+    text-decoration-line: underline;
   }
 
   code {

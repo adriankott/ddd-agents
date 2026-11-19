@@ -1,0 +1,1617 @@
+{
+  "keys": [
+    {
+      "key": " System",
+      "defaultText": " System",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationMessage/ConversationMessageSystem/ConversationMessageSystemHeader/ConversationMessageSystemHeader.tsx"
+      ]
+    },
+    {
+      "key": "\"%query%\"",
+      "defaultText": "\"%query%\"",
+      "placeholders": [
+        "query"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/WebSearchResultsConversationWidget/WebSearchResultsCanvas.tsx"
+      ]
+    },
+    {
+      "key": "%conversion% of the previous stage",
+      "defaultText": "%conversion% of the previous stage",
+      "placeholders": [
+        "conversion"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/kit/components/data/ChartFunnelRows/ChartFunnelRows.tsx"
+      ]
+    },
+    {
+      "key": "%count% character",
+      "defaultText": "%count% character",
+      "placeholders": [
+        "count"
+      ],
+      "contexts": [
+        "one",
+        "other"
+      ],
+      "usedIn": [
+        "src/widgets/WritingDraftConversationWidget/WritingDraftWidget/WritingDraftWidget.tsx"
+      ]
+    },
+    {
+      "key": "%count% conversations matched",
+      "defaultText": "%count% conversations matched",
+      "placeholders": [
+        "count"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/ConversationSearchResultsConversationWidget/ConversationSearchResultsConversationWidget.tsx"
+      ]
+    },
+    {
+      "key": "%count% place",
+      "defaultText": "%count% place",
+      "placeholders": [
+        "count"
+      ],
+      "contexts": [
+        "one",
+        "other"
+      ],
+      "usedIn": [
+        "src/kit/components/map/ComposedMapView.tsx"
+      ]
+    },
+    {
+      "key": "%count% view",
+      "defaultText": "%count% view",
+      "placeholders": [
+        "count"
+      ],
+      "contexts": [
+        "one",
+        "other"
+      ],
+      "usedIn": [
+        "src/kit/components/media/video-widget/VideoWidget.composed.tsx"
+      ]
+    },
+    {
+      "key": "%position% of %count%",
+      "defaultText": "%position% of %count%",
+      "placeholders": [
+        "count",
+        "position"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/kit/components/layout/Carousel.composed.tsx"
+      ]
+    },
+    {
+      "key": "%productName% Assistant",
+      "defaultText": "%productName% Assistant",
+      "placeholders": [
+        "productName"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationMessage/ConversationMessageWidgets/ConversationMessageHeader/ConversationMessageHeader.tsx"
+      ]
+    },
+    {
+      "key": "AI Extensions",
+      "defaultText": "AI Extensions",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationMessage/ConversationMessageSystem/ConversationMessageSystemHeader/ConversationMessageSystemHeader.tsx",
+        "src/chat/ConversationMessage/ConversationMessageWidgets/ConversationMessageHeader/ConversationMessageHeader.tsx"
+      ]
+    },
+    {
+      "key": "About this entry",
+      "defaultText": "About this entry",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/EntityMentionConversationWidget/EntityMentionChip/EntityMentionChip.tsx",
+        "src/widgets/EntityMentionConversationWidget/shared/entity-mention-presentation.ts"
+      ]
+    },
+    {
+      "key": "About:",
+      "defaultText": "About:",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/EntityMentionConversationWidget/EntityMentionChip/EntityMentionChip.tsx"
+      ]
+    },
+    {
+      "key": "Added to your message",
+      "defaultText": "Added to your message",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/EntityMentionConversationWidget/EntityMentionAskButton/EntityMentionAskButton.tsx"
+      ]
+    },
+    {
+      "key": "Almost ready…",
+      "defaultText": "Almost ready…",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationMessage/ConversationMessageWidgets/ConversationMessageThinking/ConversationMessageThinking.tsx"
+      ]
+    },
+    {
+      "key": "As of %captureMoment%",
+      "defaultText": "As of %captureMoment%",
+      "placeholders": [
+        "captureMoment"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/ClockConversationWidget/ClockWidget/ClockWidget.tsx"
+      ]
+    },
+    {
+      "key": "Ask about this",
+      "defaultText": "Ask about this",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/EntityMentionConversationWidget/EntityMentionAskButton/EntityMentionAskButton.tsx"
+      ]
+    },
+    {
+      "key": "Ask anything",
+      "defaultText": "Ask anything",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationMessageInput/ConversationMessageInput.tsx"
+      ]
+    },
+    {
+      "key": "Asking about",
+      "defaultText": "Asking about",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/EntityMentionConversationWidget/EntityMentionWidgetBody/EntityMentionWidgetBody.tsx"
+      ]
+    },
+    {
+      "key": "Assistant",
+      "defaultText": "Assistant",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationMessage/ConversationMessageWidgets/ConversationMessageHeader/ConversationMessageHeader.tsx"
+      ]
+    },
+    {
+      "key": "Clarifying response…",
+      "defaultText": "Clarifying response…",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationMessage/ConversationMessageWidgets/ConversationMessageThinking/ConversationMessageThinking.tsx"
+      ]
+    },
+    {
+      "key": "Clear all",
+      "defaultText": "Clear all",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/MultiChoiceConversationWidget/MultiChoiceConversationWidget.tsx"
+      ]
+    },
+    {
+      "key": "Close canvas",
+      "defaultText": "Close canvas",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/CanvasPane/CanvasPane.tsx"
+      ]
+    },
+    {
+      "key": "Close the full-screen map",
+      "defaultText": "Close the full-screen map",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/kit/components/map/ComposedMapView.tsx"
+      ]
+    },
+    {
+      "key": "Confirm %count% selection",
+      "defaultText": "Confirm %count% selection",
+      "placeholders": [
+        "count"
+      ],
+      "contexts": [
+        "one",
+        "other"
+      ],
+      "usedIn": [
+        "src/widgets/MultiChoiceConversationWidget/MultiChoiceConversationWidget.tsx"
+      ]
+    },
+    {
+      "key": "Confirm selection",
+      "defaultText": "Confirm selection",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/MultiChoiceConversationWidget/MultiChoiceConversationWidget.tsx"
+      ]
+    },
+    {
+      "key": "Conversation closed",
+      "defaultText": "Conversation closed",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationErrorWidget/ConversationErrorWidget.tsx"
+      ]
+    },
+    {
+      "key": "Conversation data as of %dataTime%",
+      "defaultText": "Conversation data as of %dataTime%",
+      "placeholders": [
+        "dataTime"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/image-render/ComposedViewEmailDataTimes/ComposedViewEmailDataTimes.tsx"
+      ]
+    },
+    {
+      "key": "Conversation data as of the time of the report",
+      "defaultText": "Conversation data as of the time of the report",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/image-render/ComposedViewEmailDataTimes/ComposedViewEmailDataTimes.tsx"
+      ]
+    },
+    {
+      "key": "Copied",
+      "defaultText": "Copied",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/kit/components/inputs/Button.composed.tsx",
+        "src/kit/components/rich/Code.composed.tsx",
+        "src/widgets/WritingDraftConversationWidget/WritingDraftWidget/WritingDraftWidget.tsx"
+      ]
+    },
+    {
+      "key": "Copy",
+      "defaultText": "Copy",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/kit/components/rich/Code.composed.tsx",
+        "src/widgets/WritingDraftConversationWidget/WritingDraftWidget/WritingDraftWidget.tsx"
+      ]
+    },
+    {
+      "key": "Currency converter",
+      "defaultText": "Currency converter",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/CurrencyConverterConversationWidget/CurrencyConverterWidget/CurrencyConverterWidget.tsx"
+      ]
+    },
+    {
+      "key": "Custom visualization",
+      "defaultText": "Custom visualization",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/CustomVisualizationConversationWidget/CustomVisualizationWidget/CustomVisualizationFrame.tsx"
+      ]
+    },
+    {
+      "key": "Day",
+      "defaultText": "Day",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/ClockConversationWidget/ClockWidget/ClockRow.tsx"
+      ]
+    },
+    {
+      "key": "Discard changes",
+      "defaultText": "Discard changes",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/WritingDraftConversationWidget/WritingDraftWidget/WritingDraftWidget.tsx"
+      ]
+    },
+    {
+      "key": "Done",
+      "defaultText": "Done",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/WritingDraftConversationWidget/WritingDraftWidget/WritingDraftWidget.tsx"
+      ]
+    },
+    {
+      "key": "E-mail draft",
+      "defaultText": "E-mail draft",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/WritingDraftConversationWidget/WritingDraftWidget/WritingDraftWidget.tsx"
+      ]
+    },
+    {
+      "key": "Edit",
+      "defaultText": "Edit",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/WritingDraftConversationWidget/WritingDraftWidget/WritingDraftWidget.tsx"
+      ]
+    },
+    {
+      "key": "Edited by you",
+      "defaultText": "Edited by you",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/WritingDraftConversationWidget/WritingDraftWidget/WritingDraftWidget.tsx"
+      ]
+    },
+    {
+      "key": "Enter an amount, such as 250 or 1,250.75",
+      "defaultText": "Enter an amount, such as 250 or 1,250.75",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/CurrencyConverterConversationWidget/CurrencyConverterWidget/CurrencyConverterWidget.tsx"
+      ]
+    },
+    {
+      "key": "Gathering business data…",
+      "defaultText": "Gathering business data…",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationMessage/ConversationMessageWidgets/ConversationMessageThinking/ConversationMessageThinking.tsx"
+      ]
+    },
+    {
+      "key": "Hide task instruction",
+      "defaultText": "Hide task instruction",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationMessage/ConversationTaskInstructionDisclosure/ConversationTaskInstructionDisclosure.tsx"
+      ]
+    },
+    {
+      "key": "Interactive visualization — open the conversation to use it.",
+      "defaultText": "Interactive visualization — open the conversation to use it.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/CustomVisualizationConversationWidget/CustomVisualizationWidget/CustomVisualizationWidget.tsx"
+      ]
+    },
+    {
+      "key": "Letter draft",
+      "defaultText": "Letter draft",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/WritingDraftConversationWidget/WritingDraftWidget/WritingDraftWidget.tsx"
+      ]
+    },
+    {
+      "key": "Limit reached",
+      "defaultText": "Limit reached",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationErrorWidget/ConversationErrorWidget.tsx"
+      ]
+    },
+    {
+      "key": "Live data as of %dataTime%",
+      "defaultText": "Live data as of %dataTime%",
+      "placeholders": [
+        "dataTime"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/image-render/ComposedViewEmailDataTimes/ComposedViewEmailDataTimes.tsx"
+      ]
+    },
+    {
+      "key": "Loading older messages…",
+      "defaultText": "Loading older messages…",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationViewBody/ConversationViewBody.tsx"
+      ]
+    },
+    {
+      "key": "Message draft",
+      "defaultText": "Message draft",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/WritingDraftConversationWidget/WritingDraftWidget/WritingDraftWidget.tsx"
+      ]
+    },
+    {
+      "key": "Network error",
+      "defaultText": "Network error",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationErrorWidget/ConversationErrorWidget.tsx"
+      ]
+    },
+    {
+      "key": "Next picture",
+      "defaultText": "Next picture",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/kit/components/media/ImageGroup.composed.tsx"
+      ]
+    },
+    {
+      "key": "Night",
+      "defaultText": "Night",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/ClockConversationWidget/ClockWidget/ClockRow.tsx"
+      ]
+    },
+    {
+      "key": "No",
+      "defaultText": "No",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/kit/components/data/TableValue/TableValue.tsx"
+      ]
+    },
+    {
+      "key": "No data to show.",
+      "defaultText": "No data to show.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/kit/components/data/DataEmptyLine/DataEmptyLine.tsx"
+      ]
+    },
+    {
+      "key": "No explanation to show.",
+      "defaultText": "No explanation to show.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/ConceptExplainerConversationWidget/ConceptExplainerConversationWidget.tsx"
+      ]
+    },
+    {
+      "key": "No map available.",
+      "defaultText": "No map available.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/provider/components/default-components.tsx"
+      ]
+    },
+    {
+      "key": "No pictures to show.",
+      "defaultText": "No pictures to show.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/kit/components/media/ImageGroup.composed.tsx"
+      ]
+    },
+    {
+      "key": "No recipient yet",
+      "defaultText": "No recipient yet",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/WritingDraftConversationWidget/WritingDraftWidget/WritingDraftWidget.tsx"
+      ]
+    },
+    {
+      "key": "No subject yet",
+      "defaultText": "No subject yet",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/WritingDraftConversationWidget/WritingDraftWidget/WritingDraftWidget.tsx"
+      ]
+    },
+    {
+      "key": "No time zone to show.",
+      "defaultText": "No time zone to show.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/ClockConversationWidget/ClockConversationWidget.tsx"
+      ]
+    },
+    {
+      "key": "Older interactive content is hidden.",
+      "defaultText": "Older interactive content is hidden.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/renderer/WindowedWidget/WindowedWidget.tsx"
+      ]
+    },
+    {
+      "key": "Open in canvas",
+      "defaultText": "Open in canvas",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/CanvasLauncherWidget/CanvasLauncherWidget.tsx"
+      ]
+    },
+    {
+      "key": "Open in mail",
+      "defaultText": "Open in mail",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/WritingDraftConversationWidget/WritingDraftWidget/WritingDraftWidget.tsx"
+      ]
+    },
+    {
+      "key": "Open on YouTube",
+      "defaultText": "Open on YouTube",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/kit/components/media/video-widget/VideoWidget.composed.tsx"
+      ]
+    },
+    {
+      "key": "Open the gallery at %alt%, %count% more picture",
+      "defaultText": "Open the gallery at %alt%, %count% more picture",
+      "placeholders": [
+        "alt",
+        "count"
+      ],
+      "contexts": [
+        "one",
+        "other"
+      ],
+      "usedIn": [
+        "src/kit/components/media/MediaImageTile.tsx"
+      ]
+    },
+    {
+      "key": "Open the map in full screen",
+      "defaultText": "Open the map in full screen",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/kit/components/map/ComposedMapView.tsx"
+      ]
+    },
+    {
+      "key": "Open the picture %alt% full size",
+      "defaultText": "Open the picture %alt% full size",
+      "placeholders": [
+        "alt"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/kit/components/media/MediaImageTile.tsx"
+      ]
+    },
+    {
+      "key": "Open video",
+      "defaultText": "Open video",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/kit/components/media/Video.composed.tsx"
+      ]
+    },
+    {
+      "key": "Opened %label%",
+      "defaultText": "Opened %label%",
+      "placeholders": [
+        "label"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/ToolTraceConversationWidget/ToolTraceConversationWidget.tsx"
+      ]
+    },
+    {
+      "key": "Part of this visualization could not run.",
+      "defaultText": "Part of this visualization could not run.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/CustomVisualizationConversationWidget/CustomVisualizationWidget/CustomVisualizationFrame.tsx"
+      ]
+    },
+    {
+      "key": "Phone call declined",
+      "defaultText": "Phone call declined",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationMessage/ConversationCallMarkerChip/ConversationCallMarkerChip.tsx"
+      ]
+    },
+    {
+      "key": "Phone call ended",
+      "defaultText": "Phone call ended",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationMessage/ConversationCallMarkerChip/ConversationCallMarkerChip.tsx"
+      ]
+    },
+    {
+      "key": "Phone call not answered",
+      "defaultText": "Phone call not answered",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationMessage/ConversationCallMarkerChip/ConversationCallMarkerChip.tsx"
+      ]
+    },
+    {
+      "key": "Phone call started",
+      "defaultText": "Phone call started",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationMessage/ConversationCallMarkerChip/ConversationCallMarkerChip.tsx"
+      ]
+    },
+    {
+      "key": "Planning what to do…",
+      "defaultText": "Planning what to do…",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationMessage/ConversationMessageWidgets/ConversationMessageThinking/ConversationMessageThinking.tsx"
+      ]
+    },
+    {
+      "key": "Play the video %title%",
+      "defaultText": "Play the video %title%",
+      "placeholders": [
+        "title"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/kit/components/media/Video.composed.tsx",
+        "src/kit/components/media/video-widget/VideoWidget.composed.tsx"
+      ]
+    },
+    {
+      "key": "Please fill in the required fields.",
+      "defaultText": "Please fill in the required fields.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/kit/components/form/Form.composed.tsx"
+      ]
+    },
+    {
+      "key": "Post draft",
+      "defaultText": "Post draft",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/WritingDraftConversationWidget/WritingDraftWidget/WritingDraftWidget.tsx"
+      ]
+    },
+    {
+      "key": "Previous picture",
+      "defaultText": "Previous picture",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/kit/components/media/ImageGroup.composed.tsx"
+      ]
+    },
+    {
+      "key": "Processing...",
+      "defaultText": "Processing...",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationMessageInput/ConversationMessageInputAttachments/ConversationMessageInputAttachmentPreviewWidget.tsx"
+      ]
+    },
+    {
+      "key": "Rate of %rateDate%",
+      "defaultText": "Rate of %rateDate%",
+      "placeholders": [
+        "rateDate"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/CurrencyConverterConversationWidget/CurrencyConverterWidget/CurrencyConverterWidget.tsx"
+      ]
+    },
+    {
+      "key": "Re-open canvas",
+      "defaultText": "Re-open canvas",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationView.tsx"
+      ]
+    },
+    {
+      "key": "Recipient",
+      "defaultText": "Recipient",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/WritingDraftConversationWidget/WritingDraftWidget/WritingDraftWidget.tsx"
+      ]
+    },
+    {
+      "key": "Reply draft",
+      "defaultText": "Reply draft",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/WritingDraftConversationWidget/WritingDraftWidget/WritingDraftWidget.tsx"
+      ]
+    },
+    {
+      "key": "Resize canvas",
+      "defaultText": "Resize canvas",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/CanvasResizeHandle/CanvasResizeHandle.tsx"
+      ]
+    },
+    {
+      "key": "Retry",
+      "defaultText": "Retry",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationErrorWidget/ConversationErrorWidget.tsx"
+      ]
+    },
+    {
+      "key": "Right: change in percent",
+      "defaultText": "Right: change in percent",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/kit/components/data/Chart.composed.tsx"
+      ]
+    },
+    {
+      "key": "Right: change in percentage points",
+      "defaultText": "Right: change in percentage points",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/kit/components/data/Chart.composed.tsx"
+      ]
+    },
+    {
+      "key": "Running: %tool%...",
+      "defaultText": "Running: %tool%...",
+      "placeholders": [
+        "tool"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/controller/derive-agent-activity.ts"
+      ]
+    },
+    {
+      "key": "Search results for \"%query%\"",
+      "defaultText": "Search results for \"%query%\"",
+      "placeholders": [
+        "query"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/ConversationSearchResultsConversationWidget/ConversationSearchResultsCanvas.tsx",
+        "src/widgets/ConversationSearchResultsConversationWidget/ConversationSearchResultsConversationWidget.tsx"
+      ]
+    },
+    {
+      "key": "Select all",
+      "defaultText": "Select all",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/MultiChoiceConversationWidget/MultiChoiceConversationWidget.tsx"
+      ]
+    },
+    {
+      "key": "Send",
+      "defaultText": "Send",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/kit/components/form/Form.composed.tsx"
+      ]
+    },
+    {
+      "key": "Show",
+      "defaultText": "Show",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/renderer/WindowedWidget/WindowedWidget.tsx"
+      ]
+    },
+    {
+      "key": "Show all %lineCount% lines",
+      "defaultText": "Show all %lineCount% lines",
+      "placeholders": [
+        "lineCount"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/kit/components/rich/Code.composed.tsx"
+      ]
+    },
+    {
+      "key": "Show fewer lines",
+      "defaultText": "Show fewer lines",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/kit/components/rich/Code.composed.tsx"
+      ]
+    },
+    {
+      "key": "Show hidden widget",
+      "defaultText": "Show hidden widget",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/renderer/WindowedWidget/WindowedWidget.tsx"
+      ]
+    },
+    {
+      "key": "Show less",
+      "defaultText": "Show less",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/kit/components/text/Text.composed.tsx"
+      ]
+    },
+    {
+      "key": "Show more",
+      "defaultText": "Show more",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/kit/components/text/Text.composed.tsx"
+      ]
+    },
+    {
+      "key": "Show task instruction",
+      "defaultText": "Show task instruction",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationMessage/ConversationTaskInstructionDisclosure/ConversationTaskInstructionDisclosure.tsx"
+      ]
+    },
+    {
+      "key": "Show the next slides",
+      "defaultText": "Show the next slides",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/kit/components/layout/Carousel.composed.tsx",
+        "src/kit/components/map/MapPointCarousel.tsx"
+      ]
+    },
+    {
+      "key": "Show the previous slides",
+      "defaultText": "Show the previous slides",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/kit/components/layout/Carousel.composed.tsx",
+        "src/kit/components/map/MapPointCarousel.tsx"
+      ]
+    },
+    {
+      "key": "Showing data for %label%",
+      "defaultText": "Showing data for %label%",
+      "placeholders": [
+        "label"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/renderer/_agent-space/ConversationWidgetAgentSpaceHeader.tsx"
+      ]
+    },
+    {
+      "key": "Something new came up…",
+      "defaultText": "Something new came up…",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationMessage/ConversationMessageWidgets/ConversationMessageThinking/ConversationMessageThinking.tsx"
+      ]
+    },
+    {
+      "key": "Something went wrong",
+      "defaultText": "Something went wrong",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationErrorWidget/ConversationErrorWidget.tsx"
+      ]
+    },
+    {
+      "key": "Something went wrong. Please try again.",
+      "defaultText": "Something went wrong. Please try again.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/kit/components/form/Form.composed.tsx"
+      ]
+    },
+    {
+      "key": "Source",
+      "defaultText": "Source",
+      "placeholders": [],
+      "contexts": [
+        "one",
+        "other"
+      ],
+      "usedIn": [
+        "src/kit/components/text/SourceRef.composed.tsx"
+      ]
+    },
+    {
+      "key": "Sources",
+      "defaultText": "Sources",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/WebSearchResultsConversationWidget/WebSearchReferences.tsx",
+        "src/widgets/WebSearchResultsConversationWidget/WebSearchSourcesList.tsx"
+      ]
+    },
+    {
+      "key": "Subject",
+      "defaultText": "Subject",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/WritingDraftConversationWidget/WritingDraftWidget/WritingDraftWidget.tsx"
+      ]
+    },
+    {
+      "key": "Swap currencies",
+      "defaultText": "Swap currencies",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/CurrencyConverterConversationWidget/CurrencyConverterWidget/CurrencyConverterWidget.tsx"
+      ]
+    },
+    {
+      "key": "System",
+      "defaultText": "System",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationMessage/ConversationMessageSystem/ConversationMessageSystemHeader/ConversationMessageSystemHeader.tsx"
+      ]
+    },
+    {
+      "key": "Text draft",
+      "defaultText": "Text draft",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/WritingDraftConversationWidget/WritingDraftWidget/WritingDraftWidget.tsx"
+      ]
+    },
+    {
+      "key": "Text of the draft",
+      "defaultText": "Text of the draft",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/WritingDraftConversationWidget/WritingDraftWidget/WritingDraftWidget.tsx"
+      ]
+    },
+    {
+      "key": "The map could not be loaded.",
+      "defaultText": "The map could not be loaded.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/kit/components/map/ComposedMapView.tsx"
+      ]
+    },
+    {
+      "key": "The text is too long for a mail link: copy it and paste it into the e-mail.",
+      "defaultText": "The text is too long for a mail link: copy it and paste it into the e-mail.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/WritingDraftConversationWidget/WritingDraftWidget/WritingDraftWidget.tsx"
+      ]
+    },
+    {
+      "key": "The text of this draft is empty.",
+      "defaultText": "The text of this draft is empty.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/WritingDraftConversationWidget/WritingDraftWidget/WritingDraftWidget.tsx"
+      ]
+    },
+    {
+      "key": "The time zones of this clock are unknown.",
+      "defaultText": "The time zones of this clock are unknown.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/ClockConversationWidget/ClockConversationWidget.tsx"
+      ]
+    },
+    {
+      "key": "The visualization stopped working and was closed.",
+      "defaultText": "The visualization stopped working and was closed.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/CustomVisualizationConversationWidget/CustomVisualizationWidget/CustomVisualizationFrame.tsx"
+      ]
+    },
+    {
+      "key": "This business",
+      "defaultText": "This business",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/EntityMentionConversationWidget/shared/entity-mention-presentation.ts"
+      ]
+    },
+    {
+      "key": "This competitor",
+      "defaultText": "This competitor",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/EntityMentionConversationWidget/shared/entity-mention-presentation.ts"
+      ]
+    },
+    {
+      "key": "This conversation is closed.",
+      "defaultText": "This conversation is closed.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationClosedBar/ConversationClosedBar.tsx"
+      ]
+    },
+    {
+      "key": "This conversation is completed and closed. Please start a new conversation.",
+      "defaultText": "This conversation is completed and closed. Please start a new conversation.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationErrorWidget/ConversationErrorWidget.tsx"
+      ]
+    },
+    {
+      "key": "This detail cannot be shown here yet.",
+      "defaultText": "This detail cannot be shown here yet.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/kit/entity-detail/EntityDetailCanvasBody.tsx"
+      ]
+    },
+    {
+      "key": "This diagram could not be drawn.",
+      "defaultText": "This diagram could not be drawn.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/kit/components/rich/Diagram.composed.tsx"
+      ]
+    },
+    {
+      "key": "This draft could not be shown.",
+      "defaultText": "This draft could not be shown.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/WritingDraftConversationWidget/WritingDraftConversationWidget.tsx"
+      ]
+    },
+    {
+      "key": "This draft has no text yet.",
+      "defaultText": "This draft has no text yet.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/WritingDraftConversationWidget/WritingDraftConversationWidget.tsx"
+      ]
+    },
+    {
+      "key": "This explanation is not available.",
+      "defaultText": "This explanation is not available.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/ConceptExplainerConversationWidget/ConceptExplainerConversationWidget.tsx"
+      ]
+    },
+    {
+      "key": "This form can only be sent from the newest reply.",
+      "defaultText": "This form can only be sent from the newest reply.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/kit/components/form/Form.composed.tsx"
+      ]
+    },
+    {
+      "key": "This formula could not be rendered.",
+      "defaultText": "This formula could not be rendered.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/kit/components/rich/Math.composed.tsx"
+      ]
+    },
+    {
+      "key": "This graphic could not be shown.",
+      "defaultText": "This graphic could not be shown.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/kit/components/rich/Svg.composed.tsx"
+      ]
+    },
+    {
+      "key": "This keyword",
+      "defaultText": "This keyword",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/EntityMentionConversationWidget/shared/entity-mention-presentation.ts"
+      ]
+    },
+    {
+      "key": "This location",
+      "defaultText": "This location",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/EntityMentionConversationWidget/shared/entity-mention-presentation.ts"
+      ]
+    },
+    {
+      "key": "This map is no longer available.",
+      "defaultText": "This map is no longer available.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/kit/map-full-screen/MapFullScreenCanvasBody.tsx"
+      ]
+    },
+    {
+      "key": "This page",
+      "defaultText": "This page",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/EntityMentionConversationWidget/shared/entity-mention-presentation.ts"
+      ]
+    },
+    {
+      "key": "This post",
+      "defaultText": "This post",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/EntityMentionConversationWidget/shared/entity-mention-presentation.ts"
+      ]
+    },
+    {
+      "key": "This review",
+      "defaultText": "This review",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/EntityMentionConversationWidget/shared/entity-mention-presentation.ts"
+      ]
+    },
+    {
+      "key": "This view has nothing to show right now.",
+      "defaultText": "This view has nothing to show right now.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/kit/ComposedViewRenderer.tsx"
+      ]
+    },
+    {
+      "key": "This visualization could not be shown.",
+      "defaultText": "This visualization could not be shown.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/CustomVisualizationConversationWidget/CustomVisualizationConversationWidget.tsx"
+      ]
+    },
+    {
+      "key": "This widget shows data for %label%, not for what you currently have selected.",
+      "defaultText": "This widget shows data for %label%, not for what you currently have selected.",
+      "placeholders": [
+        "label"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/provider/environment.ts"
+      ]
+    },
+    {
+      "key": "To",
+      "defaultText": "To",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/WritingDraftConversationWidget/WritingDraftWidget/WritingDraftWidget.tsx"
+      ]
+    },
+    {
+      "key": "Today, %hourDifference% h",
+      "defaultText": "Today, %hourDifference% h",
+      "placeholders": [
+        "hourDifference"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/ClockConversationWidget/ClockWidget/ClockRow.tsx"
+      ]
+    },
+    {
+      "key": "Tomorrow, %hourDifference% h",
+      "defaultText": "Tomorrow, %hourDifference% h",
+      "placeholders": [
+        "hourDifference"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/ClockConversationWidget/ClockWidget/ClockRow.tsx"
+      ]
+    },
+    {
+      "key": "Upgrade Plan",
+      "defaultText": "Upgrade Plan",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationErrorWidget/ConversationErrorWidget.tsx"
+      ]
+    },
+    {
+      "key": "Upload failed",
+      "defaultText": "Upload failed",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationMessageInput/ConversationMessageInputAttachments/ConversationMessageInputAttachmentPreviewWidget.tsx"
+      ]
+    },
+    {
+      "key": "Uploading (%uploadProgressPercent%)...",
+      "defaultText": "Uploading (%uploadProgressPercent%)...",
+      "placeholders": [
+        "uploadProgressPercent"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationMessageInput/ConversationMessageInputAttachments/ConversationMessageInputAttachmentPreviewWidget.tsx"
+      ]
+    },
+    {
+      "key": "Usage limit reached",
+      "defaultText": "Usage limit reached",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationErrorWidget/ConversationErrorWidget.tsx"
+      ]
+    },
+    {
+      "key": "Voice chat did not connect",
+      "defaultText": "Voice chat did not connect",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationMessage/ConversationCallMarkerChip/ConversationCallMarkerChip.tsx"
+      ]
+    },
+    {
+      "key": "Voice chat ended",
+      "defaultText": "Voice chat ended",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationMessage/ConversationCallMarkerChip/ConversationCallMarkerChip.tsx"
+      ]
+    },
+    {
+      "key": "Voice chat started",
+      "defaultText": "Voice chat started",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationMessage/ConversationCallMarkerChip/ConversationCallMarkerChip.tsx"
+      ]
+    },
+    {
+      "key": "Waiting for %count% delegations...",
+      "defaultText": "Waiting for %count% delegations...",
+      "placeholders": [
+        "count"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/controller/derive-agent-activity.ts"
+      ]
+    },
+    {
+      "key": "Web search",
+      "defaultText": "Web search",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/WebSearchResultsConversationWidget/WebSearchResultsCanvas.tsx"
+      ]
+    },
+    {
+      "key": "We’re sorry, something went wrong. Please refresh the page or try again later.",
+      "defaultText": "We’re sorry, something went wrong. Please refresh the page or try again later.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationErrorWidget/ConversationErrorWidget.tsx"
+      ]
+    },
+    {
+      "key": "We’re sorry, something went wrong. Your message is saved — retry to have it answered.",
+      "defaultText": "We’re sorry, something went wrong. Your message is saved — retry to have it answered.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationErrorWidget/ConversationErrorWidget.tsx"
+      ]
+    },
+    {
+      "key": "Working on it…",
+      "defaultText": "Working on it…",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/AgentChatActivityIndicator/AgentChatActivityIndicator.tsx",
+        "src/chat/ConversationMessage/ConversationMessageWidgets/ConversationMessageThinking/ConversationMessageThinking.tsx"
+      ]
+    },
+    {
+      "key": "Wrap lines",
+      "defaultText": "Wrap lines",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/kit/components/rich/Code.composed.tsx"
+      ]
+    },
+    {
+      "key": "Yes",
+      "defaultText": "Yes",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/kit/components/data/TableValue/TableValue.tsx"
+      ]
+    },
+    {
+      "key": "Yesterday, %hourDifference% h",
+      "defaultText": "Yesterday, %hourDifference% h",
+      "placeholders": [
+        "hourDifference"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/ClockConversationWidget/ClockWidget/ClockRow.tsx"
+      ]
+    },
+    {
+      "key": "You declined a voice chat with %agentName%",
+      "defaultText": "You declined a voice chat with %agentName%",
+      "placeholders": [
+        "agentName"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationMessage/ConversationCallMarkerChip/ConversationCallMarkerChip.tsx"
+      ]
+    },
+    {
+      "key": "You missed a voice chat with %agentName%",
+      "defaultText": "You missed a voice chat with %agentName%",
+      "placeholders": [
+        "agentName"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationMessage/ConversationCallMarkerChip/ConversationCallMarkerChip.tsx"
+      ]
+    },
+    {
+      "key": "You've reached your AI usage limit for this hour. Please try again in about %retryAfterMinutes% minutes.",
+      "defaultText": "You've reached your AI usage limit for this hour. Please try again in about %retryAfterMinutes% minutes.",
+      "placeholders": [
+        "retryAfterMinutes"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationErrorWidget/ConversationErrorWidget.tsx"
+      ]
+    },
+    {
+      "key": "You've reached your AI usage limit for today. Please try again later.",
+      "defaultText": "You've reached your AI usage limit for today. Please try again later.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationErrorWidget/ConversationErrorWidget.tsx"
+      ]
+    },
+    {
+      "key": "You've reached your fair use limit for this month. This limit will reset on %resetDate%, or you can upgrade now to continue without interruption.",
+      "defaultText": "You've reached your fair use limit for this month. This limit will reset on %resetDate%, or you can upgrade now to continue without interruption.",
+      "placeholders": [
+        "resetDate"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationErrorWidget/ConversationErrorWidget.tsx"
+      ]
+    },
+    {
+      "key": "You've reached your fair use limit for this month. This limit will reset on %resetDate%.",
+      "defaultText": "You've reached your fair use limit for this month. This limit will reset on %resetDate%.",
+      "placeholders": [
+        "resetDate"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationErrorWidget/ConversationErrorWidget.tsx"
+      ]
+    },
+    {
+      "key": "You've reached your maximum monthly usage. This limit resets on %limitResetDate%, or you can upgrade now to continue without interruption.",
+      "defaultText": "You've reached your maximum monthly usage. This limit resets on %limitResetDate%, or you can upgrade now to continue without interruption.",
+      "placeholders": [
+        "limitResetDate"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationErrorWidget/ConversationErrorWidget.tsx"
+      ]
+    },
+    {
+      "key": "You've reached your maximum monthly usage. This limit resets on %limitResetDate%.",
+      "defaultText": "You've reached your maximum monthly usage. This limit resets on %limitResetDate%.",
+      "placeholders": [
+        "limitResetDate"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationErrorWidget/ConversationErrorWidget.tsx"
+      ]
+    },
+    {
+      "key": "You've sent a lot of AI requests in a short time. Please wait a minute and try again.",
+      "defaultText": "You've sent a lot of AI requests in a short time. Please wait a minute and try again.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationErrorWidget/ConversationErrorWidget.tsx"
+      ]
+    },
+    {
+      "key": "Your changes stay on this screen — the assistant does not see them.",
+      "defaultText": "Your changes stay on this screen — the assistant does not see them.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/WritingDraftConversationWidget/WritingDraftWidget/WritingDraftWidget.tsx"
+      ]
+    },
+    {
+      "key": "Your message is over the %maxLength% character limit",
+      "defaultText": "Your message is over the %maxLength% character limit",
+      "placeholders": [
+        "maxLength"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationMessageInput/ConversationMessageInput.tsx"
+      ]
+    },
+    {
+      "key": "carousel",
+      "defaultText": "carousel",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/kit/components/layout/Carousel.composed.tsx"
+      ]
+    },
+    {
+      "key": "slide",
+      "defaultText": "slide",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/kit/components/layout/Carousel.composed.tsx"
+      ]
+    },
+    {
+      "key": "the assistant",
+      "defaultText": "the assistant",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/provider/environment.ts"
+      ]
+    }
+  ]
+}

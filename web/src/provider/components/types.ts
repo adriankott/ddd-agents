@@ -163,7 +163,10 @@ export interface AgentsSplitViewPane {
 /** Two panes side by side; the side pane slides in over the right edge and covers the screen below a width. */
 export interface AgentsSplitViewProps {
   isSideOpen: boolean;
-  /** Below this viewport width the open side pane covers the main pane. */
+  /**
+   * Below this width the open side pane covers the main pane. The package default measures the split view's own box
+   * (the chat container); a replacement may keep reading the viewport.
+   */
   coversBelowWidth?: number;
   main: AgentsSplitViewPane;
   side: AgentsSplitViewPane;

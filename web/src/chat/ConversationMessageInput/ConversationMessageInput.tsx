@@ -11,7 +11,7 @@ import React, {
 import styles from "./ConversationMessageInput.module.scss";
 import type { ConversationAttachmentReference } from "../../contract/conversation";
 import { SendMessageHandler } from "../conversation-send-message";
-import { translateText } from "../../provider/environment";
+import { useAgentsTexts } from "../../provider/AgentsProvider";
 import { classNames } from "../../provider/class-names";
 import { ConversationComposerWidget } from "../../renderer/conversation-composer-widget";
 import { buildMessageTextWithComposerWidgets } from "../../renderer/composer-widget-fence";
@@ -177,10 +177,11 @@ export const ConversationMessageInput = (props: ConversationMessageInputProps) =
   const { removeComposerWidget, replaceComposerWidgetFields } = useConversationWidgetContext();
 
   const [inputValue, setInputValue] = useState("");
-  const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<HTMLSpanElement>(null);
   const isComposingRef = useRef(false);
-  const translatedPlaceholder = useMemo(() => translateText(placeholder), [placeholder]);
+  // Through the texts of this subtree (an `AgentsProvider` environment's `texts`, else the app-wide ones).
+  const texts = useAgentsTexts();
+  const translatedPlaceholder = useMemo(() => texts.translate(placeholder), [texts, placeholder]);
   const collapsedPillSizerRef = useRef<HTMLSpanElement>(null);
   const measuresCollapsedPillWidth = compact && !!onCollapsedPillWidthChange;
 
@@ -273,14 +274,6 @@ export const ConversationMessageInput = (props: ConversationMessageInputProps) =
   const handleCompositionEnd = () => {
     isComposingRef.current = false;
     handleInput();
-  };
-
-  const handleFocus = () => {
-    setIsFocused(true);
-  };
-
-  const handleBlur = () => {
-    setIsFocused(false);
   };
 
   const handleContainerMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -378,9 +371,9 @@ export const ConversationMessageInput = (props: ConversationMessageInputProps) =
             onCompositionStart={handleCompositionStart}
             onCompositionEnd={handleCompositionEnd}
             onKeyDown={handleKeyPress}
-            onFocus={handleFocus}
-            onBlur={handleBlur}
-            className={`${styles.editableInput} ${!inputValue && !isFocused ? styles.showPlaceholder : ""}`}
+            // The placeholder shows while the input is empty, focused or not: the chat focuses the input after every
+            // turn, and a focused empty input without it read as a field without purpose.
+            className={`${styles.editableInput} ${!inputValue ? styles.showPlaceholder : ""}`}
             data-placeholder={translatedPlaceholder}
             data-testid={`${testId}-textarea`}
           ></span>

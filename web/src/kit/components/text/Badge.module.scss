@@ -9,5 +9,5 @@
 // every scheme. The component library sets the fill as an inline style, which only `!important` outranks.
 .badge[data-tone="neutral"] > *,
 .badge[data-tone="muted"] > * {
-  background-color: rgba(var(--agents-bg-disabled-rgb), 0.16) !important;
+  background-color: color-mix(in srgb, var(--agents-bg-disabled) 16%, transparent) !important;
 }

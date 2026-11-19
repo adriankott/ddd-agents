@@ -37,7 +37,7 @@
 
   .markerChip[data-state="started"] & {
     background: var(--agents-success-500);
-    color: var(--agents-fg-on-dark);
+    color: var(--agents-fg-on-accent);
   }
 
   .markerChip[data-state="notConnected"] &,
