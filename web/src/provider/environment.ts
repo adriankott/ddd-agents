@@ -2,6 +2,7 @@ import type { ComponentType, ErrorInfo, ReactNode } from "react";
 import type { AgentsComponents } from "./components/types";
 import type { ConversationWidgetStatePartition } from "../renderer/conversation-widget-state-partition";
 import type { ChatAssistantCategory } from "../chat/chat-assistant-identity";
+import type { AgentChatActivityTiming } from "../chat/controller/chat-activity-timing";
 import type { ComposedNodeSchemaApplicationPart } from "../renderer/widget-tree/composed-node-schema";
 import type { CanvasBehaviour } from "../renderer/canvas/canvas-behaviours";
 import type { OpenEntityActionTarget } from "../renderer/canvas/entity-detail-instance";
@@ -150,6 +151,12 @@ export interface AgentsEnvironment {
   buildWidgetOfAnotherAgentSpaceExplanation?: (agentSpaceLabel: string) => string;
   /** The name the owner knows the agent by, for the interface texts that name it. Default: `the assistant`. */
   agentDisplayName?: string;
+  /**
+   * The timing of every chat's activity reads and working indicator, for the fields a chat's own `activityTiming`
+   * leaves out (`AgentChatActivityTiming`). Default: the package's values (one activity read per 3 s, a line at least
+   * 2.2 s beside the face). A host with a realtime push that writes `activityUpdatedAt` lowers the read window.
+   */
+  chatActivityTiming?: AgentChatActivityTiming;
   /** A React hook returning what the error card of a reached budget offers. Default: no upgrade, the plain wording. */
   useBudgetLimit?: () => AgentsBudgetLimit;
   /** A React hook returning the map script loader's state. Default: no maps. */

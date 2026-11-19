@@ -20,6 +20,10 @@ type Params = {
   /** Advances on every signal tick the host acts on (its message refetch); each advance asks for the activity too. */
   signalVersion: number;
   enabled?: boolean;
+  /** At most one request per this many milliseconds. Default {@link ACTIVITY_REQUEST_WINDOW_MS}. */
+  activityRequestWindowMs?: number;
+  /** The request cadence while a turn runs. Default {@link RUNNING_FLOOR_MS}. */
+  runningFloorMs?: number;
 };
 
 type Result = {
@@ -36,7 +40,7 @@ type Result = {
  * `getConversationActivity` (`AgentsConversationClientProvider`) while the customer watches a running turn and merges the answer into the stack. Frontend-driven on purpose: nothing is
  * generated for a hidden tab or a closed chat. The turn is pinned when it starts (`turnMessageId` from the first
  * answer), so a message the customer sends mid-turn does not move the window. Debounced to one request per
- * {@link ACTIVITY_REQUEST_WINDOW_MS} with one trailing request after a burst; a terminal status fires one request for
+ * {@link ACTIVITY_REQUEST_WINDOW_MS} (or the host's `activityRequestWindowMs`) with one trailing request after a burst; a terminal status fires one request for
  * the finished lines, and the requests go on until the endpoint answers that the turn ended — then the stack rests
  * until the next turn. A failed run ends the turn with that last request, whatever it answers, and so do
  * {@link MAX_FAILED_REQUESTS_AFTER_SIGNAL_ENDED} failed requests in a row once the signal stopped saying "running".
@@ -46,6 +50,8 @@ export const useConversationActivity = ({
   runStatus,
   signalVersion,
   enabled = true,
+  activityRequestWindowMs = ACTIVITY_REQUEST_WINDOW_MS,
+  runningFloorMs = RUNNING_FLOOR_MS,
 }: Params): Result => {
   const conversationClient = useAgentsConversationClient();
   const [elements, setElements] = useState<ActivityElement[]>([]);
@@ -127,7 +133,7 @@ export const useConversationActivity = ({
         return;
       }
       const sinceLast = Date.now() - lastRequestAtRef.current;
-      if (sinceLast >= ACTIVITY_REQUEST_WINDOW_MS) {
+      if (sinceLast >= activityRequestWindowMs) {
         void performRequest();
         return;
       }
@@ -135,10 +141,10 @@ export const useConversationActivity = ({
         trailingTimerRef.current = setTimeout(() => {
           trailingTimerRef.current = null;
           void performRequest();
-        }, ACTIVITY_REQUEST_WINDOW_MS - sinceLast);
+        }, activityRequestWindowMs - sinceLast);
       }
     },
-    [performRequest],
+    [performRequest, activityRequestWindowMs],
   );
   useEffect(() => {
     requestActivityRef.current = requestActivity;
@@ -186,7 +192,7 @@ export const useConversationActivity = ({
   // catch in performRequest bounds it: a failed run, or failed requests in a row, set `running` false.
   useEffect(() => {
     if (!enabled || (runStatus !== "running" && !running)) return;
-    const interval = setInterval(() => requestActivity(), RUNNING_FLOOR_MS);
+    const interval = setInterval(() => requestActivity(), runningFloorMs);
     const onVisibilityChange = () => {
       if (!document.hidden) requestActivity(true);
     };
@@ -195,7 +201,7 @@ export const useConversationActivity = ({
       clearInterval(interval);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [enabled, runStatus, running, requestActivity]);
+  }, [enabled, runStatus, running, requestActivity, runningFloorMs]);
 
   // A different conversation: nothing of the old one is shown.
   useEffect(() => {

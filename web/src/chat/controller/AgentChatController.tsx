@@ -16,6 +16,7 @@ import {
   type ConversationAttachmentReference,
   isAgentsClientError,
 } from "../../contract/conversation";
+import { useAgentsEnvironment } from "../../provider/AgentsProvider";
 import { reportRunningTurn } from "../../provider/environment";
 import { CanvasRestoreOnMount } from "../../renderer/canvas/CanvasRestoreOnMount";
 import { ConversationDeepLinkedWidget } from "../../renderer/ConversationDeepLinkedWidget";
@@ -30,6 +31,7 @@ import type { AgentsChatState } from "../store/agents-chat-state";
 import { ConversationErrorType } from "../store/conversation-error-type";
 import type { AgentsChatStore } from "../store/create-agents-chat-store";
 import { useAgentsChatSelector } from "../store/use-agents-chat-store";
+import { type AgentChatActivityTiming, resolveAgentChatActivityTiming } from "./chat-activity-timing";
 import type { ChatScrollTarget } from "./chat-scroll-target";
 import { deriveAgentActivity } from "./derive-agent-activity";
 import { isChatReadyToSendPendingStartRequest, type PendingStartRequest, pickPendingStartRequest } from "./pending-start-request";
@@ -98,6 +100,13 @@ export interface AgentChatControllerProps {
   scrollTarget?: ChatScrollTarget;
   /** Each finished turn's activity lines stay in the thread above its answer (rendered by `ActivityHistory`). */
   keepActivityHistoryAfterAnswer?: boolean;
+  /**
+   * The timing of the activity reads and of the working indicator's lines (the 3 s read window, the line paces, the
+   * success beat). Each field the chat leaves out comes from `AgentsEnvironment.chatActivityTiming`, else the package's
+   * value. A host whose realtime push writes `activityUpdatedAt` when the narrator finishes lowers the read window, so a
+   * narrated line shows at once.
+   */
+  activityTiming?: AgentChatActivityTiming;
   /** The host shows one conversation the owner may not leave: no starting ideas (the agent speaks first). */
   isPinnedToSingleConversation?: boolean;
   /** App extension of the widget context: the chat is the app's guided first-run setup. */
@@ -196,6 +205,7 @@ export const AgentChatController = (props: AgentChatControllerProps) => {
     initialComposerPrompt,
     scrollTarget,
     keepActivityHistoryAfterAnswer = false,
+    activityTiming,
     isPinnedToSingleConversation = false,
     isOnboardingSetupConversation = false,
     sendModelSource,
@@ -348,6 +358,11 @@ export const AgentChatController = (props: AgentChatControllerProps) => {
   });
 
   // What the agent is doing right now, one generated line per step, paced by the ticker.
+  const { chatActivityTiming: environmentActivityTiming } = useAgentsEnvironment();
+  const resolvedActivityTiming = useMemo(
+    () => resolveAgentChatActivityTiming(activityTiming, environmentActivityTiming),
+    [activityTiming, environmentActivityTiming],
+  );
   const {
     elements: activityElements,
     running: activityRunning,
@@ -355,9 +370,11 @@ export const AgentChatController = (props: AgentChatControllerProps) => {
   } = useConversationActivity({
     conversationId: liveConversationId ?? 0,
     runStatus,
-    // Every live read also asks for the activity lines; the hook throttles to one request per 3 s.
+    // Every live read also asks for the activity lines; the hook throttles to one request per read window (3 s default).
     signalVersion: liveReadCount,
     enabled: Boolean(liveConversationId),
+    activityRequestWindowMs: resolvedActivityTiming.activityRequestWindowMs,
+    runningFloorMs: resolvedActivityTiming.runningFloorMs,
   });
   const activityTicker = useActivityTicker({
     elements: activityElements,
@@ -365,6 +382,9 @@ export const AgentChatController = (props: AgentChatControllerProps) => {
     turnMessageId: activityTurnMessageId,
     failed: !!error,
     keepActivityHistoryAfterAnswer,
+    linePaceMs: resolvedActivityTiming.linePaceMs,
+    backlogLinePaceMs: resolvedActivityTiming.backlogLinePaceMs,
+    successBeatMs: resolvedActivityTiming.successBeatMs,
   });
 
   // The run status → the error card only (aiThinking follows the derived activity below). messages is a dependency:

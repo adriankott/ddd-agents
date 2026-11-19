@@ -6,8 +6,10 @@ import {
   countFinishedSteps,
   countWorkingHelpers,
   ActivityTickerPhase,
+  BACKLOG_LINE_PACE_MS,
   INITIAL_ACTIVITY_TICKER_STATE,
   KeptActivityTurn,
+  LINE_PACE_MS,
   msUntilNextActivityLine,
   shownLinesInOrder,
 } from "./activity-ticker";
@@ -33,6 +35,12 @@ interface UseActivityTickerParams {
    * it; false = they fade out with the line beside the face and nothing remains.
    */
   keepActivityHistoryAfterAnswer?: boolean;
+  /** The least time a line stands beside the face. Default `LINE_PACE_MS` (2200). */
+  linePaceMs?: number;
+  /** The shorter wait while more than two lines are queued. Default `BACKLOG_LINE_PACE_MS` (1400). */
+  backlogLinePaceMs?: number;
+  /** The success beat's rest. Default {@link SUCCESS_BEAT_MS}. */
+  successBeatMs?: number;
 }
 
 /** One turn's lines — the turn running now, in the face's success beat, or kept in the thread. */
@@ -83,7 +91,16 @@ const toKeptTurn = (keptTurn: KeptActivityTurn): ActivityTickerTurn => ({
  * {@link activityTickerReducer}; this hook only owns the timers.
  */
 export const useActivityTicker = (params: UseActivityTickerParams): ActivityTicker => {
-  const { elements, running, turnMessageId = null, failed = false, keepActivityHistoryAfterAnswer = false } = params;
+  const {
+    elements,
+    running,
+    turnMessageId = null,
+    failed = false,
+    keepActivityHistoryAfterAnswer = false,
+    linePaceMs = LINE_PACE_MS,
+    backlogLinePaceMs = BACKLOG_LINE_PACE_MS,
+    successBeatMs = SUCCESS_BEAT_MS,
+  } = params;
   const [state, dispatch] = useReducer(activityTickerReducer, INITIAL_ACTIVITY_TICKER_STATE);
 
   useEffect(() => {
@@ -103,20 +120,20 @@ export const useActivityTicker = (params: UseActivityTickerParams): ActivityTick
   // One timer for the next waiting line; every queue change re-plans it.
   useEffect(() => {
     if (state.phase !== "live") return undefined;
-    const waitMs = msUntilNextActivityLine(state.queue, Date.now());
+    const waitMs = msUntilNextActivityLine(state.queue, Date.now(), linePaceMs, backlogLinePaceMs);
     if (waitMs === null) return undefined;
     const timer = setTimeout(() => dispatch({ type: "nextLineDue", now: Date.now() }), waitMs);
     return () => clearTimeout(timer);
-  }, [state.phase, state.queue]);
+  }, [state.phase, state.queue, linePaceMs, backlogLinePaceMs]);
 
   useEffect(() => {
     if (state.phase !== "done") return undefined;
     const timer = setTimeout(
       () => dispatch({ type: "doneBeatOver", keepHistory: keepActivityHistoryAfterAnswer }),
-      SUCCESS_BEAT_MS,
+      successBeatMs,
     );
     return () => clearTimeout(timer);
-  }, [state.phase, keepActivityHistoryAfterAnswer]);
+  }, [state.phase, keepActivityHistoryAfterAnswer, successBeatMs]);
 
   return useMemo(() => {
     const { queue, phase } = state;

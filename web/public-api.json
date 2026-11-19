@@ -581,6 +581,7 @@
       "ConversationMessageWidgets",
       "ConversationView",
       "ConversationWidgetProvider",
+      "DEFAULT_AGENT_CHAT_ACTIVITY_TIMING",
       "EMPTY_AGENTS_CHAT_OPENING_REQUEST",
       "INITIAL_AGENTS_CHAT_STATE",
       "MAX_MESSAGE_LENGTH",
@@ -594,6 +595,7 @@
       "normalizeServerMessageToMarkdown",
       "readConversationErrorTypeOfRefusedSend",
       "reduceAgentsChatState",
+      "resolveAgentChatActivityTiming",
       "useActivityTicker",
       "useAgentsChatSelector",
       "useAgentsChatState",
@@ -612,6 +614,7 @@
       "AgentActivity",
       "AgentChatActivityHistoryProps",
       "AgentChatActivityProps",
+      "AgentChatActivityTiming",
       "AgentChatComposerHandle",
       "AgentChatControllerProps",
       "AgentChatProps",
@@ -643,6 +646,7 @@
       "ConversationViewProps",
       "ConversationWidgetProviderProps",
       "ConversationsSearchState",
+      "ResolvedAgentChatActivityTiming",
       "SendMessageHandler",
       "SendMessageOptions"
     ]

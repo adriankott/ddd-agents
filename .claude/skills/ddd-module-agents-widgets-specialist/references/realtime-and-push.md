@@ -69,7 +69,8 @@ The details a host relies on when it builds a client or a voice reader on top:
 - Every tool-call row is stored with status pending right before its own execution, so a read during a step sees it.
 - An element's state comes from its call row (`AgentActivityLine::STATE_QUEUED`, `STATE_RUNNING`, `STATE_FINISHED`,
   `STATE_FAILED`; `STATE_SKIPPED` for a call refused as a duplicate or by a gate); its kind is `KIND_TOOL`,
-  `KIND_DELEGATION`, `KIND_BACKGROUND`, `KIND_LONG` or `KIND_TURN_START` (the turn's opening line, always first).
+  `KIND_DELEGATION`, `KIND_BACKGROUND`, `KIND_LONG` or `KIND_TURN_START` (the turn's opening line, first when the
+  turn has one — see "The opening line" below).
   The tool calls of sub-agents join as elements with `$helperIndex`, one level deep.
 - A line is cached under the key "agentActivity:line:" + version + call row id + state + language; raising
   `AgentActivityLinesService::LINE_CACHE_VERSION` after a prompt change drops every cached line.
@@ -90,6 +91,33 @@ The details a host relies on when it builds a client or a voice reader on top:
 - `AgentActivityLinesService::isTurnRunning()` treats a turn as running while a run is in progress, an element is
   queued or running, or a sub-agent is not terminal — the parent conversation is idle while its sub-agents work, so the
   run state alone says nothing.
+
+**The opening line** ("I'm looking at …", kind `turnStart`, identity = the owner message's id) is built by
+`AgentActivityLinesService::buildTurnStartElement()` only when the turn-start decision of that owner message was
+APPLIED and said the agent works before it answers (`AgentTurnStartLineDecision::announcesTheTurnOfOwnerMessage()`).
+So a turn opens without it, by design, when any of these holds:
+
+- the decision layer does not run the site: the global `mode` of `AI.decisionModel` is `off` (the package's file ships
+  `off`), or the site `turnStartLine` is not listed `on` (an unlisted site is off; `shadow` only records), or the
+  conversation's kill switch is set;
+- nobody follows the turn: the owner is not present in the chat (a scheduled or platform run, an external agent), or a
+  call has no reader stamp; a delegation; a purpose that writes its own owner text;
+- the initiator carries no owner words (a signal-started turn, a widget click), its text is empty, or it is a chunk
+  resume of an owner turn already decided;
+- the decision model gave no usable answer (timeout, open breaker, budget refusal, unparsable) or put the probability
+  of work before the answer below `AgentTurnStartLineDecision::MINIMUM_WORK_BEFORE_ANSWER_PROBABILITY` (0.5);
+- the narrator wrote no line for it (no cache, a ceiling reached, a narrator failure): the element then carries a state
+  but no sentence, and the client shows only generated sentences.
+
+A host that wants the line sets `mode` and `sites.turnStartLine` to `on` in its own `config/app/AI/decisionModel.php`
+with a decision model configured; the decision site is the `ddd-module-agents-decisions-and-guards-specialist` skill's.
+
+**The client's timing.** The chat reads the activity at most once per `activityRequestWindowMs` (default 3000) and
+every `runningFloorMs` (4000) while a turn runs; a line stands at least `linePaceMs` (2200) beside the face,
+`backlogLinePaceMs` (1400) while more than two wait, and the success beat rests `successBeatMs` (1400). A host sets them
+per chat (`AgentChat activityTiming`) or for every chat (`AgentsEnvironment.chatActivityTiming`), each field falling
+back to the next and then to the package (`resolveAgentChatActivityTiming()`). With a realtime push that writes
+`activityUpdatedAt` when the narrator finishes, a lower read window shows a narrated line at once.
 
 Without a reader nothing is narrated: console, eval, scheduled and replay runs never dispatch. A narrator failure
 leaves the lines null; the client shows the states and the next read tries again. The narrator class names a fixed

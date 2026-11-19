@@ -149,10 +149,18 @@ export const receiveActivityElements = (
   return nextQueue;
 };
 
-/** Milliseconds until the next waiting line may be shown; null when nothing waits. */
-export const msUntilNextActivityLine = (queue: ActivityTickerQueue, now: number): number | null => {
+/**
+ * Milliseconds until the next waiting line may be shown; null when nothing waits. The paces default to
+ * {@link LINE_PACE_MS} and {@link BACKLOG_LINE_PACE_MS} (a host sets its own through the chat's `activityTiming`).
+ */
+export const msUntilNextActivityLine = (
+  queue: ActivityTickerQueue,
+  now: number,
+  linePaceMs: number = LINE_PACE_MS,
+  backlogLinePaceMs: number = BACKLOG_LINE_PACE_MS,
+): number | null => {
   if (queue.waitingLines.length === 0) return null;
-  const pace = queue.waitingLines.length > BACKLOG_THRESHOLD ? BACKLOG_LINE_PACE_MS : LINE_PACE_MS;
+  const pace = queue.waitingLines.length > BACKLOG_THRESHOLD ? backlogLinePaceMs : linePaceMs;
   return Math.max(0, queue.lastShownAt + pace - now);
 };
 

@@ -200,7 +200,11 @@ answer or switched off. The constant is on `AgentDecisionModelSettings`.
   attached).
 - **Returns:** the probability that the agent must read, search or change something before it can answer.
 - **Consequence:** at or above `AgentTurnStartLineDecision::MINIMUM_WORK_BEFORE_ANSWER_PROBABILITY` the activity stack
-  opens with one line written by the activity narrator (never by the decision model).
+  opens with one line written by the activity narrator (never by the decision model). Only under `on`: `shadow`
+  records the decision and shows no line.
+- **Default:** `off` when not listed (and the package's file has the global `mode: off`), so without a host
+  `decisionModel.php` that sets `mode` and `turnStartLine` to `on` no turn opens with the line. Every other skip:
+  the widgets skill, realtime-and-push, "The opening line".
 - **Service:** `AgentTurnStartLineDecisionsService`.
 
 ### `ownerMessageInjection` (`SITE_OWNER_MESSAGE_INJECTION`)

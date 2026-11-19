@@ -170,6 +170,19 @@
 
 ### Frontend (`@mgamadeus/ddd-agents`)
 
+- Added: the timing of the activity reads and of the working indicator as host options —
+  `AgentChat activityTiming` and `AgentsEnvironment.chatActivityTiming` (`AgentChatActivityTiming`:
+  `activityRequestWindowMs`, `runningFloorMs`, `linePaceMs`, `backlogLinePaceMs`, `successBeatMs`; each field from the
+  chat, then the environment, then the package: 3000, 4000, 2200, 1400, 1400 —
+  `resolveAgentChatActivityTiming()`, `DEFAULT_AGENT_CHAT_ACTIVITY_TIMING`). A host whose realtime push writes
+  `activityUpdatedAt` when the narrator finishes lowers the read window and shows a narrated line at once.
+  `useConversationActivity`, `useActivityTicker` and `msUntilNextActivityLine` take the values as trailing optional
+  parameters.
+- Docs: when a turn opens without the opening activity line ("I'm looking at …"): it needs the decision site
+  `turnStartLine` `on` (the package's `decisionModel.php` ships the global `mode: off`), an owner in the chat, an
+  owner message with words, a usable decision answer at or above 0.5 and a narrated sentence (widgets and decisions
+  skills).
+
 - Added: `createAgentsHttpConversationClient({ clientContext })` (`/client`): read on every start, posted message and
   injected signal and sent as the body field `clientContext`; `AgentsClientContext` and `AGENTS_CLIENT_CONTEXT_LIMITS`
   (`/contract`), `mapClientContextToWire`, `WireClientContext`, `AgentsClientContextOperation`. A field over its cap or

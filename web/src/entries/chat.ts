@@ -84,4 +84,10 @@ export type {
 } from "../chat/ConversationMessageInput/ConversationMessageInputAttachments/ConversationMessageInputAttachmentPreviewWidget";
 export type { AssistantServerMessagePayload } from "../chat/normalize-server-message-to-markdown";
 export { useActivityTicker, SUCCESS_BEAT_MS } from "../chat/controller/use-activity-ticker";
+export {
+  type AgentChatActivityTiming,
+  type ResolvedAgentChatActivityTiming,
+  DEFAULT_AGENT_CHAT_ACTIVITY_TIMING,
+  resolveAgentChatActivityTiming,
+} from "../chat/controller/chat-activity-timing";
 export { formatElapsedClock, isStepStillRunning, type ActivityTickerLine } from "../chat/controller/activity-ticker";
