@@ -2,6 +2,9 @@
 
 ## 0.1.3
 
+- Fixed: the judge's write ledger (`AIConversationAuditRenderService::isReadOnlyToolName()`) reads the tool's declared
+  `MCPToolEffect` instead of its name prefix, so a READ named `preview…` is no longer shown as a write. A name the effect
+  catalog does not know still falls back to the read prefixes.
 - **Schema:** one new nullable JSON column, `AIConversationMessages.clientContext` (the client context below). Apply it
   with the schema diff before the release goes live: the context load selects it and owner rows write it. A host with a
   table prefix or `tableNames` regenerates its models as always.

@@ -60,9 +60,17 @@ class AIConversationAuditRenderService extends Service
         return in_array($toolName, $aIConversationAuditRenderService->getRemovedOutwardActionToolNames(), true);
     }
 
-    /** A read / search / proposal / validation persists nothing. */
+    /**
+     * Whether a tool persists nothing: its declared {@see \DDD\Domain\AI\Entities\MCPPackages\MCPToolEffect} decides
+     * (a READ named `preview…` is a read). Only a name the effect catalog does not know (a tool bound to no skill)
+     * falls back to the read prefixes.
+     */
     public static function isReadOnlyToolName(string $toolName): bool
     {
+        $declaredEffect = MCPToolEffectCatalog::getEffectForToolName($toolName);
+        if ($declaredEffect !== null) {
+            return $declaredEffect->isReadOnly();
+        }
         foreach (['get', 'search', 'propose', 'resolve', 'validate', 'check', 'list', 'find'] as $readPrefix) {
             if (str_starts_with($toolName, $readPrefix)) {
                 return true;
