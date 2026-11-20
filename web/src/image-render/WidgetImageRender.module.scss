@@ -1,10 +1,11 @@
 @import "../styles/conversation-widget-container";
 
-// The capture page owns its document; the reset sits in the package's layer so a host page that shows the render
-// keeps its own (unlayered or later-layered) rules for `html` and `body`.
+// Only the page that holds a capture root, and inside the package's layer: the stylesheet is also loaded by
+// applications whose own pages keep their body spacing, and a host's own (unlayered or later-layered) rules for
+// `html` and `body` still win.
 @layer agents-defaults {
-  :global(html),
-  :global(body) {
+  :global(html):has(.root),
+  :global(body):has(.root) {
     margin: 0;
     padding: 0;
   }

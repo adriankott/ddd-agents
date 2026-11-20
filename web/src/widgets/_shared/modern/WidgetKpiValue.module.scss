@@ -35,9 +35,10 @@
   min-height: $x6;
 }
 
-// A text value is smaller than the hero, so it is centred in the hero's line box.
+// A text value is smaller than the hero; it sits on the bottom of the hero's line box like a number does, so a
+// one-line text value, a two-line one and a number end on the same line across a row of tiles.
 .textBlock {
-  justify-content: center;
+  justify-content: flex-end;
 }
 
 .textValue {

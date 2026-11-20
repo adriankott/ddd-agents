@@ -18,7 +18,7 @@ use DDD\Domain\Base\Entities\ObjectSet;
  * the transport level (timeout, connection) gets a null result and its reason instead of voiding its siblings, and
  * the trait classifies it as `transportFailed`. Never drive `ArgusApiOperations` by hand from a service.
  *
- * @property (ArgusAgentTurnStartDecision|ArgusAgentTurnClosingDecision|ArgusAgentStallRecoveryDecision|ArgusAgentOwnerMessageInjectionDecision|ArgusAgentToolResultInjectionDecision|ArgusAgentOwnerConsentDecision)[] $elements
+ * @property ArgusAgentTurnStartDecision[]|ArgusAgentTurnClosingDecision[]|ArgusAgentStallRecoveryDecision[]|ArgusAgentOwnerMessageInjectionDecision[]|ArgusAgentToolResultInjectionDecision[]|ArgusAgentOwnerConsentDecision[] $elements
  * @phpstan-consistent-constructor
  */
 class ArgusAgentDecisions extends ObjectSet

@@ -382,7 +382,8 @@ class DBAIConversation extends DBEntity
      * in via `COALESCE(rootConversationId, id)`, so a fork-join's spend lands on the customer conversation that
      * caused it): message count, tokens, cost. Ordered by one of the whitelisted columns (default: costliest
      * first), limited (default 50) — the "which conversations are expensive/long" breakdown, each row linkable to
-     * the admin inspector.
+     * the admin inspector. Counts the rows written within the range that are not truncated: a branch soft-deleted by an
+     * edit or a rewind is no longer part of the conversation, as in the conversation's own totals.
      *
      * @param string $orderBy 'totalCostInUSD' | 'totalTokens' | 'messageCount' (whitelisted; anything else falls back to cost)
      * @throws DBALException
@@ -430,6 +431,7 @@ class DBAIConversation extends DBEntity
                 JOIN `$conversationsTableName` `root` ON `root`.`id` = COALESCE(`conversation`.`rootConversationId`, `conversation`.`supervisedConversationId`, `conversation`.`id`)
                 WHERE `message`.`created` >= :from
                 AND `message`.`created` <= :to
+                AND `message`.`truncatedAt` IS NULL
                 GROUP BY `root`.`id`, `root`.`accountId`, `root`.`agentSpaceId`, `root`.`created`
                 ORDER BY `$innerOrderByColumn` DESC
                 LIMIT $limit
