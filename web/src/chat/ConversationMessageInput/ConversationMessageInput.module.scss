@@ -107,11 +107,8 @@ $collapsed-pill-padding-inline: $x2;
 // The one-line form: pill, text and send on one row, growing with the text up to a few lines.
 .compact {
   display: flex;
-  // Only the top slot wraps (`.compactTopSlot`); the text row never does. No gap between the two rows: the top slot's
-  // blocks bring their own spacing, and take no height while they are empty.
-  flex-wrap: wrap;
   align-items: flex-end;
-  gap: 0 $x1;
+  gap: $x1;
   padding: $x1 $x1 $x1 $x2_5;
   border-radius: var(--ai-border-radius);
   transition:
@@ -125,12 +122,23 @@ $collapsed-pill-padding-inline: $x2;
       max-width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
-  // A button left of the text (the "+" menu): the pill's left edge is as far from it as its right edge from send.
+  // `compactStackedSlots`: only the top slot wraps (`.compactTopSlot`); the text row never does. No gap between the two
+  // rows: the top slot's blocks bring their own spacing, and take no height while they are empty.
+  &.compactStacked {
+    flex-wrap: wrap;
+    gap: 0 $x1;
+
+    .actions {
+      height: $x5;
+    }
+  }
+
+  // A button left of the text (e.g. a "+" menu): the pill's left edge is as far from it as its right edge from send.
   &.compactWithActionsStart {
     padding-left: $x1;
   }
 
-  // The host's top slot (attachment previews and their error box) on a row of its own, the pill's full width.
+  // `compactStackedSlots`: the host's top slot (e.g. attachment previews) on a row of its own, the pill's full width.
   .compactTopSlot {
     flex: 0 0 100%;
     min-width: 0;
@@ -160,12 +168,10 @@ $collapsed-pill-padding-inline: $x2;
     padding: $x0_5 0;
   }
 
-  // The send button and at most one button beside it, in the 40px send row. A bounded width, so the pill can take it to
-  // 0 smoothly.
+  // The send button and at most one button beside it. A bounded width, so the pill can take it to 0 smoothly.
   .actions {
     flex-shrink: 0;
     max-width: 11 * $x1;
-    height: $x5;
     max-height: $x5;
     padding-top: 0;
   }

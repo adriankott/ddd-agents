@@ -77,8 +77,8 @@ class AIConversationMessagesRecentTurnTextsTest extends UnitTestCase
     /** An attached image is no owner words: its JSON never fills the cut, and a message of nothing but images is no turn. */
     public function testAnOwnerTurnCarriesOnlyTheWordsAndABlockOnlyOwnerRowIsNoTurn(): void
     {
-        $fence = "```widget\n{\"type\": \"AttachedFiles\", \"files\": [{\"fileId\": \"f1\", \"fileName\": \"storefront.jpg\", \"mimeType\": \"image/jpeg\"}]}\n```";
-        $assistantWidget = "Ist das Ihr Unternehmen?\n\n```widget\n{\"type\": \"BusinessMatchConfirm\"}\n```";
+        $fence = "```widget\n{\"type\": \"UploadedFiles\", \"files\": [{\"fileId\": \"f1\", \"fileName\": \"storefront.jpg\", \"mimeType\": \"image/jpeg\"}]}\n```";
+        $assistantWidget = "Ist das Ihr Unternehmen?\n\n```widget\n{\"type\": \"ConfirmChoice\"}\n```";
         $messages = new AIConversationMessages();
         foreach ([
             $this->message(AIConversationMessage::ROLE_USER, AIConversationMessage::AUTHOR_USER, AIConversationMessage::MESSAGE_TEXT, "Fă o postare cu pozele astea\n\n" . $fence, 0),

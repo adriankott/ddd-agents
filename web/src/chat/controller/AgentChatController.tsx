@@ -73,7 +73,7 @@ export interface AgentChatComposerHandle {
    */
   setComposerDraft: (text: string) => void;
   /** Focuses the composer, the caret at the end of its draft (e.g. after files were dropped on the chat). */
-  focusComposer: () => void;
+  focusComposer?: () => void;
 }
 
 /** Where the model of the next send comes from — read at send time (an admin's pick can change between renders). */
@@ -264,7 +264,7 @@ export const AgentChatController = (props: AgentChatControllerProps) => {
     composerRef,
     () => ({
       setComposerDraft: (text: string) => conversationMessageInputApiRef.current?.insertTextIntoInput(text),
-      focusComposer: () => conversationMessageInputApiRef.current?.focusInput(),
+      focusComposer: () => conversationMessageInputApiRef.current?.focusInput?.(),
     }),
     [],
   );

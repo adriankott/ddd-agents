@@ -1,6 +1,6 @@
 /** A file that is already in the project's media library, put into the chat composer without uploading it again. */
 export interface ComposerLibraryFile {
-  /** The Media Manager file id the agent's media tools address the file by. */
+  /** The library's file id the agent's media tools address the file by. */
   fileId: string;
   fileName: string;
   mimeType: string;

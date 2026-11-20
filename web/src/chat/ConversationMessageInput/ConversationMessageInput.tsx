@@ -40,8 +40,8 @@ export const CHARACTER_COUNTER_SHOWN_FROM_LENGTH = Math.floor(MAX_MESSAGE_LENGTH
 export interface ConversationMessageInputHandle {
   /** Replaces the input's text and focuses the caret at the end. */
   insertTextIntoInput: (text: string) => void;
-  /** Focuses the input, the caret at the end of its text (e.g. after images were dropped on the chat). */
-  focusInput: () => void;
+  /** Focuses the input, the caret at the end of its text (e.g. after files were dropped on the chat). */
+  focusInput?: () => void;
 }
 
 export interface ConversationMessageInputProps {
@@ -70,6 +70,11 @@ export interface ConversationMessageInputProps {
    * One-line form: text and send button on the same row inside a pill, growing with the text. The agent dashboard's
    * input; the chat keeps the full form.
    */
+  /**
+   * The compact form only: the top slot takes a row of its own above the text and the start cluster stands left of the
+   * text instead of in the action row. Default false: the compact layout keeps both where the full form has them.
+   */
+  compactStackedSlots?: boolean;
   compact?: boolean;
 
   /**
@@ -103,7 +108,7 @@ export interface ConversationMessageInputProps {
 
   /**
    * Additional CSS classes on the input's own box (the pill in the compact form), inside its glow. A host's decoration
-   * drawn over the input (e.g. the Ado page input's file-drop ring) gets the input's exact size this way, and its
+   * drawn over the input (e.g. a host's file-drop ring) gets the input's exact size this way, and its
    * corners from `var(--ai-border-radius)`.
    */
   inputContainerClassName?: string;
@@ -116,15 +121,16 @@ export interface ConversationMessageInputProps {
 
   /**
    * Action controls pinned to the LEFT edge of the bottom action row (the `actionsSlot` cluster
-   * stays right, next to the send button) — e.g. the agent "+" attachments menu. In the compact form they stand left
-   * of the text, on its row.
+   * stays right, next to the send button) — e.g. the agent "+" attachments menu. In the compact form with
+   * `compactStackedSlots` they stand left of the text, on its row.
    */
   actionsSlotStart?: React.ReactNode;
 
   /**
    * Host-owned content rendered above the editable text area, inside the input container —
    * attachment preview cards, validation error boxes, selection chips. Each injected block owns
-   * its reveal/collapse animation. In the compact form it takes a row of its own above the text.
+   * its reveal/collapse animation. In the compact form with `compactStackedSlots` it takes a row of its own above the
+   * text.
    */
   topSlot?: React.ReactNode;
 
@@ -147,8 +153,8 @@ export interface ConversationMessageInputProps {
   outgoingAttachmentImages?: ConversationAttachmentReference[];
 
   /**
-   * Composer widgets the HOST holds outside the widget context (e.g. an app's attached-files widget built from the
-   * files uploaded through its "+" menu), sent exactly like `outgoingComposerWidgets`: their fences follow the
+   * Composer widgets the HOST holds outside the widget context (e.g. a widget built from the files the host uploaded
+   * through its own control), sent exactly like `outgoingComposerWidgets`: their fences follow the
    * context's own in the message text and in `options.composerWidgets`. Owned and cleared by the host; Backspace never
    * touches them.
    */
@@ -190,6 +196,7 @@ export const ConversationMessageInput = (props: ConversationMessageInputProps) =
     onComposerWidgetsSent,
     apiRef,
     compact = false,
+    compactStackedSlots = false,
     collapsed = false,
     onCollapsedPillWidthChange,
   } = props;
@@ -204,6 +211,7 @@ export const ConversationMessageInput = (props: ConversationMessageInputProps) =
   const translatedPlaceholder = useMemo(() => texts.translate(placeholder), [texts, placeholder]);
   const collapsedPillSizerRef = useRef<HTMLSpanElement>(null);
   const measuresCollapsedPillWidth = compact && !!onCollapsedPillWidthChange;
+  const isCompactStacked = compact && compactStackedSlots;
 
   const isMessageTooLong = inputValue.length > MAX_MESSAGE_LENGTH;
   // Every composer widget the next send carries: the widget context's own, then the host's.
@@ -236,10 +244,12 @@ export const ConversationMessageInput = (props: ConversationMessageInputProps) =
     const messageText = buildMessageTextWithComposerWidgets(inputValue, composerWidgetsToSend);
     if (!messageText || disabled || isProcessing || isMessageTooLong || sendDisabled) return;
 
-    onSendMessage?.(messageText, {
+    const accepted = onSendMessage?.(messageText, {
       attachments: outgoingAttachmentImages?.length ? outgoingAttachmentImages : undefined,
       composerWidgets: composerWidgetsToSend.length ? composerWidgetsToSend : undefined,
     });
+    // A refused send (a closed conversation, a start still in flight) keeps the text and every composer widget.
+    if (accepted === false) return;
     onComposerWidgetsSent?.();
     setInputValue("");
     if (inputRef.current) {
@@ -383,18 +393,21 @@ export const ConversationMessageInput = (props: ConversationMessageInputProps) =
             styles.inputContainer,
             {
               [styles.compact]: compact,
-              [styles.compactWithActionsStart]: compact && !!actionsSlotStart,
+              [styles.compactStacked]: isCompactStacked,
+              [styles.compactWithActionsStart]: isCompactStacked && !!actionsSlotStart,
               [styles.collapsed]: compact && collapsed,
             },
             inputContainerClassName,
           )}
           onMouseDown={handleContainerMouseDown}
         >
-          {/* The compact form is one flex row: the top slot wraps onto a row of its own above it, and the start
+          {/* Stacked compact form: one flex row, the top slot wraps onto a row of its own above it, and the start
               cluster stands left of the text instead of in the action row. */}
-          {compact && !!topSlot && <div className={styles.compactTopSlot}>{topSlot}</div>}
-          {!compact && topSlot}
-          {compact && !!actionsSlotStart && <div className={styles.compactActionsStart}>{actionsSlotStart}</div>}
+          {isCompactStacked && !!topSlot && <div className={styles.compactTopSlot}>{topSlot}</div>}
+          {!isCompactStacked && topSlot}
+          {isCompactStacked && !!actionsSlotStart && (
+            <div className={styles.compactActionsStart}>{actionsSlotStart}</div>
+          )}
           <span
             ref={inputRef}
             contentEditable={!(disabled || isProcessing)}
@@ -426,7 +439,7 @@ export const ConversationMessageInput = (props: ConversationMessageInputProps) =
           )}
 
           <div className={styles.actions}>
-            {!compact && !!actionsSlotStart && <div className={styles.actionsStart}>{actionsSlotStart}</div>}
+            {!isCompactStacked && !!actionsSlotStart && <div className={styles.actionsStart}>{actionsSlotStart}</div>}
             {/* <div className={styles.buttons}> */}
             {/* TODO: Implement emoji functionality */}
             {/* <Button

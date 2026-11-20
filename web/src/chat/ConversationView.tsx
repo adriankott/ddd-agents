@@ -198,8 +198,8 @@ export interface ConversationViewProps {
    */
   outgoingAttachmentImages?: ConversationAttachmentReference[];
   /**
-   * Composer widgets the host holds outside the widget context (e.g. an app's attached-files widget from its "+" menu
-   * uploads), sent like the context's own on the next send. Owned and cleared by the host;
+   * Composer widgets the host holds outside the widget context (e.g. a widget built from the files the host
+   * uploaded), sent like the context's own on the next send. Owned and cleared by the host;
    * ConversationView/ConversationMessageInput only forward them.
    */
   hostComposerWidgets?: ConversationComposerWidget[];

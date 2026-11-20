@@ -119,20 +119,6 @@ describe("splitComposerWidgetFencesFromMessageText", () => {
     ]);
   });
 
-  it("extracts a fence for a widget declaring `sentInCustomerMessage` (no composerComponent)", () => {
-    const { text, widgets } = splitComposerWidgetFencesFromMessageText(
-      'Use these.\n\n```widget\n{"type":"TestSentInCustomerMessage","files":[{"fileId":"a1"}]}\n```',
-    );
-    expect(text).toBe("Use these.");
-    expect(widgets).toEqual([
-      {
-        composerWidgetId: "TestSentInCustomerMessage:0",
-        widgetName: "TestSentInCustomerMessage",
-        fields: { files: [{ fileId: "a1" }] },
-      },
-    ]);
-  });
-
   it("leaves a fence for a registered but NON-composable widget untouched in the text", () => {
     const message = '```widget\n{"type":"TestNonComposable"}\n```';
     const { text, widgets } = splitComposerWidgetFencesFromMessageText(message);

@@ -19,15 +19,18 @@
   `attachments` are unchanged. `AgentChatController` reports a send that carried composer widgets through
   `onComposerWidgetsSent(composerWidgets)`.
 - Added (npm): `attachLibraryFilesToComposer` on the widget callbacks and `AgentChatController` (a canvas puts
-  media-library files into the composer, `ComposerLibraryFile`); `focusInput` on `ConversationMessageInputHandle` and
-  `focusComposer` on `AgentChatComposerHandle`.
+  media-library files into the composer, `ComposerLibraryFile`); optional `focusInput` on
+  `ConversationMessageInputHandle` and `focusComposer` on `AgentChatComposerHandle`.
 - Added (npm): `CanvasBehaviour.titleBesideCloseButton`: the canvas pane offers its close row as the body's title slot
   (`CanvasTitleSlotContext` / `useCanvasTitleSlot`).
-- Added (npm): `inputContainerClassName` and, in the compact form, the top slot on a row of its own and the start
-  cluster left of the text in `ConversationMessageInput`; `inputActionsSlotStart`, `fileDropHintSlot` and
-  `chatAreaProps` on `AgentChatController`; `fileDropHintSlot` on `ConversationView` / `ConversationViewBody`.
+- Added (npm): `inputContainerClassName` and the opt-in `compactStackedSlots` on `ConversationMessageInput` (the compact
+  form puts the top slot on a row of its own and the start cluster left of the text; without it the compact layout is
+  unchanged); `inputActionsSlotStart`, `fileDropHintSlot` and `chatAreaProps` on `AgentChatController`;
+  `fileDropHintSlot` on `ConversationView` / `ConversationViewBody`.
+- Fixed (npm): a send the host refuses (`onSendMessage` returns `false`: a closed conversation, a start still in
+  flight) no longer clears the input's text and composer widgets.
 - Changed (npm): the attachment preview card's remove control is a bin inside the card's corner, always in view, and
-  only when the host passes `onRemove` (a read-only card otherwise); `ConversationMessageInputAttachmentPreviewWidget`
+  only when the host passes `onRemove` (a read-only card otherwise); the preview strip's gap and padding are tighter; `ConversationMessageInputAttachmentPreviewWidget`
   is exported from `./chat`.
 - Added (npm): `./renderer` exports `ConversationComposerWidget`, `ComposerLibraryFile`, `CanvasTitleSlotContext`,
   `useCanvasTitleSlot`, `buildComposerWidgetFenceBlock`, `buildMessageTextWithComposerWidgets` and
