@@ -1,5 +1,6 @@
 import {
   type ComponentType,
+  type HTMLAttributes,
   type ReactNode,
   type Ref,
   type RefObject,
@@ -25,6 +26,8 @@ import { resolveDeepLinkableWidget } from "../../renderer/resolve-deep-linkable-
 import type { ChatMessage } from "../chat-message";
 import type { SendMessageHandler } from "../conversation-send-message";
 import type { ConversationMessageInputHandle } from "../ConversationMessageInput/ConversationMessageInput";
+import type { ConversationComposerWidget } from "../../renderer/conversation-composer-widget";
+import type { ComposerLibraryFile } from "../../renderer/composer-library-file";
 import { ConversationView } from "../ConversationView";
 import type { AgentsChatState } from "../store/agents-chat-state";
 import { ConversationErrorType } from "../store/conversation-error-type";
@@ -69,6 +72,8 @@ export interface AgentChatComposerHandle {
    * nothing while the composer is not shown (a closed conversation).
    */
   setComposerDraft: (text: string) => void;
+  /** Focuses the composer, the caret at the end of its draft (e.g. after files were dropped on the chat). */
+  focusComposer: () => void;
 }
 
 /** Where the model of the next send comes from — read at send time (an admin's pick can change between renders). */
@@ -106,6 +111,13 @@ export interface AgentChatControllerProps {
   sendModelSource?: AgentChatSendModelSource;
   /** Called after a send that carried attachments, so the host clears them from the composer. */
   onAttachmentsSent?: () => void;
+  /**
+   * Called after an accepted send that carried composer widgets (the widget context's and `hostComposerWidgets`), with
+   * those widgets — the host clears the ones it owns.
+   */
+  onComposerWidgetsSent?: (composerWidgets: ConversationComposerWidget[]) => void;
+  /** Widget callback: put media-library files into the composer (a file library canvas's "Use in chat"). */
+  attachLibraryFilesToComposer?: (libraryFiles: ComposerLibraryFile[]) => void;
   /** The empty state of a new chat: a synthetic first assistant message (client state only), as markdown. */
   startingIdeasMarkdown?: string;
   /** While true the chat follows the bottom; a rising edge jumps to the newest message (a voice chat). */
@@ -117,9 +129,14 @@ export interface AgentChatControllerProps {
   /** Class names of the two wrappers around the conversation view (the host's layout). */
   chatAreaClassName?: string;
   chatWrapClassName?: string;
+  /** Further props of the chat area element (e.g. a host's file drop zone handlers). */
+  chatAreaProps?: Omit<HTMLAttributes<HTMLDivElement>, "className" | "ref">;
   /** Slots of the conversation view. */
   progressStepperSlot?: ReactNode;
+  /** The host's layer while files are dragged over the window (see `ConversationViewBody`'s `fileDropHintSlot`). */
+  fileDropHintSlot?: ReactNode;
   inputActionsSlot?: ReactNode;
+  inputActionsSlotStart?: ReactNode;
   inputTopSlot?: ReactNode;
   inputSendDisabled?: boolean;
   inputReplacementSlot?: ReactNode;
@@ -131,6 +148,8 @@ export interface AgentChatControllerProps {
   isQuestionPinSuspended?: boolean;
   /** The attachments that ride along on the next send. */
   outgoingAttachments?: ConversationAttachmentReference[];
+  /** Composer widgets the host holds outside the widget context, sent with the next send (see `ConversationMessageInput`). */
+  hostComposerWidgets?: ConversationComposerWidget[];
   /** The agent's activity at the tail of the thread (the agent avatar slot). */
   ThinkingIndicator: ComponentType<AgentChatActivityProps>;
   /** A layer over the message column (a voice chat's focus mode); shown while `isContentOverlayShown`. */
@@ -200,6 +219,8 @@ export const AgentChatController = (props: AgentChatControllerProps) => {
     isOnboardingSetupConversation = false,
     sendModelSource,
     onAttachmentsSent,
+    onComposerWidgetsSent,
+    attachLibraryFilesToComposer,
     startingIdeasMarkdown,
     followBottom = false,
     chatScrollRef,
@@ -207,8 +228,11 @@ export const AgentChatController = (props: AgentChatControllerProps) => {
     confineTopBlurBandToChatPane = false,
     chatAreaClassName,
     chatWrapClassName,
+    chatAreaProps,
     progressStepperSlot,
+    fileDropHintSlot,
     inputActionsSlot,
+    inputActionsSlotStart,
     inputTopSlot,
     inputSendDisabled,
     inputReplacementSlot,
@@ -219,6 +243,7 @@ export const AgentChatController = (props: AgentChatControllerProps) => {
     isContentOverlayShown,
     isQuestionPinSuspended,
     outgoingAttachments,
+    hostComposerWidgets,
     ThinkingIndicator,
     ContentOverlay,
     ActivityHistory,
@@ -239,6 +264,7 @@ export const AgentChatController = (props: AgentChatControllerProps) => {
     composerRef,
     () => ({
       setComposerDraft: (text: string) => conversationMessageInputApiRef.current?.insertTextIntoInput(text),
+      focusComposer: () => conversationMessageInputApiRef.current?.focusInput(),
     }),
     [],
   );
@@ -406,7 +432,7 @@ export const AgentChatController = (props: AgentChatControllerProps) => {
   }, [chatStore]);
 
   const handleSendMessage = useCallback<SendMessageHandler>(
-    (message, { startSignalText, attachments, entryPointKey }) => {
+    (message, { startSignalText, attachments, composerWidgets, entryPointKey }) => {
       // A closed conversation takes no further input — the typed input and every widget send.
       if (isConversationRunEnded) {
         rejectAsConversationClosed();
@@ -423,6 +449,7 @@ export const AgentChatController = (props: AgentChatControllerProps) => {
       // must never wipe what the owner is still composing.
       const reportSentAttachments = () => {
         if (attachments?.length) onAttachmentsSent?.();
+        if (composerWidgets?.length) onComposerWidgetsSent?.(composerWidgets);
       };
       if (conversation?.id) {
         const postConversationId = conversation.id;
@@ -469,6 +496,7 @@ export const AgentChatController = (props: AgentChatControllerProps) => {
       agentSpaceKey,
       sendModelSource,
       onAttachmentsSent,
+      onComposerWidgetsSent,
       isConversationRunEnded,
       rejectAsConversationClosed,
       fetchOpeningPage,
@@ -557,6 +585,7 @@ export const AgentChatController = (props: AgentChatControllerProps) => {
       sendMessageToChat: (message: string) => Promise.resolve(handleSendMessage(message, {}) === true),
       injectSignal: handleInjectSignal,
       prefillComposer: (text: string) => conversationMessageInputApiRef.current?.insertTextIntoInput(text),
+      attachLibraryFilesToComposer,
       chatAgentSpaceKey: agentSpaceKey,
       conversationId: liveConversationId,
       onOpenConversation,
@@ -566,6 +595,7 @@ export const AgentChatController = (props: AgentChatControllerProps) => {
     [
       handleSendMessage,
       handleInjectSignal,
+      attachLibraryFilesToComposer,
       agentSpaceKey,
       liveConversationId,
       onOpenConversation,
@@ -665,7 +695,7 @@ export const AgentChatController = (props: AgentChatControllerProps) => {
           {/* The canvas that was open in this conversation comes back once ITS messages are in. */}
           <CanvasRestoreOnMount conversationId={liveConversationId} messages={messages} />
           {children}
-          <div className={chatAreaClassName} ref={canvasViability.observe}>
+          <div {...chatAreaProps} className={chatAreaClassName} ref={canvasViability.observe}>
             <div className={chatWrapClassName}>
               <ConversationView
                 enableCanvasToggle
@@ -673,6 +703,7 @@ export const AgentChatController = (props: AgentChatControllerProps) => {
                 disableSplitView={disableSplitView}
                 confineTopBlurBandToChatPane={confineTopBlurBandToChatPane}
                 progressStepperSlot={progressStepperSlot}
+                fileDropHintSlot={fileDropHintSlot}
                 enablePinQuestionAndRevealAnswer
                 isQuestionPinSuspended={isQuestionPinSuspended}
                 scrollRef={chatScrollRef}
@@ -707,6 +738,7 @@ export const AgentChatController = (props: AgentChatControllerProps) => {
                 autoScroll={!!conversationId || (messages?.length ?? 0) > 0}
                 isCompact={isCompact}
                 inputActionsSlot={inputActionsSlot}
+                inputActionsSlotStart={inputActionsSlotStart}
                 inputTopSlot={inputTopSlot}
                 inputSendDisabled={inputSendDisabled}
                 inputReplacementSlot={inputReplacementSlot}
@@ -717,6 +749,7 @@ export const AgentChatController = (props: AgentChatControllerProps) => {
                 contentOverlaySlot={ContentOverlay ? <ContentOverlay {...activityProps} /> : undefined}
                 isContentOverlayShown={isContentOverlayShown}
                 outgoingAttachmentImages={outgoingAttachments}
+                hostComposerWidgets={hostComposerWidgets}
                 taskInstructionMessageId={taskInstructionMessageId}
                 isConversationClosed={isConversationRunEnded}
                 conversationMessageInputApiRef={conversationMessageInputApiRef}

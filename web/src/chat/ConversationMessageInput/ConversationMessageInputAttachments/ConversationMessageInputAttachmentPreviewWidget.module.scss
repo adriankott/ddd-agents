@@ -4,8 +4,6 @@
   position: relative;
   flex: 0 0 auto;
   border-radius: $x1;
-  // NO overflow: hidden — the ✕ holder overflows the top-right corner; the background still
-  // clips to the border-radius by itself, and the thumbnail rounds its own corners.
   // Semitransparent neutral fill so the card reads as a tile on both the light and dark
   // chat surface (same recipe as the selection chip's pill).
   background: color-mix(in srgb, var(--agents-neutral-500) 10%, transparent);
@@ -60,24 +58,12 @@
   bottom: $x0_5;
 }
 
-// The Button's own wrapper span stays in flow, so this holder does the positioning: the translate
-// centers the ✕ exactly on the image's top-right corner, whatever the button's rendered size.
+// The Button's own wrapper span stays in flow, so this holder does the positioning: the bin sits inside the card's
+// top-right corner and takes no room around it.
 .removeButtonHolder {
   position: absolute;
-  top: 0;
-  right: 0;
-  transform: translate(40%, -40%);
+  top: $x0_5;
+  right: $x0_5;
   display: flex;
-  // Fades in on card hover (below) — and stays visible while focused, for keyboard users.
-  opacity: 0;
-  transition: opacity 150ms ease;
-
-  &:focus-within {
-    opacity: 1;
-  }
-}
-
-.card:hover .removeButtonHolder {
-  opacity: 1;
 }
 

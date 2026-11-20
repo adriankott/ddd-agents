@@ -87,6 +87,28 @@ class AIConversationMessageWidgetFenceFieldsTest extends UnitTestCase
         self::assertFalse((new AIConversationMessage())->carriesOnlyWidgetBlocks());
     }
 
+    public function testTheMessageTextWithoutWidgetBlocksKeepsOnlyTheWords(): void
+    {
+        $fence = "```widget\n{\"type\": \"AttachedFiles\", \"files\": [{\"fileId\": \"f1\", \"mimeType\": \"image/jpeg\"}]}\n```";
+        self::assertSame('Erstelle einen Post damit.', $this->buildMessage("Erstelle einen Post damit.\n\n" . $fence)->getMessageTextWithoutWidgetBlocks());
+        self::assertSame('', $this->buildMessage($fence . "\n\n" . $fence)->getMessageTextWithoutWidgetBlocks(), 'a text of nothing but blocks has no words');
+        self::assertMatchesRegularExpression('/^vorher\s+nachher$/', $this->buildMessage("vorher\n" . $fence . "\nnachher")->getMessageTextWithoutWidgetBlocks(), 'the words around a block never fuse');
+        self::assertSame("```json\n{\"a\": 1}\n```", $this->buildMessage("```json\n{\"a\": 1}\n```")->getMessageTextWithoutWidgetBlocks(), 'a non-widget code block is text');
+        self::assertSame('', (new AIConversationMessage())->getMessageTextWithoutWidgetBlocks(), 'an unset message text has no words');
+    }
+
+    public function testQuotedUserFactsIgnoreTheJsonOfAWidgetFence(): void
+    {
+        $aiConversationMessage = $this->buildMessage(
+            "Mein Keyword ist 'vegane Pizza Berlin'\n\n"
+            . "```widget\n{\"type\": \"AttachedFiles\", \"files\": [{\"fileId\": \"f1\", \"fileName\": \"pizza.jpg\", \"mimeType\": \"image/jpeg\"}]}\n```"
+        );
+        $aiConversationMessage->messageType = AIConversationMessage::MESSAGE_TEXT;
+        $aiConversationMessage->role = AIConversationMessage::ROLE_USER;
+
+        self::assertSame(['vegane Pizza Berlin'], $aiConversationMessage->extractQuotedUserFacts());
+    }
+
     protected function buildMessage(string $messageText): AIConversationMessage
     {
         $aiConversationMessage = new AIConversationMessage();

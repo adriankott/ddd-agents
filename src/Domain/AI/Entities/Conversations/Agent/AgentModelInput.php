@@ -987,7 +987,18 @@ class AgentModelInput extends ValueObject
             if ($message->role === AIConversationMessage::ROLE_SYSTEM || $message->isToolMessage()) {
                 continue;
             }
-            $tail .= 'Role: ' . $message->role . "\nMessage: " . WidgetBlocks::buildModelFacingText((string)$message->message) . "\n";
+            // The OWNER's input widgets (a marked website element, uploaded images) are ids and JSON, not what the
+            // conversation is about: a USER row carries its words only, and a row of nothing but blocks carries
+            // nothing. Every other row reads as the model wrote it (its ComposedView snapshots folded back).
+            if ($message->role === AIConversationMessage::ROLE_USER) {
+                $messageText = $message->getMessageTextWithoutWidgetBlocks();
+                if ($messageText === '') {
+                    continue;
+                }
+            } else {
+                $messageText = WidgetBlocks::buildModelFacingText((string)$message->message);
+            }
+            $tail .= 'Role: ' . $message->role . "\nMessage: " . $messageText . "\n";
         }
         if ($tail !== '') {
             $parts[] = ($hasCover ? "RECENT MESSAGES (verbatim):\n" : '') . $tail;

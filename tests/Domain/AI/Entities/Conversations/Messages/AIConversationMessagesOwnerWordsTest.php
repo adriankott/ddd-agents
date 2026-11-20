@@ -62,6 +62,30 @@ class AIConversationMessagesOwnerWordsTest extends UnitTestCase
         self::assertSame('alt', $words[0]);
     }
 
+    public function testOwnerWordsExcludeWidgetFences(): void
+    {
+        $fence = "```widget\n{\"type\": \"AttachedFiles\", \"files\": [{\"fileId\": \"f1\", \"fileName\": \"storefront.jpg\"}]}\n```";
+        $messages = $this->messages(
+            $this->message(AIConversationMessage::ROLE_USER, AIConversationMessage::AUTHOR_USER, AIConversationMessage::MESSAGE_TEXT, "Fă o postare cu pozele astea\n\n" . $fence, 0),
+        );
+        self::assertSame('Fă o postare cu pozele astea', $messages->buildOwnerTurns()->buildRecentOwnerWords());
+        self::assertSame(['Fă o postare cu pozele astea'], $messages->buildOwnerTurns()->getOwnerTexts());
+    }
+
+    public function testAFenceOnlyNewestMessageYieldsNoOwnerWordsAndIsNoOwnerText(): void
+    {
+        $fence = "```widget\n{\"type\": \"AttachedFiles\", \"files\": [{\"fileId\": \"f1\"}]}\n```";
+        $messages = $this->messages(
+            $this->message(AIConversationMessage::ROLE_USER, AIConversationMessage::AUTHOR_USER, AIConversationMessage::MESSAGE_TEXT, 'Iulian este în regulă', 0),
+            $this->message(AIConversationMessage::ROLE_USER, AIConversationMessage::AUTHOR_USER, AIConversationMessage::MESSAGE_TEXT, $fence, 1),
+        );
+        // images sent without a word: no language read — never the earlier message's words as if written now
+        self::assertSame('', $messages->buildOwnerTurns()->buildRecentOwnerWords());
+        self::assertSame(['Iulian este în regulă'], $messages->buildOwnerTurns()->getOwnerTexts(), 'a fence-only message is no owner text');
+        // a wider window still reads the earlier words — only the fence-only row adds none
+        self::assertSame('Iulian este în regulă', $messages->buildOwnerTurns()->buildRecentOwnerWords(maxMessages: 2));
+    }
+
     public function testNoOwnerTextYieldsTheEmptyString(): void
     {
         $messages = $this->messages(

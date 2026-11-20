@@ -23,11 +23,14 @@ export const buildComposerWidgetFenceBlock = (widget: ConversationComposerWidget
 export const buildMessageTextWithComposerWidgets = (text: string, widgets: ConversationComposerWidget[]): string =>
   [text.trim(), ...widgets.map(buildComposerWidgetFenceBlock)].filter(Boolean).join("\n\n");
 
-/** The canonical names of every registered widget that declares a `composerComponent`. */
-const composableWidgetNames = (): ReadonlySet<string> =>
+/**
+ * The canonical names of every registered widget the customer's own message may carry — an entry that declares a
+ * `composerComponent` or `sentInCustomerMessage`.
+ */
+const customerMessageWidgetNames = (): ReadonlySet<string> =>
   new Set(
     conversationWidgetRegistry.widgets
-      .filter((entry) => entry.composerComponent !== undefined)
+      .filter((entry) => entry.composerComponent !== undefined || entry.sentInCustomerMessage === true)
       .map((entry) => entry.name),
   );
 
@@ -41,13 +44,13 @@ export interface SplitComposerWidgetFencesResult {
 /**
  * The inverse of {@link buildMessageTextWithComposerWidgets}. Extracts every ```widget fence in `text` whose `type`
  * resolves (canonical or legacy `Directive` form, see `widget-name-resolver.ts`) to a registered widget that
- * declares a `composerComponent` — the only fences a user bubble renders as a read-only widget instead of leaving as
- * text. Every other fence — prose, and fences for widgets WITHOUT a `composerComponent` — is left in `text`
- * verbatim. Never throws: an unterminated fence, malformed JSON, or an unresolved/non-composable `type` just leaves
- * that fence untouched.
+ * declares a `composerComponent` or `sentInCustomerMessage` — the only fences a user bubble renders as a read-only
+ * widget instead of leaving as text. Every other fence — prose, and fences for widgets the customer's message never
+ * carries — is left in `text` verbatim. Never throws: an unterminated fence, malformed JSON, or an
+ * unresolved/non-customer `type` just leaves that fence untouched.
  */
 export const splitComposerWidgetFencesFromMessageText = (text: string): SplitComposerWidgetFencesResult => {
-  const composableNames = composableWidgetNames();
+  const customerMessageNames = customerMessageWidgetNames();
   const widgets: ConversationComposerWidget[] = [];
   const fenceOpen = "```" + WIDGET_FENCE_LANG;
 
@@ -93,8 +96,8 @@ export const splitComposerWidgetFencesFromMessageText = (text: string): SplitCom
     >;
     const widgetName = typeof type === "string" ? resolveWidgetName(type) : undefined;
 
-    if (!widgetName || !composableNames.has(widgetName)) {
-      // Unknown / non-composable widget fence — leave it in the text verbatim (it still renders normally if this
+    if (!widgetName || !customerMessageNames.has(widgetName)) {
+      // Unknown / non-customer widget fence — leave it in the text verbatim (it still renders normally if this
       // text ever runs through the assistant-side remark pipeline; here it just stays as text).
       remaining += text.slice(cursor, fenceEnd);
       cursor = fenceEnd;

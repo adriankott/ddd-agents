@@ -3,6 +3,7 @@ import React from "react";
 import styles from "./ConversationMessageInputAttachmentPreviewWidget.module.scss";
 import { classNames } from "../../../provider/class-names";
 import { convertBytesToSizeString } from "./convert-bytes-to-size-string";
+import { useAgentsTexts } from "../../../provider/AgentsProvider";
 
 export type ConversationMessageInputAttachmentUploadStatus = "uploading" | "uploaded" | "failed";
 
@@ -25,15 +26,18 @@ export type ConversationMessageInputAttachmentPreview = {
 
 export interface ConversationMessageInputAttachmentPreviewWidgetProps {
   attachment: ConversationMessageInputAttachmentPreview;
-  /** The card's ✕ — the host drops the attachment (and discards its in-flight upload result). */
-  onRemove: () => void;
+  /**
+   * The card's bin — the host drops the attachment (and discards its in-flight upload result). Omitted → no bin: a
+   * read-only card (e.g. a sent message's echo of a non-image file).
+   */
+  onRemove?: () => void;
   testId?: string;
 }
 
 /**
  * One attachment card above the chat input: an image thumbnail (or a generic name/type/size card
  * for future non-image types), an upload progress bar while the media-library upload runs, a
- * failed state, and a ✕ to remove.
+ * failed state, and a bin that is always in view to remove it (only when the host passes `onRemove`).
  *
  * While uploading, a white caption with a black shadow sits over the image bottom:
  * "Uploading (45%)..." while bytes are still going out, "Processing..." once all bytes are sent
@@ -44,6 +48,7 @@ export const ConversationMessageInputAttachmentPreviewWidget = (
   props: ConversationMessageInputAttachmentPreviewWidgetProps,
 ) => {
   const { attachment, onRemove, testId = "chat-input-attachment" } = props;
+  const texts = useAgentsTexts();
 
   const isUploading = attachment.uploadStatus === "uploading";
   const hasFailed = attachment.uploadStatus === "failed";
@@ -103,18 +108,21 @@ export const ConversationMessageInputAttachmentPreviewWidget = (
         </Text>
       )}
       {/* Own holder because the component library's Button puts `className` on the inner <button>, not on its
-          in-flow wrapper span — the holder is what actually positions the ✕. */}
-      <span className={styles.removeButtonHolder}>
-        <Button
-          className={styles.removeButton}
-          variant="muted"
-          size="small"
-          icon="close"
-          onClick={onRemove}
-          testId={`${testId}-remove-button`}
-          rounded
-        />
-      </span>
+          in-flow wrapper span — the holder is what actually positions the bin. */}
+      {onRemove !== undefined && (
+        <span className={styles.removeButtonHolder}>
+          <Button
+            className={styles.removeButton}
+            variant="muted"
+            size="small"
+            icon="trash"
+            ariaLabel={texts.translate("Remove file")}
+            onClick={onRemove}
+            testId={`${testId}-remove-button`}
+            rounded
+          />
+        </span>
+      )}
     </div>
   );
 };

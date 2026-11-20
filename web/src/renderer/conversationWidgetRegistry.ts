@@ -48,6 +48,18 @@ export interface ConversationWidgetEntry {
    * removes the whole widget.
    */
   removeLastPartFromComposerWidgetFields?: (fields: Record<string, unknown>) => Record<string, unknown> | null;
+  /**
+   * The customer's OWN message may carry this widget's fence: the user bubble extracts it
+   * (`splitComposerWidgetFencesFromMessageText`) and renders `component` above the prose. For an input widget whose
+   * input UI is not a `composerComponent` (an app's upload strip, e.g. its attached-files echo). `composerComponent` implies it.
+   */
+  sentInCustomerMessage?: boolean;
+  /**
+   * Where the customer's message shows this widget's echo: `insideBubble` (default) above the prose inside the
+   * coloured bubble, or `aboveBubble` on its own, right-aligned above the bubble (the attached images) — a message that
+   * is nothing but such widgets shows no bubble at all.
+   */
+  customerMessagePlacement?: "insideBubble" | "aboveBubble";
 }
 
 /**

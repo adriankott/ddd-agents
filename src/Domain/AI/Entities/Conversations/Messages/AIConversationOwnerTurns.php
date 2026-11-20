@@ -35,34 +35,49 @@ class AIConversationOwnerTurns extends ValueObject
 
     /**
      * The message TEXTS the USER genuinely wrote, in row order — the owner or legacy user rows (ROLE_USER authored by
-     * AUTHOR_USER or legacy null; the loop's nudges/signals are AUTHOR_AGENT and never counted). Empty texts are
-     * skipped. A purpose's interface-language confirmation reads count + concatenation from this (its trigger +
-     * signal floor).
+     * AUTHOR_USER or legacy null; the loop's nudges/signals are AUTHOR_AGENT and never counted). Each text is the
+     * owner's words without the widget blocks of their message; a row that is empty, or nothing but widget blocks
+     * (images sent without a word), is skipped. A purpose's interface-language confirmation reads count +
+     * concatenation from this (its trigger + signal floor).
      *
      * @return string[]
      */
     public function getOwnerTexts(): array
     {
-        $userAuthoredMessageTexts = [];
+        return array_values(array_filter(
+            $this->getOwnerRowTextsWithoutWidgetBlocks(),
+            static fn (string $ownerRowText): bool => $ownerRowText !== ''
+        ));
+    }
+
+    /**
+     * One entry per owner or legacy user row with a non-empty text, in row order (the predicate of
+     * {@see getOwnerTexts()}): its text without widget blocks ({@see AIConversationMessage::getMessageTextWithoutWidgetBlocks()})
+     * — '' for a row that is nothing but blocks. That row keeps its entry, so a reader of the NEWEST owner row sees
+     * "no words" instead of the words of an earlier row.
+     *
+     * @return string[]
+     */
+    protected function getOwnerRowTextsWithoutWidgetBlocks(): array
+    {
+        $ownerRowTexts = [];
         foreach ($this->rows as $message) {
-            $isUserAuthored = $message->isOwnerOrLegacyUserRoleRow();
-            if (!$isUserAuthored) {
+            if (!$message->isOwnerOrLegacyUserRoleRow() || trim((string)($message->message ?? '')) === '') {
                 continue;
             }
-            $messageText = trim((string)($message->message ?? ''));
-            if ($messageText !== '') {
-                $userAuthoredMessageTexts[] = $messageText;
-            }
+            $ownerRowTexts[] = $message->getMessageTextWithoutWidgetBlocks();
         }
-        return $userAuthoredMessageTexts;
+        return $ownerRowTexts;
     }
 
     /**
      * The conversational context the turn-start decision sites read (the language, plan-dynamics and preload
      * questions): what the assistant said last before `$beforeMessageIndex` and the last `$maxTurns` owner /
-     * assistant texts before it, each cut to `$maxChars`. Pre-call lines and signals are not turns.
-     * `$collapseWhitespace` folds every whitespace run of a turn into one space (the skill preload sends each turn as
-     * one line).
+     * assistant texts before it, each cut to `$maxChars`. Pre-call lines and signals are not turns. An owner turn is
+     * the owner's words without the widget blocks of their message
+     * ({@see AIConversationMessage::getMessageTextWithoutWidgetBlocks()}); a row of nothing but blocks (images sent
+     * without a word) is no turn. Assistant texts keep their blocks. `$collapseWhitespace` folds every whitespace run
+     * of a turn into one space (the skill preload sends each turn as one line).
      *
      * @param int $beforeMessageIndex
      * @param int $maxTurns
@@ -83,11 +98,19 @@ class AIConversationOwnerTurns extends ValueObject
             if ($text === '' || str_starts_with($text, AIConversationMessage::PRE_CALL_MESSAGE_MARKER)) {
                 continue;
             }
+            $isOwnerTurn = !$message->isAssistantAuthoredText() && $message->isOwnerOrLegacyUserRoleRow();
+            if ($isOwnerTurn) {
+                // the owner's words only: an attached image's JSON would fill the cut; only blocks is no turn
+                $text = $message->getMessageTextWithoutWidgetBlocks();
+                if ($text === '') {
+                    continue;
+                }
+            }
             $turnText = $collapseWhitespace ? (preg_replace('/\s+/', ' ', $text) ?? $text) : $text;
             if ($message->isAssistantAuthoredText()) {
                 $assistantTextBefore = $text;
                 $recentTurns[] = 'assistant: ' . mb_substr($turnText, 0, $maxChars);
-            } elseif ($message->isOwnerOrLegacyUserRoleRow()) {
+            } elseif ($isOwnerTurn) {
                 $recentTurns[] = 'owner: ' . mb_substr($turnText, 0, $maxChars);
             }
         }
@@ -98,17 +121,18 @@ class AIConversationOwnerTurns extends ValueObject
      * The owner's most recent OWN words: the LAST `$maxWords` words across at most the last `$maxMessages`
      * owner-authored texts (default: the NEWEST message only — a language read from an earlier turn must never pass
      * as what the owner writes NOW; continuity across turns is the decision's sticky anchor), newest
-     * last, joined by newlines. Nothing else — no tool output, no signals, no agent text — so the decision model judges
-     * only what the owner typed. Same predicate as {@see getOwnerTexts()}. '' when the owner has not written anything
-     * yet (turn 1, a signal-started run), which the caller reads as "no decision call at all".
+     * last, joined by newlines. Nothing else — no tool output, no signals, no agent text, no widget block — so the
+     * decision model judges only what the owner typed. Same predicate as {@see getOwnerTexts()}. '' when the owner has
+     * not written anything yet (turn 1, a signal-started run) or the newest owner row is nothing but widget blocks
+     * (images sent without a word), which the caller reads as "no decision call at all".
      */
     public function buildRecentOwnerWords(int $maxWords = 40, int $maxMessages = 1): string
     {
-        $userAuthoredMessageTexts = $this->getOwnerTexts();
-        if ($userAuthoredMessageTexts === []) {
+        $ownerRowTexts = $this->getOwnerRowTextsWithoutWidgetBlocks();
+        if ($ownerRowTexts === []) {
             return '';
         }
-        $recentTexts = array_slice($userAuthoredMessageTexts, -max(1, $maxMessages));
+        $recentTexts = array_slice($ownerRowTexts, -max(1, $maxMessages));
         $words = preg_split('/\s+/u', trim(implode("\n", $recentTexts))) ?: [];
         $words = array_values(array_filter($words, static fn (string $word): bool => $word !== ''));
         if ($words === []) {

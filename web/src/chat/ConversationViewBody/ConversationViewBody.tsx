@@ -10,6 +10,7 @@ import {
 import { ConversationMessageInputComposerWidgets } from "../ConversationMessageInput/ConversationMessageInputComposerWidgets/ConversationMessageInputComposerWidgets";
 import { useConversationWidgetContext } from "../../renderer/ConversationWidgetContext";
 import type { ConversationAttachmentReference } from "../../contract/conversation";
+import type { ConversationComposerWidget } from "../../renderer/conversation-composer-widget";
 import { SendMessageHandler } from "../conversation-send-message";
 import { ConversationErrorType } from "../store/conversation-error-type";
 import type { ChatMessage } from "../chat-message";
@@ -81,6 +82,11 @@ export interface ConversationViewProps {
    * this view contributes nothing but the positioned pane root it is mounted in.
    */
   progressStepperSlot?: React.ReactNode;
+  /**
+   * Host-owned layer shown while files are dragged over the window: this chat takes them. Like `progressStepperSlot`
+   * the node positions itself against the pane root; it lies over the messages and under the input.
+   */
+  fileDropHintSlot?: React.ReactNode;
   /**
    * Optional external ref to the scrollable content wrapper. Forwarded so
    * callers can drive scroll-linked effects (e.g. an animated background
@@ -188,6 +194,12 @@ export interface ConversationViewProps {
    */
   outgoingAttachmentImages?: ConversationAttachmentReference[];
   /**
+   * Composer widgets the host holds outside the widget context (e.g. an app's attached-files widget from its "+" menu
+   * uploads), sent like the context's own on the next send. Owned and cleared by the host; forwarded to
+   * ConversationMessageInput.
+   */
+  hostComposerWidgets?: ConversationComposerWidget[];
+  /**
    * Imperative handle on the chat input (insertTextIntoInput) so host-owned controls — e.g. the
    * "+" menu's "Generate image" entry — can put text into it. Forwarded to ConversationMessageInput's `apiRef`.
    */
@@ -249,6 +261,7 @@ export const ConversationViewBody = (props: ConversationViewProps) => {
     background,
     backgroundPaintedByHost,
     progressStepperSlot,
+    fileDropHintSlot,
     scrollRef,
     scrollToBottomNonce,
     followBottomRef,
@@ -272,6 +285,7 @@ export const ConversationViewBody = (props: ConversationViewProps) => {
     contentOverlaySlot,
     isContentOverlayShown = false,
     outgoingAttachmentImages,
+    hostComposerWidgets,
     conversationMessageInputApiRef,
     allowSendWhileAiThinking,
     enablePinQuestionAndRevealAnswer = false,
@@ -695,6 +709,7 @@ export const ConversationViewBody = (props: ConversationViewProps) => {
 
       {/* Positions itself against this .chat root (see the prop's doc) — no wrapper, no class from here. */}
       {progressStepperSlot}
+      {fileDropHintSlot}
 
       {contentOverlaySlot !== undefined ? (
         <div className={styles.contentLayers} data-overlay-shown={isContentOverlayShown || undefined}>
@@ -743,6 +758,7 @@ export const ConversationViewBody = (props: ConversationViewProps) => {
             }
             sendDisabled={inputSendDisabled}
             outgoingAttachmentImages={outgoingAttachmentImages}
+            hostComposerWidgets={hostComposerWidgets}
             outgoingComposerWidgets={composerWidgets}
             onComposerWidgetsSent={clearComposerWidgets}
             apiRef={conversationMessageInputApiRef}
