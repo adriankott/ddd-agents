@@ -418,6 +418,24 @@ class AIConversationMessage extends Entity
         return $widgetBlocks->count() > 0 && trim($widgetBlocks->buildMarkdownWithoutBlocks()) === '';
     }
 
+    /**
+     * This message's text without its widget blocks ({@see WidgetBlocks::buildMarkdownWithoutBlocks()}), trimmed: the
+     * words its author wrote — '' for an unset text and for a message that is nothing but blocks
+     * ({@see self::carriesOnlyWidgetBlocks()}). An input widget in the OWNER's message (a marked website element,
+     * uploaded images) carries ids and JSON keys, not the owner's words, so every reader that treats owner text as
+     * prose goes through this: the owner texts, owner words and owner turn lines ({@see AIConversationOwnerTurns}),
+     * the quoted-fact extraction ({@see self::extractQuotedUserFacts()}) and the summary input
+     * ({@see \DDD\Domain\AI\Entities\Conversations\Agent\AgentModelInput::buildSummaryContent()}). The chat wire and
+     * the compaction transcript keep the raw text: the ids in the block must reach the model and survive compaction.
+     */
+    public function getMessageTextWithoutWidgetBlocks(): string
+    {
+        if (!isset($this->message) || $this->message === '') {
+            return '';
+        }
+        return trim($this->buildWidgetBlocks()->buildMarkdownWithoutBlocks());
+    }
+
     /** @var string The loop's empty-turn nudge (stall recovery) — the first {@see $signalSource}. */
     public const string SIGNAL_SOURCE_LOOP_NUDGE = 'LOOP_NUDGE';
 
@@ -2036,7 +2054,9 @@ class AIConversationMessage extends Entity
      * the load-bearing facts the user explicitly named. The tool-call identifier extraction misses these (they live in
      * prose, not tool args/results), and the cheap summarizer pulls quoted prose unreliably — so capturing them
      * deterministically here guarantees they reach the IDENTIFIERS block and survive into + across the compaction tree.
-     * Only USER-authored text (an assistant's quotes are echoes / derived, not source facts).
+     * Only USER-authored text (an assistant's quotes are echoes / derived, not source facts), and only its prose: the
+     * quoted JSON keys and values of a widget block (`"type"`, `"fileId"`, `"image/jpeg"`) are not facts the owner
+     * stated ({@see self::getMessageTextWithoutWidgetBlocks()}).
      *
      * @return string[]
      */
@@ -2045,7 +2065,7 @@ class AIConversationMessage extends Entity
         if (!$this->isUserRoleText()) {
             return [];
         }
-        $text = $this->message ?? '';
+        $text = $this->getMessageTextWithoutWidgetBlocks();
         if ($text === '') {
             return [];
         }

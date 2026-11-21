@@ -87,9 +87,11 @@ export {
   type ConversationMessageInputHandle,
   type ConversationMessageInputProps,
 } from "../chat/ConversationMessageInput/ConversationMessageInput";
-export type {
-  ConversationMessageInputAttachmentPreview,
-  ConversationMessageInputAttachmentUploadStatus,
+export {
+  ConversationMessageInputAttachmentPreviewWidget,
+  type ConversationMessageInputAttachmentPreview,
+  type ConversationMessageInputAttachmentPreviewWidgetProps,
+  type ConversationMessageInputAttachmentUploadStatus,
 } from "../chat/ConversationMessageInput/ConversationMessageInputAttachments/ConversationMessageInputAttachmentPreviewWidget";
 export type { AssistantServerMessagePayload } from "../chat/normalize-server-message-to-markdown";
 export { useActivityTicker, SUCCESS_BEAT_MS } from "../chat/controller/use-activity-ticker";

@@ -248,6 +248,39 @@
 
 ## 0.1.2
 
+- Added: `AIConversationMessage::getMessageTextWithoutWidgetBlocks()`, the words of a message without its widget
+  blocks ('' for an unset text and for a message of nothing but blocks). The owner texts, the owner words and the owner
+  turn lines of `AIConversationOwnerTurns`, the quoted-fact extraction (`extractQuotedUserFacts()`) and the summary input
+  (`AgentModelInput::buildSummaryContent()`, USER rows only) read the owner's prose through it: an input widget in the
+  owner's message (uploaded images, a marked website element) carries ids and JSON keys, not words. A newest owner row
+  of nothing but blocks yields no owner words, is no owner text and no turn line. The chat wire and the compaction
+  transcript keep the raw text.
+- Added (npm): a registry entry may declare `sentInCustomerMessage` (the customer's own message may carry its fence
+  without a `composerComponent`) and `customerMessagePlacement` (`insideBubble` by default, or `aboveBubble`: the echo
+  stands on its own above the bubble; a message of nothing but such widgets shows no bubble). The user bubble extracts
+  every fence whose entry declares `composerComponent` or `sentInCustomerMessage`.
+- Added (npm): `hostComposerWidgets` on `ConversationMessageInput`, `ConversationView`, `ConversationViewBody` and
+  `AgentChatController`: composer widgets the host holds outside the widget context (an app's attached-files widget),
+  sent after the context's own in the message text and in `options.composerWidgets`. `outgoingAttachmentImages` /
+  `attachments` are unchanged. `AgentChatController` reports a send that carried composer widgets through
+  `onComposerWidgetsSent(composerWidgets)`.
+- Added (npm): `attachLibraryFilesToComposer` on the widget callbacks and `AgentChatController` (a canvas puts
+  media-library files into the composer, `ComposerLibraryFile`); optional `focusInput` on
+  `ConversationMessageInputHandle` and `focusComposer` on `AgentChatComposerHandle`.
+- Added (npm): `CanvasBehaviour.titleBesideCloseButton`: the canvas pane offers its close row as the body's title slot
+  (`CanvasTitleSlotContext` / `useCanvasTitleSlot`).
+- Added (npm): `inputContainerClassName` and the opt-in `compactStackedSlots` on `ConversationMessageInput` (the compact
+  form puts the top slot on a row of its own and the start cluster left of the text; without it the compact layout is
+  unchanged); `inputActionsSlotStart`, `fileDropHintSlot` and `chatAreaProps` on `AgentChatController`;
+  `fileDropHintSlot` on `ConversationView` / `ConversationViewBody`.
+- Fixed (npm): a send the host refuses (`onSendMessage` returns `false`: a closed conversation, a start still in
+  flight) no longer clears the input's text and composer widgets.
+- Changed (npm): the attachment preview card's remove control is a bin inside the card's corner, always in view, and
+  only when the host passes `onRemove` (a read-only card otherwise); the preview strip's gap and padding are tighter; `ConversationMessageInputAttachmentPreviewWidget`
+  is exported from `./chat`.
+- Added (npm): `./renderer` exports `ConversationComposerWidget`, `ComposerLibraryFile`, `CanvasTitleSlotContext`,
+  `useCanvasTitleSlot`, `buildComposerWidgetFenceBlock`, `buildMessageTextWithComposerWidgets` and
+  `splitComposerWidgetFencesFromMessageText`.
 - Added: `DBAIConversationMessage::buildToolCallExecutionCostInUSDSql()`, the SQL of what a row's tool call booked
   while it ran (0 without one), for a reader that shows tool executions apart from the model steps.
   `buildCostInUSDIncludingToolCallExecutionSql()` builds on it; its SQL is unchanged.

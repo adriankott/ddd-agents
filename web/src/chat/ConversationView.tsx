@@ -18,6 +18,7 @@ import type { ChatMessage } from "./chat-message";
 import { ConversationMessageUserTheme } from "./ConversationMessage/ConversationMessageUser/ConversationMessageUser";
 import { ConversationMessageInputHandle } from "./ConversationMessageInput/ConversationMessageInput";
 import type { ConversationAttachmentReference } from "../contract/conversation";
+import type { ConversationComposerWidget } from "../renderer/conversation-composer-widget";
 import { SendMessageHandler } from "./conversation-send-message";
 import { CanvasPane } from "./CanvasPane/CanvasPane";
 import { CanvasResizeHandle } from "./CanvasResizeHandle/CanvasResizeHandle";
@@ -140,6 +141,8 @@ export interface ConversationViewProps {
    * boundary is why the host cannot place the strip itself.
    */
   progressStepperSlot?: React.ReactNode;
+  /** See ConversationViewBody: the host's layer while files are dragged over the window. */
+  fileDropHintSlot?: React.ReactNode;
   /**
    * Scroll-up older-message pagination (opt-in — forwarded to ConversationViewBody). When `onLoadOlder` is provided, a top
    * sentinel prefetches the next older page and the viewport is anchored across the prepend. Default off.
@@ -194,6 +197,12 @@ export interface ConversationViewProps {
    * send. Owned and cleared by the host; ConversationView/ConversationMessageInput only forward them.
    */
   outgoingAttachmentImages?: ConversationAttachmentReference[];
+  /**
+   * Composer widgets the host holds outside the widget context (e.g. a widget built from the files the host
+   * uploaded), sent like the context's own on the next send. Owned and cleared by the host;
+   * ConversationView/ConversationMessageInput only forward them.
+   */
+  hostComposerWidgets?: ConversationComposerWidget[];
   /**
    * Imperative handle on the chat input (insertTextIntoInput) so host-owned controls — e.g. the
    * "+" menu's "Generate image" entry — can put text into it.

@@ -8,6 +8,7 @@ import {
   canvasBodies,
   canvasFeatureFlagOf,
 } from "../../renderer/canvas/canvasBodies";
+import { CanvasTitleSlotContext } from "../../renderer/canvas/canvas-title-slot-context";
 import { ConversationWidgetFeatureGate } from "../../renderer/_access/ConversationWidgetFeatureGate";
 import { normalizeServerMessageToMarkdown } from "../normalize-server-message-to-markdown";
 import type { ChatMessage } from "../chat-message";
@@ -47,6 +48,7 @@ export const CanvasPane = ({ messages, boxed = false }: CanvasPaneProps) => {
   // Re-deferred on every open (the mountGeneration changes each time a canvas mounts).
   const mountGeneration = canvas?.mountGeneration;
   const [contentReady, setContentReady] = useState(false);
+  const [titleSlot, setTitleSlot] = useState<HTMLDivElement | null>(null);
   useEffect(() => {
     setContentReady(false);
     const timer = window.setTimeout(() => setContentReady(true), CANVAS_OPEN_SETTLE_MS);
@@ -79,6 +81,7 @@ export const CanvasPane = ({ messages, boxed = false }: CanvasPaneProps) => {
       data-canvas-id={canvas.canvasId}
     >
       <div className={classes.closeButtonRow}>
+        {behaviour?.titleBesideCloseButton && <div ref={setTitleSlot} className={classes.titleSlot} />}
         <Button
           variant="muted"
           // Floating over the body's dark hero image: the light trigger for dark surfaces.
@@ -98,20 +101,22 @@ export const CanvasPane = ({ messages, boxed = false }: CanvasPaneProps) => {
         {contentReady ? (
           // The app's wrapper of a canvas body (host application: canvas-hosted list pages must not rewrite the page URL).
           <CanvasBodyContainer>
-            <ConversationWidgetErrorBoundary widgetName={`canvas:${canvas.canvasId}`}>
-              {featureFlag ? (
-                // The canvas owns its gate (not inherited from an opener): a restored or page-opened canvas has no
-                // widget mount to inherit it from. A page anchor's agent space is the gate's agent space.
-                <ConversationWidgetFeatureGate
-                  featureFlag={featureFlag}
-                  agentSpaceKeyAttribute={anchor.kind === "page" ? anchor.agentSpaceKey : undefined}
-                >
-                  {body}
-                </ConversationWidgetFeatureGate>
-              ) : (
-                body
-              )}
-            </ConversationWidgetErrorBoundary>
+            <CanvasTitleSlotContext.Provider value={behaviour?.titleBesideCloseButton ? titleSlot : null}>
+              <ConversationWidgetErrorBoundary widgetName={`canvas:${canvas.canvasId}`}>
+                {featureFlag ? (
+                  // The canvas owns its gate (not inherited from an opener): a restored or page-opened canvas has no
+                  // widget mount to inherit it from. A page anchor's agent space is the gate's agent space.
+                  <ConversationWidgetFeatureGate
+                    featureFlag={featureFlag}
+                    agentSpaceKeyAttribute={anchor.kind === "page" ? anchor.agentSpaceKey : undefined}
+                  >
+                    {body}
+                  </ConversationWidgetFeatureGate>
+                ) : (
+                  body
+                )}
+              </ConversationWidgetErrorBoundary>
+            </CanvasTitleSlotContext.Provider>
           </CanvasBodyContainer>
         ) : (
           <OpeningLoader />

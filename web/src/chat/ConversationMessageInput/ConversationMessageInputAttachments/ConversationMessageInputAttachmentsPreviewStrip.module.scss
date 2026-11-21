@@ -23,10 +23,7 @@
 
 .strip {
   display: flex;
-  // Wide enough that a card's ✕ (sticking ~13px past its right edge) clears the next card.
-  gap: $x2_5;
-  // Top/right room for the cards' ✕ buttons, whose centers sit ON the card corners (half the
-  // button sticks out) — the scroll container would clip them otherwise.
-  padding: $x2 $x2 $x1 0;
+  gap: $x1;
+  padding: 0 0 $x1;
   overflow-x: auto;
 }

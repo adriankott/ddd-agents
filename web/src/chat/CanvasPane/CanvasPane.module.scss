@@ -29,6 +29,15 @@
   margin-bottom: $x1;
 }
 
+// Behaviour `titleBesideCloseButton`: the body's title, portalled in, takes the room left of the button.
+.titleSlot {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  margin-right: auto;
+}
+
 // Boxed: the canvas bodies pad their own top ($x2 by convention), so the row adds no gap of its own — except above a
 // full-bleed body (`.rootFullBleedContent`, set when the canvas's behaviour declares `fullBleed`), which has no inset
 // of its own to meet the button with and keeps the $x1 gap.

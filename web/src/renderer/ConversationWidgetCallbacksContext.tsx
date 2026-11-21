@@ -1,5 +1,6 @@
 import { createContext, ReactNode, useContext, useMemo } from "react";
 import { ConversationComposerWidget } from "./conversation-composer-widget";
+import type { ComposerLibraryFile } from "./composer-library-file";
 import { CanvasOpenRequest, CanvasState, LastClosedCanvas } from "./canvas/canvas-state";
 import type { CanvasCreatedEntity } from "./canvas/canvas-reducers";
 
@@ -145,6 +146,12 @@ export interface ConversationWidgetCallbacks {
    * message. No-op by default; hosts that own a chat input wire it to that input's imperative handle.
    */
   prefillComposer: (text: string) => void;
+  /**
+   * Put files that are already in the project's media library into the composer as attachments, without uploading
+   * them again (a file library canvas's "Use in chat"). Set only by a host whose composer holds attachments; a canvas
+   * offers no "Use in chat" where it is undefined.
+   */
+  attachLibraryFilesToComposer?: (libraryFiles: ComposerLibraryFile[]) => void;
   /**
    * Inject a model-visible / user-invisible SIGNAL into the CURRENT conversation and drive one agent turn. Unlike
    * `sendMessageToChat` (which posts a visible USER message), this does NOT render a chat bubble — it tells the agent

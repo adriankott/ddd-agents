@@ -23,8 +23,8 @@ export type SendMessageOptions = {
   /**
    * Composer widgets sent alongside this message — informational for hosts (the message TEXT is already the
    * record: `onSendMessage` receives it with each widget's ```widget fence appended, see
-   * `buildMessageTextWithComposerWidgets`). ConversationMessageInput never builds these — it forwards the
-   * host-provided `outgoingComposerWidgets`.
+   * `buildMessageTextWithComposerWidgets`). ConversationMessageInput never builds these — it forwards the widget
+   * context's `outgoingComposerWidgets`, then the host's `hostComposerWidgets`.
    */
   composerWidgets?: ConversationComposerWidget[];
 

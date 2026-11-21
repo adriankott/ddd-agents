@@ -40,12 +40,14 @@ export const CHARACTER_COUNTER_SHOWN_FROM_LENGTH = Math.floor(MAX_MESSAGE_LENGTH
 export interface ConversationMessageInputHandle {
   /** Replaces the input's text and focuses the caret at the end. */
   insertTextIntoInput: (text: string) => void;
+  /** Focuses the input, the caret at the end of its text (e.g. after files were dropped on the chat). */
+  focusInput?: () => void;
 }
 
 export interface ConversationMessageInputProps {
   /**
-   * Callback when a message is submitted. `options.attachments` echoes `outgoingAttachmentImages`
-   * when the host provided any — ConversationMessageInput itself never builds attachments, it only rides them along.
+   * Callback when a message is submitted. The text already carries every outgoing composer widget's fence;
+   * `options.composerWidgets` lists the same widgets (`outgoingComposerWidgets`, then `hostComposerWidgets`).
    */
   onSendMessage?: SendMessageHandler;
 
@@ -68,6 +70,11 @@ export interface ConversationMessageInputProps {
    * One-line form: text and send button on the same row inside a pill, growing with the text. The agent dashboard's
    * input; the chat keeps the full form.
    */
+  /**
+   * The compact form only: the top slot takes a row of its own above the text and the start cluster stands left of the
+   * text instead of in the action row. Default false: the compact layout keeps both where the full form has them.
+   */
+  compactStackedSlots?: boolean;
   compact?: boolean;
 
   /**
@@ -100,6 +107,13 @@ export interface ConversationMessageInputProps {
   className?: string;
 
   /**
+   * Additional CSS classes on the input's own box (the pill in the compact form), inside its glow. A host's decoration
+   * drawn over the input (e.g. a host's file-drop ring) gets the input's exact size this way, and its
+   * corners from `var(--ai-border-radius)`.
+   */
+  inputContainerClassName?: string;
+
+  /**
    * Extra action controls rendered inside the input's bottom action row, left of the send button —
    * e.g. the agent model picker pill.
    */
@@ -107,14 +121,16 @@ export interface ConversationMessageInputProps {
 
   /**
    * Action controls pinned to the LEFT edge of the bottom action row (the `actionsSlot` cluster
-   * stays right, next to the send button) — e.g. the agent "+" attachments menu.
+   * stays right, next to the send button) — e.g. the agent "+" attachments menu. In the compact form with
+   * `compactStackedSlots` they stand left of the text, on its row.
    */
   actionsSlotStart?: React.ReactNode;
 
   /**
    * Host-owned content rendered above the editable text area, inside the input container —
    * attachment preview cards, validation error boxes, selection chips. Each injected block owns
-   * its reveal/collapse animation.
+   * its reveal/collapse animation. In the compact form with `compactStackedSlots` it takes a row of its own above the
+   * text.
    */
   topSlot?: React.ReactNode;
 
@@ -135,6 +151,14 @@ export interface ConversationMessageInputProps {
    * on the next send. Owned and cleared by the host; ConversationMessageInput only forwards them.
    */
   outgoingAttachmentImages?: ConversationAttachmentReference[];
+
+  /**
+   * Composer widgets the HOST holds outside the widget context (e.g. a widget built from the files the host uploaded
+   * through its own control), sent exactly like `outgoingComposerWidgets`: their fences follow the
+   * context's own in the message text and in `options.composerWidgets`. Owned and cleared by the host; Backspace never
+   * touches them.
+   */
+  hostComposerWidgets?: ConversationComposerWidget[];
 
   /**
    * Composer widgets that ride along on the next send — mirrors `outgoingAttachmentImages`. On send their fences
@@ -159,6 +183,7 @@ export const ConversationMessageInput = (props: ConversationMessageInputProps) =
     isProcessing = false,
     testId = "chat-input",
     className,
+    inputContainerClassName,
     actionsSlot,
     actionsSlotStart,
     topSlot,
@@ -166,10 +191,12 @@ export const ConversationMessageInput = (props: ConversationMessageInputProps) =
     glowUnderlay,
     sendDisabled = false,
     outgoingAttachmentImages,
+    hostComposerWidgets,
     outgoingComposerWidgets,
     onComposerWidgetsSent,
     apiRef,
     compact = false,
+    compactStackedSlots = false,
     collapsed = false,
     onCollapsedPillWidthChange,
   } = props;
@@ -186,10 +213,13 @@ export const ConversationMessageInput = (props: ConversationMessageInputProps) =
   const sendButtonAccessibleName = texts.translate("Send message");
   const collapsedPillSizerRef = useRef<HTMLSpanElement>(null);
   const measuresCollapsedPillWidth = compact && !!onCollapsedPillWidthChange;
+  const isCompactStacked = compact && compactStackedSlots;
 
   const isMessageTooLong = inputValue.length > MAX_MESSAGE_LENGTH;
+  // Every composer widget the next send carries: the widget context's own, then the host's.
+  const composerWidgetsToSend = [...(outgoingComposerWidgets ?? []), ...(hostComposerWidgets ?? [])];
   // Text OR at least one composer widget is enough to send (a fence-only message is allowed).
-  const hasSendableContent = inputValue.trim() !== "" || (outgoingComposerWidgets?.length ?? 0) > 0;
+  const hasSendableContent = inputValue.trim() !== "" || composerWidgetsToSend.length > 0;
 
   const focusInputAtEnd = () => {
     if (!inputRef.current) return;
@@ -210,16 +240,18 @@ export const ConversationMessageInput = (props: ConversationMessageInputProps) =
     }
   };
 
-  useImperativeHandle(apiRef, () => ({ insertTextIntoInput: setInputText }));
+  useImperativeHandle(apiRef, () => ({ insertTextIntoInput: setInputText, focusInput: focusInputAtEnd }));
 
   const handleSendMessage = () => {
-    const messageText = buildMessageTextWithComposerWidgets(inputValue, outgoingComposerWidgets ?? []);
+    const messageText = buildMessageTextWithComposerWidgets(inputValue, composerWidgetsToSend);
     if (!messageText || disabled || isProcessing || isMessageTooLong || sendDisabled) return;
 
-    onSendMessage?.(messageText, {
+    const accepted = onSendMessage?.(messageText, {
       attachments: outgoingAttachmentImages?.length ? outgoingAttachmentImages : undefined,
-      composerWidgets: outgoingComposerWidgets?.length ? outgoingComposerWidgets : undefined,
+      composerWidgets: composerWidgetsToSend.length ? composerWidgetsToSend : undefined,
     });
+    // A refused send (a closed conversation, a start still in flight) keeps the text and every composer widget.
+    if (accepted === false) return;
     onComposerWidgetsSent?.();
     setInputValue("");
     if (inputRef.current) {
@@ -359,13 +391,25 @@ export const ConversationMessageInput = (props: ConversationMessageInputProps) =
         blurWidth={6}
       >
         <div
-          className={classNames(styles.inputContainer, {
-            [styles.compact]: compact,
-            [styles.collapsed]: compact && collapsed,
-          })}
+          className={classNames(
+            styles.inputContainer,
+            {
+              [styles.compact]: compact,
+              [styles.compactStacked]: isCompactStacked,
+              [styles.compactWithActionsStart]: isCompactStacked && !!actionsSlotStart,
+              [styles.collapsed]: compact && collapsed,
+            },
+            inputContainerClassName,
+          )}
           onMouseDown={handleContainerMouseDown}
         >
-          {topSlot}
+          {/* Stacked compact form: one flex row, the top slot wraps onto a row of its own above it, and the start
+              cluster stands left of the text instead of in the action row. */}
+          {isCompactStacked && !!topSlot && <div className={styles.compactTopSlot}>{topSlot}</div>}
+          {!isCompactStacked && topSlot}
+          {isCompactStacked && !!actionsSlotStart && (
+            <div className={styles.compactActionsStart}>{actionsSlotStart}</div>
+          )}
           <span
             ref={inputRef}
             contentEditable={!(disabled || isProcessing)}
@@ -397,7 +441,7 @@ export const ConversationMessageInput = (props: ConversationMessageInputProps) =
           )}
 
           <div className={styles.actions}>
-            {actionsSlotStart && <div className={styles.actionsStart}>{actionsSlotStart}</div>}
+            {!isCompactStacked && !!actionsSlotStart && <div className={styles.actionsStart}>{actionsSlotStart}</div>}
             {/* <div className={styles.buttons}> */}
             {/* TODO: Implement emoji functionality */}
             {/* <Button

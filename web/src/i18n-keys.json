@@ -796,6 +796,15 @@
       ]
     },
     {
+      "key": "Remove file",
+      "defaultText": "Remove file",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/chat/ConversationMessageInput/ConversationMessageInputAttachments/ConversationMessageInputAttachmentPreviewWidget.tsx"
+      ]
+    },
+    {
       "key": "Reply draft",
       "defaultText": "Reply draft",
       "placeholders": [],

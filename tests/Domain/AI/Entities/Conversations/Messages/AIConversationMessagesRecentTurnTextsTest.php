@@ -73,4 +73,27 @@ class AIConversationMessagesRecentTurnTextsTest extends UnitTestCase
             'assistant: Platz 3 für „zahnarzt“.',
         ], $messages->buildOwnerTurns()->buildRecentTurnTextsBefore(4, collapseWhitespace: true)->recentTurns);
     }
+
+    /** An attached image is no owner words: its JSON never fills the cut, and a message of nothing but images is no turn. */
+    public function testAnOwnerTurnCarriesOnlyTheWordsAndABlockOnlyOwnerRowIsNoTurn(): void
+    {
+        $fence = "```widget\n{\"type\": \"UploadedFiles\", \"files\": [{\"fileId\": \"f1\", \"fileName\": \"storefront.jpg\", \"mimeType\": \"image/jpeg\"}]}\n```";
+        $assistantWidget = "Ist das Ihr Unternehmen?\n\n```widget\n{\"type\": \"ConfirmChoice\"}\n```";
+        $messages = new AIConversationMessages();
+        foreach ([
+            $this->message(AIConversationMessage::ROLE_USER, AIConversationMessage::AUTHOR_USER, AIConversationMessage::MESSAGE_TEXT, "Fă o postare cu pozele astea\n\n" . $fence, 0),
+            $this->message(AIConversationMessage::ROLE_ASSISTANT, AIConversationMessage::AUTHOR_ASSISTANT, AIConversationMessage::MESSAGE_TEXT, $assistantWidget, 1),
+            $this->message(AIConversationMessage::ROLE_USER, AIConversationMessage::AUTHOR_USER, AIConversationMessage::MESSAGE_TEXT, $fence, 2),
+            $this->message(AIConversationMessage::ROLE_USER, AIConversationMessage::AUTHOR_USER, AIConversationMessage::MESSAGE_TEXT, 'Și asta', 3),
+        ] as $message) {
+            $messages->add($message);
+        }
+
+        $context = $messages->buildOwnerTurns()->buildRecentTurnTextsBefore(3, collapseWhitespace: true);
+        self::assertSame([
+            'owner: Fă o postare cu pozele astea',
+            'assistant: ' . (preg_replace('/\s+/', ' ', $assistantWidget) ?? $assistantWidget),
+        ], $context->recentTurns, 'the owner turn has no JSON, the block-only row is no turn, the assistant keeps its block');
+        self::assertSame($assistantWidget, $context->assistantTextBefore);
+    }
 }

@@ -122,6 +122,40 @@ $collapsed-pill-padding-inline: $x2;
       max-width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
+  // `compactStackedSlots`: only the top slot wraps (`.compactTopSlot`); the text row never does. No gap between the two
+  // rows: the top slot's blocks bring their own spacing, and take no height while they are empty.
+  &.compactStacked {
+    flex-wrap: wrap;
+    gap: 0 $x1;
+
+    .actions {
+      height: $x5;
+    }
+  }
+
+  // A button left of the text (e.g. a "+" menu): the pill's left edge is as far from it as its right edge from send.
+  &.compactWithActionsStart {
+    padding-left: $x1;
+  }
+
+  // `compactStackedSlots`: the host's top slot (e.g. attachment previews) on a row of its own, the pill's full width.
+  .compactTopSlot {
+    flex: 0 0 100%;
+    min-width: 0;
+  }
+
+  // The start cluster left of the text, at the bottom of a longer message like send. As tall as the send row
+  // (`.actions`), so its button is centred on the same line as the buttons on the right; the row aligns both boxes on
+  // their bottom edge. A bounded width, so the pill can take it to 0 smoothly.
+  .compactActionsStart {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    max-width: $x5;
+    height: $x5;
+    max-height: $x5;
+  }
+
   // Centred on the send button while it is one line (the row sits on its bottom edge so the button stays at the end
   // of a longer message); from the second line on the text is the tallest item and fills the row anyway.
   .editableInput {

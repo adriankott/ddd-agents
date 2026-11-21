@@ -3,6 +3,8 @@ import React, { useMemo } from "react";
 import { classNames } from "../../../provider/class-names";
 import styles from "./ConversationMessageUser.module.scss";
 import { splitComposerWidgetFencesFromMessageText } from "../../../renderer/composer-widget-fence";
+import type { ConversationComposerWidget } from "../../../renderer/conversation-composer-widget";
+import { conversationWidgetRegistry } from "../../../renderer/conversationWidgetRegistry";
 import { ConversationMessageUserWidgets } from "./ConversationMessageUserWidgets";
 
 export type ConversationMessageUserTheme = "default" | "light" | "dark" | "primary";
@@ -13,6 +15,11 @@ export interface ConversationMessageUserProps {
   isGenericChat?: boolean;
 }
 
+/** True when the widget's registry entry shows its echo on its own above the bubble (e.g. attached images). */
+const isShownAboveBubble = (widget: ConversationComposerWidget): boolean =>
+  conversationWidgetRegistry.widgets.find((entry) => entry.name === widget.widgetName)?.customerMessagePlacement ===
+  "aboveBubble";
+
 export const ConversationMessageUser = (props: ConversationMessageUserProps) => {
   const { text, isGenericChat, theme = "default" } = props;
 
@@ -20,6 +27,8 @@ export const ConversationMessageUser = (props: ConversationMessageUserProps) => 
   // read-only widgets above the prose, exactly like the assistant-side remark pipeline renders them in a reply —
   // but WITHOUT running that pipeline over user text (never treat the customer's own prose as Markdown).
   const { text: proseText, widgets } = useMemo(() => splitComposerWidgetFencesFromMessageText(text), [text]);
+  const widgetsAboveBubble = useMemo(() => widgets.filter(isShownAboveBubble), [widgets]);
+  const widgetsInsideBubble = useMemo(() => widgets.filter((widget) => !isShownAboveBubble(widget)), [widgets]);
 
   const bubbleClass =
     theme === "light"
@@ -37,12 +46,26 @@ export const ConversationMessageUser = (props: ConversationMessageUserProps) => 
         ? "var(--agents-chat-user-bubble-text)"
         : "var(--agents-fg-on-accent)";
 
-  return (
+  const bubble = (
     <div className={classNames(styles.message, bubbleClass)} data-testid="chat-message-user">
-      <ConversationMessageUserWidgets widgets={widgets} />
-      <Text allowNewLines translate={false} color={textColor}>
-        {proseText}
-      </Text>
+      <ConversationMessageUserWidgets widgets={widgetsInsideBubble} />
+      {/* A widget-only message (e.g. images sent without text) has no prose line to render. */}
+      {proseText !== "" && (
+        <Text allowNewLines translate={false} color={textColor}>
+          {proseText}
+        </Text>
+      )}
+    </div>
+  );
+
+  if (widgetsAboveBubble.length === 0) return bubble;
+
+  // Widgets placed above the bubble (e.g. attached images) stand on their own, right-aligned; a message that is nothing
+  // but such widgets shows no bubble at all.
+  return (
+    <div className={styles.messageWithWidgetsAboveBubble}>
+      <ConversationMessageUserWidgets widgets={widgetsAboveBubble} />
+      {(proseText !== "" || widgetsInsideBubble.length > 0) && bubble}
     </div>
   );
 };

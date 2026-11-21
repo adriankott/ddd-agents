@@ -28,6 +28,18 @@ export * from "../renderer/widget-hydration";
 // The counterpart of `registerWidgetHydrator`: a host that layers its own hydrators (a story) takes them off again.
 export { unregisterWidgetHydrator } from "../renderer/widget-hydration/widget-hydration.registry";
 export * from "../renderer/canvas/canvas-behaviours";
+// The canvas pane's title slot (`titleBesideCloseButton`): an app's canvas body portals its title into it.
+export { CanvasTitleSlotContext, useCanvasTitleSlot } from "../renderer/canvas/canvas-title-slot-context";
+// A media-library file a canvas puts into the composer (`attachLibraryFilesToComposer`).
+export type { ComposerLibraryFile } from "../renderer/composer-library-file";
+// A composer widget and its fence in a customer message: an app's host-held composer widget (`hostComposerWidgets`).
+export type { ConversationComposerWidget } from "../renderer/conversation-composer-widget";
+export {
+  buildComposerWidgetFenceBlock,
+  buildMessageTextWithComposerWidgets,
+  splitComposerWidgetFencesFromMessageText,
+  type SplitComposerWidgetFencesResult,
+} from "../renderer/composer-widget-fence";
 export * from "../renderer/canvas/canvas-state";
 export { canvasBodies, canvasFeatureFlagOf, type CanvasBodyProps } from "../renderer/canvas/canvasBodies";
 // The entity an `openEntity` action opens, for a host's own `onOpenEntity` of the composed-view renderer.

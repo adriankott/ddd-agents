@@ -63,6 +63,11 @@ export interface CanvasBehaviour {
    * content.
    */
   readonly overlayCloseButton?: boolean;
+  /**
+   * The body's title sits in the close button's row instead of in a row of its own below it: the body portals it into
+   * the pane's title slot (`useCanvasTitleSlot`). Default false: the row holds the button alone.
+   */
+  readonly titleBesideCloseButton?: boolean;
 }
 
 /** Width of the canvas pane (% of the split) when a behaviour declares none. */

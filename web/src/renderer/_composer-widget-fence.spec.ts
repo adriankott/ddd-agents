@@ -11,13 +11,15 @@ import {
 import { ConversationComposerWidget } from "./conversation-composer-widget";
 import remarkWidgetFencePlugin from "./remarkWidgetFencePlugin";
 
-// A minimal fake registry: one widget IS composable (declares `composerComponent`), one registered widget is NOT
-// (a list widget that renders in messages but was never meant to live in the composer) — so the split
-// function's "only composable fences are extracted" rule is exercised without depending on a real widget shipping.
+// A minimal fake registry: one widget IS composable (declares `composerComponent`), one is sent in the customer's
+// message without a composer (declares `sentInCustomerMessage`, an uploaded-files echo), and one registered widget is
+// NEITHER (a list widget that renders in messages but was never meant to live in the composer) — so the split
+// function's "only customer-message fences are extracted" rule is exercised without depending on a real widget.
 vi.mock("./conversationWidgetRegistry", () => ({
   conversationWidgetRegistry: {
     widgets: [
       { name: "TestComposable", component: () => null, composerComponent: () => null },
+      { name: "TestSentInCustomerMessage", component: () => null, sentInCustomerMessage: true },
       { name: "TestNonComposable", component: () => null },
     ],
   },
@@ -100,6 +102,20 @@ describe("splitComposerWidgetFencesFromMessageText", () => {
     );
     expect(widgets).toEqual([
       { composerWidgetId: "TestComposable:0", widgetName: "TestComposable", fields: { label: "Hero" } },
+    ]);
+  });
+
+  it("extracts a fence for a widget declaring `sentInCustomerMessage` (no composerComponent)", () => {
+    const { text, widgets } = splitComposerWidgetFencesFromMessageText(
+      'Use these.\n\n```widget\n{"type":"TestSentInCustomerMessage","files":[{"fileId":"a1"}]}\n```',
+    );
+    expect(text).toBe("Use these.");
+    expect(widgets).toEqual([
+      {
+        composerWidgetId: "TestSentInCustomerMessage:0",
+        widgetName: "TestSentInCustomerMessage",
+        fields: { files: [{ fileId: "a1" }] },
+      },
     ]);
   });
 
