@@ -461,7 +461,7 @@ export const ConversationMessageInput = (props: ConversationMessageInputProps) =
             {sendReplacementWhenEmpty && !hasSendableContent ? (
               sendReplacementWhenEmpty
             ) : (
-              <div className={classNames({ [styles.sendBlocked]: isMessageTooLong })}>
+              <div className={classNames(styles.ownAction, { [styles.sendBlocked]: isMessageTooLong })}>
                 <Tooltip
                   text={isMessageTooLong ? "Your message is over the %maxLength% character limit" : undefined}
                   replacements={{ maxLength: MAX_MESSAGE_LENGTH.toLocaleString() }}

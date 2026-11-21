@@ -4,6 +4,7 @@ export { AgentChat, type AgentChatProps } from "../chat/AgentChat/AgentChat";
 export {
   AgentChatController,
   type AgentChatActivityHistoryProps,
+  type AgentChatAssistantAvatarProps,
   type AgentChatActivityProps,
   type AgentChatComposerHandle,
   type AgentChatControllerProps,
@@ -67,7 +68,10 @@ export {
 // The building blocks a host composes its own chat surface from: the canvas pane, the message list, the message rows,
 // the input with its attachment shapes, and the activity ticker an app's own activity face paces itself by.
 export { CanvasPane } from "../chat/CanvasPane/CanvasPane";
-export { ConversationMessageList } from "../chat/ConversationMessageList/ConversationMessageList";
+export {
+  ConversationMessageList,
+  findUnansweredWidgetMessageId,
+} from "../chat/ConversationMessageList/ConversationMessageList";
 export {
   ConversationMessageUser,
   type ConversationMessageUserProps,

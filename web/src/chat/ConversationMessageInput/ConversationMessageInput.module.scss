@@ -59,10 +59,12 @@ $collapsed-pill-padding-inline: $x2;
   align-items: center;
   gap: $x1;
   padding-top: $x1;
+}
 
-  svg path {
-    fill: currentColor;
-  }
+// The package's own controls of the action row (the send button) draw their icon in the text colour. Host controls in
+// the row (`actionsSlot`, `actionsSlotStart`, `sendReplacementWhenEmpty`) keep their icons as drawn.
+.ownAction svg path {
+  fill: currentColor;
 }
 
 // Left-pinned cluster of the actions row (e.g. the "+" attachments menu). margin-right: auto

@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.1.7
+
+- Changed: requires `mgamadeus/ddd` ^3.37.2. From that Core version on, a value object stored in a column or read from
+  JSON is built as the application's class of it, so an application's same-path subclass of `RunSettings` (and of every
+  other package value object) keeps its own fields on load, as the `RunSettings` docblock states.
+- Fixed (npm): the composer's action row fills only the package's own icons (the send button) with the text colour; a
+  host's control in `actionsSlot`, `actionsSlotStart` or `sendReplacementWhenEmpty` keeps its icon as drawn (an outline
+  icon no longer turns into a solid blob).
+- Added (npm): `onMessageSent(messageText)` on `AgentChat` / `AgentChatController`, once for every accepted send (typed,
+  a widget's send, the opening request's message), e.g. for a send animation. A refused send reports nothing.
+- Added (npm): `AssistantAvatar` on `AgentChat` / `AgentChatController` (`AgentChatAssistantAvatarProps`: the message):
+  shown left of each assistant message, at its top; `renderAssistantAvatar` on `ConversationView`,
+  `ConversationViewBody` and `ConversationMessageList`.
+- Added (npm): `AgentChatActivityProps.chatStore` (read more of the chat's state with `useAgentsChatSelector`) and
+  `AgentChatActivityProps.unansweredWidgetMessageId` (the newest widget-carrying assistant message the owner has not
+  answered, else null); `findUnansweredWidgetMessageId` is exported from `./chat`. Whether that widget waits for an
+  answer (`AWAITS_OWNER_INPUT`) is not on the wire.
+- Documented (npm): `ThinkingIndicator` is always mounted, also between turns — the resting avatar under the last
+  message — one instance across a turn's start and end.
+
 ## 0.1.6
 
 - Added: `AIConversationMessage::getMessageTextWithoutWidgetBlocks()`, the words of a message without its widget

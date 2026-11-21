@@ -75,6 +75,11 @@ interface ConversationMessageListProps {
    * publishes that gap as `--chat-messages-gap`. Undefined (every other host) renders the rows exactly as before.
    */
   renderAfterMessage?: (message: ChatMessage) => React.ReactNode;
+  /**
+   * Host content beside each shown assistant message (an avatar face, 24–28 px): it stands left of the message, at its
+   * top. Undefined (every other host) renders the assistant messages exactly as before.
+   */
+  renderAssistantAvatar?: (message: ChatMessage) => React.ReactNode;
   /** The backend refuses every widget signal of a closed conversation, so no widget renders its controls. */
   isConversationClosed?: boolean;
 }
@@ -141,6 +146,7 @@ export const ConversationMessageList = ({
   enableFreshMessageBlockReveal,
   taskInstructionMessageId,
   renderAfterMessage,
+  renderAssistantAvatar,
   isConversationClosed = false,
 }: ConversationMessageListProps) => {
   const list = messages ?? [];
@@ -223,6 +229,14 @@ export const ConversationMessageList = ({
           enableFreshMessageBlockReveal={enableFreshMessageBlockReveal}
         />
       );
+      if (renderAssistantAvatar) {
+        messageNode = (
+          <div key={message.id} className={styles.assistantMessageWithAvatar}>
+            <div className={styles.assistantAvatar}>{renderAssistantAvatar(message)}</div>
+            <div className={styles.assistantMessageBesideAvatar}>{messageNode}</div>
+          </div>
+        );
+      }
     } else if (message.role === "SYSTEM" && isDebugMode) {
       messageNode = (
         <ConversationMessageSystem

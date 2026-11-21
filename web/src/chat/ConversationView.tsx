@@ -236,6 +236,8 @@ export interface ConversationViewProps {
    * started each turn. Forwarded through ConversationViewBody to ConversationMessageList. Undefined changes nothing.
    */
   renderAfterMessage?: (message: ChatMessage) => React.ReactNode;
+  /** Host content beside each shown assistant message (an avatar face), forwarded through ConversationViewBody. */
+  renderAssistantAvatar?: (message: ChatMessage) => React.ReactNode;
   /** Forwarded through ConversationViewBody to ConversationMessageList: a closed conversation renders no widget controls. */
   isConversationClosed?: boolean;
   onSuggestionClick: (text: string) => void;

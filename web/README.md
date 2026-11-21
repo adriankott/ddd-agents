@@ -130,6 +130,10 @@ key the generator cannot see as a literal is wrapped in `textKey("…")`.
 | `showsTopBlurBand` | `false` | the frosted band under a floating top bar, following the chat pane |
 | `composerRef` | — | `setComposerDraft(text)` puts a draft into the mounted composer, never sends |
 | `ThinkingIndicator` | `AgentChatActivityIndicator` | the activity at the tail of the thread; `AgentChatActivityStack` is the stacked feed (one sentence per tool call, older lines drifting up under a top mask, a polite status region for the newest), and `(props) => <AgentChatActivityIndicator {...props} dotsVariant="pulse" />` the calm dots |
+| `ThinkingIndicator` mounting | — | always mounted, also between turns: the resting avatar under the last message (`active` and `isAgentWorkingOnTask` false); its props carry the `chatStore` and `unansweredWidgetMessageId` (an open widget question) |
+| `AssistantAvatar` | — | a face left of each assistant message, at its top (`AgentChatAssistantAvatarProps`: the message) |
+| `onMessageSent` | — | `(messageText) => …` once for every accepted send (typed, a widget's, the opening request's), e.g. a send animation |
+| `inputActionsSlot` / `inputActionsSlotStart` | — | host controls in the composer's action row; the package fills only its own icons, a host icon keeps its own fill |
 | `activityTiming` | `AgentsEnvironment.chatActivityTiming`, else the package | the activity read window (3000 ms), the read floor while a turn runs (4000), the line paces (2200 / 1400 with a backlog) and the success beat (1400); a host with a realtime push that writes `activityUpdatedAt` lowers the read window so a narrated line shows at once |
 
 The canvas split fits by the width of the chat's own container (`ResizeObserver`), not the viewport: below 850 px the

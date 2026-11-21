@@ -30,6 +30,7 @@ import type { ConversationMessageInputHandle } from "../ConversationMessageInput
 import type { ConversationComposerWidget } from "../../renderer/conversation-composer-widget";
 import type { ComposerLibraryFile } from "../../renderer/composer-library-file";
 import { ConversationView } from "../ConversationView";
+import { findUnansweredWidgetMessageId } from "../ConversationMessageList/ConversationMessageList";
 import type { AgentsChatState } from "../store/agents-chat-state";
 import { ConversationErrorType } from "../store/conversation-error-type";
 import type { AgentsChatStore } from "../store/create-agents-chat-store";
@@ -66,6 +67,20 @@ export interface AgentChatActivityProps {
   agentSpaceKey: number;
   /** The chat's resolved activity timing (`activityTiming`, the environment's, the package's), for the component's motion. */
   activityTiming?: ResolvedAgentChatActivityTiming;
+  /** The chat's store, for a component that reads more of the chat's state (`useAgentsChatSelector`). */
+  chatStore: AgentsChatStore;
+  /**
+   * The newest widget-carrying assistant message the owner has not answered yet (no later owner message, no later
+   * widget click) — null when there is none ({@link findUnansweredWidgetMessageId}). Whether that widget waits for an
+   * answer is the widget class's `AWAITS_OWNER_INPUT` on the server; the wire does not carry it, so a host that tells
+   * questions from other widgets checks the widget names of that message itself.
+   */
+  unansweredWidgetMessageId: string | number | null;
+}
+
+/** What the host's avatar beside an assistant message gets (`AssistantAvatar`). */
+export interface AgentChatAssistantAvatarProps {
+  message: ChatMessage;
 }
 
 /** What the host's activity history under a message gets: the finished turn that message started, if any. */
@@ -127,6 +142,12 @@ export interface AgentChatControllerProps {
   /** Called after a send that carried attachments, so the host clears them from the composer. */
   onAttachmentsSent?: () => void;
   /**
+   * Called once for every send the chat accepted (typed, a widget's send, the opening request's message), with the
+   * text as sent, right when it goes out — e.g. for a host's send animation. A refused send (a closed conversation, a
+   * start still in flight) reports nothing.
+   */
+  onMessageSent?: (messageText: string) => void;
+  /**
    * Called after an accepted send that carried composer widgets (the widget context's and `hostComposerWidgets`), with
    * those widgets — the host clears the ones it owns.
    */
@@ -165,8 +186,14 @@ export interface AgentChatControllerProps {
   outgoingAttachments?: ConversationAttachmentReference[];
   /** Composer widgets the host holds outside the widget context, sent with the next send (see `ConversationMessageInput`). */
   hostComposerWidgets?: ConversationComposerWidget[];
-  /** The agent's activity at the tail of the thread (the agent avatar slot). */
+  /**
+   * The agent's activity at the tail of the thread (the agent avatar slot). Always mounted, also between turns: it is
+   * the resting avatar under the last message while `active` and `isAgentWorkingOnTask` are false, and the working one
+   * during a turn — one instance, never remounted by a turn's start or end.
+   */
   ThinkingIndicator: ComponentType<AgentChatActivityProps>;
+  /** Shown left of each assistant message, at its top (an avatar face, 24–28 px). Undefined: no avatar. */
+  AssistantAvatar?: ComponentType<AgentChatAssistantAvatarProps>;
   /** A layer over the message column (a voice chat's focus mode); shown while `isContentOverlayShown`. */
   ContentOverlay?: ComponentType<AgentChatActivityProps>;
   /** The kept activity lines under the message that started a turn (with `keepActivityHistoryAfterAnswer`). */
@@ -235,6 +262,7 @@ export const AgentChatController = (props: AgentChatControllerProps) => {
     isOnboardingSetupConversation = false,
     sendModelSource,
     onAttachmentsSent,
+    onMessageSent,
     onComposerWidgetsSent,
     attachLibraryFilesToComposer,
     startingIdeasMarkdown,
@@ -261,6 +289,7 @@ export const AgentChatController = (props: AgentChatControllerProps) => {
     outgoingAttachments,
     hostComposerWidgets,
     ThinkingIndicator,
+    AssistantAvatar,
     ContentOverlay,
     ActivityHistory,
     children,
@@ -471,11 +500,12 @@ export const AgentChatController = (props: AgentChatControllerProps) => {
       const sentMessageText = client.composeSentMessageText
         ? client.composeSentMessageText(message, attachments)
         : message;
-      // Only a send that carried attachments clears them: a widget send and the cold-start greeting carry none and
+      // Reported for an accepted send only. Only a send that carried attachments clears them: a widget send and the cold-start greeting carry none and
       // must never wipe what the owner is still composing.
-      const reportSentAttachments = () => {
+      const reportAcceptedSend = () => {
         if (attachments?.length) onAttachmentsSent?.();
         if (composerWidgets?.length) onComposerWidgetsSent?.(composerWidgets);
+        onMessageSent?.(message);
       };
       if (conversation?.id) {
         const postConversationId = conversation.id;
@@ -488,7 +518,7 @@ export const AgentChatController = (props: AgentChatControllerProps) => {
           .catch((failure: unknown) =>
             chatStore.dispatch({ type: "messagePostFailed", error: toAgentsClientErrorOfPort(failure) }),
           );
-        reportSentAttachments();
+        reportAcceptedSend();
         return true;
       }
       // No conversation yet — lazy start; `startSignalText` rides along as the invisible start context.
@@ -511,7 +541,7 @@ export const AgentChatController = (props: AgentChatControllerProps) => {
         .catch((failure: unknown) => {
           chatStore.dispatch({ type: "startFailed", error: toAgentsClientErrorOfPort(failure) });
         });
-      reportSentAttachments();
+      reportAcceptedSend();
       return true;
     },
     [
@@ -523,6 +553,7 @@ export const AgentChatController = (props: AgentChatControllerProps) => {
       sendModelSource,
       onAttachmentsSent,
       onComposerWidgetsSent,
+      onMessageSent,
       isConversationRunEnded,
       rejectAsConversationClosed,
       fetchOpeningPage,
@@ -696,6 +727,12 @@ export const AgentChatController = (props: AgentChatControllerProps) => {
     [ActivityHistory, activityHistoryByTurnMessageId],
   );
 
+  const unansweredWidgetMessageId = useMemo(() => findUnansweredWidgetMessageId(messages ?? []), [messages]);
+  const renderAssistantAvatar = useCallback(
+    (message: ChatMessage) => (AssistantAvatar ? <AssistantAvatar message={message} /> : null),
+    [AssistantAvatar],
+  );
+
   const activityProps: AgentChatActivityProps = {
     active: agentActivity.active,
     failed: !!error,
@@ -703,6 +740,8 @@ export const AgentChatController = (props: AgentChatControllerProps) => {
     isAgentWorkingOnTask: agentActivity.active || activityTicker.phase === "live",
     agentSpaceKey,
     activityTiming: resolvedActivityTiming,
+    chatStore,
+    unansweredWidgetMessageId,
   };
 
   return (
@@ -749,6 +788,7 @@ export const AgentChatController = (props: AgentChatControllerProps) => {
                 thinkingIndicator={<ThinkingIndicator {...activityProps} />}
                 // Only while the history is kept: otherwise every row would carry an empty history slot.
                 renderAfterMessage={keepActivityHistoryAfterAnswer ? renderActivityHistoryAfterMessage : undefined}
+                renderAssistantAvatar={AssistantAvatar ? renderAssistantAvatar : undefined}
                 hideAssistantMeta
                 userMessageTheme="dark"
                 error={error}

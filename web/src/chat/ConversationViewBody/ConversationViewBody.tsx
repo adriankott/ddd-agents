@@ -235,6 +235,8 @@ export interface ConversationViewProps {
    * activity card under the message that started each turn). Undefined changes nothing.
    */
   renderAfterMessage?: (message: ChatMessage) => React.ReactNode;
+  /** Host content beside each shown assistant message (an avatar face), forwarded to ConversationMessageList. */
+  renderAssistantAvatar?: (message: ChatMessage) => React.ReactNode;
   /** Forwarded to ConversationMessageList: a closed conversation renders no widget controls. */
   isConversationClosed?: boolean;
   onSuggestionClick: (text: string) => void;
@@ -292,6 +294,7 @@ export const ConversationViewBody = (props: ConversationViewProps) => {
     isQuestionPinSuspended = false,
     taskInstructionMessageId,
     renderAfterMessage,
+    renderAssistantAvatar,
     isConversationClosed,
     onSuggestionClick,
     onSendMessage,
@@ -681,6 +684,7 @@ export const ConversationViewBody = (props: ConversationViewProps) => {
               enableFreshMessageBlockReveal={enablePinQuestionAndRevealAnswer}
               taskInstructionMessageId={taskInstructionMessageId}
               renderAfterMessage={renderAfterMessage}
+              renderAssistantAvatar={renderAssistantAvatar}
               isConversationClosed={isConversationClosed}
             />
           </WidgetWindowRootContext.Provider>

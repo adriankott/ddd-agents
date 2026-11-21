@@ -266,3 +266,22 @@
     }
   }
 }
+
+// `renderAssistantAvatar`: the host's avatar left of an assistant message, at its top; the message keeps the rest of
+// the row.
+.assistantMessageWithAvatar {
+  display: flex;
+  align-items: flex-start;
+  gap: $x1;
+  min-width: 0;
+}
+
+.assistantAvatar {
+  flex: 0 0 auto;
+  display: flex;
+}
+
+.assistantMessageBesideAvatar {
+  flex: 1 1 auto;
+  min-width: 0;
+}
