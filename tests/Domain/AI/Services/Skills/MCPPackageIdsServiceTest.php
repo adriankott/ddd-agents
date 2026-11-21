@@ -8,6 +8,7 @@ use DDD\Domain\AI\Entities\Skills\AISkill;
 use DDD\Domain\AI\Services\Skills\MCPPackageIdsService;
 use DDD\Presentation\Mcp\Client\AI\AgentMandatesMCPPackage;
 use DDD\Presentation\Mcp\Client\AI\AgentTaskRunReportsMCPPackage;
+use DDD\Presentation\Mcp\Client\AI\AgentTaskSchedulesMCPPackage;
 use LogicException;
 use PHPUnit\Framework\TestCase;
 
@@ -54,7 +55,11 @@ class MCPPackageIdsServiceTest extends TestCase
     {
         $defaultBinding = require dirname(__DIR__, 5) . '/config/app/AI/skillPackages.php';
         self::assertSame(
-            [AISkill::ASSISTANT_MANDATES => [AgentMandatesMCPPackage::class], AISkill::ASSISTANT_TASK_RUN_REPORTS => [AgentTaskRunReportsMCPPackage::class]],
+            [
+                AISkill::ASSISTANT_MANDATES => [AgentMandatesMCPPackage::class],
+                AISkill::ASSISTANT_TASKS => [AgentTaskSchedulesMCPPackage::class],
+                AISkill::ASSISTANT_TASK_RUN_REPORTS => [AgentTaskRunReportsMCPPackage::class],
+            ],
             AISkill::resolvePackageIdsOfBinding($defaultBinding)
         );
     }

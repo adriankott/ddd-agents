@@ -72,8 +72,8 @@ Not here: the conversation tree, run claims and the release of a child's run (lo
   still execute, workers still run, mails still go. Override all three refusal methods.
 - **Fire command without the expiry step.** `spawnRunConversationForClaimedSchedule()` does not expire a schedule; the
   command checks `AIConversationScheduleTransition::OPERATION_EXPIRE` before it claims.
-- **Schedule tools without the provenance guard.** The package ships no schedule tools; a host's create, change and
-  delete tools must refuse a call whose `AgentToolCallProvenance` carries a `scheduleId`, or a mission text with "every
+- **Schedule tools without the provenance guard.** The package's schedule tools (`AgentTaskSchedulesMCPPackage`) have
+  it; a host's own create, change and delete tools must refuse a call whose `AgentToolCallProvenance` carries a `scheduleId`, or a mission text with "every
   day" re-creates its schedule on every run.
 - **No reaper cron line.** A child whose worker died never ends; its parent waits until the owner writes again.
 - **Reading the result from the `delegate` row's answer.** It says "started"; the result is a later signal row or

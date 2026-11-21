@@ -58,7 +58,7 @@ class AISkillsServiceRequirementsAndPersonaTest extends TestCase
     {
         $skillsDirectory = dirname(__DIR__, 5) . '/config/app/AI/Skills';
         $aISkillsService = new AISkillsServiceWithFixedConfig([], ['agentName' => 'Ava', 'productName' => 'Shopline']);
-        foreach (['Assistant/Mandates.md', 'Assistant/TaskRunReports.md'] as $skillFile) {
+        foreach (['Assistant/Mandates.md', 'Assistant/Tasks.md', 'Assistant/TaskRunReports.md'] as $skillFile) {
             $substitutedText = $aISkillsService->substitutePersonaPlaceholders((string)file_get_contents($skillsDirectory . '/' . $skillFile));
             self::assertStringNotContainsString('{%', $substitutedText, $skillFile);
             $frontmatter = AISkillsService::splitFrontmatter($substitutedText)->frontmatter;

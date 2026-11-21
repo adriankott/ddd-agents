@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.8 (unreleased)
+
+- Added: the schedule tools `AgentTaskSchedulesMCPPackage` (id `agent.taskSchedules`) with the skill `Assistant.Tasks`
+  (`config/app/AI/Skills/Assistant/Tasks.md`): `startBackgroundTask`, `scheduleOneTimeTask`,
+  `createRecurringTaskSchedule`, `getTaskSchedules`, `getTaskRuns`, `getTaskRunReport`, `pauseTaskSchedule`,
+  `resumeTaskSchedule`, `deleteTaskSchedule`, `updateTaskSchedule` over the package's schedules. Scope: the space the
+  call names (filled from the conversation), else the account's schedules without a space. They apply every limit of
+  `AIConversationScheduleCreationLimits` and refuse schedule administration inside a scheduled run; the names match the
+  tools `config/app/AI/Purposes/Schedule/Run.md` refers to. A host offers them by listing
+  `AISkill::ASSISTANT_TASKS => ['agent.taskSchedules']` in its `skillPackages.php` (its file replaces the package's);
+  the budget note, the cost note and the widget of the task list (`TASK_LIST_WIDGET_TYPE`) are override points of a
+  same-path subclass. Nothing changes for a host that does not bind it.
+
 ## 0.1.7
 
 - Changed: requires `mgamadeus/ddd` ^3.37.2. From that Core version on, a value object stored in a column or read from

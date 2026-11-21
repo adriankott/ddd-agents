@@ -31,7 +31,7 @@ return [
 ## Package ids
 
 Every MCP package names itself with its static `MCPPackage::$name` (the package's own: `agent.mandates`,
-`agent.taskRunReports`; the kernel's: `demo.notes`). `MCPPackageIdsService` finds the packages by scanning the
+`agent.taskSchedules`, `agent.taskRunReports`; the kernel's: `demo.notes`). `MCPPackageIdsService` finds the packages by scanning the
 source roots of `AgentSourceRootsService` (the application's `src/` under the root namespace `App\` first, then every
 DDD module's `src/`), below `Presentation/Mcp`, file names ending in `MCPPackage.php`, abstract classes skipped. The
 first class holding an id wins; a host class that EXTENDS the package's class of the same id is the intended
@@ -63,7 +63,7 @@ The config reader takes the application's file instead of the module's, key by k
 
 | Config | Package default | What a host's file must do |
 |---|---|---|
-| `AI.skillPackages` | binds `Assistant.Mandates` → `agent.mandates`, `Assistant.TaskRunReports` → `agent.taskRunReports` | list EVERY skill the host offers, the package's two included. Without `Assistant.TaskRunReports` the purpose `Schedule.Run` preloads a skill that has no tools |
+| `AI.skillPackages` | binds `Assistant.Mandates` → `agent.mandates`, `Assistant.Tasks` → `agent.taskSchedules`, `Assistant.TaskRunReports` → `agent.taskRunReports` | list EVERY skill the host offers, the package's three included. Without `Assistant.TaskRunReports` the purpose `Schedule.Run` preloads a skill that has no tools |
 | `AI.skillRequirements` | empty | the gates the host puts on any skill, its own or a module's (reference [gating-by-entitlements-and-rights.md](gating-by-entitlements-and-rights.md)) |
 | `AI.purposeRequirements` | empty | the flags a purpose needs before a customer may start it |
 | `AI.skillNamespaceGroups` | one group, `Agent` | the groups of the admin catalog view (below) |
@@ -87,8 +87,8 @@ test can pin the host's intended overrides.
 ## Skill name constants
 
 `AISkill` carries constants for the names the package knows (for example `AISkill::ASSISTANT_MANDATES`,
-`AISkill::WEB_SEARCH`). Only two of them ship a file and a package: `Assistant.Mandates` and
-`Assistant.TaskRunReports`. The others (`Assistant.Settings`, `Assistant.Tasks`, `Assistant.Budget`,
+`AISkill::WEB_SEARCH`). Only three of them ship a file and a package: `Assistant.Mandates`,
+`Assistant.Tasks` and `Assistant.TaskRunReports`. The others (`Assistant.Settings`, `Assistant.Budget`,
 `Memory.Management`, `Money.CurrencyConversion`, `Web.Search`, `Web.Images`, `Web.PageView`,
 `Communication.VoiceCalls`, `Communication.Messages`) are names a host may implement itself; package code reads only
 `AISkill::ASSISTANT_BUDGET` (the offer drops it under a hide-usage budget policy). A host names its own skills in a

@@ -62,7 +62,7 @@ class DemoNotesMCPPackage extends MCPPackage
 - A package is no container service. The executor asks the container for the package class first and falls back to
   instantiating it; the reference kernel's `services.yaml` excludes its MCP folder from service registration. Put
   domain work into a host service the tool takes as a method parameter.
-- The package's own tool packages (`AgentMandatesMCPPackage`, `AgentTaskRunReportsMCPPackage`) are working examples of
+- The package's own tool packages (`AgentMandatesMCPPackage`, `AgentTaskSchedulesMCPPackage`, `AgentTaskRunReportsMCPPackage`) are working examples of
   every pattern in this skill; their mechanism is explained by the autonomy skill
   (`ddd-module-agents-autonomy-specialist`).
 - A package that must reuse the work of a tool under another request class derives from a class that holds the work
@@ -74,7 +74,7 @@ class DemoNotesMCPPackage extends MCPPackage
 
 A tool reaches the agent only through a loaded skill. The host's `config/app/AI/skillPackages.php` maps each skill
 name to its packages, by class or by package id; it **replaces the package's file whole**, so a host that wants the
-package's own skills (`Assistant.Mandates`, `Assistant.TaskRunReports`) lists them itself.
+package's own skills (`Assistant.Mandates`, `Assistant.Tasks`, `Assistant.TaskRunReports`) lists them itself.
 `AISkill::getPackageClassesBySkillName()` reads the binding once per process. A package id resolves only for a package
 the source-root scan finds (`MCPPackageIdsService`); the rules of the scan are the skills-and-purposes skill's, and the
 way out for a host under another root namespace — bind by class, as the reference kernel does — is the entry

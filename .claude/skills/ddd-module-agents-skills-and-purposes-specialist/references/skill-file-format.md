@@ -13,7 +13,7 @@ One agent skill is one markdown file below `config/app/AI/Skills/` of a config r
 root that holds the file (the application's roots before a module's). A file alone is not offered: the skill also
 needs its entry in the binding `AI.skillPackages` (reference [catalog-binding-overrides-and-lint.md](catalog-binding-overrides-and-lint.md)).
 
-The package ships two skill files, `Assistant.Mandates` and `Assistant.TaskRunReports`; the reference kernel ships
+The package ships three skill files, `Assistant.Mandates`, `Assistant.Tasks` and `Assistant.TaskRunReports`; the reference kernel ships
 `Demo.Notes`. Read `Demo.Notes` first: it is the smallest complete skill.
 
 ## The shape of the file

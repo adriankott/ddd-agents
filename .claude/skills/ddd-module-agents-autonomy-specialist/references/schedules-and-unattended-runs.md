@@ -97,9 +97,9 @@ with the schedule's `reportChannel`.
   a host send tool without the declaration stays callable inside a run and is a second delivery path. The text of
   `config/app/AI/Purposes/Schedule/Run.md` names four schedule tools the run must not call
   (scheduleOneTimeTask, createRecurringTaskSchedule, updateTaskSchedule, deleteTaskSchedule); it also tells the model
-  to call `send_owner_report` and `getPreviousTaskRunReports`, which the package ships. None of the four schedule
-  tools ships with the package. A host whose schedule tools carry these names keeps the file; any other host replaces
-  the purpose file with its own at the same config path.
+  to call `send_owner_report` and `getPreviousTaskRunReports`, which the package ships. The four schedule tools ship
+  with the package (`AgentTaskSchedulesMCPPackage`, section "The package's schedule tools"). A host whose own schedule
+  tools carry other names replaces the purpose file with its own at the same config path.
 - **The time zone** of the schedule is frozen on the run; its sub-agents inherit it.
 - **The run closes** once its report reached its channel: `ScheduleRunPurpose::shouldCloseConversationAfterSettledTurn()`
   holds for a CHAT run when the turn settled, for an EMAIL run once `reportDeliveredAt` is set (owner reports
@@ -180,14 +180,37 @@ model belongs to the context skill `ddd-module-agents-context-specialist`.
   cron firings per day, recurring schedules created per day, runs per schedule, title length). `createSchedule()` does
   not enforce them; the tool does.
 - **A scheduled run never administers schedules.** The purpose says so, and every tool call of the run and of its
-  sub-agents carries the `scheduleId` in `AgentToolCallProvenance`. The package ships no schedule tools: a host's
-  create, change, pause, resume and delete tools must refuse a call whose provenance has a `scheduleId` — otherwise a
+  sub-agents carries the `scheduleId` in `AgentToolCallProvenance`. The package's schedule tools refuse such a call; a
+  host's own create, change, pause, resume and delete tools must refuse a call whose provenance has a `scheduleId` — otherwise a
   mission text that contains "every day at 12:00" re-creates its own schedule on every run. Starting a one-off
   background task is execution, not administration, and may stay allowed.
 
+## The package's schedule tools
+
+`DDD\Presentation\Mcp\Client\AI\AgentTaskSchedulesMCPPackage` (id `agent.taskSchedules`, skill `Assistant.Tasks`,
+skill file `config/app/AI/Skills/Assistant/Tasks.md`) is the agent's surface over the schedules: `startBackgroundTask`,
+`scheduleOneTimeTask`, `createRecurringTaskSchedule`, `getTaskSchedules`, `getTaskRuns`, `getTaskRunReport`,
+`pauseTaskSchedule`, `resumeTaskSchedule`, `deleteTaskSchedule`, `updateTaskSchedule`. A host lists
+`AISkill::ASSISTANT_TASKS => ['agent.taskSchedules']` in its `skillPackages.php` to offer them.
+
+| Point | What the package does |
+|---|---|
+| Scope | the space `agentSpaceId` names (filled from the conversation), else the schedules the account holds without a space; the reads filter on it, AND-connected on top of the model's filter |
+| A schedule by id | found with read rights; its space must be usable by the acting account, a schedule without a space must be the account's own — else "not found" |
+| Owner | the conversation's account, else the signed-in one; `createSchedule()` stores the signed-in account |
+| Zone | an explicit `timezoneIdentifier`, else the call's zone, else the space's; none known = UTC |
+| Limits | every limit of `AIConversationScheduleCreationLimits`, the self-replication guard, the frequency floor on create and on a cron edit |
+| Report channel | EMAIL when the call names none — a host without the report mail lets the model pass CHAT (owner reports reference) |
+| Budget | the schedule budget pot line (`composeScheduleBudgetPotNote()`) and the monthly cost projection (`composeMonthlyCostNote()`), both protected; an application without a pot gets no line |
+| Widget of the task list | `TASK_LIST_WIDGET_TYPE` (default null: none); a same-path subclass that sets it gets a widget fence with `agentSpaceId` in the `getTaskSchedules` result, never on a phone line or in a sub-agent |
+| Account rights | none; an application that gates scheduling by a right declares `MCPRequiresAccountRights` on its same-path subclass |
+
+A host with different rules derives the class at the same path (same id) and overrides the protected methods; a
+tool that needs another request class gets a method of its own (tools reference, package-bundle-and-controller).
+
 ## Writing the tool that creates a schedule
 
-The package ships no schedule tool; the host writes one per action in its own MCP package. A creating tool:
+A host that writes its own schedule tools instead, one per action in its own MCP package. A creating tool:
 
 1. **Refuses inside a scheduled run.** When the call's `AgentToolCallProvenance::$scheduleId` is set (a scheduled run or
    one of its sub-agents), it creates nothing and answers that a run executes its task and never schedules.
@@ -270,7 +293,8 @@ Full class names of what a host extends or calls here: `DDD\Domain\AI\Services\C
 
 - The cron lines of the package's fire command and its state-sweep command
   (`app:ai-schedule:close-for-inactive-agent-spaces`) — cadence in the entry skill's host duties.
-- The tools that create, list, change, pause, resume and delete schedules, with the provenance guard above.
+- The binding of `Assistant.Tasks` to `agent.taskSchedules` — or its own tools that create, list, change, pause,
+  resume and delete schedules, with the provenance guard above.
 - Optionally: the budget pot (`ScheduleBudgetPotsService`), eligibility (`AgentAutomationEligibilityService`), the
   sweep filter, the report mail (owner reports reference).
 
