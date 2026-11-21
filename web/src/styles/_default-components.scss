@@ -289,7 +289,7 @@ $agents-icon-glyphs: (
 
 .agents-button--primary {
   background: var(--agents-fg-cta);
-  color: var(--agents-fg-on-dark);
+  color: var(--agents-fg-on-cta);
 
   &:hover:not(:disabled) {
     background: color-mix(in srgb, var(--agents-fg-cta) 86%, var(--agents-fg));
@@ -317,7 +317,7 @@ $agents-icon-glyphs: (
 
 .agents-button--shimmer {
   background: linear-gradient(110deg, var(--agents-accent1-500), var(--agents-fg-cta));
-  color: var(--agents-fg-on-dark);
+  color: var(--agents-fg-on-cta);
 
   &:hover:not(:disabled) {
     background: linear-gradient(110deg, var(--agents-fg-cta), var(--agents-accent1-500));

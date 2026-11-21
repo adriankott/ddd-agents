@@ -147,5 +147,7 @@ the thread sets that variable on `[data-agents-chat-scroll]` or through its own 
 - Colour tokens: set the plain variables (`--agents-fg`, `--agents-fg-cta`, `--agents-shadow`, …); package rules mix
   them with `color-mix()`. The `--agents-<name>-rgb` triplets of 0.1 keep working at the root element: each plain colour
   of the triplet list defaults to `rgb(var(--agents-<name>-rgb))`.
+- `--agents-fg-on-cta` is the text on the `--agents-fg-cta` fill (the primary button; white by default in both themes);
+  a host whose CTA colour is light in dark mode sets it dark there.
 - `--agents-fg-on-accent` is the text on an accent fill (white in light, dark in dark mode); `--agents-fg-on-dark` stays
   white for text over a dark scrim.

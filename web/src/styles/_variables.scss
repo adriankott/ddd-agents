@@ -32,6 +32,9 @@ $agents-light-colors: (
   "fg-light": #5a6270,
   "fg-lightest": #8b929d,
   "fg-cta": #2563eb,
+  // Text and icons on the `fg-cta` fill (the primary button). White by default in both themes; a host whose CTA colour
+  // is light in dark sets it dark there.
+  "fg-on-cta": #ffffff,
   "fg-on-dark": #ffffff,
   // Text and icons on an accent fill (a coloured bubble, a success dot): white on the light theme's deep fills, dark on
   // the dark theme's bright ones. `fg-on-dark` stays white for text over a dark scrim (a photo, a video).
@@ -107,6 +110,7 @@ $agents-dark-colors: (
   "fg-light": #aab1bc,
   "fg-lightest": #7d8592,
   "fg-cta": #60a5fa,
+  "fg-on-cta": #ffffff,
   "fg-on-dark": #ffffff,
   "fg-on-accent": #111418,
   "text-subtle": #7d8592,

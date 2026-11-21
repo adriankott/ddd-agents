@@ -2,6 +2,7 @@ import { Skeleton } from "../../../provider/components";
 import { classNames } from "../../../provider/class-names";
 import { useEffect, useMemo, useState } from "react";
 import type { ComposedViewComponentDefinition, ComposedViewComponentProps } from "../../composed-view-component-types";
+import { useLayoutNesting } from "../layout/layout-nesting-context";
 import { MediaCaption } from "./MediaCaption";
 import { MediaImageTile } from "./MediaImageTile";
 import { openMediaImagesLightbox, readAspectRatio, readImageFit, readMediaImage } from "./media-values";
@@ -12,6 +13,8 @@ import styles from "./Image.module.scss";
  * title and caption under it and its source as a chip over it, lazily loaded, opening the component library's lightbox on click. In
  * a compact slot (a table cell) it is a 4:3 thumbnail without text. A picture whose `src` is no http(s) or data:image
  * address reports `failed` and renders nothing; a picture that does not load shows its alt text and reports `failed`.
+ * Inside a `Pressable` (a selectable tile) the picture opens nothing: the whole tile is the one control, and a button
+ * inside the Pressable's button would take the click.
  */
 const ImageNode = (props: ComposedViewComponentProps) => {
   const { props: nodeProps, isPending, sizeClass, runtime, testId } = props;
@@ -20,6 +23,7 @@ const ImageNode = (props: ComposedViewComponentProps) => {
   const isCompact = sizeClass === "compact";
   const [hasLoadFailed, setHasLoadFailed] = useState(false);
   const { reportNodeStatus } = runtime;
+  const { isInsidePressable } = useLayoutNesting();
 
   useEffect(() => {
     setHasLoadFailed(false);
@@ -50,7 +54,7 @@ const ImageNode = (props: ComposedViewComponentProps) => {
     );
   }
   if (!image) return null;
-  const openLightbox = runtime.isEmailRender ? undefined : () => openMediaImagesLightbox([image], 0);
+  const openLightbox = runtime.isEmailRender || isInsidePressable ? undefined : () => openMediaImagesLightbox([image], 0);
   return (
     <figure className={classNames(styles.image, isCompact && styles.imageCompact)} data-testid={testId}>
       <MediaImageTile

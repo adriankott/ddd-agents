@@ -92,6 +92,43 @@ export const composeFormSubmitSignal = (
 
 export const composeFormDeclineSignal = (formName: string) => `ComposedView form "${formName}" declined.`;
 
+/** A stored message as {@link findStoredFormAnswer} reads it. */
+export interface StoredFormAnswerMessage {
+  id?: number | string | null;
+  role?: string | null;
+  messageType?: string | null;
+  message?: string | null;
+}
+
+/**
+ * The answer the transcript holds for the form `formName` of the message `hostMessageId`: "sent" or "declined" when a
+ * signal row after the host message carries the form's submit or decline sentence, before the owner wrote a message
+ * of their own; undefined otherwise (no transcript, host message not loaded, no answer). Restores the done state of a
+ * form after a reload. Pure.
+ */
+export const findStoredFormAnswer = (
+  messages: ReadonlyArray<StoredFormAnswerMessage> | null | undefined,
+  hostMessageId: string | number | undefined,
+  formName: string,
+): "sent" | "declined" | undefined => {
+  if (!messages || hostMessageId === undefined) return undefined;
+  const hostIndex = messages.findIndex((message) => message.id !== undefined && message.id !== null && String(message.id) === String(hostMessageId));
+  if (hostIndex < 0) return undefined;
+  const submitHead = `ComposedView form "${formName}" submitted:`;
+  const declineSentence = composeFormDeclineSignal(formName);
+  for (let index = hostIndex + 1; index < messages.length; index += 1) {
+    const message = messages[index];
+    const text = typeof message.message === "string" ? message.message : "";
+    if (message.messageType === "SIGNAL") {
+      if (text.includes(submitHead)) return "sent";
+      if (text.includes(declineSentence)) return "declined";
+      continue;
+    }
+    if (message.role === "USER") return undefined;
+  }
+  return undefined;
+};
+
 /** The state name a prop value reads or writes: a `{"$state": …}` binding or a `{"set": …}` event. */
 const readBoundStateName = (propValue: JsonValue): string | undefined => {
   if (typeof propValue !== "object" || propValue === null || Array.isArray(propValue)) return undefined;

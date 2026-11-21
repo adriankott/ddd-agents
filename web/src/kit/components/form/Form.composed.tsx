@@ -11,6 +11,7 @@ import {
   collectBoundStateNames,
   composeFormDeclineSignal,
   composeFormSubmitSignal,
+  findStoredFormAnswer,
   isFormFieldFilled,
   isFormNameAllowed,
   readStateNameList,
@@ -41,12 +42,19 @@ const FormNode = (props: ComposedViewComponentProps) => {
   const { node, props: nodeProps, slots, sizeClass, runtime, testId } = props;
   const { state, interactive, isEmailRender, reportNodeStatus } = runtime;
   const isInsideForm = useContext(ComposedViewFormContext);
-  const { injectSignal } = useConversationWidgetContext();
-  const [submissionStatus, setSubmissionStatus] = useState<FormSubmissionStatus>("idle");
+  const { injectSignal, messages } = useConversationWidgetContext();
+  const [localSubmissionStatus, setSubmissionStatus] = useState<FormSubmissionStatus>("idle");
   const [hasTriedWithMissingFields, setHasTriedWithMissingFields] = useState(false);
   const isSignalInFlightRef = useRef(false);
 
   const formName = isFormNameAllowed(nodeProps.name) ? nodeProps.name : undefined;
+  // after a reload the answer lives only in the transcript: its signal row restores "Sent" / "Declined"
+  const storedAnswer = useMemo(
+    () => (formName === undefined ? undefined : findStoredFormAnswer(messages, runtime.messageId, formName)),
+    [messages, runtime.messageId, formName],
+  );
+  const submissionStatus: FormSubmissionStatus =
+    localSubmissionStatus === "idle" && storedAnswer !== undefined ? storedAnswer : localSubmissionStatus;
   const fieldNames = useMemo(
     () =>
       Array.isArray(node.props.fields)
@@ -203,10 +211,11 @@ const FormNode = (props: ComposedViewComponentProps) => {
             {headerItems.length > 0 ? <div className={styles.headerItems}>{headerItems}</div> : null}
           </div>
         ) : null}
-        {/* Disabled while the answer is on its way and after it was given; the e-mail capture keeps the normal look
+        {/* Disabled while the answer is on its way, after it was given and on a reply that can no longer send (its options
+            are inert, not only its submit); the e-mail capture keeps the normal look
             (its page is inert and the renderer freezes the state). */}
         <ComposedViewFormContext.Provider value={true}>
-          <fieldset className={styles.fields} disabled={isAnswered || isSending}>
+          <fieldset className={styles.fields} disabled={isAnswered || isSending || (!canSend && !isEmailRender)}>
             {slots.children}
           </fieldset>
         </ComposedViewFormContext.Provider>

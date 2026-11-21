@@ -11,7 +11,8 @@ import styles from "./Pressable.module.scss";
  * node's `onClick` — `{"set": <state>}` writes `value`, `{"action": <name>}` runs the tree's action — through the
  * renderer, so a frozen tree (the e-mail) writes nothing. `isSelected` draws the one selection ring of the design
  * (inset ring + 8 % tint) and sets `aria-pressed`. In the e-mail capture, and inside another pressable, the content
- * shows without a control. Nothing inside → `empty`.
+ * shows without a control. Nothing inside → `empty`. Content that is not a `Surface` (which pads itself) gets the
+ * card padding, so text never touches the selection ring or the rounded corner.
  */
 const Pressable = (props: ComposedViewComponentProps) => {
   const { node, props: nodeProps, slots, runtime, testId } = props;
@@ -20,6 +21,8 @@ const Pressable = (props: ComposedViewComponentProps) => {
   const isSelected = typeof nodeProps.isSelected === "boolean" ? nodeProps.isSelected : undefined;
   const accessibleLabel = readTextProp(nodeProps.label);
   const hasContent = contentNodes.length > 0;
+  const contentDefinitions = node.nodesBySlotName.children ?? [];
+  const padsContent = !(contentDefinitions.length === 1 && contentDefinitions[0].type === "Surface");
   const { reportNodeStatus } = runtime;
   const innerNesting = useMemo(() => ({ ...nesting, isInsidePressable: true }), [nesting]);
 
@@ -31,7 +34,10 @@ const Pressable = (props: ComposedViewComponentProps) => {
   if (!hasContent) return null;
   if (runtime.isEmailRender || nesting.isInsidePressable) {
     return (
-      <div className={classNames(styles.pressable, styles.content, isSelected && styles.selected)} data-testid={testId}>
+      <div
+        className={classNames(styles.pressable, styles.content, padsContent && styles.padded, isSelected && styles.selected)}
+        data-testid={testId}
+      >
         {contentNodes}
       </div>
     );
@@ -40,7 +46,7 @@ const Pressable = (props: ComposedViewComponentProps) => {
     <InteractiveSurface hoverable className={classNames(styles.pressable, isSelected && styles.selected)}>
       <button
         type="button"
-        className={styles.button}
+        className={classNames(styles.button, padsContent && styles.padded)}
         data-testid={testId}
         aria-pressed={isSelected}
         aria-label={accessibleLabel}

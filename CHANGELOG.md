@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.4 (unreleased)
+
+- Fixed (web): an `Image` or `ImageGroup` inside a `Pressable` opens no lightbox and the group shows no carousel
+  controls; the whole tile is the one control (before, a click on the picture opened it full size and React logged a
+  button inside a button).
+- Fixed (web): a `Pressable` whose content is not one `Surface` pads its content by the card padding, so text no longer
+  touches the selection ring or gets cut by the rounded corner.
+- Added (web): the colour token `--agents-fg-on-cta`, the text on the `--agents-fg-cta` fill (primary and shimmer
+  buttons). White by default in both themes, so nothing changes until a host sets it; a host whose CTA colour is light
+  in dark mode sets it dark there.
+- Fixed (web): a Form in a reply that can no longer send keeps its options inert, not only its submit; after a reload a
+  sent or declined Form shows "Sent" / "Declined" again, read from its signal row in the transcript
+  (`findStoredFormAnswer()`; `ConversationWidgetTranscriptMessage` gains the optional `messageType` and `message`).
+
 ## 0.1.3
 
 - Fixed: the judge's write ledger (`AIConversationAuditRenderService::isReadOnlyToolName()`) reads the tool's declared

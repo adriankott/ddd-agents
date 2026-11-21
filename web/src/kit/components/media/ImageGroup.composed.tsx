@@ -4,6 +4,7 @@ import { KeyboardEvent, useEffect, useMemo, useState } from "react";
 import { translateText } from "../../../provider/environment";
 import { composedNodeSchema } from "../../../renderer/widget-tree/composed-node-schema";
 import type { ComposedViewComponentDefinition, ComposedViewComponentProps } from "../../composed-view-component-types";
+import { useLayoutNesting } from "../layout/layout-nesting-context";
 import { MediaCaption } from "./MediaCaption";
 import { MediaImageTile } from "./MediaImageTile";
 import {
@@ -31,16 +32,18 @@ interface ImageGroupLayoutProps {
   images: MediaImage[];
   aspectRatio: MediaAspectRatio;
   isEmailRender: boolean;
+  /** Inside a `Pressable`: no tile opens the lightbox and the carousel has no controls — the tile is the one control. */
+  isInsidePressable: boolean;
   onImageLoadFailed: (imageIndex: number) => void;
   testId: string;
 }
 
-const buildOpenImageHandler = (images: MediaImage[], imageIndex: number, isEmailRender: boolean) =>
-  isEmailRender ? undefined : () => openMediaImagesLightbox(images, imageIndex);
+const buildOpenImageHandler = (images: MediaImage[], imageIndex: number, isEmailRender: boolean, isInsidePressable: boolean) =>
+  isEmailRender || isInsidePressable ? undefined : () => openMediaImagesLightbox(images, imageIndex);
 
 /** The grid (ChatGPT 44): up to `maxVisible` tiles, the last one counting the hidden rest; every tile opens the lightbox. */
 const ImageGroupGrid = (props: ImageGroupLayoutProps & { maxVisibleTiles: number; isCompact: boolean }) => {
-  const { images, aspectRatio, isEmailRender, onImageLoadFailed, maxVisibleTiles, isCompact, testId } = props;
+  const { images, aspectRatio, isEmailRender, isInsidePressable, onImageLoadFailed, maxVisibleTiles, isCompact, testId } = props;
   const visibleImages = images.slice(0, maxVisibleTiles);
   const hiddenImageCount = images.length - visibleImages.length;
   return (
@@ -54,7 +57,7 @@ const ImageGroupGrid = (props: ImageGroupLayoutProps & { maxVisibleTiles: number
             isEager={isEmailRender}
             isCompact={isCompact}
             hiddenImageCount={imageIndex === visibleImages.length - 1 ? hiddenImageCount : 0}
-            onOpen={buildOpenImageHandler(images, imageIndex, isEmailRender)}
+            onOpen={buildOpenImageHandler(images, imageIndex, isEmailRender, isInsidePressable)}
             onLoadFailed={() => onImageLoadFailed(imageIndex)}
           />
           {isCompact ? null : <MediaCaption title={image.title} caption={image.caption} />}
@@ -66,7 +69,7 @@ const ImageGroupGrid = (props: ImageGroupLayoutProps & { maxVisibleTiles: number
 
 /** The magazine (ChatGPT 15): the first picture as a 16:9 hero, the others as tiles under it, each with its text. */
 const ImageGroupMagazine = (props: ImageGroupLayoutProps & { heroAspectRatio: MediaAspectRatio }) => {
-  const { images, aspectRatio, heroAspectRatio, isEmailRender, onImageLoadFailed, testId } = props;
+  const { images, aspectRatio, heroAspectRatio, isEmailRender, isInsidePressable, onImageLoadFailed, testId } = props;
   const [heroImage, ...tileImages] = images;
   return (
     <div className={styles.magazine} data-testid={testId}>
@@ -76,7 +79,7 @@ const ImageGroupMagazine = (props: ImageGroupLayoutProps & { heroAspectRatio: Me
           image={heroImage}
           aspectRatio={heroAspectRatio}
           isEager={isEmailRender}
-          onOpen={buildOpenImageHandler(images, 0, isEmailRender)}
+          onOpen={buildOpenImageHandler(images, 0, isEmailRender, isInsidePressable)}
           onLoadFailed={() => onImageLoadFailed(0)}
         />
         <MediaCaption title={heroImage.title} caption={heroImage.caption} />
@@ -90,7 +93,7 @@ const ImageGroupMagazine = (props: ImageGroupLayoutProps & { heroAspectRatio: Me
                 image={image}
                 aspectRatio={aspectRatio}
                 isEager={isEmailRender}
-                onOpen={buildOpenImageHandler(images, tileIndex + 1, isEmailRender)}
+                onOpen={buildOpenImageHandler(images, tileIndex + 1, isEmailRender, isInsidePressable)}
                 onLoadFailed={() => onImageLoadFailed(tileIndex + 1)}
               />
               <MediaCaption title={image.title} caption={image.caption} />
@@ -138,12 +141,12 @@ const CarouselStepButton = (props: CarouselStepButtonProps) => {
  * as "2 / 5" and the arrow keys. The e-mail capture shows the first picture without the controls.
  */
 const ImageGroupCarousel = (props: ImageGroupLayoutProps) => {
-  const { images, aspectRatio, isEmailRender, onImageLoadFailed, testId } = props;
+  const { images, aspectRatio, isEmailRender, isInsidePressable, onImageLoadFailed, testId } = props;
   const [shownImageIndex, setShownImageIndex] = useState(0);
   const lastImageIndex = images.length - 1;
   const currentImageIndex = Math.min(shownImageIndex, lastImageIndex);
   const currentImage = images[currentImageIndex];
-  const hasControls = !isEmailRender && images.length > 1;
+  const hasControls = !isEmailRender && !isInsidePressable && images.length > 1;
   const showImage = (imageIndex: number) => setShownImageIndex(Math.min(Math.max(imageIndex, 0), lastImageIndex));
   const showImageForKey = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === "ArrowLeft") showImage(currentImageIndex - 1);
@@ -165,7 +168,7 @@ const ImageGroupCarousel = (props: ImageGroupLayoutProps) => {
           image={currentImage}
           aspectRatio={aspectRatio}
           isEager
-          onOpen={buildOpenImageHandler(images, currentImageIndex, isEmailRender)}
+          onOpen={buildOpenImageHandler(images, currentImageIndex, isEmailRender, isInsidePressable)}
           onLoadFailed={() => onImageLoadFailed(currentImageIndex)}
         />
         {hasControls ? (
@@ -208,6 +211,7 @@ const ImageGroupCarousel = (props: ImageGroupLayoutProps) => {
  */
 const ImageGroupNode = (props: ComposedViewComponentProps) => {
   const { props: nodeProps, isPending, sizeClass, runtime, testId } = props;
+  const { isInsidePressable } = useLayoutNesting();
   const maxRepeatRows = composedNodeSchema.budgets.maxRepeatRows;
   const { images, droppedCount, cappedCount } = useMemo(
     () => readMediaImageList(nodeProps.images, maxRepeatRows),
@@ -283,6 +287,7 @@ const ImageGroupNode = (props: ComposedViewComponentProps) => {
     images,
     aspectRatio: readAspectRatio(nodeProps.aspectRatio, layout === "magazine" ? "1:1" : "4:3"),
     isEmailRender: runtime.isEmailRender,
+    isInsidePressable,
     onImageLoadFailed: markImageLoadFailed,
     testId,
   };

@@ -12,6 +12,7 @@ import type { WidgetRenderReportEntry } from "../../../renderer/render-report/wi
 import { ComposedViewRenderer } from "../../ComposedViewRenderer";
 import { buildComposedViewComponentRegistry, ComposedViewComponentsContext } from "../../composed-view-components";
 import type { ComposedViewComponentProps } from "../../composed-view-component-types";
+import { findStoredFormAnswer } from "./compose-form-signal";
 import { composedViewComponent as formComponent } from "./Form.composed";
 
 /**
@@ -212,6 +213,8 @@ describe("the Form node", () => {
   test("a replay keeps the inputs but offers no submit; the e-mail capture shows no action row", () => {
     renderForm(contactForm(), { interactive: false });
     expect(screen.queryByRole("button")).toBeNull();
+    // the options of a reply that can no longer send are inert, not only its submit
+    expect(screen.getByLabelText("E-mail").closest("fieldset")?.disabled).toBe(true);
     expect(screen.getByText("This form can only be sent from the newest reply.")).toBeTruthy();
     cleanup();
     renderForm(contactForm(), { isEmailRender: true, interactive: false });
@@ -242,5 +245,59 @@ describe("the Form node", () => {
       fireEvent.click(screen.getByRole("button", { name: "Send" }));
     });
     expect(injectSignal).toHaveBeenCalledWith('ComposedView form "outer" submitted:\n- message:\n- phone: 0251 123');
+  });
+});
+
+describe("findStoredFormAnswer", () => {
+  const transcript = [
+    { id: 10, role: "ASSISTANT", message: "pick a picture" },
+    { id: 11, role: "USER", messageType: "SIGNAL", message: 'ComposedView form "picturePick" submitted:\n- picked: 16844' },
+    { id: 12, role: "ASSISTANT", message: "done" },
+  ];
+
+  test("a submit signal after the host message restores Sent", () => {
+    expect(findStoredFormAnswer(transcript, 10, "picturePick")).toBe("sent");
+  });
+
+  test("a decline signal restores Declined", () => {
+    expect(
+      findStoredFormAnswer(
+        [transcript[0], { id: 11, role: "USER", messageType: "SIGNAL", message: 'ComposedView form "picturePick" declined.' }],
+        "10",
+        "picturePick",
+      ),
+    ).toBe("declined");
+  });
+
+  test("another form's signal, an owner message first, or an unknown host message restore nothing", () => {
+    expect(findStoredFormAnswer(transcript, 10, "otherForm")).toBeUndefined();
+    expect(
+      findStoredFormAnswer([transcript[0], { id: 13, role: "USER", message: "never mind" }, transcript[1]], 10, "picturePick"),
+    ).toBeUndefined();
+    expect(findStoredFormAnswer(transcript, 99, "picturePick")).toBeUndefined();
+    expect(findStoredFormAnswer(null, 10, "picturePick")).toBeUndefined();
+  });
+
+  test("a reloaded form shows Sent instead of the replay line", () => {
+    const tree = readComposedViewTree(contactForm(), getComposedNodeSchema());
+    const store = configureStore({ reducer: { AIExtensionsWidgetHydration: WidgetHydrationReducer } });
+    render(
+      <Provider store={store}>
+        <StandaloneConversationWidgetProvider
+          callbacks={{
+            messages: [
+              { id: 5, role: "ASSISTANT" },
+              { id: 6, role: "USER", messageType: "SIGNAL", message: 'ComposedView form "contactRequest" submitted:\n- message: hi' },
+            ],
+          }}
+        >
+          <ComposedViewComponentsContextProvider>
+            <ComposedViewRenderer tree={tree} interactive={false} isEmailRender={false} messageId={5} agentSpaceKey={7} onReport={() => undefined} />
+          </ComposedViewComponentsContextProvider>
+        </StandaloneConversationWidgetProvider>
+      </Provider>,
+    );
+    expect(screen.getByText("Sent")).toBeTruthy();
+    expect(screen.queryByText("This form can only be sent from the newest reply.")).toBeNull();
   });
 });

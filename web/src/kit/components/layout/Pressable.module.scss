@@ -52,3 +52,9 @@
   flex-direction: column;
   min-width: 0;
 }
+
+// Content without its own padding (an Image with Text lines under it): the card padding keeps text off the selection
+// ring and out of the rounded corner. A Surface pads itself and is left alone.
+.padded {
+  padding: $x1;
+}

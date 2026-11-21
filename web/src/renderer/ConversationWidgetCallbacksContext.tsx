@@ -7,10 +7,14 @@ import type { CanvasCreatedEntity } from "./canvas/canvas-reducers";
 // state and the hook every widget reads. `ConversationWidgetContext.tsx` adds the provider bound to the chat's state
 // partition and re-exports this module, so package code that renders widgets never loads the chat.
 
-/** A message of the transcript a widget reads (its id and author role); the chat's messages carry more. */
+/** A message of the transcript a widget reads (its id and author role, its type and text); the chat's messages carry more. */
 export interface ConversationWidgetTranscriptMessage {
   id?: number | string | null;
   role?: string | null;
+  /** `SIGNAL` for a signal row (a widget's answer); absent on an optimistic message. */
+  messageType?: string | null;
+  /** The stored text — for a signal row the signal sentence. */
+  message?: string | null;
 }
 
 export type ChatEngagementMediaItem = {

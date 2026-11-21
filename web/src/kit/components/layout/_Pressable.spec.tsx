@@ -84,4 +84,28 @@ describe("Pressable", () => {
     expect(screen.getAllByText("Organic").length).toBeGreaterThan(0);
     expect(container.querySelectorAll("[class*='selected']")).toHaveLength(1);
   });
+
+  test("a picture inside a tile opens nothing: the whole tile is the one button, its text is padded off the ring", () => {
+    const { container } = renderLayoutTree({
+      state: { picked: "" },
+      view: {
+        type: "Pressable",
+        onClick: { set: "picked" },
+        value: "16844",
+        label: "Pick picture 16844",
+        children: [
+          { type: "Image", src: "https://example.org/16844.png", alt: "Picture 16844" },
+          { type: "Quote", text: "#16844" },
+        ],
+      },
+    });
+    expect(screen.getAllByRole("button")).toHaveLength(1);
+    expect(container.querySelector("[data-testid$='-tile-open']")).toBeNull();
+    expect(screen.getByRole("button", { name: "Pick picture 16844" }).className).toMatch(/padded/);
+  });
+
+  test("a tile whose content is one Surface is not padded again", () => {
+    renderLayoutTree(channelTiles);
+    expect(screen.getByRole("button", { name: "Show the organic channel" }).className).not.toMatch(/padded/);
+  });
 });
