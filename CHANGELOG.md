@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.9 (unreleased)
+## 0.1.9
 
 - Added: the package's memory store, the default implementation behind `AgentMemoriesService`. Off by default
   (`config/app/AI/agentMemory.php`, `'enabled' => false`): while it is off nothing changes, every memory question is
