@@ -1,4 +1,4 @@
-# Config map: the sixteen config files and who explains them
+# Config map: the seventeen config files and who explains them
 
 **Reader:** host developer
 
@@ -14,7 +14,7 @@ Readers that fall back per key to their class default: `AgentApplicationWording:
 file does not list is off, except `AgentDecisionModelSettings::DEFAULT_ON_SITES`). The other readers take the file as
 it is.
 
-Besides the sixteen PHP files the package ships prompts (`config/app/AI/Prompts/`), purposes
+Besides the seventeen PHP files the package ships prompts (`config/app/AI/Prompts/`), purposes
 (`config/app/AI/Purposes/`) and two agent skill files (`config/app/AI/Skills/`); a host's file at the same path
 replaces each of them the same way. Prompts: `ddd-module-agents-context-specialist` and
 `ddd-module-agents-decisions-and-guards-specialist`; purposes and skills: `ddd-module-agents-skills-and-purposes-specialist`
@@ -27,6 +27,7 @@ and `ddd-module-agents-autonomy-specialist`.
 | `agentApplicationNames.php` | `AI.agentApplicationNames` | `AgentApplicationNames` | trace line prefix, console label, further environment variable names | `[agent:trace]`, `agent`, none | this file |
 | `agentApplicationWording.php` | `AI.agentApplicationWording` | `AgentApplicationWording::current()` | the host's words in the module's sentences | neutral words (`workspace`, `subscription`, empty examples) | this file |
 | `agentEgress.php` | `AI.agentEgress` | `ArgusAIAgentConversation` | the HTTP transfer of the agent's model call | stall abort off, no proxy | this file |
+| `agentMemory.php` | `AI.agentMemory` | `AgentMemoriesService::isMemoryStoreEnabled()`, `AgentMemoryCurationService` | the package's memory store on or off (`enabled`), the application's data with a home of its own the curation never copies (`structuredHomes`, string list) | off, none | `ddd-module-agents-context-specialist` |
 | `agentModelInputOptions.php` | `AI.agentModelInputOptions` | `AgentModelInputOptions::resolveFor()` (per model call; a purpose's `modelInputOptions:` map wins per key) | what the model input leaves out to save tokens: groups of meta tools, the widget part of the base prompt, base prompt sections by name, the memory rules without a memory tool, the reachable tool schemas from the first call | everything as before (byte-identical input) | `ddd-module-agents-context-specialist` |
 | `agentPersona.php` | `AI.agentPersona` | `ArgusAIAgentConversation::findAgentPersonaNames()`, `AISkillsService::getAgentPersona()` | the agent's name and the product name in the prompts and in the skill and purpose texts | `Assistant`, `this product` | this file |
 | `agentToolCallChildProcess.php` | `AI.agentToolCallChildProcess` | `AgentToolCallForkJoinService` | the host's console script that starts a child process for one tool call, and the command the child runs | no console script, so every call runs inline; command `app:ai-agent:execute-tool-call` | `ddd-module-agents-tools-specialist` |

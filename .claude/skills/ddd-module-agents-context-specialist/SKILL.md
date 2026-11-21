@@ -1,6 +1,6 @@
 ---
 name: ddd-module-agents-context-specialist
-description: "Explains and tunes what the ddd-agents model sees per call and how that input stays small, stable and cached. Covers the model input (AgentModelInput segments, volatile tail, core prompts, replacing Character.md), trimming it per host or purpose (agentModelInputOptions.php: meta tools, widgets, base prompt sections, tools loaded by skill), prompt cache and stable prefix (breakpoints, wire APIs, append-only loading, epochs), context reduction (compaction tree, tool-result stubbing), skill and tool eviction, state epochs, recall and search, embeddings, memories and standing directives, owner presence, device, time zones, client context, call_tool delivery, cold-skill drop, tool-call efficiency, contextRetention.php. Use when cached tokens drop to zero, a skill load costs the whole prompt, prompt or meta tools cost too many tokens, the context grows too large, compaction never fires or loses an id, a skill unloads too early, the agent repeats a read, the zone is off, search fails, or a host adds memories."
+description: "Explains and tunes what the ddd-agents model sees per call and how that input stays small, stable and cached. Covers the model input (AgentModelInput segments, volatile tail, core prompts, Character.md), trimming it per host or purpose (agentModelInputOptions.php: meta tools, widgets, base prompt sections, tools loaded by skill), prompt cache and stable prefix (breakpoints, wire APIs, append-only loading, epochs), context reduction (compaction tree, tool-result stubbing), skill and tool eviction, state epochs, recall and search, embeddings, memories, standing directives and the memory store (agentMemory.php), owner presence, device, time zones, client context, call_tool delivery, cold-skill drop, tool-call efficiency, contextRetention.php. Use when cached tokens drop to zero, a load costs the whole prompt, prompt or meta tools cost too much, the context grows, compaction never fires or loses an id, a skill unloads too early, the agent repeats a read, the zone is off, search fails, or a host adds memory."
 metadata:
   author: mgamadeus
   version: "0.1.0"
@@ -26,7 +26,7 @@ the tools and their results to the tools skill.
 | Skill and tool eviction | `LoadedCapabilities`, `LoadedCapability`, `AgentColdCapabilityUnloading` |
 | Volatile context delivered once per change | `AgentStateEpoch`, `AgentStateDelivery`, `AgentStateDelta`, `AgentSpaceContextFields` |
 | Recall, conversation search, embeddings | `SemanticSearchService`, `AIConversationMessageEmbeddingsService`, `AITextEmbeddingsService` |
-| Memories, standing directives, day context, local situation | `AgentMemoriesService`, `AgentStandingDirectives`, `AgentSituationalContextService` |
+| Memories, standing directives, day context, local situation; the package's memory store and its curation | `AgentMemoriesService`, `AgentStandingDirectives`, `AgentSituationalContextService`, `AgentMemory`, `AgentMemoryStoreService`, `AgentMemoryCurationService`, `AgentMemoriesMCPPackage` |
 | Owner presence, device, time | `OwnerPresence`, `OwnerDevice`, `AgentClock` |
 | The knobs | `ContextRetentionSettings`, `CompactionSettings`, `config/app/AI/contextRetention.php` |
 
@@ -65,7 +65,8 @@ the tools and their results to the tools skill.
    the package file.
 9. **Host hooks are same-path subclasses** of `AgentMemoriesService`, `AgentSituationalContextService`,
    `AITextEmbeddingsService`, `AgentSpacesService` and `AgentModelInput`, resolved through the container; the defaults
-   answer "nothing".
+   answer "nothing". The one exception: `AgentMemoriesService` answers from the package's memory store while
+   `AI.agentMemory.enabled` is on.
 
 ## Traps
 
@@ -205,7 +206,7 @@ Details, the section rule and replacing `Character.md`: [what-the-model-sees.md]
 | Search returns nothing or everything; adding embeddings; the message context window | [recall-and-search.md](references/recall-and-search.md) |
 | Phone vs chat vs unattended run; the device bracket; time zones in tools | [owner-presence-device-and-time.md](references/owner-presence-device-and-time.md) |
 | The agent re-loads a skill, repeats a read, or calls a tool three times | [tool-call-efficiency.md](references/tool-call-efficiency.md) |
-| Memories, standing directives, episodic history | [memories-and-standing-directives.md](references/memories-and-standing-directives.md) |
+| Memories, standing directives, episodic history; switching on the package's memory store, its curation and tools | [memories-and-standing-directives.md](references/memories-and-standing-directives.md) |
 
 **Package maintainer**
 

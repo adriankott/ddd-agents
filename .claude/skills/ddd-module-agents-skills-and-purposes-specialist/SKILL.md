@@ -120,6 +120,7 @@ return [
     AISkill::ASSISTANT_MANDATES => ['agent.mandates'],
     AISkill::ASSISTANT_TASKS => ['agent.taskSchedules'],
     AISkill::ASSISTANT_TASK_RUN_REPORTS => ['agent.taskRunReports'],
+    AISkill::MEMORY_MANAGEMENT => ['agent.memories'], // offered only while AI.agentMemory.enabled is on
     'Demo.Notes' => [DemoNotesMCPPackage::class],
 ];
 ```

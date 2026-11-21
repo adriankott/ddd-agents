@@ -62,6 +62,7 @@ class AgentMessengerTransports
         AIConversationCompactionMessage::class => self::COMPACTION,
         AIConversationFinalizeMessage::class => self::COMPACTION,
         AIConversationSummarizeMessage::class => self::COMPACTION,
+        AgentMemoryCurateMessage::class => self::COMPACTION,
         AIConversationReportEmailSendMessage::class => self::COMPACTION,
         AIConversationScorecardMessage::class => self::SCORECARD,
         AIConversationMessageEmbeddingMessage::class => self::MESSAGE_EMBEDDING,

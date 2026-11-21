@@ -47,6 +47,12 @@ class AgentAIUsageScope
     /** Checking whether a recurring task's goal is fulfilled. */
     public const string AI_SCHEDULE_JUDGE_DONE_CRITERIA = 'AI.SCHEDULE.JUDGE.DONE_CRITERIA';
 
+    /** Finding what is worth remembering in a conversation. */
+    public const string AI_MEMORY_EXTRACT = 'AI.MEMORY.EXTRACT.CANDIDATES';
+
+    /** Deciding how a new memory relates to what the assistant already remembers. */
+    public const string AI_MEMORY_RECONCILE = 'AI.MEMORY.RECONCILE.DECIDE';
+
     /** Ranking assistant search results by relevance. */
     public const string AI_SEARCH_RERANK = 'AI.SEARCH.RERANK.RELEVANCE';
 

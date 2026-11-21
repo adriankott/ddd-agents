@@ -46,6 +46,7 @@ framework:
       'DDD\Domain\AI\MessageHandlers\AIConversationCompactionMessage': ai_conversation_compaction
       'DDD\Domain\AI\MessageHandlers\AIConversationFinalizeMessage': ai_conversation_compaction
       'DDD\Domain\AI\MessageHandlers\AIConversationSummarizeMessage': ai_conversation_compaction
+      'DDD\Domain\AI\MessageHandlers\AgentMemoryCurateMessage': ai_conversation_compaction
       'DDD\Domain\AI\MessageHandlers\AIConversationReportEmailSendMessage': ai_conversation_compaction
       'DDD\Domain\AI\MessageHandlers\AIConversationScorecardMessage': ai_conversation_scorecard
       'DDD\Domain\AI\MessageHandlers\AIConversationMessageEmbeddingMessage': ai_conversation_message_embedding

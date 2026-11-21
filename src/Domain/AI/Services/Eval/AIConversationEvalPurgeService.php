@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DDD\Domain\AI\Services\Eval;
 
 use DDD\Domain\AI\Entities\Evals\ConversationPurge\AIConversationEvalPurgeKeys;
+use DDD\Domain\AI\Repo\DB\Conversations\Memories\DBAgentMemoryModel;
 use DDD\Domain\AI\Entities\Evals\ConversationPurge\AIConversationEvalPurgeReport;
 use DDD\Domain\AI\Entities\Evals\ConversationPurge\AIConversationEvalPurgeSettings;
 use DDD\Domain\AI\Entities\Evals\ConversationPurge\AIConversationEvalPurgeStep;
@@ -211,6 +212,7 @@ class AIConversationEvalPurgeService extends Service
             "{$toolCallBatchTableName}.sourceUserMessageId" => 'the batch goes with its conversation',
             DBAIConversationDelegationBatchModel::getTableName() . '.spawnedByMessageId' => 'the batch goes with its parent conversation',
             DBAIConversationTraceEventModel::getTableName() . '.agentVoiceCallId' => 'the trace event goes with its conversation',
+            DBAgentMemoryModel::getTableName() . '.sourceMessageId' => 'a plain number recording where a memory was said; an evaluation run is never curated into memories, and a memory outlives its message',
             DBAgentEvalSuiteCaseModel::getTableName() . '.aiConversationId' => 'the stored case of a suite run keeps the id of the conversation it ran as a plain number; the record outlives the conversation',
         ];
     }

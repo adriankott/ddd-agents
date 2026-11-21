@@ -165,6 +165,7 @@ config/app/AI/Prompts/AI/Agent/Agentic.md	context
 config/app/AI/Prompts/AI/Agent/Character.md	context
 config/app/AI/Prompts/AI/Agent/General.md	context
 config/app/AI/Prompts/AI/Search/**	context
+config/app/AI/Prompts/AI/Memory/**	context
 # tools (ddd-module-agents-tools-specialist): MCP tool layer, attributes, DTOs, executor, dispatch and execution, batches, meta-tool contract
 src/Domain/AI/Entities/MCPPackages/**	tools
 src/Domain/AI/**/*ToolCallBatch*	tools

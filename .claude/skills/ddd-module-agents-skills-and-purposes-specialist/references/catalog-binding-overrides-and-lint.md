@@ -31,7 +31,7 @@ return [
 ## Package ids
 
 Every MCP package names itself with its static `MCPPackage::$name` (the package's own: `agent.mandates`,
-`agent.taskSchedules`, `agent.taskRunReports`; the kernel's: `demo.notes`). `MCPPackageIdsService` finds the packages by scanning the
+`agent.taskSchedules`, `agent.taskRunReports`, `agent.memories`; the kernel's: `demo.notes`). `MCPPackageIdsService` finds the packages by scanning the
 source roots of `AgentSourceRootsService` (the application's `src/` under the root namespace `App\` first, then every
 DDD module's `src/`), below `Presentation/Mcp`, file names ending in `MCPPackage.php`, abstract classes skipped. The
 first class holding an id wins; a host class that EXTENDS the package's class of the same id is the intended
@@ -63,7 +63,7 @@ The config reader takes the application's file instead of the module's, key by k
 
 | Config | Package default | What a host's file must do |
 |---|---|---|
-| `AI.skillPackages` | binds `Assistant.Mandates` → `agent.mandates`, `Assistant.Tasks` → `agent.taskSchedules`, `Assistant.TaskRunReports` → `agent.taskRunReports` | list EVERY skill the host offers, the package's three included. Without `Assistant.TaskRunReports` the purpose `Schedule.Run` preloads a skill that has no tools |
+| `AI.skillPackages` | binds `Assistant.Mandates` → `agent.mandates`, `Assistant.Tasks` → `agent.taskSchedules`, `Assistant.TaskRunReports` → `agent.taskRunReports`, `Memory.Management` → `agent.memories` | list EVERY skill the host offers, the package's four included (`Memory.Management` only while the memory store is on: an unavailable package, `MCPPackage::isAvailable()`, is left out of the binding and a skill bound to it alone disappears). Without `Assistant.TaskRunReports` the purpose `Schedule.Run` preloads a skill that has no tools |
 | `AI.skillRequirements` | empty | the gates the host puts on any skill, its own or a module's (reference [gating-by-entitlements-and-rights.md](gating-by-entitlements-and-rights.md)) |
 | `AI.purposeRequirements` | empty | the flags a purpose needs before a customer may start it |
 | `AI.skillNamespaceGroups` | one group, `Agent` | the groups of the admin catalog view (below) |

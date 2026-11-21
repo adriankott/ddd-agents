@@ -7,6 +7,7 @@ namespace DDD\Tests\Agents\Domain\AI\Services\Skills;
 use DDD\Domain\AI\Entities\Skills\AISkill;
 use DDD\Domain\AI\Services\Skills\MCPPackageIdsService;
 use DDD\Presentation\Mcp\Client\AI\AgentMandatesMCPPackage;
+use DDD\Presentation\Mcp\Client\AI\AgentMemoriesMCPPackage;
 use DDD\Presentation\Mcp\Client\AI\AgentTaskRunReportsMCPPackage;
 use DDD\Presentation\Mcp\Client\AI\AgentTaskSchedulesMCPPackage;
 use LogicException;
@@ -59,6 +60,7 @@ class MCPPackageIdsServiceTest extends TestCase
                 AISkill::ASSISTANT_MANDATES => [AgentMandatesMCPPackage::class],
                 AISkill::ASSISTANT_TASKS => [AgentTaskSchedulesMCPPackage::class],
                 AISkill::ASSISTANT_TASK_RUN_REPORTS => [AgentTaskRunReportsMCPPackage::class],
+                AISkill::MEMORY_MANAGEMENT => [AgentMemoriesMCPPackage::class],
             ],
             AISkill::resolvePackageIdsOfBinding($defaultBinding)
         );

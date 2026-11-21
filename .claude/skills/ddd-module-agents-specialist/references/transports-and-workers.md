@@ -13,7 +13,7 @@ handler binds to its transport with `AsMessageHandler(fromTransport: …)` and e
 | Transport (constant) | Messages | Handler limit (PHP execution seconds, memory) |
 |---|---|---|
 | `ai_conversation_turn` (`TURN`) | `AIConversationResumeMessage`: one agent turn | 1800 s, 1024M |
-| `ai_conversation_compaction` (`COMPACTION`) | `AIConversationCompactionMessage`, `AIConversationFinalizeMessage`, `AIConversationSummarizeMessage`, `AIConversationReportEmailSendMessage` | 1800 s / 1800 s / 600 s / 300 s, 512M |
+| `ai_conversation_compaction` (`COMPACTION`) | `AIConversationCompactionMessage`, `AIConversationFinalizeMessage`, `AIConversationSummarizeMessage`, `AIConversationReportEmailSendMessage`, `AgentMemoryCurateMessage` | 1800 s / 1800 s / 600 s / 300 s / 900 s, 512M (the memory curation 1024M) |
 | `ai_conversation_scorecard` (`SCORECARD`) | `AIConversationScorecardMessage` | 900 s, 512M |
 | `ai_conversation_message_embedding` (`MESSAGE_EMBEDDING`) | `AIConversationMessageEmbeddingMessage` | 600 s, 512M |
 | `ai_tool_result_screening` (`TOOL_RESULT_SCREENING`) | `AgentToolResultScreeningMessage`: the background injection screen of an untrusted tool result; the turn never waits for it | 120 s |

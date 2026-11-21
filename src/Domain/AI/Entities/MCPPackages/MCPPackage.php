@@ -23,6 +23,19 @@ class MCPPackage extends ValueObject
     public static ?string $description = null;
 
     /**
+     * Whether the package is available in this installation. An unavailable package is left out of the skill binding
+     * ({@see \DDD\Domain\AI\Entities\Skills\AISkill::getPackageClassesBySkillName()}): its tools are neither offered
+     * nor listed, and a skill bound to unavailable packages only is no skill. Every package is available unless it
+     * depends on a component an application switches on (the package's memory tools: the memory store).
+     *
+     * @return bool
+     */
+    public static function isAvailable(): bool
+    {
+        return true;
+    }
+
+    /**
      * Builds — and caches in Redis — the MCP documentation for this package. `$noCache` bypasses the cached entry,
      * rebuilds from source and overwrites the cache (invalidation + refresh), as {@see MCPBundle::buildDocumentation()}
      * does.

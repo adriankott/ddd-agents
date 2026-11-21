@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace DDD\Domain\AI\Entities\Skills;
 
+use DDD\Domain\AI\Entities\MCPPackages\MCPPackage;
+
 use DDD\Domain\AI\Entities\Conversations\AIConversationEntitlement;
 use DDD\Domain\AI\Entities\Conversations\Agent\SubSkillToolDiscovery;
 use DDD\Domain\AI\Entities\Conversations\Variants\AIConversationVariants;
@@ -708,9 +710,35 @@ class AISkill extends Entity
             if (!is_array($configuredPackageClassesBySkillName) || $configuredPackageClassesBySkillName === []) {
                 throw new \LogicException('The skill → MCP package binding (config ' . AISkillsService::CONFIG_SKILL_PACKAGES . ') is missing or empty.');
             }
-            self::$packageClassesBySkillName = self::resolvePackageIdsOfBinding($configuredPackageClassesBySkillName);
+            self::$packageClassesBySkillName = self::withoutUnavailablePackages(self::resolvePackageIdsOfBinding($configuredPackageClassesBySkillName));
         }
         return self::$packageClassesBySkillName;
+    }
+
+    /**
+     * A resolved skill binding without the packages that are not available ({@see \DDD\Domain\AI\Entities\MCPPackages\MCPPackage::isAvailable()}):
+     * a skill keeps its other packages, and a skill bound to unavailable packages only is dropped. A skill bound to no
+     * package at all stays as it is.
+     *
+     * @param array<string, string[]> $packageClassesBySkillName skill name => package classes
+     * @return array<string, string[]> the same binding without unavailable packages
+     */
+    public static function withoutUnavailablePackages(array $packageClassesBySkillName): array
+    {
+        $availablePackageClassesBySkillName = [];
+        foreach ($packageClassesBySkillName as $skillName => $packageClasses) {
+            $availablePackageClasses = [];
+            foreach ($packageClasses as $packageClass) {
+                if (!is_subclass_of($packageClass, MCPPackage::class) || $packageClass::isAvailable()) {
+                    $availablePackageClasses[] = $packageClass;
+                }
+            }
+            if ($packageClasses !== [] && $availablePackageClasses === []) {
+                continue;
+            }
+            $availablePackageClassesBySkillName[$skillName] = $availablePackageClasses;
+        }
+        return $availablePackageClassesBySkillName;
     }
 
     /**

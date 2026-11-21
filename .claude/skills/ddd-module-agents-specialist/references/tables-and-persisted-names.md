@@ -7,7 +7,7 @@ leave the process.
 
 ## The database entities
 
-Fifteen entities of the package have a database repository; every other entity is a value object, a config file or
+Sixteen entities of the package have a database repository; every other entity is a value object, a config file or
 an Argus load.
 
 | Entity (set) | What a row is | Skill that explains it |
@@ -21,14 +21,15 @@ an Argus load.
 | `AIConversationDelegationBatch` (`AIConversationDelegationBatches`) | one fan-out to sub-agents and its deadline | `ddd-module-agents-autonomy-specialist` |
 | `AIConversationSchedule` (`AIConversationSchedules`) | one schedule of unattended runs | `ddd-module-agents-autonomy-specialist` |
 | `AgentMandate` (`AgentMandates`) | one standing permission | `ddd-module-agents-autonomy-specialist` |
+| `AgentMemory` (`AgentMemories`) | one durable memory of the owner (the package's memory store; written only while `AI.agentMemory.enabled` is on) | `ddd-module-agents-context-specialist` |
 | `AIConversationTaskPushNotificationConfig` (`AIConversationTaskPushNotificationConfigs`) | the push target of an external agent | `ddd-module-agents-widgets-specialist` |
 | `AIConversationTraceEvent` (`AIConversationTraceEvents`) | one trace event of a run | `ddd-module-agents-observability-specialist` |
 | `AIConversationTurnEvent` (`AIConversationTurnEvents`), `AIConversationTurnEventSnapshot` (`AIConversationTurnEventSnapshots`) | the timed events of one turn | `ddd-module-agents-observability-specialist` |
 | `AgentEvalSuiteRun` (`AgentEvalSuiteRuns`) | one finished evaluation run: command, label, host, times, counts, options, result folder | `ddd-module-agents-observability-specialist` |
 | `AgentEvalSuiteCase` (`AgentEvalSuiteCases`) | one case of a stored evaluation run with its verdict and figures | `ddd-module-agents-observability-specialist` |
 
-Conversations, schedules and mandates carry `accountId` and `agentSpaceId`. The read rights of the conversation,
-message, schedule, batch, event and embedding repositories run through `DDD\Domain\AI\Services\Conversations\Rights\AgentAccountRightsService`; the space and the
+Conversations, schedules, mandates and memories carry `accountId` and `agentSpaceId`. The read rights of the conversation,
+message, schedule, memory, batch, event and embedding repositories run through `DDD\Domain\AI\Services\Conversations\Rights\AgentAccountRightsService`; the space and the
 mandate repositories keep their own rule (the row's own account, or an admin with access to all resources). The
 stored evaluation runs and their cases are read by an admin only: an admin reads every row, every other account none
 (a host narrows or widens the rule in `isAuthenticatedAccountReaderOfEveryRow()` of its same-path repositories).

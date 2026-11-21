@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.1.9 (unreleased)
+
+- Added: the package's memory store, the default implementation behind `AgentMemoriesService`. Off by default
+  (`config/app/AI/agentMemory.php`, `'enabled' => false`): while it is off nothing changes, every memory question is
+  answered "no memory" and the new table is never read. Switched on (after the table `AgentMemories` exists):
+  - `AgentMemory` / `AgentMemories` (`AgentMemoryStoreService`): durable directives, facts and solutions of the owner,
+    per account and optionally per space, bitemporal (a newer value closes the old row), one current row per scope and
+    content (unique generated `virtualCurrentDedupKey`), embedded for the similarity search (a text match without an
+    embedding provider), read rights through `AgentAccountRightsService`;
+  - the standing directives of the scope in every model input, `findSimilarMemories()` for the search service, the
+    table in the embedding repair;
+  - the curation after an owner turn (`AgentMemoryCurateMessage` on the compaction transport, `AgentMemoryCurationService`):
+    extraction and reconciliation model calls (prompts `AI.Memory.Extract`, `AI.Memory.Reconcile`,
+    `AI.Memory.ReconcileResolution`, `AI.Memory.ConflictExcerpt`; usage scopes `AI.MEMORY.EXTRACT.CANDIDATES`,
+    `AI.MEMORY.RECONCILE.DECIDE`), a `MEMORY_CONFLICT` signal for a contradiction the owner has to settle;
+    `AI.agentMemory.structuredHomes` names the host's data that is never copied into a memory;
+  - the tools `AgentMemoriesMCPPackage` (id `agent.memories`, skill `Memory.Management`, bound in the package's default
+    `skillPackages.php`): `listMemories`, `searchMemory`, `remember`, `updateMemory`, `forget`.
+- Added: `MCPPackage::isAvailable()` (default true). The skill binding leaves an unavailable package out, and a skill
+  bound to unavailable packages only disappears (`AISkill::withoutUnavailablePackages()`). The memory tools are
+  unavailable while the store is off.
+- Host duty when switching the store on: create the table (schema diff), route `AgentMemoryCurateMessage` like the
+  other compaction messages (the routing list of `AgentMessengerTransports` names it), and list
+  `AISkill::MEMORY_MANAGEMENT => ['agent.memories']` when the host's `skillPackages.php` replaces the package's.
+
 ## 0.1.8
 
 - Added: the schedule tools `AgentTaskSchedulesMCPPackage` (id `agent.taskSchedules`) with the skill `Assistant.Tasks`

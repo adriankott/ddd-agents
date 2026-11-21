@@ -113,4 +113,28 @@ class AgentAIPromptNames
      *      actually granted the requested mandate (action class + scope), extracting verbatim customer quotes as
      *      the evidence excerpt; quantity-based grants are rejected with a conversion instruction. */
     public const string APP_AI_MANDATE_APPROVAL_CHECK = 'AI.Mandates.ApprovalCheck';
+
+    /**
+     * @var string The memory curation's first step: candidate memories from the owner's new messages of a conversation
+     * (JSON). Placeholders: MEMORY_LANGUAGE, STRUCTURED_HOMES.
+     */
+    public const string APP_AI_MEMORY_EXTRACT = 'AI.Memory.Extract';
+
+    /**
+     * @var string The memory curation's second step: ADD / UPDATE / INVALIDATE / NOOP / CONFLICT for each candidate
+     * against the nearest stored memories (JSON). Placeholders: SCOPE, NEIGHBOUR_MEMORIES, MEMORY_LANGUAGE.
+     */
+    public const string APP_AI_MEMORY_RECONCILE = 'AI.Memory.Reconcile';
+
+    /**
+     * @var string The reconciliation of candidates that settle a contradiction the agent raised before: INVALIDATE /
+     * ADD / NOOP, never CONFLICT (JSON). Placeholders: SCOPE, NEIGHBOUR_MEMORIES, MEMORY_LANGUAGE.
+     */
+    public const string APP_AI_MEMORY_RECONCILE_RESOLUTION = 'AI.Memory.ReconcileResolution';
+
+    /**
+     * @var string The one or two sentences of an earlier owner message that state a value a new statement contradicts
+     * (plain text). Placeholders: CONTRADICTED_MEMORY, NEW_CONTRADICTING_STATEMENT.
+     */
+    public const string APP_AI_MEMORY_CONFLICT_EXCERPT = 'AI.Memory.ConflictExcerpt';
 }

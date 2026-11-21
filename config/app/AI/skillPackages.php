@@ -17,4 +17,6 @@ return [
     AISkill::ASSISTANT_MANDATES => ['agent.mandates'],
     AISkill::ASSISTANT_TASKS => ['agent.taskSchedules'],
     AISkill::ASSISTANT_TASK_RUN_REPORTS => ['agent.taskRunReports'],
+    // offered only while the memory store is switched on (AI.agentMemory.enabled): the package is unavailable otherwise
+    AISkill::MEMORY_MANAGEMENT => ['agent.memories'],
 ];
