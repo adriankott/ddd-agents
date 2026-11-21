@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DDD\Domain\AI\Services\Conversations\Agent;
 
+use DDD\Domain\AI\Entities\Conversations\Agent\Wire\AgentCallToolDelivery;
 use DDD\Domain\AI\Entities\Conversations\Agent\AgentApplicationWording;
 use DDD\Domain\AI\Entities\Conversations\Agent\AgentRun;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolExecutionTimeout;
@@ -189,7 +190,8 @@ class AgentToolCallDispatchService extends Service
                     ? LoadSkillsTool::buildResultOfRepeatedCall(
                         $repeatCount,
                         $callMessage->getLoadedCapabilities()?->getLoadedSkillNames() ?? [],
-                        $this->buildCallableToolNamesOfLoadedSkills($agentRun, $conversation, $callMessage)
+                        $this->buildCallableToolNamesOfLoadedSkills($agentRun, $conversation, $callMessage),
+                        $conversation->deliversToolsThroughCallTool()
                     )
                     : null;
                 // a later repeated `load_skills` of the turn: the tool-less step follows, and the answer still names the
@@ -199,7 +201,8 @@ class AgentToolCallDispatchService extends Service
                     ? LoadSkillsTool::buildResultOfRepeatedCallBeforeAStepWithoutTools(
                         $repeatCount,
                         $callMessage->getLoadedCapabilities()?->getLoadedSkillNames() ?? [],
-                        $this->buildCallableToolNamesOfLoadedSkills($agentRun, $conversation, $callMessage)
+                        $this->buildCallableToolNamesOfLoadedSkills($agentRun, $conversation, $callMessage),
+                        $conversation->deliversToolsThroughCallTool()
                     )
                     : null;
                 $resultContent = $repeatedSkillLoadResult ?? $repeatedSkillLoadResultBeforeAStepWithoutTools ?? ($earlierUnsavedCall !== null ? $repeatedCallCheck->buildUnsavedRepeatCorrective($earlierUnsavedCall) : sprintf(
@@ -237,6 +240,11 @@ class AgentToolCallDispatchService extends Service
                 // a plan tool the brake held back: the next step answers without tools, never another `auto` step that
                 // offers the same tool on the wire again
                 $forceToolLessAnswerStep = $forceToolLessAnswerStep || $agentRun->stepToolRestriction->answersWithheldCallWithToolLessStep($toolName);
+            } elseif ($toolName === AgentCallToolDelivery::NAME) {
+                // a `call_tool` call that named no tool (the unwrapping after the model's answer left it as it is): the
+                // answer is the call form; an identical repeat meets the repeat guard above
+                $resultContent = AgentCallToolDelivery::buildRefusalOfCallWithoutToolName();
+                $toolCall->markFailed();
             } elseif ($toolName === DelegateTool::NAME && $allowThreads) {
                 // ONE call = ONE sub-agent. The answer is fixed now and the call's status final (COMPLETED
                 // when it started or was queued, FAILED when refused); the turn does not park — the sub-agent's end
@@ -445,6 +453,20 @@ class AgentToolCallDispatchService extends Service
                 $toolResult = $this->executeToolCall($toolCall, $conversation);
                 $resultContent = $toolResult->content;
                 $toolPlatformNoteForModel = $toolResult->platformNoteForModel;
+                // a failed `call_tool` call of a name that is no tool of a loaded skill (and of no skill at all — the
+                // branch above answers a tool of an unloaded skill): the answer names the tools that can be called
+                if ($toolResult->isError && $toolCall->deliveredThroughCallTool) {
+                    $callableToolNames = $this->buildCallableToolNamesOfLoadedSkills($agentRun, $conversation, $callMessage);
+                    if (!in_array($toolName, $callableToolNames, true)) {
+                        $resultContent .= "\n\n" . sprintf(
+                            '`%s` is no tool of a loaded skill. %s A tool of another skill needs `load_skills` first.',
+                            $toolName,
+                            $callableToolNames !== []
+                                ? 'The tools `call_tool` can run now: ' . implode(', ', array_map(static fn (string $callableToolName): string => "`$callableToolName`", $callableToolNames)) . '.'
+                                : 'No skill is loaded, so `call_tool` can run no tool yet.'
+                        );
+                    }
+                }
                 // An OWNER-GATE refusal (a write before the owner's confirmation, a write before the draft's nod):
                 // the only correct next move is TEXT — present / ask and end the turn. Force the tool-less step like
                 // the refused-write breaker; without it the model re-issued the refused write again and again.
@@ -556,6 +578,19 @@ class AgentToolCallDispatchService extends Service
         $reachableSkillNames = $conversation->buildReachableSkillCatalog()->getSkillNames();
         $loadableSkillNames = array_values(array_intersect($skillNamesProvidingTool, $reachableSkillNames));
         $namedSkillNames = $loadableSkillNames !== [] ? $loadableSkillNames : $skillNamesProvidingTool;
+        if ($conversation->deliversToolsThroughCallTool()) {
+            // the `call_tool` delivery lists a tool only while its skill is loaded: the skill was never loaded, or it
+            // was unloaded after a long time without use
+            return sprintf(
+                'Not executed: `%s` cannot run — its skill %s is not loaded (never loaded in this conversation, or unloaded '
+                . 'after a long time without use). Call `load_skills` with %s first: the load lists the skill\'s tools '
+                . 'with their arguments again. Then call `%s` through `call_tool` again.',
+                $toolName,
+                implode(' or ', array_map(static fn (string $skillName): string => "`$skillName`", $namedSkillNames)),
+                '[' . implode(', ', array_map(static fn (string $skillName): string => "'$skillName'", array_slice($namedSkillNames, 0, 1))) . ']',
+                $toolName
+            );
+        }
         return sprintf(
             'Not executed: `%s` is in your tool list, but its skill %s is not loaded yet — the skill\'s instructions say when '
             . 'and how to use the tool. Call `load_skills` with %s first, then call `%s` again with the same arguments '
@@ -707,7 +742,8 @@ class AgentToolCallDispatchService extends Service
             // tools of loaded skills are callable the answer names them: the next move is one of them, not a name
             return AgentSkillLoadOutcome::withoutSkillNames(LoadSkillsTool::buildResultOfCallNamingNoSkill(
                 $loadedSkillNames,
-                $this->buildCallableToolNamesOfLoadedSkills($agentRun, $conversation, $callMessage)
+                $this->buildCallableToolNamesOfLoadedSkills($agentRun, $conversation, $callMessage),
+                $conversation->deliversToolsThroughCallTool()
             ));
         }
         $aISkillLoadRefusals = AISkillLoadRefusals::buildFor($requestedAISkills, $conversation->buildAISkillOfferRestrictions($agentRun));
@@ -720,7 +756,7 @@ class AgentToolCallDispatchService extends Service
             }
         }
         return AgentSkillLoadOutcome::afterTheGates(
-            $correctedSkillNameSentences . $callMessage->loadSkillsFromToolArguments($toolArguments, $conversation->findBlockedToolNamesOfConversationTree($agentRun)) . $refusalSentences,
+            $correctedSkillNameSentences . $callMessage->loadSkillsFromToolArguments($toolArguments, $conversation->findBlockedToolNamesOfConversationTree($agentRun), $conversation->deliversToolsThroughCallTool()) . $refusalSentences,
             $aISkillLoadRefusals->loadableSkillNames,
             $refusalSentences
         );
@@ -836,12 +872,12 @@ class AgentToolCallDispatchService extends Service
         }
         $subSkillNamesToLoad = array_values(array_unique($subSkillNamesToLoad));
         if ($subSkillNamesToLoad === []) {
-            return $callMessage->loadToolsFromToolArguments($toolArguments);
+            return $callMessage->loadToolsFromToolArguments($toolArguments, $conversation->deliversToolsThroughCallTool());
         }
         $agentSkillLoadOutcome = $this->loadSkillsThroughGates($agentRun, ['skill_names' => $subSkillNamesToLoad], $conversation, $callMessage);
         $loadedSubSkillNames = array_map('strval', $agentSkillLoadOutcome->admittedSkillNames ?? $subSkillNamesToLoad);
         // the tools of the loaded skills are promoted whatever happened to the sub-skills
-        $loadToolsResult = $callMessage->loadToolsFromToolArguments($toolArguments);
+        $loadToolsResult = $callMessage->loadToolsFromToolArguments($toolArguments, $conversation->deliversToolsThroughCallTool());
         // why a sub-skill was refused stays in the result: the gates' sentences, as the load path rendered them
         $refusalSentences = $agentSkillLoadOutcome->refusalSentences;
         if ($loadedSubSkillNames === []) {
@@ -850,9 +886,10 @@ class AgentToolCallDispatchService extends Service
         $residentToolNames = $callMessage->getLoadedCapabilities()?->getLoadedToolNames() ?? [];
         $loadedRequestedToolNames = array_values(array_intersect($requestedToolNames, $residentToolNames));
         return 'Loaded the sub-skill ' . implode(', ', $loadedSubSkillNames) . ': its instructions are in your context now and '
-            . 'its tools are in your tool list from the next step'
+            . ($conversation->deliversToolsThroughCallTool() ? 'its tools are listed with them from the next step' : 'its tools are in your tool list from the next step')
             . ($loadedRequestedToolNames !== [] ? ' (' . implode(', ', $loadedRequestedToolNames) . ')' : '')
-            . '. Read the instructions, then call the tool.' . $refusalSentences;
+            . ($conversation->deliversToolsThroughCallTool() ? '. Read the instructions, then call the tool through `call_tool`.' : '. Read the instructions, then call the tool.')
+            . $refusalSentences;
     }
 
     /**

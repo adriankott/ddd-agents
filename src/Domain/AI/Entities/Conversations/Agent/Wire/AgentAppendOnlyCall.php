@@ -58,6 +58,9 @@ class AgentAppendOnlyCall
      */
     public const string HEADER_SKILLS_LOADED_TOOLS_LISTED = '# Skills loaded now — their instructions follow; their tools in your tool list can be called from now on';
 
+    /** Leads the instructions of the skills a call appended under the `call_tool` delivery: their tools follow as text. */
+    public const string HEADER_SKILLS_LOADED_TOOLS_AS_TEXT = '# Skills loaded now — their tools are listed above and are called through `call_tool`; their instructions follow';
+
     /** @var array<int, array<string, mixed>> The tools of the fixed top-level `tools`. */
     public array $topLevelToolSchemas = [];
 
@@ -111,6 +114,9 @@ class AgentAppendOnlyCall
         // an epoch that carries the whole reachable tool set top-level keeps every offered tool there —
         // the offer is the same for the whole epoch, and a load appends its instructions only
         $offersReachableToolsTopLevel = $prefixEpoch->offersReachableToolsTopLevel();
+        // the `call_tool` delivery declares the meta tools and the one fixed `call_tool` only: a loaded skill's tool —
+        // the base set's included — is listed as text by an item and never declared
+        $deliversToolsThroughCallTool = $prefixEpoch->deliversToolsThroughCallTool();
 
         // the fixed top-level tools: the meta tools (but the conditional ones) and the base set's tools
         $topLevelToolNames = [];
@@ -126,9 +132,11 @@ class AgentAppendOnlyCall
             if (in_array($offeredToolName, $carriedConditionalMetaToolNames, true)) {
                 continue;
             }
-            $staysTopLevel = $offersReachableToolsTopLevel
-                || in_array($offeredToolName, $baseToolNames, true)
-                || (!in_array($offeredToolName, $cumulativeResidentToolNames, true) && !in_array($offeredToolName, self::CONDITIONAL_META_TOOL_NAMES, true));
+            $staysTopLevel = $deliversToolsThroughCallTool
+                ? !in_array($offeredToolName, $cumulativeResidentToolNames, true) && !in_array($offeredToolName, $baseToolNames, true)
+                : ($offersReachableToolsTopLevel
+                    || in_array($offeredToolName, $baseToolNames, true)
+                    || (!in_array($offeredToolName, $cumulativeResidentToolNames, true) && !in_array($offeredToolName, self::CONDITIONAL_META_TOOL_NAMES, true)));
             if ($staysTopLevel) {
                 $agentAppendOnlyCall->topLevelToolSchemas[] = $offeredToolSchema;
                 $topLevelToolNames[] = $offeredToolName;
@@ -140,6 +148,16 @@ class AgentAppendOnlyCall
             $agentAppendOnlyCall->topLevelToolSchemas[] = $conditionalMetaToolSchemasByName[$carriedToolName];
             $topLevelToolNames[] = $carriedToolName;
         }
+        if ($deliversToolsThroughCallTool) {
+            // the one fixed tool every loaded skill's tool is called through closes the list — the same bytes on every call
+            $agentAppendOnlyCall->topLevelToolSchemas[] = AgentCallToolDelivery::buildCallToolSchema();
+            $topLevelToolNames[] = AgentCallToolDelivery::NAME;
+        }
+        // the base set's tools are top-level under the native delivery and need no item; under `call_tool` the first call
+        // of the epoch lists them as text like any other loaded tool
+        $toolNamesNoItemLists = $deliversToolsThroughCallTool ? [] : $baseToolNames;
+        $coldDroppedCapabilityNames = $prefixEpoch->coldDroppedCapabilityNames;
+        $coldDroppedAfterMessageIndex = $prefixEpoch->coldDroppedAfterMessageIndex;
 
         // the items of the earlier calls of the epoch, at their positions, in history order — diffed against the epoch's
         // base set and the top-level tools: a compaction edge between a load row and the row that recorded the load puts
@@ -161,7 +179,13 @@ class AgentAppendOnlyCall
             // `# Situation` entry are superseded by the system content of the situation epoch
             $rendersSkillTextOfRow = ($message->indexInConversation ?? -1) >= $skillTextStartIndex;
             $recordedSkillNames = $rendersSkillTextOfRow ? array_values(array_diff($requestSnapshot->appendedSkillNames ?? [], $baseSkillNames, $appendedSkillNames)) : [];
-            $recordedToolNames = array_values(array_diff($requestSnapshot->appendedToolNames ?? [], $baseToolNames, $topLevelToolNames, $appendedToolNames));
+            $recordedToolNames = array_values(array_diff($requestSnapshot->appendedToolNames ?? [], $toolNamesNoItemLists, $topLevelToolNames, $appendedToolNames));
+            // a row from before the epoch's cold unloading renders nothing of what was unloaded then: the item would send
+            // the text and tools of a skill that is no longer loaded (a later `load_skills` appends them at its own row)
+            if ($coldDroppedCapabilityNames !== [] && $coldDroppedAfterMessageIndex !== null && ($message->indexInConversation ?? PHP_INT_MAX) <= $coldDroppedAfterMessageIndex) {
+                $recordedSkillNames = array_values(array_diff($recordedSkillNames, $coldDroppedCapabilityNames));
+                $recordedToolNames = array_values(array_diff($recordedToolNames, $coldDroppedCapabilityNames));
+            }
             // a recorded `# Situation` entry renders with the recording call's variants and names; a full entry names the
             // sections the earlier entries carried that it withdraws (the walk's state); an entry recorded before
             // entries carried names is not rendered
@@ -317,15 +341,29 @@ class AgentAppendOnlyCall
         bool $includesSharedParams
     ): AgentAppendedHistoryInsertion {
         $agentAppendedHistoryInsertion = new AgentAppendedHistoryInsertion();
+        $deliversToolsThroughCallTool = $agentModelInput->prefixEpoch?->deliversToolsThroughCallTool() ?? false;
+        $joinedToolSchemas = [];
         foreach ($toolNames as $toolName) {
             if (isset($toolSchemasByName[$toolName])) {
-                $agentAppendedHistoryInsertion->chatCompletionsToolSchemas[] = $toolSchemasByName[$toolName];
+                $joinedToolSchemas[] = $toolSchemasByName[$toolName];
             }
         }
+        if (!$deliversToolsThroughCallTool) {
+            $agentAppendedHistoryInsertion->chatCompletionsToolSchemas = $joinedToolSchemas;
+        }
         $developerTextParts = [];
+        if ($deliversToolsThroughCallTool && $joinedToolSchemas !== []) {
+            // the joined tools as text, BEFORE the instructions: the instructions (when to use the tools, and which
+            // other skill a neighbouring request belongs to) stay the last thing the model reads before the turn
+            $developerTextParts[] = AgentCallToolDelivery::buildToolsText($joinedToolSchemas, (string)$agentModelInput->prefixEpoch?->toolDelivery);
+        }
         if ($skillNames !== []) {
             $appendedSkills = $resolvedSkills->filterToNames($skillNames);
-            $skillsHeader = ($agentModelInput->prefixEpoch?->offersReachableToolsTopLevel() ?? false) ? self::HEADER_SKILLS_LOADED_TOOLS_LISTED : self::HEADER_SKILLS_LOADED;
+            $skillsHeader = match (true) {
+                $deliversToolsThroughCallTool => self::HEADER_SKILLS_LOADED_TOOLS_AS_TEXT,
+                $agentModelInput->prefixEpoch?->offersReachableToolsTopLevel() ?? false => self::HEADER_SKILLS_LOADED_TOOLS_LISTED,
+                default => self::HEADER_SKILLS_LOADED,
+            };
             // option b: the epoch's situation is fixed (a change starts a new epoch), so the text carries its sections
             $prefixEpochOfCall = $agentModelInput->prefixEpoch;
             $skillsText = $skillsHeader . "\nNow loaded: " . implode(', ', $skillNames) . "\n\n"

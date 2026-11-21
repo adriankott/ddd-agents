@@ -121,6 +121,12 @@ class RequestSnapshot extends ValueObject
     public ?string $skillLoadingStrategy = null;
 
     /**
+     * @var string|null Under append-only loading: how a loaded skill's tools reached the model at this call
+     *      ({@see ContextRetentionSettings::TOOL_DELIVERIES}); null on a call of the system-prompt swap.
+     */
+    public ?string $toolDelivery = null;
+
+    /**
      * @var string|null The hash of the `additional_tools` items of this call's history, in history order:
      *      the cache diff names `toolsAppended` when the top-level tools stayed and this hash moved. Null without such items.
      */

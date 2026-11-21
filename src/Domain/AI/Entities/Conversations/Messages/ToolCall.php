@@ -451,6 +451,13 @@ class ToolCall extends ValueObject
     public bool $wasRefusedByGate = false;
 
     /**
+     * @var bool True when the model made this call through `call_tool` (the `call_tool` delivery of an append-only
+     *           conversation, {@see \DDD\Domain\AI\Entities\Conversations\Agent\Wire\AgentCallToolDelivery}): name and
+     *           arguments are the called tool's own, and the history sends the call back as the `call_tool` call it was.
+     */
+    public bool $deliveredThroughCallTool = false;
+
+    /**
      * @var bool True when the owner-consent check held a write of this call (NOT_RESERVED): the tool answered —
      *           possibly COMPLETED — without changing anything. Such a call is no completed write for the answer
      *           contract; the final answer asks the owner for the confirmation instead
@@ -757,10 +764,15 @@ class ToolCall extends ValueObject
         return [
             'id' => $this->toolCallId ?? '',
             'type' => 'function',
-            'function' => [
-                'name' => $this->name ?? '',
-                'arguments' => $this->argumentsAsJson(),
-            ],
+            'function' => $this->deliveredThroughCallTool
+                ? [
+                    'name' => \DDD\Domain\AI\Entities\Conversations\Agent\Wire\AgentCallToolDelivery::NAME,
+                    'arguments' => \DDD\Domain\AI\Entities\Conversations\Agent\Wire\AgentCallToolDelivery::buildWrappedArgumentsJson($this->name ?? '', $this->argumentsAsJson()),
+                ]
+                : [
+                    'name' => $this->name ?? '',
+                    'arguments' => $this->argumentsAsJson(),
+                ],
         ];
     }
 

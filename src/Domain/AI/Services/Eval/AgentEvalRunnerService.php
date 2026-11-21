@@ -1228,6 +1228,7 @@ class AgentEvalRunnerService extends Service
             $agentEvalArms->rebuildEpochOnSituationChange,
             $agentEvalArms->stateChangeDelivery
         );
+        $agentEvalArms->applyToolDeliveryArmsTo($conversation->contextRetentionSettings);
         $conversation->budgetBypass = $this->isConsoleBudgetBypassGranted();
         return $conversation;
     }
@@ -1422,6 +1423,7 @@ class AgentEvalRunnerService extends Service
                 $agentEvalArms->rebuildEpochOnSituationChange,
                 $agentEvalArms->stateChangeDelivery
             );
+            $agentEvalArms->applyToolDeliveryArmsTo($conversation->contextRetentionSettings);
         }
     }
 

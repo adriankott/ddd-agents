@@ -41,6 +41,12 @@ trait ContextRetentionSettingsOptionsTrait
     /** @var string The state-change delivery */
     public const string OPTION_STATE_CHANGE_DELIVERY = 'state-change-delivery';
 
+    /** @var string How a loaded skill's tools reach the model under append-only loading */
+    public const string OPTION_TOOL_DELIVERY = 'tool-delivery';
+
+    /** @var string Whether cold skills leave at a compaction rebase under append-only loading */
+    public const string OPTION_DROP_COLD_SKILLS_AT_REBASE = 'drop-cold-skills-at-rebase';
+
     /** @var string[] The eviction thresholds: option name by field name of {@see ContextRetentionSettingsOverride::COUNT_FIELDS} */
     public const array CONTEXT_RETENTION_COUNT_OPTION_NAMES_BY_FIELD = [
         'pressureBudgetTokens' => 'evict-soft',
@@ -63,6 +69,8 @@ trait ContextRetentionSettingsOptionsTrait
         'skillLoadingStrategy' => 'skill-loading-strategy',
         'rebuildEpochOnSituationChange' => 'rebuild-epoch-on-situation-change',
         'stateChangeDelivery' => 'state-change-delivery',
+        'toolDelivery' => 'tool-delivery',
+        'dropColdSkillsAtCompactionRebase' => 'drop-cold-skills-at-rebase',
     ];
 
     /** @var string The prefix of the compaction options of a command whose own options are about something else */
@@ -97,7 +105,9 @@ trait ContextRetentionSettingsOptionsTrait
             ->addOption(self::OPTION_UNLOAD_GRANULARITY, null, InputOption::VALUE_REQUIRED, 'unloadGranularity: `' . ContextRetentionSettings::UNLOAD_GRANULARITY_SKILL . '` (a skill leaves with all its tools, once per owner turn) or `' . ContextRetentionSettings::UNLOAD_GRANULARITY_TOOL . '` (the score of each tool after every step)')
             ->addOption(self::OPTION_SKILL_LOADING_STRATEGY, null, InputOption::VALUE_REQUIRED, 'skillLoadingStrategy: `' . implode('` or `', ContextRetentionSettings::SKILL_LOADING_STRATEGIES) . '`; takes effect on a new conversation only')
             ->addOption(self::OPTION_REBUILD_EPOCH_ON_SITUATION_CHANGE, null, InputOption::VALUE_REQUIRED, 'rebuildEpochOnSituationChange: `' . ContextRetentionSettingsOverride::SWITCH_ON . '` or `' . ContextRetentionSettingsOverride::SWITCH_OFF . '`; takes effect before the conversation\'s first model call only')
-            ->addOption(self::OPTION_STATE_CHANGE_DELIVERY, null, InputOption::VALUE_REQUIRED, 'stateChangeDelivery: `' . implode('` or `', ContextRetentionSettings::STATE_CHANGE_DELIVERIES) . '`; takes effect before the conversation\'s first model call only');
+            ->addOption(self::OPTION_STATE_CHANGE_DELIVERY, null, InputOption::VALUE_REQUIRED, 'stateChangeDelivery: `' . implode('` or `', ContextRetentionSettings::STATE_CHANGE_DELIVERIES) . '`; takes effect before the conversation\'s first model call only')
+            ->addOption(self::OPTION_TOOL_DELIVERY, null, InputOption::VALUE_REQUIRED, 'toolDelivery (append-only loading): `' . implode('` or `', ContextRetentionSettings::TOOL_DELIVERIES) . '`; set it before the conversation\'s first model call only')
+            ->addOption(self::OPTION_DROP_COLD_SKILLS_AT_REBASE, null, InputOption::VALUE_REQUIRED, 'dropColdSkillsAtCompactionRebase (append-only loading): `' . ContextRetentionSettingsOverride::SWITCH_ON . '` or `' . ContextRetentionSettingsOverride::SWITCH_OFF . '` — at the first model call after a compaction the skills unused for --evict-skill-turns owner turns are unloaded');
     }
 
     /**
@@ -120,7 +130,9 @@ trait ContextRetentionSettingsOptionsTrait
                 $this->readOptionValue($input, self::OPTION_SKILL_LOADING_STRATEGY),
                 $this->readOptionValue($input, self::OPTION_REBUILD_EPOCH_ON_SITUATION_CHANGE),
                 $this->readOptionValue($input, self::OPTION_STATE_CHANGE_DELIVERY),
-                $rawCountsByField
+                $rawCountsByField,
+                $input->hasOption(self::OPTION_TOOL_DELIVERY) ? $this->readOptionValue($input, self::OPTION_TOOL_DELIVERY) : null,
+                $input->hasOption(self::OPTION_DROP_COLD_SKILLS_AT_REBASE) ? $this->readOptionValue($input, self::OPTION_DROP_COLD_SKILLS_AT_REBASE) : null
             );
         } catch (SettingsOverrideValueRefusedException $settingsOverrideValueRefusedException) {
             $optionNamesByField = self::CONTEXT_RETENTION_COUNT_OPTION_NAMES_BY_FIELD + self::CONTEXT_RETENTION_CHOICE_OPTION_NAMES_BY_FIELD;

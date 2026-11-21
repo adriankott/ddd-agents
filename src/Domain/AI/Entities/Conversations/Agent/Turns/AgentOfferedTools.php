@@ -55,7 +55,7 @@ class AgentOfferedTools extends ValueObject
     public static function buildFor(OfferedSkillCatalog $offeredSkillCatalog, AgentOfferedToolsInputs $agentOfferedToolsInputs): self
     {
         $skillCatalog = $offeredSkillCatalog->skills;
-        $loadSkillsTool = LoadSkillsTool::forCatalog($skillCatalog, $offeredSkillCatalog->alreadyLoadedSkillNames);
+        $loadSkillsTool = LoadSkillsTool::forCatalog($skillCatalog, $offeredSkillCatalog->alreadyLoadedSkillNames, $agentOfferedToolsInputs->toolsAreCalledThroughCallTool);
         $toolSchemas = [];
         if ($loadSkillsTool->hasLoadableSkills()) {
             $toolSchemas[] = $loadSkillsTool->toOpenAiToolSchema();

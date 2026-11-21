@@ -92,6 +92,25 @@ class AgentEvalArms extends ValueObject
     /** @var string|null The state-change delivery stamped at each conversation's creation; null = the purpose's or the global default */
     public ?string $stateChangeDelivery = null;
 
+    /** @var string|null The tool delivery set at each conversation's creation ({@see \DDD\Domain\AI\Entities\Conversations\Messages\ContextRetentionSettings::TOOL_DELIVERIES}); null = the global default */
+    public ?string $toolDelivery = null;
+
+    /** @var bool|null Whether cold skills leave at a compaction rebase, set at each conversation's creation; null = the global default */
+    public ?bool $dropColdSkillsAtCompactionRebase = null;
+
+    /**
+     * Write the arms that are plain retention settings (no creation stamp of their own) onto a new conversation's settings.
+     */
+    public function applyToolDeliveryArmsTo(\DDD\Domain\AI\Entities\Conversations\Messages\ContextRetentionSettings $contextRetentionSettings): void
+    {
+        if ($this->toolDelivery !== null) {
+            $contextRetentionSettings->toolDelivery = $this->toolDelivery;
+        }
+        if ($this->dropColdSkillsAtCompactionRebase !== null) {
+            $contextRetentionSettings->dropColdSkillsAtCompactionRebase = $this->dropColdSkillsAtCompactionRebase;
+        }
+    }
+
     /** @var bool true = every model call of the run stores its full sent payload and raw response */
     public bool $storeRequestSnapshot = false;
 

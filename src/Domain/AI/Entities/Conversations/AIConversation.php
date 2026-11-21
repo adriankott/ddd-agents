@@ -924,8 +924,13 @@ class AIConversation extends Entity
             $childContextRetentionSettings->rebuildEpochOnSituationChange = $parentConversation->rebuildsEpochOnSituationChange();
             // a child delivers volatile changes the way its parent does
             $childContextRetentionSettings->stateChangeDelivery = $parentConversation->getStateChangeDelivery();
+            // a child's tools reach its model the way its parent's do
+            $childContextRetentionSettings->toolDelivery = $parentConversation->getToolDelivery();
+            $childContextRetentionSettings->dropColdSkillsAtCompactionRebase = $parentConversation->dropsColdSkillsAtCompactionRebase();
             $this->contextRetentionSettings = $childContextRetentionSettings;
         } else {
+            $this->contextRetentionSettings->toolDelivery ??= $parentConversation->getToolDelivery();
+            $this->contextRetentionSettings->dropColdSkillsAtCompactionRebase ??= $parentConversation->dropsColdSkillsAtCompactionRebase();
             $this->contextRetentionSettings->skillLoadingStrategy ??= $parentConversation->getSkillLoadingStrategy();
             $this->contextRetentionSettings->rebuildEpochOnSituationChange ??= $parentConversation->rebuildsEpochOnSituationChange();
             $this->contextRetentionSettings->stateChangeDelivery ??= $parentConversation->getStateChangeDelivery();
@@ -1362,6 +1367,7 @@ class AIConversation extends Entity
         $agentOfferedToolsInputs->loadableSubSkillTools = $this->buildLoadableSubSkillTools($offeredSkillCatalog, $anchorLoadedCapabilities);
         $agentOfferedToolsInputs->listsSubSkillToolsByNameOnly = SubSkillToolDiscovery::listsSubSkillToolsByNameOnly();
         $agentOfferedToolsInputs->loadsSkillsAppendOnly = $loadsSkillsAppendOnly;
+        $agentOfferedToolsInputs->toolsAreCalledThroughCallTool = $this->deliversToolsThroughCallTool();
         // an append-only epoch whose purpose's whole reachable tool set fits the ceiling offers that set
         // and every conditional meta tool from the start — the top-level `tools` never change inside the epoch; a call of
         // a tool whose skill is not loaded yet is refused by the dispatch with the next move
@@ -1369,6 +1375,11 @@ class AIConversation extends Entity
             $appendOnlyToolSet = $this->buildAppendOnlyToolSet($agentRun);
             if ($appendOnlyToolSet->offersReachableToolsTopLevel()) {
                 $agentOfferedToolsInputs->appendOnlyReachableToolDefinitions = $appendOnlyToolSet->reachableToolDefinitions;
+                $agentOfferedToolsInputs->offersConditionalMetaToolsFromTheStart = true;
+                $agentOfferedToolsInputs->offersWaitForSubAgents = $agentOfferedToolsInputs->offersWaitForSubAgents || ($allowThreads && !$this->isDelegation());
+            } elseif ($this->deliversToolsThroughCallTool()) {
+                // the `call_tool` delivery declares the meta tools and `call_tool` only — every conditional meta tool from
+                // the start, so the top-level `tools` are the same bytes for the whole conversation
                 $agentOfferedToolsInputs->offersConditionalMetaToolsFromTheStart = true;
                 $agentOfferedToolsInputs->offersWaitForSubAgents = $agentOfferedToolsInputs->offersWaitForSubAgents || ($allowThreads && !$this->isDelegation());
             }
@@ -1398,7 +1409,8 @@ class AIConversation extends Entity
         $appendOnlyToolSet = AgentAppendOnlyToolSet::decideFor(
             $reachableToolDefinitions,
             $this->getDescriptionPrefixesOfToolArgumentsFilledFromAgentSpace(),
-            ContextRetentionSettings::resolveAppendOnlyReachableToolSetCeilingTokens()
+            // the `call_tool` delivery never declares a domain tool, so the reachable set never goes top-level
+            $this->deliversToolsThroughCallTool() ? 0 : ContextRetentionSettings::resolveAppendOnlyReachableToolSetCeilingTokens()
         );
         if ($agentRun !== null) {
             $agentRun->appendOnlyToolSetsByConversationKey[$memoKey] = $appendOnlyToolSet;
@@ -2129,6 +2141,59 @@ class AIConversation extends Entity
         return ($settings ?? new ContextRetentionSettings())->getStateChangeDelivery();
     }
 
+    /** How a loaded skill's tools reach the model in this conversation: the set value, else the global default. */
+    public function getToolDelivery(): string
+    {
+        $settings = isset($this->contextRetentionSettings) ? $this->contextRetentionSettings : null;
+        return ($settings ?? new ContextRetentionSettings())->getToolDelivery();
+    }
+
+    /** Whether a loaded skill's tools are listed as text and called through the one fixed `call_tool`. */
+    public function deliversToolsThroughCallTool(): bool
+    {
+        $settings = isset($this->contextRetentionSettings) ? $this->contextRetentionSettings : null;
+        return ($settings ?? new ContextRetentionSettings())->deliversToolsThroughCallTool();
+    }
+
+    /** Whether the skills unused for the configured owner turns leave at a compaction rebase (append-only loading). */
+    public function dropsColdSkillsAtCompactionRebase(): bool
+    {
+        $settings = isset($this->contextRetentionSettings) ? $this->contextRetentionSettings : null;
+        return ($settings ?? new ContextRetentionSettings())->dropsColdSkillsAtCompactionRebase();
+    }
+
+    /**
+     * The start index of the prefix epoch the current compaction cover gives (the first row after the cover's edge) when
+     * no model call has run on that cover yet and no cold unloading is recorded for it — the one moment the cold skills
+     * leave an append-only conversation ({@see ContextRetentionSettings::$dropColdSkillsAtCompactionRebase}). Null
+     * without a cover, once a call ran on it, or once the unloading of this epoch is recorded.
+     */
+    public function findPrefixEpochStartIndexAwaitingColdUnloading(): ?int
+    {
+        $compactionCover = $this->buildCompactionCover();
+        $coveredUpToIndex = $compactionCover->getCoveredUpToIndex();
+        if ($coveredUpToIndex === null) {
+            return null;
+        }
+        $epochStartIndex = $coveredUpToIndex + 1;
+        if ($this->getAgentWorkingState()?->findColdCapabilityDropOfEpoch($epochStartIndex) !== null) {
+            return null;
+        }
+        $coverFingerprint = AgentPrefixEpoch::buildCoverFingerprint($compactionCover->getCoverNodes());
+        $newestModelCallRow = null;
+        foreach (isset($this->messages) ? $this->messages->getElements() : [] as $loadedMessage) {
+            if (($loadedMessage->inputTokens ?? 0) > 0 && isset($loadedMessage->requestSnapshot)
+                && ($newestModelCallRow === null || ($loadedMessage->indexInConversation ?? -1) > ($newestModelCallRow->indexInConversation ?? -1))
+            ) {
+                $newestModelCallRow = $loadedMessage;
+            }
+        }
+        if ($newestModelCallRow !== null && $newestModelCallRow->requestSnapshot->epochCoverFingerprint === $coverFingerprint) {
+            return null;
+        }
+        return $epochStartIndex;
+    }
+
     /** Whether this conversation delivers a volatile value's change once, as a note (`onceWhenChanged`). */
     public function deliversStateChangesOnce(): bool
     {
@@ -2456,6 +2521,17 @@ class AIConversation extends Entity
         }
         $agentPrefixEpoch->coverFingerprint = AgentPrefixEpoch::buildCoverFingerprint($compactionCover->getCoverNodes());
         $agentPrefixEpoch->baseCapabilities = $this->findLoadedCapabilitiesAtPrefixEpochStart($agentPrefixEpoch->startIndex, $agentRun);
+        $agentPrefixEpoch->toolDelivery = $this->usesConversationAppend() ? $this->getToolDelivery() : ContextRetentionSettings::TOOL_DELIVERY_NATIVE;
+        // the cold skills unloaded when this cover first met a model call are no part of the epoch's base set
+        $coldCapabilityDrop = $coveredUpToIndex === null ? null : $this->getAgentWorkingState()?->findColdCapabilityDropOfEpoch($coveredUpToIndex + 1);
+        if ($coldCapabilityDrop !== null && $coldCapabilityDrop['names'] !== []) {
+            $agentPrefixEpoch->coldDroppedCapabilityNames = $coldCapabilityDrop['names'];
+            $agentPrefixEpoch->coldDroppedAfterMessageIndex = $coldCapabilityDrop['afterMessageIndex'];
+            if ($agentPrefixEpoch->baseCapabilities !== null) {
+                $agentPrefixEpoch->baseCapabilities = $agentPrefixEpoch->baseCapabilities->deepCopy();
+                $agentPrefixEpoch->baseCapabilities->removeByNames(...$coldCapabilityDrop['names']);
+            }
+        }
         // the decision model's preload on the first row is no part of the base set: the first call appends it behind a
         // `load_skills` call and its result (the shape of the model's own load, which it does not repeat), and the base
         // prefix stays the same for every new conversation, whatever the preload picked
@@ -2523,6 +2599,13 @@ class AIConversation extends Entity
     protected function startSituationEpochOf(AgentPrefixEpoch $agentPrefixEpoch, int $situationChangeStartIndex, ?AIConversationVariants $situationVariants, ?AgentRun $agentRun): void
     {
         $situationChangeBaseCapabilities = $this->findLoadedCapabilitiesAtPrefixEpochStart($situationChangeStartIndex, $agentRun);
+        // a situation epoch that started before the cover epoch's cold unloading: its stored base set still names them
+        if ($situationChangeBaseCapabilities !== null && $agentPrefixEpoch->coldDroppedCapabilityNames !== []
+            && $agentPrefixEpoch->coldDroppedAfterMessageIndex !== null && $situationChangeStartIndex <= $agentPrefixEpoch->coldDroppedAfterMessageIndex + 1
+        ) {
+            $situationChangeBaseCapabilities = $situationChangeBaseCapabilities->deepCopy();
+            $situationChangeBaseCapabilities->removeByNames(...$agentPrefixEpoch->coldDroppedCapabilityNames);
+        }
         $situationChangeBaseAISkills = null;
         if ($situationChangeBaseCapabilities !== null) {
             /** @var AISkillsService $aiSkillsService */

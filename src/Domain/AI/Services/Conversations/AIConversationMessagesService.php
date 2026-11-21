@@ -1809,6 +1809,52 @@ class AIConversationMessagesService extends EntitiesService
         return $turnMessages;
     }
 
+    /**
+     * The indexes of the turn initiators BELOW the loaded tail of `$conversation` — the owner turns a compaction cover
+     * stands for. One query with the predicate of {@see findTurnInitiatorIndexOfConversationId()}; empty for a
+     * conversation without an id, without loaded rows, or whose tail starts at the first row.
+     *
+     * @return int[]
+     * @throws \Doctrine\DBAL\Exception
+     */
+    public function findTurnInitiatorIndexesBelowLoadedTail(AIConversation $conversation): array
+    {
+        if (!isset($conversation->id) || !isset($conversation->messages)) {
+            return [];
+        }
+        $oldestLoadedIndex = null;
+        foreach ($conversation->messages->getElements() as $message) {
+            $index = $message->indexInConversation ?? null;
+            if ($index !== null && ($oldestLoadedIndex === null || $index < $oldestLoadedIndex)) {
+                $oldestLoadedIndex = (int)$index;
+            }
+        }
+        if ($oldestLoadedIndex === null || $oldestLoadedIndex <= 0) {
+            return [];
+        }
+        $tableName = DBAIConversationMessageModel::getTableName();
+        $initiatorIndexes = EntityManagerFactory::getInstance()->getConnection()->fetchFirstColumn(
+            "SELECT `indexInConversation` FROM `$tableName` WHERE `aiConversationId` = :aiConversationId AND `truncatedAt` IS NULL"
+            . ' AND `indexInConversation` < :oldestLoadedIndex'
+            . ' AND ((`role` = :userRole AND (`authorType` = :userAuthor OR `authorType` IS NULL'
+            . ' OR (`authorType` = :orchestratorAuthor AND `messageType` = :textType AND `indexInConversation` = 0)))'
+            . ' OR (`messageType` = :signalType AND `signalSource` IN (:initiatorSignalSources)))'
+            . ' ORDER BY `indexInConversation` ASC',
+            [
+                'aiConversationId' => (int)$conversation->id,
+                'oldestLoadedIndex' => $oldestLoadedIndex,
+                'userRole' => AIConversationMessage::ROLE_USER,
+                'userAuthor' => AIConversationMessage::AUTHOR_USER,
+                'orchestratorAuthor' => AIConversationMessage::AUTHOR_AGENT,
+                'textType' => AIConversationMessage::MESSAGE_TEXT,
+                'signalType' => AIConversationMessage::MESSAGE_SIGNAL,
+                'initiatorSignalSources' => ConversationSignalSources::getValuesThatStartATurn(),
+            ],
+            ['initiatorSignalSources' => ArrayParameterType::STRING]
+        );
+        return array_map('intval', $initiatorIndexes);
+    }
+
     /** @throws \Doctrine\DBAL\Exception */
     protected function findTurnInitiatorIndexOfConversationId(int $aiConversationId, ?int $atOrBeforeIndex): ?int
     {
@@ -4703,16 +4749,43 @@ class AIConversationMessagesService extends EntitiesService
      * of the anchor's set are {@see AgentColdCapabilityUnloading}; this persists the anchor's capability column once and
      * records one always-on `eviction` row per victim AFTER the persist (a crash in between would otherwise leave a
      * phantom row) — the speculative preloads removed first are recorded as they go, as before.
+     *
+     * @throws \Doctrine\DBAL\Exception
      */
     public function unloadColdCapabilitiesOfRun(AgentRun $agentRun, AIConversation $conversation, ?AgentConsoleStream $consoleStream = null, bool $emitRealtimeSignal = false): void
     {
         // nothing is unloaded inside an append-only epoch (the knobs are inert; the compaction rebase is
-        // the only moment the set is rebuilt)
+        // the only moment the set is rebuilt) — with `dropColdSkillsAtCompactionRebase` the cold skills leave at the
+        // first model call a new compaction cover meets, and the epoch records what left (also when nothing did, so
+        // the epoch is never unloaded a second time)
+        $prefixEpochStartIndexAwaitingColdUnloading = null;
         if ($conversation->usesConversationAppend()) {
-            $this->aiTrace('turn.eviction.skipped', ['conversationId' => $conversation->id ?? null, 'reason' => 'conversationAppend', 'pass' => 'coldUnloading']);
-            return;
+            $prefixEpochStartIndexAwaitingColdUnloading = $conversation->dropsColdSkillsAtCompactionRebase() && $conversation->unloadsPerSkill()
+                ? $conversation->findPrefixEpochStartIndexAwaitingColdUnloading()
+                : null;
+            if ($prefixEpochStartIndexAwaitingColdUnloading === null) {
+                $this->aiTrace('turn.eviction.skipped', ['conversationId' => $conversation->id ?? null, 'reason' => 'conversationAppend', 'pass' => 'coldUnloading']);
+                return;
+            }
         }
-        $unloading = AgentColdCapabilityUnloading::applyTo($conversation);
+        // at the rebase the unused owner turns are counted across the cover: the loaded tail right after a compaction
+        // holds only the newest few turns, so the tail alone never reaches `unloadSkillAfterUnusedTurns`
+        $unloading = AgentColdCapabilityUnloading::applyTo(
+            $conversation,
+            $prefixEpochStartIndexAwaitingColdUnloading !== null ? $this->findTurnInitiatorIndexesBelowLoadedTail($conversation) : []
+        );
+        if ($prefixEpochStartIndexAwaitingColdUnloading !== null) {
+            $coldCapabilityNames = $unloading === null ? [] : array_values(array_unique(array_merge($unloading->speculativeFirstNames, array_map('strval', array_keys($unloading->priorTelemetryByVictimName)))));
+            $conversation->getOrCreateAgentWorkingState()->recordColdCapabilityDrop(
+                $prefixEpochStartIndexAwaitingColdUnloading,
+                $conversation->messages->getNewestMessageIndex() ?? -1,
+                $coldCapabilityNames
+            );
+            /** @var AIConversationsService $aIConversationsService */
+            $aIConversationsService = AIConversation::getService();
+            $aIConversationsService->persistAgentWorkingStateSlice($conversation, 'coldCapabilityDrops');
+            $this->aiTrace('turn.eviction.compactionRebase', ['conversationId' => $conversation->id ?? null, 'epochStartIndex' => $prefixEpochStartIndexAwaitingColdUnloading, 'unloaded' => $coldCapabilityNames]);
+        }
         if ($unloading === null || !$unloading->changedTheSet()) {
             return;
         }
