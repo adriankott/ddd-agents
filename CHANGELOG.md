@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.4 (unreleased)
+## 0.1.4
 
 - **Changed default:** a NEW append-only conversation gets the tool delivery `callTool` and the cold-skill drop at the
   compaction rebase (`ContextRetentionSettings::$toolDelivery` `native` | `callTool` | `callToolJsonSchema`,
