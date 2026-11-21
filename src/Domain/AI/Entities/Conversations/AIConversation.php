@@ -2563,12 +2563,12 @@ class AIConversation extends Entity
         $agentPrefixEpoch->toolDelivery = $this->usesConversationAppend() ? $this->getToolDelivery() : ContextRetentionSettings::TOOL_DELIVERY_NATIVE;
         // the cold skills unloaded when this cover first met a model call are no part of the epoch's base set
         $coldCapabilityDrop = $coveredUpToIndex === null ? null : $this->getAgentWorkingState()?->findColdCapabilityDropOfEpoch($coveredUpToIndex + 1);
-        if ($coldCapabilityDrop !== null && $coldCapabilityDrop['names'] !== []) {
-            $agentPrefixEpoch->coldDroppedCapabilityNames = $coldCapabilityDrop['names'];
-            $agentPrefixEpoch->coldDroppedAfterMessageIndex = $coldCapabilityDrop['afterMessageIndex'];
+        if ($coldCapabilityDrop !== null && $coldCapabilityDrop->names !== []) {
+            $agentPrefixEpoch->coldDroppedCapabilityNames = $coldCapabilityDrop->names;
+            $agentPrefixEpoch->coldDroppedAfterMessageIndex = $coldCapabilityDrop->afterMessageIndex;
             if ($agentPrefixEpoch->baseCapabilities !== null) {
                 $agentPrefixEpoch->baseCapabilities = $agentPrefixEpoch->baseCapabilities->deepCopy();
-                $agentPrefixEpoch->baseCapabilities->removeByNames(...$coldCapabilityDrop['names']);
+                $agentPrefixEpoch->baseCapabilities->removeByNames(...$coldCapabilityDrop->names);
             }
         }
         // the decision model's preload on the first row is no part of the base set: the first call appends it behind a

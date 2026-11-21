@@ -13,7 +13,7 @@
   'native'` and `'dropColdSkillsAtCompactionRebase' => false` in its `config/app/AI/contextRetention.php` (a host that
   replaces that file without the keys gets the built-in defaults `callTool` / `true`). Console and eval arms
   `--tool-delivery`, `--drop-cold-skills-at-rebase`; `RequestSnapshot::$toolDelivery` records each call; the working
-  state records `coldCapabilityDrops`. Details: the context skill, `tool-delivery-and-cold-skill-drop.md`.
+  state records `coldCapabilityDrops` (`AgentColdCapabilityDrops` of `AgentColdCapabilityDrop`). Details: the context skill, `tool-delivery-and-cold-skill-drop.md`.
 - Changed: the turn-initiator SQL condition is shared (`AIConversationMessagesService::buildTurnInitiatorPredicateSql()`
   and `buildTurnInitiatorPredicateParameters()`).
 - Fixed (web): an `Image` or `ImageGroup` inside a `Pressable` opens no lightbox and the group shows no carousel

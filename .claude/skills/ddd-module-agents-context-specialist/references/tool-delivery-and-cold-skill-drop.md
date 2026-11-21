@@ -1,5 +1,11 @@
 # Tool delivery through `call_tool` and the cold-skill drop
 
+**Reader:** host developer and package maintainer
+
+Contents: 1. The two settings · 2. `callTool` / `callToolJsonSchema` · 3. `dropColdSkillsAtCompactionRebase`
+
+## 1. The two settings
+
 Two creation stamps on `ContextRetentionSettings`, both acting only under `skillLoadingStrategy: conversationAppend`.
 
 | Setting | Values | Default for a new conversation | A conversation without the stamp |
@@ -13,7 +19,7 @@ default changes. `AIConversationsService::keepStampedToolDelivery()` refuses ano
 (the stored calls are rendered by it); the drop switch may change at any time. Sub-agents inherit both. Eval and console
 arms: `--tool-delivery`, `--drop-cold-skills-at-rebase` (`ContextRetentionSettingsOptionsTrait`, `AgentEvalArmOptionsTrait`).
 
-## `callTool` / `callToolJsonSchema`
+## 2. `callTool` / `callToolJsonSchema`
 
 - The top-level `tools` are the meta tools (the conditional ones from the first call) plus ONE fixed tool
   `call_tool(name, arguments)`, last. They are the same bytes for the whole conversation; the reachable tool set never
@@ -38,7 +44,7 @@ Known limits: after a wrong skill preload the model calls the nearest listed too
 the right skill (native recovers more reliably); a `call_tool` can name a tool that exists nowhere (answered with the
 callable list).
 
-## `dropColdSkillsAtCompactionRebase`
+## 3. `dropColdSkillsAtCompactionRebase`
 
 Inside an append-only epoch nothing is unloaded. With the setting on, the first model call of a turn after a compaction
 changed the cover runs the skill-granular unloading (`AgentColdCapabilityUnloading`, `unloadSkillAfterUnusedTurns`,
@@ -46,7 +52,8 @@ changed the cover runs the skill-granular unloading (`AgentColdCapabilityUnloadi
 
 - The unused owner turns are counted across the cover: the initiator indexes below the loaded tail
   (`findTurnInitiatorIndexesBelowLoadedTail()`, one query) are added to the recency count.
-- What left is recorded in the working state (`coldCapabilityDrops`: `epochStartIndex`, `afterMessageIndex`, `names`;
+- What left is recorded in the working state (`AgentWorkingState::getColdCapabilityDrops()`, one
+  `AgentColdCapabilityDrop` per epoch: `epochStartIndex`, `afterMessageIndex`, `names`;
   an empty record too, so an epoch is never unloaded twice), removed from the epoch's base set and from the history
   items of the rows up to `afterMessageIndex`.
 - A skill leaves as a whole group with its tools; a later need loads it again.

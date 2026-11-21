@@ -329,24 +329,24 @@ class AgentWorkingState extends ValueObject
     public array $securityFilteredOwnerMessageIndexes = [];
 
     /**
-     * @var array<int, array{epochStartIndex: int, afterMessageIndex: int, names: string[]}> The cold unloadings of an
+     * @var AgentColdCapabilityDrops The cold unloadings of an
      *      append-only conversation, one per compaction cover that met a model call
      *      ({@see \DDD\Domain\AI\Entities\Conversations\Messages\ContextRetentionSettings::$dropColdSkillsAtCompactionRebase}):
      *      the prefix epoch's start index, the newest history row at that moment, and the capabilities (skills and tools)
      *      that left — [] when none was cold. The epoch's base set and its history items are rendered without them.
      *      Persisted via {@see \DDD\Domain\AI\Services\Conversations\AIConversationsService::persistAgentWorkingStateSlice()}.
      */
-    public array $coldCapabilityDrops = [];
+    public ?AgentColdCapabilityDrops $coldCapabilityDrops = null;
 
-    /** @return array{epochStartIndex: int, afterMessageIndex: int, names: string[]}|null the recorded cold unloading of the epoch starting at `$epochStartIndex` */
-    public function findColdCapabilityDropOfEpoch(int $epochStartIndex): ?array
+    /** The recorded cold unloading of the epoch starting at `$epochStartIndex`, or null. */
+    public function findColdCapabilityDropOfEpoch(int $epochStartIndex): ?AgentColdCapabilityDrop
     {
-        foreach ($this->coldCapabilityDrops as $coldCapabilityDrop) {
-            if ($coldCapabilityDrop['epochStartIndex'] === $epochStartIndex) {
-                return $coldCapabilityDrop;
-            }
-        }
-        return null;
+        return $this->getColdCapabilityDrops()->findDropOfEpoch($epochStartIndex);
+    }
+
+    public function getColdCapabilityDrops(): AgentColdCapabilityDrops
+    {
+        return $this->coldCapabilityDrops ??= new AgentColdCapabilityDrops();
     }
 
     /**
@@ -359,7 +359,7 @@ class AgentWorkingState extends ValueObject
         if ($this->findColdCapabilityDropOfEpoch($epochStartIndex) !== null) {
             return;
         }
-        $this->coldCapabilityDrops[] = ['epochStartIndex' => $epochStartIndex, 'afterMessageIndex' => $afterMessageIndex, 'names' => array_values($capabilityNames)];
+        $this->getColdCapabilityDrops()->add(AgentColdCapabilityDrop::create($epochStartIndex, $afterMessageIndex, $capabilityNames));
     }
 
     public function isOwnerMessageSecurityFiltered(?int $messageIndex): bool
@@ -498,7 +498,7 @@ class AgentWorkingState extends ValueObject
                 'securityFilteredOwnerMessageIndexes' => $this->securityFilteredOwnerMessageIndexes,
                 'platformWrittenOwnerMessageIndexes' => $this->platformWrittenOwnerMessageIndexes,
                 'voiceTranscriptOwnerMessageIndexes' => $this->voiceTranscriptOwnerMessageIndexes,
-                'coldCapabilityDrops' => $this->coldCapabilityDrops,
+                'coldCapabilityDrops' => $this->getColdCapabilityDrops()->toRepositoryList(),
                 default => throw new \InvalidArgumentException('Not a top-level key of the agent working state: ' . $key),
             };
         }
@@ -605,17 +605,9 @@ class AgentWorkingState extends ValueObject
             'intval',
             array_filter((array)($repoArray['voiceTranscriptOwnerMessageIndexes'] ?? []), 'is_numeric')
         ));
-        $this->coldCapabilityDrops = [];
-        foreach (is_array($repoArray['coldCapabilityDrops'] ?? null) ? $repoArray['coldCapabilityDrops'] : [] as $coldCapabilityDropRow) {
-            if (!is_array($coldCapabilityDropRow) || !is_numeric($coldCapabilityDropRow['epochStartIndex'] ?? null)) {
-                continue;
-            }
-            $this->coldCapabilityDrops[] = [
-                'epochStartIndex' => (int)$coldCapabilityDropRow['epochStartIndex'],
-                'afterMessageIndex' => (int)($coldCapabilityDropRow['afterMessageIndex'] ?? -1),
-                'names' => array_values(array_map('strval', is_array($coldCapabilityDropRow['names'] ?? null) ? $coldCapabilityDropRow['names'] : [])),
-            ];
-        }
+        $this->coldCapabilityDrops = AgentColdCapabilityDrops::fromRepositoryList(
+            is_array($repoArray['coldCapabilityDrops'] ?? null) ? $repoArray['coldCapabilityDrops'] : []
+        );
         $this->ownerConsentUses = is_array($repoArray['ownerConsentUses'] ?? null) && $repoArray['ownerConsentUses'] !== []
             ? OwnerConsentUses::fromRepositoryObject($repoArray['ownerConsentUses'])
             : null;
