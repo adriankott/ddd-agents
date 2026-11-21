@@ -1,6 +1,6 @@
 ---
 name: ddd-module-agents-context-specialist
-description: "Explains and tunes what the ddd-agents model sees on each call and how that input stays small, stable and prompt-cached. Covers the model input (AgentModelInput segments, volatile tail, core prompts, replacing Character.md), trimming it per host or purpose (agentModelInputOptions.php: meta tools, widgets, base prompt sections, tools loaded by skill), prompt cache and stable prefix (breakpoints, wire APIs, append-only loading, prefix epochs), context reduction (compaction tree, tool-result stubbing), skill and tool eviction, state epochs, recall and search, embeddings, memories and standing directives, owner presence, device, time zones, client context, tool-call efficiency, contextRetention.php. Use when cached tokens drop to zero, a skill load costs the whole prompt, the base prompt or meta tools cost too many tokens, the context grows too large, compaction never fires or loses an id, a skill unloads too early, the agent repeats a read, the zone is wrong, search returns nothing, or a host adds memories."
+description: "Explains and tunes what the ddd-agents model sees per call and how that input stays small, stable and cached. Covers the model input (AgentModelInput segments, volatile tail, core prompts, replacing Character.md), trimming it per host or purpose (agentModelInputOptions.php: meta tools, widgets, base prompt sections, tools loaded by skill), prompt cache and stable prefix (breakpoints, wire APIs, append-only loading, epochs), context reduction (compaction tree, tool-result stubbing), skill and tool eviction, state epochs, recall and search, embeddings, memories and standing directives, owner presence, device, time zones, client context, call_tool delivery, cold-skill drop, tool-call efficiency, contextRetention.php. Use when cached tokens drop to zero, a skill load costs the whole prompt, prompt or meta tools cost too many tokens, the context grows too large, compaction never fires or loses an id, a skill unloads too early, the agent repeats a read, the zone is off, search fails, or a host adds memories."
 metadata:
   author: mgamadeus
   version: "0.1.0"
@@ -49,11 +49,15 @@ the tools and their results to the tools skill.
    the boundary. A conversation owns no zone except a schedule-bound one; it re-reads the space's zone at every model
    request and every tool call.
 5. **The stamped choices are frozen.** `ContextRetentionSettings::$skillLoadingStrategy`,
-   `$rebuildEpochOnSituationChange` and `$stateChangeDelivery` are stamped at creation (request, then the purpose's
-   `contextRetention:` map, then `config/app/AI/contextRetention.php`) and never change after the first model call.
+   `$rebuildEpochOnSituationChange`, `$stateChangeDelivery`, `$toolDelivery` and `$dropColdSkillsAtCompactionRebase`
+   are stamped at creation (request, then the purpose's `contextRetention:` map, then
+   `config/app/AI/contextRetention.php`); the first four never change after the first model call. A conversation stored
+   without the `toolDelivery` / drop stamp keeps `native` and unloads nothing — the getters read the stamp, never the
+   default.
 6. **Nothing is unloaded inside an append-only epoch.** Under `conversationAppend` the cold-capability unloading is
-   skipped (`AIConversationMessagesService::unloadColdCapabilitiesOfRun()` returns early); the set is rebuilt only when
-   a new epoch starts (compaction, state epoch start).
+   skipped inside an epoch; the set is rebuilt only when a new epoch starts (compaction, state epoch start). With
+   `dropColdSkillsAtCompactionRebase` the first call after a compaction unloads cold skills once per epoch (recorded in
+   the working state's `coldCapabilityDrops`).
 7. **Token estimates are chars / 4.** Retention, eviction, the append-only tool-set ceiling and the fixed overhead use
    the stored character counts divided by four, never a tokenizer. Thresholds are ratios in that unit.
 8. **Replace, never merge.** A host's `config/app/AI/contextRetention.php` and a host prompt file at the same path
@@ -158,6 +162,8 @@ Keep the method a single indexed read.
 | `stateChangeDelivery` | `onceWhenChanged` | `everyCall` | `ContextRetentionSettings::resolveDefaultStateChangeDelivery()` |
 | `appendOnlyReachableToolSetCeilingTokens` | 55000 | 55000 | `ContextRetentionSettings::resolveAppendOnlyReachableToolSetCeilingTokens()` |
 | `previousReasoningCapTokens` | 4000 | 4000 | `AgentWireConfiguration::resolveDefaultPreviousReasoningCapTokens()` |
+| `toolDelivery` | `callTool` | `callTool` (a conversation without the stamp: `native`) | `ContextRetentionSettings::resolveDefaultToolDelivery()` |
+| `dropColdSkillsAtCompactionRebase` | `true` | `true` (a conversation without the stamp: no drop) | `ContextRetentionSettings::resolveDefaultDropColdSkillsAtCompactionRebase()` |
 
 Per conversation, every other knob lives on `ContextRetentionSettings` (tool-result window and budget, image cap,
 eviction horizons, pressure, hard cap, pins) and `CompactionSettings` (threshold override, model, fallbacks); a
@@ -192,6 +198,7 @@ Details, the section rule and replacing `Character.md`: [what-the-model-sees.md]
 | What exactly is sent on a call; which segment says what; adding a day context or local situation; the client context (route, record, tab) and its host hook | [what-the-model-sees.md](references/what-the-model-sees.md) |
 | The base prompt, the meta tools or the tool schemas cost too many tokens; a consumer without widgets, delegation or memory; replacing the default character | [what-the-model-sees.md](references/what-the-model-sees.md) (section 5) |
 | Cached tokens are 0 or low; a deploy or a load costs the whole prompt; choosing the wire API | [prompt-cache-and-stable-prefix.md](references/prompt-cache-and-stable-prefix.md) |
+| `call_tool` delivery, a tool called through `call_tool`, `toolDelivery` stamps; cold skills dropped after a compaction | [tool-delivery-and-cold-skill-drop.md](references/tool-delivery-and-cold-skill-drop.md) |
 | The context grows past the model's reliable length; compaction never fires; an id is lost after compaction; old tool results disappear | [context-reduction.md](references/context-reduction.md) |
 | A skill or tool leaves too early or never; tuning `unloadGranularity`, pins, the hard cap | [skill-and-tool-eviction.md](references/skill-and-tool-eviction.md) |
 | A change of the space's context, the zone or the directives; `[SIGNAL:<kind>]` notes; the 30-minute rule | [volatile-context-once-per-change.md](references/volatile-context-once-per-change.md) |

@@ -2,6 +2,20 @@
 
 ## 0.1.4 (unreleased)
 
+- **Changed default:** a NEW append-only conversation gets the tool delivery `callTool` and the cold-skill drop at the
+  compaction rebase (`ContextRetentionSettings::$toolDelivery` `native` | `callTool` | `callToolJsonSchema`,
+  `$dropColdSkillsAtCompactionRebase`; config `AI.contextRetention.toolDelivery` / `dropColdSkillsAtCompactionRebase`).
+  Under `callTool` the top-level tools are the meta tools plus one fixed `call_tool(name, arguments)`; a loaded skill's
+  tools are listed as text in its load and a `call_tool` call is unwrapped into the named tool right after the answer,
+  so the tool list never changes inside a conversation (measured: mid-turn skill-load calls 42 % → 77 % cached,
+  uncached input −20 %). Both settings are stamped at creation: a conversation stored before this release keeps the
+  native delivery and unloads nothing. A host keeps the old behaviour for new conversations with `'toolDelivery' =>
+  'native'` and `'dropColdSkillsAtCompactionRebase' => false` in its `config/app/AI/contextRetention.php` (a host that
+  replaces that file without the keys gets the built-in defaults `callTool` / `true`). Console and eval arms
+  `--tool-delivery`, `--drop-cold-skills-at-rebase`; `RequestSnapshot::$toolDelivery` records each call; the working
+  state records `coldCapabilityDrops`. Details: the context skill, `tool-delivery-and-cold-skill-drop.md`.
+- Changed: the turn-initiator SQL condition is shared (`AIConversationMessagesService::buildTurnInitiatorPredicateSql()`
+  and `buildTurnInitiatorPredicateParameters()`).
 - Fixed (web): an `Image` or `ImageGroup` inside a `Pressable` opens no lightbox and the group shows no carousel
   controls; the whole tile is the one control (before, a click on the picture opened it full size and React logged a
   button inside a button).

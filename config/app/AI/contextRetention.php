@@ -13,6 +13,11 @@ declare(strict_types=1);
  * (append-only skill rows inside a prefix epoch, Responses API only; a Chat Completions model falls back to the swap).
  * `rebuildEpochOnSituationChange`, `stateChangeDelivery` (`everyCall` / `onceWhenChanged`),
  * `appendOnlyReachableToolSetCeilingTokens` and `previousReasoningCapTokens`: see the settings class.
+ * `toolDelivery` (`native` / `callTool` / `callToolJsonSchema`, append-only loading only): `callTool` declares the meta
+ * tools plus one fixed `call_tool(name, arguments)` and lists a loaded skill's tools as text in its load; `native`
+ * declares every tool. `dropColdSkillsAtCompactionRebase`: at the first model call after a compaction, skills unused for
+ * `unloadSkillAfterUnusedTurns` owner turns are unloaded once per epoch (needs `unloadGranularity: skill`). Both are
+ * stamped on a NEW conversation; a conversation stored without the stamp keeps `native` and unloads nothing.
  */
 return [
     'unloadGranularity' => 'skill',
@@ -21,4 +26,6 @@ return [
     'stateChangeDelivery' => 'onceWhenChanged',
     'appendOnlyReachableToolSetCeilingTokens' => 55000,
     'previousReasoningCapTokens' => 4000,
+    'toolDelivery' => 'callTool',
+    'dropColdSkillsAtCompactionRebase' => true,
 ];

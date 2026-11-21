@@ -174,6 +174,8 @@ class ContextRetentionSettingsOptionsTraitTest extends UnitTestCase
                 'skillLoadingStrategy' => ContextRetentionSettingsOptionsProbeCommand::OPTION_SKILL_LOADING_STRATEGY,
                 'rebuildEpochOnSituationChange' => ContextRetentionSettingsOptionsProbeCommand::OPTION_REBUILD_EPOCH_ON_SITUATION_CHANGE,
                 'stateChangeDelivery' => ContextRetentionSettingsOptionsProbeCommand::OPTION_STATE_CHANGE_DELIVERY,
+                'toolDelivery' => ContextRetentionSettingsOptionsProbeCommand::OPTION_TOOL_DELIVERY,
+                'dropColdSkillsAtCompactionRebase' => ContextRetentionSettingsOptionsProbeCommand::OPTION_DROP_COLD_SKILLS_AT_REBASE,
             ],
             $constants['CONTEXT_RETENTION_CHOICE_OPTION_NAMES_BY_FIELD']
         );

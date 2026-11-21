@@ -1828,7 +1828,7 @@ class AIConversationMessagesService extends EntitiesService
 
     /**
      * The indexes of the turn initiators BELOW the loaded tail of `$conversation` — the owner turns a compaction cover
-     * stands for. One query with the predicate of {@see findTurnInitiatorIndexOfConversationId()}; empty for a
+     * stands for. One query with the turn-initiator predicate ({@see buildTurnInitiatorPredicateSql()}); empty for a
      * conversation without an id, without loaded rows, or whose tail starts at the first row.
      *
      * @return int[]
@@ -1853,23 +1853,44 @@ class AIConversationMessagesService extends EntitiesService
         $initiatorIndexes = EntityManagerFactory::getInstance()->getConnection()->fetchFirstColumn(
             "SELECT `indexInConversation` FROM `$tableName` WHERE `aiConversationId` = :aiConversationId AND `truncatedAt` IS NULL"
             . ' AND `indexInConversation` < :oldestLoadedIndex'
-            . ' AND ((`role` = :userRole AND (`authorType` = :userAuthor OR `authorType` IS NULL'
-            . ' OR (`authorType` = :orchestratorAuthor AND `messageType` = :textType AND `indexInConversation` = 0)))'
-            . ' OR (`messageType` = :signalType AND `signalSource` IN (:initiatorSignalSources)))'
+            . ' AND ' . $this->buildTurnInitiatorPredicateSql()
             . ' ORDER BY `indexInConversation` ASC',
-            [
-                'aiConversationId' => (int)$conversation->id,
-                'oldestLoadedIndex' => $oldestLoadedIndex,
-                'userRole' => AIConversationMessage::ROLE_USER,
-                'userAuthor' => AIConversationMessage::AUTHOR_USER,
-                'orchestratorAuthor' => AIConversationMessage::AUTHOR_AGENT,
-                'textType' => AIConversationMessage::MESSAGE_TEXT,
-                'signalType' => AIConversationMessage::MESSAGE_SIGNAL,
-                'initiatorSignalSources' => ConversationSignalSources::getValuesThatStartATurn(),
-            ],
+            array_merge(
+                ['aiConversationId' => (int)$conversation->id, 'oldestLoadedIndex' => $oldestLoadedIndex],
+                $this->buildTurnInitiatorPredicateParameters()
+            ),
             ['initiatorSignalSources' => ArrayParameterType::STRING]
         );
         return array_map('intval', $initiatorIndexes);
+    }
+
+    /**
+     * The SQL condition of a turn-initiator row: an owner row (or a legacy user row), the orchestrator's task that opens a
+     * delegation child's turn (the AUTHOR_AGENT TEXT at index 0), or a signal whose source starts a turn — the SQL twin
+     * of {@see AIConversationMessage::isOwnerOrLegacyUserRoleRow()}. Its parameters: {@see buildTurnInitiatorPredicateParameters()}.
+     */
+    protected function buildTurnInitiatorPredicateSql(): string
+    {
+        return '((`role` = :userRole AND (`authorType` = :userAuthor OR `authorType` IS NULL'
+            . ' OR (`authorType` = :orchestratorAuthor AND `messageType` = :textType AND `indexInConversation` = 0)))'
+            . ' OR (`messageType` = :signalType AND `signalSource` IN (:initiatorSignalSources)))';
+    }
+
+    /**
+     * The parameters of {@see buildTurnInitiatorPredicateSql()}; `initiatorSignalSources` is bound as a string list.
+     *
+     * @return array<string, mixed>
+     */
+    protected function buildTurnInitiatorPredicateParameters(): array
+    {
+        return [
+            'userRole' => AIConversationMessage::ROLE_USER,
+            'userAuthor' => AIConversationMessage::AUTHOR_USER,
+            'orchestratorAuthor' => AIConversationMessage::AUTHOR_AGENT,
+            'textType' => AIConversationMessage::MESSAGE_TEXT,
+            'signalType' => AIConversationMessage::MESSAGE_SIGNAL,
+            'initiatorSignalSources' => ConversationSignalSources::getValuesThatStartATurn(),
+        ];
     }
 
     /** @throws \Doctrine\DBAL\Exception */
@@ -1880,21 +1901,10 @@ class AIConversationMessagesService extends EntitiesService
         $initiatorIndex = $connection->fetchOne(
             "SELECT MAX(`indexInConversation`) FROM `$tableName` WHERE `aiConversationId` = :aiConversationId AND `truncatedAt` IS NULL"
             . ($atOrBeforeIndex !== null ? ' AND `indexInConversation` <= :atOrBeforeIndex' : '')
-            // the orchestrator's task opens a delegation child's turn too (the AUTHOR_AGENT TEXT at index 0) —
-            // the SQL twin of AIConversationMessage::isOwnerOrLegacyUserRoleRow()
-            . ' AND ((`role` = :userRole AND (`authorType` = :userAuthor OR `authorType` IS NULL'
-            . ' OR (`authorType` = :orchestratorAuthor AND `messageType` = :textType AND `indexInConversation` = 0)))'
-            . ' OR (`messageType` = :signalType AND `signalSource` IN (:initiatorSignalSources)))',
+            . ' AND ' . $this->buildTurnInitiatorPredicateSql(),
             array_merge(
-                [
-                    'aiConversationId' => $aiConversationId,
-                    'userRole' => AIConversationMessage::ROLE_USER,
-                    'userAuthor' => AIConversationMessage::AUTHOR_USER,
-                    'orchestratorAuthor' => AIConversationMessage::AUTHOR_AGENT,
-                    'textType' => AIConversationMessage::MESSAGE_TEXT,
-                    'signalType' => AIConversationMessage::MESSAGE_SIGNAL,
-                    'initiatorSignalSources' => ConversationSignalSources::getValuesThatStartATurn(),
-                ],
+                ['aiConversationId' => $aiConversationId],
+                $this->buildTurnInitiatorPredicateParameters(),
                 $atOrBeforeIndex !== null ? ['atOrBeforeIndex' => $atOrBeforeIndex] : []
             ),
             ['initiatorSignalSources' => ArrayParameterType::STRING]
