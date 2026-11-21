@@ -1835,6 +1835,8 @@ class AIConversationsService extends EntitiesService
     {
         $contextRetentionSettings = $this->keepStampedRebuildEpochOnSituationChange($conversation, $contextRetentionSettings);
         $contextRetentionSettings = $this->keepStampedStateChangeDelivery($conversation, $contextRetentionSettings);
+        $contextRetentionSettings = $this->keepStampedToolDelivery($conversation, $contextRetentionSettings);
+        $contextRetentionSettings = $this->keepStampedDropColdSkillsAtCompactionRebase($conversation, $contextRetentionSettings);
         $storedSkillLoadingStrategy = isset($conversation->contextRetentionSettings)
             ? ContextRetentionSettings::canonicalSkillLoadingStrategy($conversation->contextRetentionSettings->skillLoadingStrategy)
             : null;
@@ -1877,6 +1879,50 @@ class AIConversationsService extends EntitiesService
             );
         }
         $updatedSettings->rebuildEpochOnSituationChange = $requestedRebuildEpochOnSituationChange ?? $storedRebuildEpochOnSituationChange;
+        return $updatedSettings;
+    }
+
+    /**
+     * The same rule for {@see ContextRetentionSettings::$toolDelivery}: the stored history's tool calls are rendered by
+     * it, so an update that leaves it unset keeps the stored value, and a different value is refused once the
+     * conversation made a model call. A conversation without a stamp (created before the setting existed) runs on the
+     * native delivery: after its first model call only `native` is accepted.
+     *
+     * @throws BadRequestException a change after the conversation's first model call
+     */
+    protected function keepStampedToolDelivery(AIConversation $conversation, ?ContextRetentionSettings $contextRetentionSettings): ?ContextRetentionSettings
+    {
+        $requestedToolDelivery = $contextRetentionSettings !== null ? ContextRetentionSettings::canonicalToolDelivery($contextRetentionSettings->toolDelivery) : null;
+        $storedToolDelivery = isset($conversation->contextRetentionSettings)
+            ? ContextRetentionSettings::canonicalToolDelivery($conversation->contextRetentionSettings->toolDelivery)
+            : null;
+        if ($storedToolDelivery === null && $requestedToolDelivery === null) {
+            return $contextRetentionSettings;
+        }
+        $toolDeliveryInEffect = $storedToolDelivery ?? ContextRetentionSettings::TOOL_DELIVERY_NATIVE;
+        if ($requestedToolDelivery !== null && $requestedToolDelivery !== $toolDeliveryInEffect && $this->conversationHasModelCall($conversation)) {
+            throw new BadRequestException(
+                'toolDelivery cannot change after the conversation\'s first model call (in effect: ' . $toolDeliveryInEffect . ')'
+            );
+        }
+        $updatedSettings = $contextRetentionSettings !== null ? clone $contextRetentionSettings : new ContextRetentionSettings();
+        $updatedSettings->toolDelivery = $requestedToolDelivery ?? $storedToolDelivery;
+        return $updatedSettings;
+    }
+
+    /**
+     * {@see ContextRetentionSettings::$dropColdSkillsAtCompactionRebase} survives an update that leaves it unset. A
+     * different value is accepted at any time: the rule acts at a compaction rebase only, and what an epoch dropped is
+     * recorded in the working state.
+     */
+    protected function keepStampedDropColdSkillsAtCompactionRebase(AIConversation $conversation, ?ContextRetentionSettings $contextRetentionSettings): ?ContextRetentionSettings
+    {
+        $storedDropColdSkillsAtCompactionRebase = isset($conversation->contextRetentionSettings) ? $conversation->contextRetentionSettings->dropColdSkillsAtCompactionRebase : null;
+        if ($storedDropColdSkillsAtCompactionRebase === null || ($contextRetentionSettings !== null && $contextRetentionSettings->dropColdSkillsAtCompactionRebase !== null)) {
+            return $contextRetentionSettings;
+        }
+        $updatedSettings = $contextRetentionSettings !== null ? clone $contextRetentionSettings : new ContextRetentionSettings();
+        $updatedSettings->dropColdSkillsAtCompactionRebase = $storedDropColdSkillsAtCompactionRebase;
         return $updatedSettings;
     }
 

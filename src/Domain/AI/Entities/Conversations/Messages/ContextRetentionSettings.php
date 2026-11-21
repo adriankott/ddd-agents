@@ -89,6 +89,21 @@ class ContextRetentionSettings extends ValueObject
     /** @var string[] The state-change deliveries. */
     public const array STATE_CHANGE_DELIVERIES = [self::STATE_CHANGE_DELIVERY_EVERY_CALL, self::STATE_CHANGE_DELIVERY_ONCE_WHEN_CHANGED];
 
+    /** A loaded skill's tools are declared to the model as tools of their own (top-level or an `additional_tools` item). */
+    public const string TOOL_DELIVERY_NATIVE = 'native';
+
+    /**
+     * The top-level tools stay the meta tools plus the one fixed `call_tool`; a loaded skill's tools reach the model as
+     * signature text in the developer message of the load and are called through `call_tool`.
+     */
+    public const string TOOL_DELIVERY_CALL_TOOL = 'callTool';
+
+    /** {@see TOOL_DELIVERY_CALL_TOOL} with each tool's JSON schema as the text instead of its compact signature. */
+    public const string TOOL_DELIVERY_CALL_TOOL_JSON_SCHEMA = 'callToolJsonSchema';
+
+    /** @var string[] Every value of {@see $toolDelivery} */
+    public const array TOOL_DELIVERIES = [self::TOOL_DELIVERY_NATIVE, self::TOOL_DELIVERY_CALL_TOOL, self::TOOL_DELIVERY_CALL_TOOL_JSON_SCHEMA];
+
     /** @var bool|null Force the whole footprint layer on/off for THIS conversation (null = on, the default). */
     public ?bool $enabled = null;
 
@@ -136,6 +151,26 @@ class ContextRetentionSettings extends ValueObject
      * conversation made a model call, inherited by its sub-agents. Null = the global default.
      */
     public ?string $stateChangeDelivery = null;
+
+    /**
+     * @var string|null Under {@see SKILL_LOADING_STRATEGY_CONVERSATION_APPEND}: how the tools of a loaded skill reach the
+     * model — one of {@see TOOL_DELIVERIES}. STAMPED at the conversation's creation like {@see $skillLoadingStrategy}
+     * (conversation request → purpose `contextRetention:` map → the global default `AI.contextRetention.toolDelivery`,
+     * built-in {@see TOOL_DELIVERY_CALL_TOOL}), frozen once the conversation made a model call (the history's calls are
+     * rendered by it), inherited by its sub-agents. Null = a conversation created before the setting existed: it stays
+     * on {@see TOOL_DELIVERY_NATIVE}, whatever the global default is. Inert under the system-prompt swap.
+     */
+    public ?string $toolDelivery = null;
+
+    /**
+     * @var bool|null Under {@see SKILL_LOADING_STRATEGY_CONVERSATION_APPEND}: true = at the first model call after a
+     * compaction changed the cover, the skills unused for {@see $unloadSkillAfterUnusedTurns} owner turns are unloaded
+     * and the new prefix epoch does not carry them (one `load_skills` brings a skill back). STAMPED at the
+     * conversation's creation (conversation request → purpose `contextRetention:` map → the global default
+     * `AI.contextRetention.dropColdSkillsAtCompactionRebase`, built-in true). Null = a conversation created before the
+     * setting existed: nothing is unloaded, as before.
+     */
+    public ?bool $dropColdSkillsAtCompactionRebase = null;
 
     // --- Phase 1 — tool-result clearing (LIVE) ---
 
@@ -376,6 +411,80 @@ class ContextRetentionSettings extends ValueObject
         return self::STATE_CHANGE_DELIVERY_EVERY_CALL;
     }
 
+    /**
+     * The tool delivery in effect for this conversation: the stamped value. A conversation without a stamp was created
+     * before the setting existed and stays on {@see TOOL_DELIVERY_NATIVE} — the global default is read at a
+     * conversation's creation only ({@see buildForNewConversation()}), so a change of the default never switches the
+     * delivery inside a stored history.
+     */
+    public function getToolDelivery(): string
+    {
+        return self::canonicalToolDelivery($this->toolDelivery) ?? self::TOOL_DELIVERY_NATIVE;
+    }
+
+    /** Whether a loaded skill's tools are called through the one fixed `call_tool` (either text form). */
+    public function deliversToolsThroughCallTool(): bool
+    {
+        return $this->usesConversationAppend() && $this->getToolDelivery() !== self::TOOL_DELIVERY_NATIVE;
+    }
+
+    /** One of {@see TOOL_DELIVERIES} (any case, surrounding blanks) → the constant; anything else → null (= inherit). */
+    public static function canonicalToolDelivery(?string $value): ?string
+    {
+        $normalized = strtolower(trim((string)$value));
+        foreach (self::TOOL_DELIVERIES as $toolDelivery) {
+            if ($normalized === strtolower($toolDelivery)) {
+                return $toolDelivery;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The GLOBAL default a NEW conversation is stamped with ({@see $toolDelivery}): `AI.contextRetention.toolDelivery`
+     * from the committed config only; absent or unknown = {@see TOOL_DELIVERY_CALL_TOOL}. Never throws.
+     */
+    public static function resolveDefaultToolDelivery(): string
+    {
+        try {
+            $configured = Config::get(self::CONFIG_KEY);
+            $fromConfig = is_array($configured) ? self::canonicalToolDelivery(is_string($configured['toolDelivery'] ?? null) ? $configured['toolDelivery'] : null) : null;
+            if ($fromConfig !== null) {
+                return $fromConfig;
+            }
+        } catch (Throwable) {
+            // no config file — the built-in default
+        }
+        return self::TOOL_DELIVERY_CALL_TOOL;
+    }
+
+    /**
+     * Whether the skills unused for the configured owner turns leave at a compaction rebase (append-only loading only):
+     * the stamped value. A conversation without a stamp was created before the setting existed and unloads nothing.
+     */
+    public function dropsColdSkillsAtCompactionRebase(): bool
+    {
+        return $this->usesConversationAppend() && ($this->dropColdSkillsAtCompactionRebase ?? false);
+    }
+
+    /**
+     * The GLOBAL default a NEW conversation is stamped with ({@see $dropColdSkillsAtCompactionRebase}):
+     * `AI.contextRetention.dropColdSkillsAtCompactionRebase` from the committed config only; absent or not a boolean =
+     * true. Never throws.
+     */
+    public static function resolveDefaultDropColdSkillsAtCompactionRebase(): bool
+    {
+        try {
+            $configured = Config::get(self::CONFIG_KEY);
+            if (is_array($configured) && is_bool($configured['dropColdSkillsAtCompactionRebase'] ?? null)) {
+                return $configured['dropColdSkillsAtCompactionRebase'];
+            }
+        } catch (Throwable) {
+            // no config file — the built-in default
+        }
+        return true;
+    }
+
     /** `systemPromptSwap` / `conversationAppend` (any case, surrounding blanks) → the constant; anything else → null (= inherit). */
     public static function canonicalSkillLoadingStrategy(?string $value): ?string
     {
@@ -481,14 +590,19 @@ class ContextRetentionSettings extends ValueObject
      * is left unstamped: the run stamps it with the wire API of its model before its first call
      * ({@see \DDD\Domain\AI\Services\Conversations\AIConversationsService::stampCreationSettingsOfUnstampedConversation()}),
      * so a creation path that does not know the model (the console chat, an evaluation run) never stamps a strategy the
-     * model cannot run. Pure; the argument is not changed.
+     * model cannot run. {@see $toolDelivery} and {@see $dropColdSkillsAtCompactionRebase} are always stamped here
+     * (`$requestedToolDelivery` / `$requestedDropColdSkillsAtCompactionRebase`, then the settings' value, then the global
+     * default) — a conversation that carries neither stamp predates them and keeps the native delivery without
+     * unloading. Pure; the argument is not changed.
      */
     public static function buildForNewConversation(
         ?self $requestedSettings,
         ?string $requestedSkillLoadingStrategy,
         ?bool $requestedRebuildEpochOnSituationChange = null,
         ?string $requestedStateChangeDelivery = null,
-        ?string $agentWireApi = null
+        ?string $agentWireApi = null,
+        ?string $requestedToolDelivery = null,
+        ?bool $requestedDropColdSkillsAtCompactionRebase = null
     ): self {
         $settingsForNewConversation = $requestedSettings !== null ? clone $requestedSettings : new static();
         $settingsForNewConversation->skillLoadingStrategy = self::canonicalSkillLoadingStrategy($requestedSkillLoadingStrategy)
@@ -500,6 +614,12 @@ class ContextRetentionSettings extends ValueObject
         $settingsForNewConversation->stateChangeDelivery = self::canonicalStateChangeDelivery($requestedStateChangeDelivery)
             ?? self::canonicalStateChangeDelivery($settingsForNewConversation->stateChangeDelivery)
             ?? self::resolveDefaultStateChangeDelivery();
+        $settingsForNewConversation->toolDelivery = self::canonicalToolDelivery($requestedToolDelivery)
+            ?? self::canonicalToolDelivery($settingsForNewConversation->toolDelivery)
+            ?? self::resolveDefaultToolDelivery();
+        $settingsForNewConversation->dropColdSkillsAtCompactionRebase = $requestedDropColdSkillsAtCompactionRebase
+            ?? $settingsForNewConversation->dropColdSkillsAtCompactionRebase
+            ?? self::resolveDefaultDropColdSkillsAtCompactionRebase();
         return $settingsForNewConversation;
     }
 
@@ -511,7 +631,7 @@ class ContextRetentionSettings extends ValueObject
     public function isOnlyTheSkillLoadingStrategyStamp(): bool
     {
         foreach ((new ReflectionClass(self::class))->getProperties(ReflectionProperty::IS_PUBLIC) as $knobProperty) {
-            if ($knobProperty->isStatic() || $knobProperty->getDeclaringClass()->getName() !== self::class || in_array($knobProperty->getName(), ['skillLoadingStrategy', 'rebuildEpochOnSituationChange', 'stateChangeDelivery'], true)) {
+            if ($knobProperty->isStatic() || $knobProperty->getDeclaringClass()->getName() !== self::class || in_array($knobProperty->getName(), ['skillLoadingStrategy', 'rebuildEpochOnSituationChange', 'stateChangeDelivery', 'toolDelivery', 'dropColdSkillsAtCompactionRebase'], true)) {
                 continue;
             }
             if ($knobProperty->isInitialized($this) && $knobProperty->getValue($this) !== null) {

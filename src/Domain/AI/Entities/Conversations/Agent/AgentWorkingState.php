@@ -328,6 +328,40 @@ class AgentWorkingState extends ValueObject
      */
     public array $securityFilteredOwnerMessageIndexes = [];
 
+    /**
+     * @var array<int, array{epochStartIndex: int, afterMessageIndex: int, names: string[]}> The cold unloadings of an
+     *      append-only conversation, one per compaction cover that met a model call
+     *      ({@see \DDD\Domain\AI\Entities\Conversations\Messages\ContextRetentionSettings::$dropColdSkillsAtCompactionRebase}):
+     *      the prefix epoch's start index, the newest history row at that moment, and the capabilities (skills and tools)
+     *      that left — [] when none was cold. The epoch's base set and its history items are rendered without them.
+     *      Persisted via {@see \DDD\Domain\AI\Services\Conversations\AIConversationsService::persistAgentWorkingStateSlice()}.
+     */
+    public array $coldCapabilityDrops = [];
+
+    /** @return array{epochStartIndex: int, afterMessageIndex: int, names: string[]}|null the recorded cold unloading of the epoch starting at `$epochStartIndex` */
+    public function findColdCapabilityDropOfEpoch(int $epochStartIndex): ?array
+    {
+        foreach ($this->coldCapabilityDrops as $coldCapabilityDrop) {
+            if ($coldCapabilityDrop['epochStartIndex'] === $epochStartIndex) {
+                return $coldCapabilityDrop;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Record the cold unloading of the epoch starting at `$epochStartIndex` (once per epoch; a second record is ignored).
+     *
+     * @param string[] $capabilityNames
+     */
+    public function recordColdCapabilityDrop(int $epochStartIndex, int $afterMessageIndex, array $capabilityNames): void
+    {
+        if ($this->findColdCapabilityDropOfEpoch($epochStartIndex) !== null) {
+            return;
+        }
+        $this->coldCapabilityDrops[] = ['epochStartIndex' => $epochStartIndex, 'afterMessageIndex' => $afterMessageIndex, 'names' => array_values($capabilityNames)];
+    }
+
     public function isOwnerMessageSecurityFiltered(?int $messageIndex): bool
     {
         return $messageIndex !== null && in_array($messageIndex, $this->securityFilteredOwnerMessageIndexes, true);
@@ -419,6 +453,7 @@ class AgentWorkingState extends ValueObject
         'securityFilteredOwnerMessageIndexes',
         'platformWrittenOwnerMessageIndexes',
         'voiceTranscriptOwnerMessageIndexes',
+        'coldCapabilityDrops',
     ];
 
     /** @return array<string, mixed> */
@@ -463,6 +498,7 @@ class AgentWorkingState extends ValueObject
                 'securityFilteredOwnerMessageIndexes' => $this->securityFilteredOwnerMessageIndexes,
                 'platformWrittenOwnerMessageIndexes' => $this->platformWrittenOwnerMessageIndexes,
                 'voiceTranscriptOwnerMessageIndexes' => $this->voiceTranscriptOwnerMessageIndexes,
+                'coldCapabilityDrops' => $this->coldCapabilityDrops,
                 default => throw new \InvalidArgumentException('Not a top-level key of the agent working state: ' . $key),
             };
         }
@@ -569,6 +605,17 @@ class AgentWorkingState extends ValueObject
             'intval',
             array_filter((array)($repoArray['voiceTranscriptOwnerMessageIndexes'] ?? []), 'is_numeric')
         ));
+        $this->coldCapabilityDrops = [];
+        foreach (is_array($repoArray['coldCapabilityDrops'] ?? null) ? $repoArray['coldCapabilityDrops'] : [] as $coldCapabilityDropRow) {
+            if (!is_array($coldCapabilityDropRow) || !is_numeric($coldCapabilityDropRow['epochStartIndex'] ?? null)) {
+                continue;
+            }
+            $this->coldCapabilityDrops[] = [
+                'epochStartIndex' => (int)$coldCapabilityDropRow['epochStartIndex'],
+                'afterMessageIndex' => (int)($coldCapabilityDropRow['afterMessageIndex'] ?? -1),
+                'names' => array_values(array_map('strval', is_array($coldCapabilityDropRow['names'] ?? null) ? $coldCapabilityDropRow['names'] : [])),
+            ];
+        }
         $this->ownerConsentUses = is_array($repoArray['ownerConsentUses'] ?? null) && $repoArray['ownerConsentUses'] !== []
             ? OwnerConsentUses::fromRepositoryObject($repoArray['ownerConsentUses'])
             : null;

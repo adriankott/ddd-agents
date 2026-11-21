@@ -49,13 +49,13 @@ class LoadSkillsTool extends ValueObject implements AgentMetaTool
      * @param string[] $loadedSkillNames the skills loaded before the call
      * @param string[] $callableToolNames the loaded skills' tools the model can call now
      */
-    public static function buildResultOfCallNamingNoSkill(array $loadedSkillNames, array $callableToolNames): string
+    public static function buildResultOfCallNamingNoSkill(array $loadedSkillNames, array $callableToolNames, bool $toolsAreCalledThroughCallTool = false): string
     {
         if ($loadedSkillNames === [] || $callableToolNames === []) {
             return self::RESULT_WITHOUT_SKILL_NAMES;
         }
-        return 'Nothing was loaded: `skill_names` named no skill. ' . self::renderLoadedSkillsWithTheirTools($loadedSkillNames, $callableToolNames)
-            . ' Call the tool the request needs directly NOW. `' . self::NAME . '` takes only a skill that is not loaded yet, named exactly as '
+        return 'Nothing was loaded: `skill_names` named no skill. ' . self::renderLoadedSkillsWithTheirTools($loadedSkillNames, $callableToolNames, $toolsAreCalledThroughCallTool)
+            . ' Call the tool the request needs ' . self::renderHowAToolIsCalled($toolsAreCalledThroughCallTool) . ' NOW. `' . self::NAME . '` takes only a skill that is not loaded yet, named exactly as '
             . '"Available skills" or the sub-skill list of a loaded skill states it; never call it with an empty list.';
     }
 
@@ -69,17 +69,17 @@ class LoadSkillsTool extends ValueObject implements AgentMetaTool
      * @param string[] $loadedSkillNames the skills loaded before the call
      * @param string[] $callableToolNames the loaded skills' tools the model can call now
      */
-    public static function buildResultOfRepeatedCall(int $identicalCallCount, array $loadedSkillNames, array $callableToolNames): ?string
+    public static function buildResultOfRepeatedCall(int $identicalCallCount, array $loadedSkillNames, array $callableToolNames, bool $toolsAreCalledThroughCallTool = false): ?string
     {
         if ($loadedSkillNames === [] || $callableToolNames === []) {
             return null;
         }
         return sprintf(
             'NOT executed: you have called `%s` with these exact arguments %d times and it loads nothing more. %s Call the tool the '
-                . 'request needs directly NOW, or answer if the request needs no tool. Do not repeat this `%s` call.',
+                . 'request needs ' . self::renderHowAToolIsCalled($toolsAreCalledThroughCallTool) . ' NOW, or answer if the request needs no tool. Do not repeat this `%s` call.',
             self::NAME,
             $identicalCallCount,
-            self::renderLoadedSkillsWithTheirTools($loadedSkillNames, $callableToolNames),
+            self::renderLoadedSkillsWithTheirTools($loadedSkillNames, $callableToolNames, $toolsAreCalledThroughCallTool),
             self::NAME
         );
     }
@@ -94,7 +94,7 @@ class LoadSkillsTool extends ValueObject implements AgentMetaTool
      * @param string[] $loadedSkillNames the skills loaded before the call
      * @param string[] $callableToolNames the loaded skills' tools the model could call
      */
-    public static function buildResultOfRepeatedCallBeforeAStepWithoutTools(int $identicalCallCount, array $loadedSkillNames, array $callableToolNames): ?string
+    public static function buildResultOfRepeatedCallBeforeAStepWithoutTools(int $identicalCallCount, array $loadedSkillNames, array $callableToolNames, bool $toolsAreCalledThroughCallTool = false): ?string
     {
         if ($loadedSkillNames === [] || $callableToolNames === []) {
             return null;
@@ -106,7 +106,7 @@ class LoadSkillsTool extends ValueObject implements AgentMetaTool
                 . 'that you lack access or that it is unavailable.',
             self::NAME,
             $identicalCallCount,
-            self::renderLoadedSkillsWithTheirTools($loadedSkillNames, $callableToolNames)
+            self::renderLoadedSkillsWithTheirTools($loadedSkillNames, $callableToolNames, $toolsAreCalledThroughCallTool)
         );
     }
 
@@ -116,13 +116,24 @@ class LoadSkillsTool extends ValueObject implements AgentMetaTool
      * @param string[] $loadedSkillNames
      * @param string[] $callableToolNames
      */
-    protected static function renderLoadedSkillsWithTheirTools(array $loadedSkillNames, array $callableToolNames): string
+    protected static function renderLoadedSkillsWithTheirTools(array $loadedSkillNames, array $callableToolNames, bool $toolsAreCalledThroughCallTool = false): string
     {
         $callableToolNames = array_values(array_unique($callableToolNames));
         $listedToolNames = array_slice($callableToolNames, 0, self::MAX_TOOL_NAMES_LISTED_IN_A_RESULT);
         $unlistedToolCount = count($callableToolNames) - count($listedToolNames);
-        return 'Loaded right now: ' . implode(', ', $loadedSkillNames) . ' — their tools are ALREADY in your tool list ('
+        return 'Loaded right now: ' . implode(', ', $loadedSkillNames) . ' — their tools are ALREADY '
+            . ($toolsAreCalledThroughCallTool ? 'listed in this conversation' : 'in your tool list') . ' ('
             . implode(', ', $listedToolNames) . ($unlistedToolCount > 0 ? ' and ' . $unlistedToolCount . ' more' : '') . ').';
+    }
+
+    /**
+     * How a text tells the model to call a tool of a loaded skill: `directly` when the tool is declared, through
+     * `call_tool` when the loaded skills' tools are listed as text
+     * ({@see \DDD\Domain\AI\Entities\Conversations\Agent\Wire\AgentCallToolDelivery}).
+     */
+    public static function renderHowAToolIsCalled(bool $toolsAreCalledThroughCallTool): string
+    {
+        return $toolsAreCalledThroughCallTool ? 'through `call_tool`' : 'directly';
     }
 
     /**
@@ -148,6 +159,17 @@ class LoadSkillsTool extends ValueObject implements AgentMetaTool
 
     /** What the catalog line of a loaded skill says between its name and its description ({@see renderCatalogLineOfLoadedSkill()}). */
     public const string CATALOG_LINE_LOADED_MARK = 'LOADED, its tools are in your tool list — ';
+
+    /** {@see CATALOG_HEADER} of a conversation whose loaded skills' tools are listed as text and called through `call_tool`. */
+    public const string CATALOG_HEADER_CALL_TOOL = "\n\n# Available skills — load with load_skills when a request needs them\n"
+        . "This list names every skill, loaded or not. A skill marked LOADED, named under \"Loaded skills\", or announced as loaded later in this conversation is loaded: its tools are listed in this conversation — call them through `call_tool`, never load that skill again.\n";
+
+    /** {@see CATALOG_HEADER_WITHOUT_LOADED_MARKS} of such a conversation. */
+    public const string CATALOG_HEADER_WITHOUT_LOADED_MARKS_CALL_TOOL = "\n\n# Available skills — load with load_skills when a request needs them\n"
+        . "This list names every skill, loaded or not. A skill that \"Loaded skills\" names is loaded: its tools are listed in this conversation — call them through `call_tool`, never load that skill again.\n";
+
+    /** {@see CATALOG_LINE_LOADED_MARK} of such a conversation. */
+    public const string CATALOG_LINE_LOADED_MARK_CALL_TOOL = 'LOADED, its tools are listed in this conversation — ';
 
     /**
      * ONE catalog line: `- <name> — <description>` plus, for a ROOT, the sub-skills it unlocks (names only, no
@@ -182,10 +204,10 @@ class LoadSkillsTool extends ValueObject implements AgentMetaTool
      *
      * @param array<string, string> $toolSummaries tool name => one-line summary, for a sub-skill's line
      */
-    public static function renderCatalogLineOfLoadedSkill(AISkill $skill, array $toolSummaries = [], bool $namesSubSkills = true): string
+    public static function renderCatalogLineOfLoadedSkill(AISkill $skill, array $toolSummaries = [], bool $namesSubSkills = true, bool $toolsAreCalledThroughCallTool = false): string
     {
         $namePrefix = "- {$skill->name} — ";
-        return $namePrefix . self::CATALOG_LINE_LOADED_MARK . substr(self::renderCatalogLine($skill, $toolSummaries, $namesSubSkills), strlen($namePrefix));
+        return $namePrefix . ($toolsAreCalledThroughCallTool ? self::CATALOG_LINE_LOADED_MARK_CALL_TOOL : self::CATALOG_LINE_LOADED_MARK) . substr(self::renderCatalogLine($skill, $toolSummaries, $namesSubSkills), strlen($namePrefix));
     }
 
     /**
@@ -209,7 +231,8 @@ class LoadSkillsTool extends ValueObject implements AgentMetaTool
         ?AgentFeatureFlagsInterface $featureFlags = null,
         ?AgentAccountRightsInterface $accountRights = null,
         bool $topLevelOnly = false,
-        array $skillNamesOfTheLoadedSkillsBlock = []
+        array $skillNamesOfTheLoadedSkillsBlock = [],
+        bool $toolsAreCalledThroughCallTool = false
     ): string {
         $lines = [];
         $marksALoadedSkill = false;
@@ -224,7 +247,7 @@ class LoadSkillsTool extends ValueObject implements AgentMetaTool
                 : [];
             $namesSubSkills = !$topLevelOnly;
             if (in_array($skill->name, $skillNamesOfTheLoadedSkillsBlock, true)) {
-                $lines[] = self::renderCatalogLineOfLoadedSkill($skill, $toolSummaries, $namesSubSkills);
+                $lines[] = self::renderCatalogLineOfLoadedSkill($skill, $toolSummaries, $namesSubSkills, $toolsAreCalledThroughCallTool);
                 $marksALoadedSkill = true;
                 continue;
             }
@@ -232,6 +255,9 @@ class LoadSkillsTool extends ValueObject implements AgentMetaTool
         }
         if ($lines === []) {
             return '';
+        }
+        if ($toolsAreCalledThroughCallTool) {
+            return ($marksALoadedSkill ? self::CATALOG_HEADER_CALL_TOOL : self::CATALOG_HEADER_WITHOUT_LOADED_MARKS_CALL_TOOL) . implode("\n", $lines);
         }
         return ($marksALoadedSkill ? self::CATALOG_HEADER : self::CATALOG_HEADER_WITHOUT_LOADED_MARKS) . implode("\n", $lines);
     }
@@ -241,6 +267,9 @@ class LoadSkillsTool extends ValueObject implements AgentMetaTool
 
     /** @var string[] skills already loaded on this turn — excluded from the enum so the model cannot re-load them. */
     protected array $alreadyLoadedSkillNames = [];
+
+    /** Whether the loaded skills' tools are listed as text and called through `call_tool` — the description says how a loaded skill's tool is called. */
+    protected bool $toolsAreCalledThroughCallTool = false;
 
     public function __construct()
     {
@@ -253,11 +282,12 @@ class LoadSkillsTool extends ValueObject implements AgentMetaTool
      *   the model structurally cannot re-load a skill it already has (prompt-only "don't reload" hints are ignored by
      *   weak models). Their tools stay available via the loaded skills' ToolDefinitions; only re-loading is removed.
      */
-    public static function forCatalog(AISkills $catalog, array $alreadyLoadedSkillNames = []): static
+    public static function forCatalog(AISkills $catalog, array $alreadyLoadedSkillNames = [], bool $toolsAreCalledThroughCallTool = false): static
     {
         $tool = new static();
         $tool->catalog = $catalog;
         $tool->alreadyLoadedSkillNames = $alreadyLoadedSkillNames;
+        $tool->toolsAreCalledThroughCallTool = $toolsAreCalledThroughCallTool;
         return $tool;
     }
 
@@ -307,8 +337,8 @@ class LoadSkillsTool extends ValueObject implements AgentMetaTool
                 'name' => self::NAME,
                 'description' => 'Load one or more skills to gain their tools — pick from the "Available skills" list in '
                     . 'the system prompt or from the sub-skills a loaded skill lists. Call when the request needs '
-                    . 'capabilities not yet loaded. A skill already loaded is never loaded again — its tools are in your '
-                    . 'tool list: call them.',
+                    . 'capabilities not yet loaded. A skill already loaded is never loaded again — its tools are '
+                    . ($this->toolsAreCalledThroughCallTool ? 'listed in this conversation: call them through `call_tool`.' : 'in your tool list: call them.'),
                 'parameters' => [
                     'type' => 'object',
                     'required' => ['skill_names'],

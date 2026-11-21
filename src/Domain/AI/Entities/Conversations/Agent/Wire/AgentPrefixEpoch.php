@@ -86,6 +86,28 @@ class AgentPrefixEpoch
     public array $carriedConditionalMetaToolNames = [];
 
     /**
+     * @var string How a loaded skill's tools reach the model in this conversation
+     *      ({@see \DDD\Domain\AI\Entities\Conversations\Messages\ContextRetentionSettings::TOOL_DELIVERIES}).
+     */
+    public string $toolDelivery = \DDD\Domain\AI\Entities\Conversations\Messages\ContextRetentionSettings::TOOL_DELIVERY_NATIVE;
+
+    /**
+     * @var string[] The capabilities (skills and tools) unloaded as cold when this epoch's compaction cover first met a
+     *      model call; [] = none. They are no part of the base set, and a history row up to
+     *      {@see $coldDroppedAfterMessageIndex} renders none of them.
+     */
+    public array $coldDroppedCapabilityNames = [];
+
+    /** @var int|null The newest history row at the moment of that unloading; null = no unloading recorded. */
+    public ?int $coldDroppedAfterMessageIndex = null;
+
+    /** Whether a loaded skill's tools are listed as text and called through the one fixed `call_tool`. */
+    public function deliversToolsThroughCallTool(): bool
+    {
+        return $this->toolDelivery !== \DDD\Domain\AI\Entities\Conversations\Messages\ContextRetentionSettings::TOOL_DELIVERY_NATIVE;
+    }
+
+    /**
      * The conditional meta tools the model calls in `[$fromIndex, $beforeIndex)` appended (their request snapshots'
      * `appendedToolNames`), in history order.
      *

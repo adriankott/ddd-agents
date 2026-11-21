@@ -43,6 +43,8 @@ trait AgentEvalArmOptionsTrait
     public const string ARM_SKILL_LOADING_STRATEGY = 'skill-loading-strategy';
     public const string ARM_REBUILD_EPOCH_ON_SITUATION_CHANGE = 'rebuild-epoch-on-situation-change';
     public const string ARM_STATE_CHANGE_DELIVERY = 'state-change-delivery';
+    public const string ARM_TOOL_DELIVERY = 'tool-delivery';
+    public const string ARM_DROP_COLD_SKILLS_AT_REBASE = 'drop-cold-skills-at-rebase';
     /** A FLAG arm (no value): resolved by {@see resolveEvalArmOptions()} itself, passed to a child as the bare flag. */
     public const string ARM_STORE_SNAPSHOT = 'store-snapshot';
 
@@ -79,6 +81,8 @@ trait AgentEvalArmOptionsTrait
             self::ARM_SKILL_LOADING_STRATEGY => ContextRetentionSettings::SKILL_LOADING_STRATEGIES,
             self::ARM_REBUILD_EPOCH_ON_SITUATION_CHANGE => self::REBUILD_EPOCH_ON_SITUATION_CHANGE_ARM_VALUES,
             self::ARM_STATE_CHANGE_DELIVERY => ContextRetentionSettings::STATE_CHANGE_DELIVERIES,
+            self::ARM_TOOL_DELIVERY => ContextRetentionSettings::TOOL_DELIVERIES,
+            self::ARM_DROP_COLD_SKILLS_AT_REBASE => self::REBUILD_EPOCH_ON_SITUATION_CHANGE_ARM_VALUES,
         ];
     }
 
@@ -102,6 +106,8 @@ trait AgentEvalArmOptionsTrait
             ->addOption(self::ARM_SKILL_LOADING_STRATEGY, null, InputOption::VALUE_REQUIRED, 'How a loaded skill reaches the model: `' . implode('` | `', ContextRetentionSettings::SKILL_LOADING_STRATEGIES) . '`. Stamped at each conversation\'s creation. Not passed = the purpose\'s or the global default.')
             ->addOption(self::ARM_REBUILD_EPOCH_ON_SITUATION_CHANGE, null, InputOption::VALUE_REQUIRED, 'With append-only skill loading: `on` = a situation change starts a new prefix epoch, `off` = the change is appended. Stamped at each conversation\'s creation. Not passed = the purpose\'s or the global default.')
             ->addOption(self::ARM_STATE_CHANGE_DELIVERY, null, InputOption::VALUE_REQUIRED, 'How a change of a volatile value reaches the model: `' . implode('` | `', ContextRetentionSettings::STATE_CHANGE_DELIVERIES) . '`. Stamped at each conversation\'s creation. Not passed = the purpose\'s or the global default.')
+            ->addOption(self::ARM_TOOL_DELIVERY, null, InputOption::VALUE_REQUIRED, 'With append-only skill loading, how a loaded skill\'s tools reach the model: `' . implode('` | `', ContextRetentionSettings::TOOL_DELIVERIES) . '`. Set at each conversation\'s creation. Not passed = the global default.')
+            ->addOption(self::ARM_DROP_COLD_SKILLS_AT_REBASE, null, InputOption::VALUE_REQUIRED, 'With append-only skill loading: `on` = at the first model call after a compaction the skills unused for the configured owner turns are unloaded, `off` = every loaded skill is carried. Not passed = the global default.')
             ->addOption(self::ARM_STALL_RECOVERY, null, InputOption::VALUE_REQUIRED, 'The stall-recovery site: `on` | `off`. Not passed = the platform default.')
             ->addOption(self::ARM_STORE_SNAPSHOT, null, InputOption::VALUE_NONE, 'Store the full sent payload and the raw response of every model call of the run\'s conversations on their request snapshots.')
             ->addOption(self::ARM_FIXED_REASONING_EFFORT, null, InputOption::VALUE_REQUIRED, 'A fixed reasoning effort for every model call of the run: `low` | `medium` | `high` (the effort site is not asked, delegated conversations inherit it). Not passed = the platform resolves the effort.');
@@ -174,6 +180,10 @@ trait AgentEvalArmOptionsTrait
         $agentEvalArms->previousReasoningCapTokens = isset($arms[self::ARM_PREVIOUS_REASONING_CAP_TOKENS]) ? (int)$arms[self::ARM_PREVIOUS_REASONING_CAP_TOKENS] : null;
         $agentEvalArms->skillLoadingStrategy = $arms[self::ARM_SKILL_LOADING_STRATEGY] ?? null;
         $agentEvalArms->stateChangeDelivery = $arms[self::ARM_STATE_CHANGE_DELIVERY] ?? null;
+        $agentEvalArms->toolDelivery = $arms[self::ARM_TOOL_DELIVERY] ?? null;
+        $agentEvalArms->dropColdSkillsAtCompactionRebase = isset($arms[self::ARM_DROP_COLD_SKILLS_AT_REBASE])
+            ? $arms[self::ARM_DROP_COLD_SKILLS_AT_REBASE] === 'on'
+            : null;
         $agentEvalArms->rebuildEpochOnSituationChange = isset($arms[self::ARM_REBUILD_EPOCH_ON_SITUATION_CHANGE])
             ? $arms[self::ARM_REBUILD_EPOCH_ON_SITUATION_CHANGE] === 'on'
             : null;

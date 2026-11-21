@@ -1567,8 +1567,10 @@ class AIConversationMessage extends Entity
      *
      * @param array<string, mixed> $arguments
      * @param string[] $blockedToolNames
+     * @param bool $toolsAreCalledThroughCallTool whether the loaded skills' tools are listed as text and called through
+     * `call_tool` — the status line then never says "in your tool list" or "call them directly"
      */
-    public function loadSkillsFromToolArguments(array $arguments, array $blockedToolNames = []): string
+    public function loadSkillsFromToolArguments(array $arguments, array $blockedToolNames = [], bool $toolsAreCalledThroughCallTool = false): string
     {
         $requestedSkillNames = array_map('strval', is_array($arguments['skill_names'] ?? null) ? $arguments['skill_names'] : []);
         $priorLoadedSkillNames = $this->getLoadedCapabilities()?->getLoadedSkillNames() ?? [];
@@ -1605,7 +1607,9 @@ class AIConversationMessage extends Entity
                 $this->loadTools(...$restoredToolNames);
                 return 'Re-loaded: ' . implode(', ', $alreadyLoadedRequestedNames) . ' — restored tools: '
                     . implode(', ', $restoredToolNames)
-                    . '. They are in your tool list from the next step; call them directly NOW.';
+                    . ($toolsAreCalledThroughCallTool
+                        ? '. They are listed for you again from the next step; call them through `call_tool` NOW.'
+                        : '. They are in your tool list from the next step; call them directly NOW.');
             }
             // A skill only the PLATFORM loaded (a preload) and the model asks for the first time: answered like the load
             // it would have been without the preload — the model takes it over. "Already loaded" to its first own load
@@ -1626,8 +1630,10 @@ class AIConversationMessage extends Entity
                 // the tools are named: after the model's own load it is handed their definitions; after this takeover
                 // nothing new arrives, and a bare "loaded" made it load again
                 $takenOverToolNames = array_slice(array_values(array_unique($residentCallableToolNames)), 0, 12);
-                return 'Skills loaded: ' . implode(', ', $alreadyLoadedRequestedNames) . '. Their tools are in your tool list'
-                    . ($takenOverToolNames !== [] ? ' — ' . implode(', ', $takenOverToolNames) : '') . '. Call the one you need next.';
+                return 'Skills loaded: ' . implode(', ', $alreadyLoadedRequestedNames) . '. Their tools are '
+                    . ($toolsAreCalledThroughCallTool ? 'listed in this conversation' : 'in your tool list')
+                    . ($takenOverToolNames !== [] ? ' — ' . implode(', ', $takenOverToolNames) : '')
+                    . ($toolsAreCalledThroughCallTool ? '. Call the one you need next through `call_tool`.' : '. Call the one you need next.');
             }
             // Truly fully resident. Answering "Skills loaded" here bred an obedience loop: an agent steered to
             // "load X" kept re-loading on that confirmation until the byte-exact repeat guard aborted the whole
@@ -1635,9 +1641,10 @@ class AIConversationMessage extends Entity
             // sensible next move is the tool call — never another load.
             $residentCallableToolNames = array_slice(array_values(array_unique($residentCallableToolNames)), 0, 12);
             return 'Already loaded: ' . implode(', ', $alreadyLoadedRequestedNames)
-                . ' — the tools are ALREADY in your tool list'
+                . ($toolsAreCalledThroughCallTool ? ' — the tools are ALREADY listed in this conversation' : ' — the tools are ALREADY in your tool list')
                 . ($residentCallableToolNames !== [] ? ' (' . implode(', ', $residentCallableToolNames) . ')' : '')
-                . '. Call them directly NOW; never call load_skills for an already-loaded skill.';
+                . ($toolsAreCalledThroughCallTool ? '. Call them through `call_tool` NOW' : '. Call them directly NOW')
+                . '; never call load_skills for an already-loaded skill.';
         }
         // the answer says what THIS call did: a name that is no loadable skill loads nothing, whatever the message
         // already holds — answering it like a load is repeated until the repeat guard ends the turn
@@ -1677,7 +1684,7 @@ class AIConversationMessage extends Entity
      *
      * @param array<string, mixed> $arguments
      */
-    public function loadToolsFromToolArguments(array $arguments): string
+    public function loadToolsFromToolArguments(array $arguments, bool $toolsAreCalledThroughCallTool = false): string
     {
         $requestedToolNames = array_values(array_filter(
             array_map('strval', is_array($arguments['tool_names'] ?? null) ? $arguments['tool_names'] : []),
@@ -1697,7 +1704,8 @@ class AIConversationMessage extends Entity
             : '';
         if (array_diff($loadedToolNames, $priorLoadedToolNames) === []) {
             if ($alreadyResidentToolNames !== []) {
-                return 'Already in your tool list: ' . implode(', ', $alreadyResidentToolNames) . '. Call them directly NOW.'
+                return ($toolsAreCalledThroughCallTool ? 'Already listed in this conversation: ' : 'Already in your tool list: ') . implode(', ', $alreadyResidentToolNames)
+                    . ($toolsAreCalledThroughCallTool ? '. Call them through `call_tool` NOW.' : '. Call them directly NOW.')
                     . ($notLoadedSentence !== '' ? ' NOT loaded: ' . $notLoadedSentence : '');
             }
             return $notLoadedSentence !== '' ? 'Nothing was loaded: ' . $notLoadedSentence : 'No tools loaded.';
@@ -2514,7 +2522,10 @@ class AIConversationMessage extends Entity
         $toolCallEntry = (isset($this->toolCall) ? $this->toolCall : null)?->toOpenAiToolCallArray()
             ?? ['id' => '', 'type' => 'function', 'function' => ['name' => '', 'arguments' => '{}']];
         if ($stubArguments) {
-            $toolCallEntry['function']['arguments'] = '{"superseded":true}';
+            // a call made through `call_tool` keeps the tool's name: only the tool's own arguments are stubbed
+            $toolCallEntry['function']['arguments'] = isset($this->toolCall) && $this->toolCall->deliveredThroughCallTool
+                ? \DDD\Domain\AI\Entities\Conversations\Agent\Wire\AgentCallToolDelivery::buildWrappedArgumentsJson($this->toolCall->name ?? '', '{"superseded":true}')
+                : '{"superseded":true}';
         }
         return $toolCallEntry;
     }

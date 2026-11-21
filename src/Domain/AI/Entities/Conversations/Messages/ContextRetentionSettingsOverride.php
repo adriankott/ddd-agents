@@ -53,6 +53,12 @@ class ContextRetentionSettingsOverride extends ValueObject
     /** @var string|null {@see ContextRetentionSettings::$stateChangeDelivery}; null = not passed */
     public ?string $stateChangeDelivery = null;
 
+    /** @var string|null {@see ContextRetentionSettings::$toolDelivery}; null = not passed */
+    public ?string $toolDelivery = null;
+
+    /** @var bool|null {@see ContextRetentionSettings::$dropColdSkillsAtCompactionRebase}; null = not passed */
+    public ?bool $dropColdSkillsAtCompactionRebase = null;
+
     /** @var int|null {@see ContextRetentionSettings::$pressureBudgetTokens}; null = not passed */
     public ?int $pressureBudgetTokens = null;
 
@@ -86,6 +92,8 @@ class ContextRetentionSettingsOverride extends ValueObject
      * @param string|null $rebuildEpochOnSituationChange {@see SWITCH_ON} / {@see SWITCH_OFF}
      * @param string|null $stateChangeDelivery one of {@see ContextRetentionSettings::STATE_CHANGE_DELIVERIES}
      * @param array<string, string|null> $rawCountsByField raw thresholds by a field name of {@see COUNT_FIELDS}
+     * @param string|null $toolDelivery one of {@see ContextRetentionSettings::TOOL_DELIVERIES}
+     * @param string|null $dropColdSkillsAtCompactionRebase {@see SWITCH_ON} / {@see SWITCH_OFF}
      * @return static|null null when no value was passed
      * @throws SettingsOverrideValueRefusedException when a value is outside what its knob accepts, or a field name is unknown
      */
@@ -95,7 +103,9 @@ class ContextRetentionSettingsOverride extends ValueObject
         ?string $skillLoadingStrategy = null,
         ?string $rebuildEpochOnSituationChange = null,
         ?string $stateChangeDelivery = null,
-        array $rawCountsByField = []
+        array $rawCountsByField = [],
+        ?string $toolDelivery = null,
+        ?string $dropColdSkillsAtCompactionRebase = null
     ): ?static {
         $contextRetentionSettingsOverride = new static();
         $contextRetentionSettingsOverride->loadToolsOnSkillLoad = $loadToolsOnSkillLoad ? true : null;
@@ -118,6 +128,13 @@ class ContextRetentionSettingsOverride extends ValueObject
             ContextRetentionSettings::canonicalStateChangeDelivery($stateChangeDelivery),
             ContextRetentionSettings::STATE_CHANGE_DELIVERIES
         );
+        $contextRetentionSettingsOverride->toolDelivery = static::parseChoice(
+            'toolDelivery',
+            $toolDelivery,
+            ContextRetentionSettings::canonicalToolDelivery($toolDelivery),
+            ContextRetentionSettings::TOOL_DELIVERIES
+        );
+        $contextRetentionSettingsOverride->dropColdSkillsAtCompactionRebase = static::parseSwitch('dropColdSkillsAtCompactionRebase', $dropColdSkillsAtCompactionRebase);
         foreach ($rawCountsByField as $fieldName => $rawCount) {
             if (!in_array($fieldName, static::COUNT_FIELDS, true)) {
                 throw SettingsOverrideValueRefusedException::forFieldAndReason($fieldName, 'is no threshold of the context retention');
@@ -135,7 +152,8 @@ class ContextRetentionSettingsOverride extends ValueObject
     public function isEmpty(): bool
     {
         if ($this->loadToolsOnSkillLoad !== null || $this->unloadGranularity !== null || $this->skillLoadingStrategy !== null
-            || $this->rebuildEpochOnSituationChange !== null || $this->stateChangeDelivery !== null) {
+            || $this->rebuildEpochOnSituationChange !== null || $this->stateChangeDelivery !== null
+            || $this->toolDelivery !== null || $this->dropColdSkillsAtCompactionRebase !== null) {
             return false;
         }
         foreach (static::COUNT_FIELDS as $fieldName) {
@@ -172,6 +190,12 @@ class ContextRetentionSettingsOverride extends ValueObject
         }
         if ($this->stateChangeDelivery !== null) {
             $contextRetentionSettings->stateChangeDelivery = $this->stateChangeDelivery;
+        }
+        if ($this->toolDelivery !== null) {
+            $contextRetentionSettings->toolDelivery = $this->toolDelivery;
+        }
+        if ($this->dropColdSkillsAtCompactionRebase !== null) {
+            $contextRetentionSettings->dropColdSkillsAtCompactionRebase = $this->dropColdSkillsAtCompactionRebase;
         }
         foreach (static::COUNT_FIELDS as $fieldName) {
             if ($this->{$fieldName} !== null) {

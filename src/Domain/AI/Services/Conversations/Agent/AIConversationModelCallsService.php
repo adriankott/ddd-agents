@@ -20,6 +20,7 @@ use DDD\Domain\AI\Exceptions\AIModelCallTransportFailedException;
 use DDD\Domain\AI\Exceptions\AIModelCallFailedException;
 use DDD\Domain\AI\Entities\Conversations\Agent\Wire\AgentWireConfiguration;
 use DDD\Domain\AI\Entities\Conversations\Agent\Wire\AgentAppendOnlyCall;
+use DDD\Domain\AI\Entities\Conversations\Agent\Wire\AgentCallToolDelivery;
 use DDD\Domain\AI\Entities\Skills\AISkills;
 use DDD\Domain\AI\Services\Skills\AISkillsService;
 use DDD\Domain\AI\Repo\Argus\Conversations\Wire\AgentResponsesInputItems;
@@ -129,6 +130,21 @@ class AIConversationModelCallsService extends Service
         $argusAIAgentConversation = ArgusAIAgentConversation::newInstance();
         $argusAIAgentConversation->aiModelNameOverride = $aiModelName;
         return AgentWireConfiguration::resolveWireApiFor($this->findAgentModelOfEgress($argusAIAgentConversation), $runSettings);
+    }
+
+    /**
+     * The names of Chat-form tool schemas.
+     *
+     * @param array<int, array<string, mixed>> $toolSchemas
+     * @return string[]
+     */
+    protected function readToolNamesOfSchemas(array $toolSchemas): array
+    {
+        $toolNames = [];
+        foreach ($toolSchemas as $toolSchema) {
+            $toolNames[] = (string)($toolSchema['function']['name'] ?? $toolSchema['name'] ?? '');
+        }
+        return $toolNames;
     }
 
     /**
@@ -370,6 +386,13 @@ class AIConversationModelCallsService extends Service
             $agentAppendOnlyCall = $this->buildAppendOnlyCall($conversation, $argusAIAgentConversation->modelInput, $toolSchemas, true, $agentRun);
             $argusAIAgentConversation->toolSchemas = $agentAppendOnlyCall->topLevelToolSchemas;
             $argusAIAgentConversation->modelInput->appendedHistoryItems = $agentAppendOnlyCall->appendedHistoryItems;
+            // under the `call_tool` delivery a step pinned to a tool that is not declared pins `call_tool` instead
+            if ($argusAIAgentConversation->modelInput->prefixEpoch->deliversToolsThroughCallTool() && is_array($argusAIAgentConversation->forceToolChoice)) {
+                $pinnedToolName = (string)($argusAIAgentConversation->forceToolChoice['function']['name'] ?? $argusAIAgentConversation->forceToolChoice['name'] ?? '');
+                if ($pinnedToolName !== '' && !in_array($pinnedToolName, $this->readToolNamesOfSchemas($agentAppendOnlyCall->topLevelToolSchemas), true)) {
+                    $argusAIAgentConversation->forceToolChoice = ['type' => 'function', 'function' => ['name' => AgentCallToolDelivery::NAME]];
+                }
+            }
         }
         // the state notes ride the history on both strategies — after the append-only history items at the same position
         $stateDeliveryOfCall = $argusAIAgentConversation->modelInput->stateDelivery;
@@ -443,6 +466,7 @@ class AIConversationModelCallsService extends Service
             // the wire API and the skill-loading strategy of this call, and the hash of its appended tools
             $requestSnapshot->wireApi = $agentWireConfiguration->wireApi;
             $requestSnapshot->skillLoadingStrategy = $agentWireConfiguration->skillLoadingStrategy;
+            $requestSnapshot->toolDelivery = $agentAppendOnlyCall !== null ? $argusAIAgentConversation->modelInput->prefixEpoch?->toolDelivery : null;
             $requestSnapshot->recordAppendedToolsHash(is_array($requestPayload['body']['input'] ?? null) ? $requestPayload['body']['input'] : null);
             // TEST-ONLY server-state arm: the stored response this call produced and the chain link it made
             if ($agentWireConfiguration->usesResponsesServerState() && $argusAIAgentConversation->lastResponsesServerStateChain !== null) {
@@ -509,6 +533,11 @@ class AIConversationModelCallsService extends Service
             $toolCalls = new ToolCalls();
             foreach ($rawToolCalls as $rawCall) {
                 $toolCall = ToolCall::fromResponse($rawCall);
+                // the `call_tool` delivery: a `call_tool` call becomes the call of the tool it names, before any guard,
+                // the dispatch or the stored row reads the call
+                if ($agentAppendOnlyCall !== null && ($argusAIAgentConversation->modelInput->prefixEpoch?->deliversToolsThroughCallTool() ?? false)) {
+                    AgentCallToolDelivery::unwrapCall($toolCall, $this->readToolNamesOfSchemas($agentAppendOnlyCall->topLevelToolSchemas));
+                }
                 // the call's own record of its tool's effect, before any guard reads it
                 $toolCall->stampEffect(MCPToolEffectCatalog::getEffectForToolName((string)($toolCall->name ?? '')));
                 $toolCalls->add($toolCall);

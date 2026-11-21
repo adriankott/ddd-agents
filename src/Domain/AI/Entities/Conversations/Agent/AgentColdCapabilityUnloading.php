@@ -48,8 +48,14 @@ class AgentColdCapabilityUnloading extends ValueObject
         return $this->granularity === ContextRetentionSettings::UNLOAD_GRANULARITY_SKILL ? 'skillUnloading' : 'sweep';
     }
 
-    /** Unload the cold capabilities of the conversation's newest capability-carrying message; null when nothing applies. */
-    public static function applyTo(AIConversation $conversation): ?static
+    /**
+     * Unload the cold capabilities of the conversation's newest capability-carrying message; null when nothing applies.
+     *
+     * @param int[] $coveredInitiatorIndexes the turn initiators below the loaded tail (the rows a compaction cover
+     * stands for) — the skill-granular unloading then counts the unused owner turns across the cover
+     * ({@see LoadedCapabilityRecencies::buildFor()}); empty = the loaded tail only
+     */
+    public static function applyTo(AIConversation $conversation, array $coveredInitiatorIndexes = []): ?static
     {
         // anchor on the newest message that CARRIES a set (at a turn start `last()` is the initiator row).
         $anchorMessage = $conversation->messages->getNewestMessageWithLoadedCapabilities();
@@ -65,7 +71,7 @@ class AgentColdCapabilityUnloading extends ValueObject
         $currentTurnIndex = $conversation->buildOwnerTurns()->countOwnerTurns();
         if ($settings->unloadsPerSkill()) {
             $unloading->granularity = ContextRetentionSettings::UNLOAD_GRANULARITY_SKILL;
-            $unloading->unloadColdSkillGroups($conversation, $settings, $currentTurnIndex);
+            $unloading->unloadColdSkillGroups($conversation, $settings, $currentTurnIndex, $coveredInitiatorIndexes);
             return $unloading;
         }
         $unloading->sweepColdCapabilities($conversation, $settings, $currentTurnIndex);
@@ -97,16 +103,19 @@ class AgentColdCapabilityUnloading extends ValueObject
 
     /**
      * SKILL-granular unloading: "owner turns since" is derived from the compaction-proof initiator stamp
-     * over the loaded tail; a stamp-less row (legacy, `tool`-mode history) falls back to the turn count.
+     * over the loaded tail (plus the initiators a compaction cover stands for, when given); a stamp-less row (legacy,
+     * `tool`-mode history) falls back to the turn count.
+     *
+     * @param int[] $coveredInitiatorIndexes
      */
-    protected function unloadColdSkillGroups(AIConversation $conversation, ContextRetentionSettings $settings, int $currentTurnIndex): void
+    protected function unloadColdSkillGroups(AIConversation $conversation, ContextRetentionSettings $settings, int $currentTurnIndex, array $coveredInitiatorIndexes = []): void
     {
         $loadedCapabilities = $this->anchorMessage->getLoadedCapabilities();
         $currentInitiatorIndex = $conversation->messages->getNewestInitiatorMessageIndex();
         $leavingNames = $loadedCapabilities->computeSkillUnloading(
             $settings,
             LoadedSkillGroups::buildFor($loadedCapabilities, $this->anchorMessage->findLoadedAISkills()),
-            LoadedCapabilityRecencies::buildFor($loadedCapabilities, $conversation->messages->buildOwnerTurns(), $currentInitiatorIndex, $currentTurnIndex)
+            LoadedCapabilityRecencies::buildFor($loadedCapabilities, $conversation->messages->buildOwnerTurns(), $currentInitiatorIndex, $currentTurnIndex, $coveredInitiatorIndexes)
         );
         if ($leavingNames === []) {
             return;

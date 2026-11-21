@@ -115,6 +115,9 @@ class AgentOfferedToolsInputs extends ValueObject
      */
     public bool $offersConditionalMetaToolsFromTheStart = false;
 
+    /** Whether the loaded skills' tools are listed as text and called through `call_tool` (the descriptions of the meta tools say so). */
+    public bool $toolsAreCalledThroughCallTool = false;
+
     public function __construct()
     {
         parent::__construct();

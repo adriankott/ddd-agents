@@ -885,7 +885,8 @@ class AgentModelInput extends ValueObject
                 $this->featureFlags,
                 $this->accountRights,
                 $listsSubSkillsUnderLoadedParent,
-                $rendersLoadedSkillsBlock ? $systemLoadedCapabilities->getLoadedSkillNames() : []
+                $rendersLoadedSkillsBlock ? $systemLoadedCapabilities->getLoadedSkillNames() : [],
+                $this->prefixEpoch?->deliversToolsThroughCallTool() ?? false
             );
             if ($skillCatalogBlock !== '') {
                 $skillCatalogSegment = AgentContextSegment::of(AgentContextSegmentType::SKILL_CATALOG, $skillCatalogBlock);
@@ -1210,9 +1211,9 @@ class AgentModelInput extends ValueObject
             }
             $repeatedSkillToolNames = array_slice(array_values($repeatedSkillToolNames), 0, 12);
             return '[SIGNAL:skills] ' . implode(', ', $repeatedSkillNames) . (count($repeatedSkillNames) === 1 ? ' is' : ' are')
-                . ' loaded — its tools are in your tool list now'
+                . (($this->prefixEpoch?->deliversToolsThroughCallTool() ?? false) ? ' loaded — its tools are listed in this conversation' : ' loaded — its tools are in your tool list now')
                 . ($repeatedSkillToolNames !== [] ? ' (' . implode(', ', $repeatedSkillToolNames) . ')' : '')
-                . ': call the one you need.';
+                . (($this->prefixEpoch?->deliversToolsThroughCallTool() ?? false) ? ': call the one you need through `call_tool`.' : ': call the one you need.');
         }
         for ($i = count($this->messages) - 1; $i >= 0; $i--) {
             $candidate = $this->messages[$i];

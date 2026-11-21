@@ -19,16 +19,30 @@ class LoadedCapabilityRecencies extends ValueObject
     /** @var array<string, int> capability name → owner turns since its last use */
     protected array $ownerTurnsSinceByName = [];
 
-    /** The recencies of every capability of `$loadedCapabilities` at the current turn. */
-    public static function buildFor(LoadedCapabilities $loadedCapabilities, AIConversationOwnerTurns $ownerTurns, ?int $currentInitiatorIndex, int $currentTurnIndex): self
+    /**
+     * The recencies of every capability of `$loadedCapabilities` at the current turn.
+     *
+     * @param int[] $coveredInitiatorIndexes the turn initiators BELOW the loaded tail (the rows a compaction cover
+     * stands for). Without them a stamp below the tail counts only the loaded turns ("at least that old"); with them
+     * the turns the cover stands for are counted too, so the count is exact across a compaction.
+     */
+    public static function buildFor(LoadedCapabilities $loadedCapabilities, AIConversationOwnerTurns $ownerTurns, ?int $currentInitiatorIndex, int $currentTurnIndex, array $coveredInitiatorIndexes = []): self
     {
         $turnsByName = [];
         foreach ($loadedCapabilities->getElements() as $capability) {
             $initiatorIndex = $capability->resolveRecencyInitiatorIndex();
-            $turnsByName[$capability->name] = $initiatorIndex === null
+            if ($initiatorIndex === null) {
                 // a row without a stamp: the earlier turn count, minus the current turn (the stamp semantics)
-                ? max(0, $capability->turnsSinceLastUse($currentTurnIndex) - 1)
-                : $ownerTurns->countTurnsBetweenInitiators($initiatorIndex, $currentInitiatorIndex);
+                $turnsByName[$capability->name] = max(0, $capability->turnsSinceLastUse($currentTurnIndex) - 1);
+                continue;
+            }
+            $turns = $ownerTurns->countTurnsBetweenInitiators($initiatorIndex, $currentInitiatorIndex);
+            foreach ($coveredInitiatorIndexes as $coveredInitiatorIndex) {
+                if ($coveredInitiatorIndex > $initiatorIndex && ($currentInitiatorIndex === null || $coveredInitiatorIndex < $currentInitiatorIndex)) {
+                    $turns++;
+                }
+            }
+            $turnsByName[$capability->name] = $turns;
         }
         return self::fromTurnsByName($turnsByName);
     }
