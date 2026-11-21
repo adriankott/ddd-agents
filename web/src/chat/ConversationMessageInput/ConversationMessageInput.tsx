@@ -70,12 +70,13 @@ export interface ConversationMessageInputProps {
    * One-line form: text and send button on the same row inside a pill, growing with the text. The agent dashboard's
    * input; the chat keeps the full form.
    */
+  compact?: boolean;
+
   /**
    * The compact form only: the top slot takes a row of its own above the text and the start cluster stands left of the
    * text instead of in the action row. Default false: the compact layout keeps both where the full form has them.
    */
   compactStackedSlots?: boolean;
-  compact?: boolean;
 
   /**
    * Compact only: shrunk to a small glowing pill showing one line, the placeholder or the start of a draft, its buttons

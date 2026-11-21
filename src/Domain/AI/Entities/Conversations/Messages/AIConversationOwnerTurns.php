@@ -44,10 +44,13 @@ class AIConversationOwnerTurns extends ValueObject
      */
     public function getOwnerTexts(): array
     {
-        return array_values(array_filter(
-            $this->getOwnerRowTextsWithoutWidgetBlocks(),
-            static fn (string $ownerRowText): bool => $ownerRowText !== ''
-        ));
+        $ownerTexts = [];
+        foreach ($this->getOwnerRowTextsWithoutWidgetBlocks() as $ownerRowText) {
+            if ($ownerRowText !== '') {
+                $ownerTexts[] = $ownerRowText;
+            }
+        }
+        return $ownerTexts;
     }
 
     /**
