@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.5
+
+- Fixed: `expect.argsContain` fixtures written before 0.1.3 match again. A text under a named key that starts with that
+  key as JSON (`"dateFrom":"2026-01` under `dateFrom`) is searched in the whole arguments, as it was written; any other
+  text reads only the named argument (`AgentEvalExpectation::isNeedleWrittenForTheWholeArguments()`). Migration
+  (optional): write the value only (`"dateFrom": ["2026-01"]`). Since 0.1.3 such a fixture failed without a hint.
+- Fixed (npm): the "Sent" and "Declined" labels of an answered Form are in `i18n-keys.json` (the manifest scan reads
+  the string child of `DonePill`), so a host can translate them.
+
 ## 0.1.4
 
 - **Changed default:** a NEW append-only conversation gets the tool delivery `callTool` and the cold-skill drop at the

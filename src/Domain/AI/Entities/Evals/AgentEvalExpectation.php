@@ -321,14 +321,31 @@ class AgentEvalExpectation extends ValueObject
         $argsContainFailures = [];
         foreach ($this->expectBlock['argsContain'] as $argumentKey => $needles) {
             // a named key reads the value of that argument; a list without names reads the whole arguments
-            $searchedText = is_string($argumentKey) ? $this->buildArgumentValueAsUnescapedText($arguments, $argumentKey) : $arguments;
+            $argumentValueText = is_string($argumentKey) ? $this->buildArgumentValueAsUnescapedText($arguments, $argumentKey) : $arguments;
             foreach ((array)$needles as $needle) {
+                // a needle written for the whole arguments (before 0.1.3) starts with the key it names — `"dateFrom":"2026`
+                // under `dateFrom`; it is still searched in the whole arguments, as it was written
+                $searchedText = is_string($argumentKey) && $this->isNeedleWrittenForTheWholeArguments((string)$needle, $argumentKey)
+                    ? $arguments
+                    : $argumentValueText;
                 if (!str_contains($searchedText, (string)$needle)) {
                     $argsContainFailures[] = sprintf("argsContain[%s]: '%s' not in args %s", (string)$argumentKey, (string)$needle, $arguments);
                 }
             }
         }
         return $argsContainFailures;
+    }
+
+    /**
+     * Whether `$needle` names `$argumentKey` itself as a JSON key (`"dateFrom":…`, also with spaces): the form written
+     * for the whole-arguments search before a named key read only that argument's value. A dotted key matches its last
+     * segment.
+     */
+    public function isNeedleWrittenForTheWholeArguments(string $needle, string $argumentKey): bool
+    {
+        $keySegments = explode('.', $argumentKey);
+        $lastKeySegment = (string)end($keySegments);
+        return preg_match('/^\s*"' . preg_quote($lastKeySegment, '/') . '"\s*:/', $needle) === 1;
     }
 
     /**

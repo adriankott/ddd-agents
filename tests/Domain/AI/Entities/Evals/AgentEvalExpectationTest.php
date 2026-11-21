@@ -391,6 +391,32 @@ class AgentEvalExpectationTest extends UnitTestCase
         self::assertSame(["argsContain[scheduleAt]: ' 14:30' not in args {\"content\":\"probe\"}"], $result->failures);
     }
 
+    public function testANeedleWrittenForTheWholeArgumentsStillMatchesUnderItsOwnKey(): void
+    {
+        $conversation = $this->conversation([['readFigures', '{"dateFrom":"2026-01-01","term":"bikes"}', 'COMPLETED']]);
+
+        $result = $this->evaluate($conversation, [
+            'skill' => 'Example.Figures',
+            'tool' => 'readFigures',
+            'argsContain' => ['dateFrom' => ['"dateFrom":"2026-01', '2026-01-01'], 'term' => ['"term":"bikes"', 'bikes']],
+        ]);
+        self::assertSame([], $result->failures, 'the old whole-arguments form and the value form both match');
+
+        $wrongValue = $this->evaluate($conversation, [
+            'skill' => 'Example.Figures',
+            'tool' => 'readFigures',
+            'argsContain' => ['dateFrom' => ['"dateFrom":"2025']],
+        ]);
+        self::assertFalse($wrongValue->passed, 'the old form still fails on a wrong value');
+
+        $otherArgument = $this->evaluate($conversation, [
+            'skill' => 'Example.Figures',
+            'tool' => 'readFigures',
+            'argsContain' => ['dateFrom' => ['bikes']],
+        ]);
+        self::assertFalse($otherArgument->passed, 'a plain needle reads only the named argument');
+    }
+
     public function testArgsContainReadsAnArgumentThePlatformFillsAsCarriedWhenTheCallLeavesItOut(): void
     {
         $expect = [

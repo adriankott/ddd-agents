@@ -338,6 +338,15 @@
       ]
     },
     {
+      "key": "Declined",
+      "defaultText": "Declined",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/kit/components/form/Form.composed.tsx"
+      ]
+    },
+    {
       "key": "Discard changes",
       "defaultText": "Discard changes",
       "placeholders": [],
@@ -888,6 +897,15 @@
       "contexts": [],
       "usedIn": [
         "src/chat/ConversationMessageInput/ConversationMessageInput.tsx"
+      ]
+    },
+    {
+      "key": "Sent",
+      "defaultText": "Sent",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/kit/components/form/Form.composed.tsx"
       ]
     },
     {

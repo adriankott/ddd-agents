@@ -6,7 +6,7 @@
 //
 // A key is found where the package translates it:
 //   - the first argument of `translateText(…)`, `….translate(…)`, `useTranslatedText(…)` and the marker `textKey(…)`;
-//   - a string child of the translating components (`Text`, `WidgetText`, `Button`, `StatusChip`,
+//   - a string child of the translating components (`Text`, `WidgetText`, `Button`, `StatusChip`, `DonePill`,
 //     `ConversationWidgetButton`) unless the element
 //     says `translate={false}`, and the text props of the others (`Tooltip.text`, `StatusBadge.text`, the `label` of
 //     `Checkbox`, `TextInput` and `TextArea`);
@@ -29,7 +29,7 @@ export const I18N_KEYS_FILE = path.join(packageDir, "src", "i18n-keys.json");
 const JSX_FACTORY = "__agentsJsx";
 const TRANSLATE_FUNCTIONS = new Set(["translateText", "useTranslatedText", "textKey"]);
 /** Components whose string children are text keys. */
-const CHILD_TRANSLATING_COMPONENTS = new Set(["Text", "WidgetText", "Button", "StatusChip", "ConversationWidgetButton"]);
+const CHILD_TRANSLATING_COMPONENTS = new Set(["Text", "WidgetText", "Button", "StatusChip", "ConversationWidgetButton", "DonePill"]);
 /** Components whose named props are text keys. */
 const PROP_TRANSLATING_COMPONENTS = {
   Tooltip: ["text"],
