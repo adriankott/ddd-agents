@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.8 (unreleased)
+## 0.1.8
 
 - Added: the schedule tools `AgentTaskSchedulesMCPPackage` (id `agent.taskSchedules`) with the skill `Assistant.Tasks`
   (`config/app/AI/Skills/Assistant/Tasks.md`): `startBackgroundTask`, `scheduleOneTimeTask`,
