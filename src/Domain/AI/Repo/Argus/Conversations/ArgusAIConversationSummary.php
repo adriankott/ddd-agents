@@ -82,7 +82,8 @@ class ArgusAIConversationSummary extends AIConversationSummary
             useArgusEntityCache: $lazyloadAttributeInstance->useCache,
             useApiACallCache: $lazyloadAttributeInstance->useCache
         );
-        return $this->toEntity();
+        $summaryInstance = AIConversationSummary::newInstance();
+        return $this->toEntity(entityInstance: $summaryInstance);
     }
 
     /**

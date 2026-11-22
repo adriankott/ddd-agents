@@ -2125,7 +2125,8 @@ class AIConversationsService extends EntitiesService
             $summarizer->previousSummary = $conversation->summary; // → incremental input over the delta slice
         }
         $summarizer->argusLoad(useArgusEntityCache: false, useApiACallCache: false);
-        $generatedSummary = $summarizer->toEntity();
+        $summaryInstance = AIConversationSummary::newInstance();
+        $generatedSummary = $summarizer->toEntity(entityInstance: $summaryInstance);
         if (!isset($generatedSummary->title) || !isset($generatedSummary->text)) {
             $this->aiTrace('summary.skipped', ['conversationId' => $conversation->id, 'reason' => 'null_summary']);
             return; // the model produced nothing usable — keep the current summary; the next settle retries

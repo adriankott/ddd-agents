@@ -11,12 +11,14 @@ use DDD\Domain\AI\Entities\Conversations\Messages\ToolCall;
 use DDD\Infrastructure\Exceptions\BadRequestException;
 use DDD\Presentation\Mcp\Client\AI\ToolCallsOfTheCurrentTurn;
 use DDD\Presentation\Mcp\Client\AI\WebSearchMCPPackage;
+use DDD\Tests\Agents\Presentation\Mcp\Client\AI\Fixtures\LimitedWebSearchHostService;
 use DDD\Tests\Agents\Support\UnitTestCase;
 use DDD\Tests\Agents\Support\WebSearchTestConfiguration;
 
 /**
  * `searchTheWeb` refuses a call beyond `hits.maxSearchCallsPerTurn` searches in the current turn: the calling row
  * counts, an earlier turn, a failed call (a refusal) and a duplicate do not; outside the agent loop there is no limit.
+ * The application's `findMaxSearchCallsPerTurn()` sets the limit of a call; null leaves it to the configuration.
  */
 class WebSearchCallsPerTurnLimitTest extends UnitTestCase
 {
@@ -66,6 +68,26 @@ class WebSearchCallsPerTurnLimitTest extends UnitTestCase
         try {
             WebSearchMCPPackage::throwIfSearchCallsOfTheTurnAreUsedUp(new AgentToolCallProvenance(conversationMessages: $this->buildTurnWithSearches(6)));
             self::assertNull(ToolCallsOfTheCurrentTurn::countCallsThatDidWork(new AgentToolCallProvenance(), 'searchTheWeb'));
+        } finally {
+            WebSearchTestConfiguration::restoreConfigValues($configValuesBefore);
+        }
+    }
+
+    public function testTheApplicationSetsTheLimitOfACall(): void
+    {
+        $configValuesBefore = WebSearchTestConfiguration::declareWebSearchConfiguration(WebSearchTestConfiguration::buildEnabledConfiguration());
+        try {
+            $limitedWebSearchHostService = new LimitedWebSearchHostService();
+            $limitedWebSearchHostService->maxSearchCallsPerTurn = 6;
+            WebSearchMCPPackage::throwIfSearchCallsOfTheTurnAreUsedUp(new AgentToolCallProvenance(conversationMessages: $this->buildTurnWithSearches(6)), $limitedWebSearchHostService);
+
+            $limitedWebSearchHostService->maxSearchCallsPerTurn = 0;
+            WebSearchMCPPackage::throwIfSearchCallsOfTheTurnAreUsedUp(new AgentToolCallProvenance(conversationMessages: $this->buildTurnWithSearches(9)), $limitedWebSearchHostService);
+
+            $limitedWebSearchHostService->maxSearchCallsPerTurn = null;
+            $this->expectException(BadRequestException::class);
+            $this->expectExceptionMessage('At most 3 searches per turn');
+            WebSearchMCPPackage::throwIfSearchCallsOfTheTurnAreUsedUp(new AgentToolCallProvenance(conversationMessages: $this->buildTurnWithSearches(4)), $limitedWebSearchHostService);
         } finally {
             WebSearchTestConfiguration::restoreConfigValues($configValuesBefore);
         }

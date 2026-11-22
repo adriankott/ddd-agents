@@ -6,6 +6,7 @@ namespace DDD\Tests\Agents\Domain\AI\Entities\WebSearch;
 
 use DDD\Domain\AI\Entities\WebSearch\WebPageMarkdown;
 use DDD\Domain\AI\Entities\WebSearch\WebSearchHitListFilters;
+use DDD\Tests\Agents\Domain\AI\Entities\WebSearch\Fixtures\HostWebPageMarkdown;
 use DDD\Tests\Agents\Support\UnitTestCase;
 
 /**
@@ -80,5 +81,30 @@ class WebPageMarkdownTest extends UnitTestCase
         );
         $webFilters = WebSearchHitListFilters::fromToolArguments('web', 'DE', null, ['example.com'], ['en'], 99, 8, 4096);
         self::assertNotSame($webSearchHitListFilters->buildCacheKeyPart(), $webFilters->buildCacheKeyPart());
+    }
+
+    public function testAnApplicationAddsItsLinesAboveThePageTextAndItsOwnContinueSentence(): void
+    {
+        $webPageMarkdown = new HostWebPageMarkdown();
+        $webPageMarkdown->url = 'https://acme.example';
+        $webPageMarkdown->title = 'Acme';
+        $webPageMarkdown->markdown = 'Welcome to Acme.';
+        $rendered = $webPageMarkdown->buildLlmMarkdown(1000);
+
+        $platformLinePosition = mb_strpos($rendered, 'Platform-verified social profile URLs on this page:');
+        $pageTextPosition = mb_strpos($rendered, 'Welcome to Acme.');
+        self::assertNotFalse($platformLinePosition);
+        self::assertNotFalse($pageTextPosition);
+        self::assertLessThan($pageTextPosition, $platformLinePosition);
+        self::assertStringStartsWith("# Acme — https://acme.example\n\nPlatform-verified", $rendered);
+
+        $webPageMarkdown->ok = false;
+        $webPageMarkdown->reason = WebPageMarkdown::REASON_TIMEOUT;
+        self::assertStringContainsString('Continue with the facts already on file.', $webPageMarkdown->buildFailureExplanationForAgent());
+
+        $packageWebPageMarkdown = new WebPageMarkdown();
+        $packageWebPageMarkdown->url = 'https://acme.example';
+        $packageWebPageMarkdown->markdown = 'Welcome to Acme.';
+        self::assertStringNotContainsString('Platform-verified', $packageWebPageMarkdown->buildLlmMarkdown(1000));
     }
 }

@@ -159,7 +159,8 @@ class AIWebSearchService extends Service
         $this->bookWebSearchFee($argusWebSearchHitLists, $webSearchHitListFilters, $webSearchPayer);
         foreach ($loadersByPosition as $argusWebSearchHitList) {
             /** @var ArgusWebSearchHitList $argusWebSearchHitList */
-            $webSearchHitList = $argusWebSearchHitList->toEntity();
+            $webSearchHitListInstance = WebSearchHitList::newInstance();
+            $webSearchHitList = $argusWebSearchHitList->toEntity(entityInstance: $webSearchHitListInstance);
             if ($webSearchHitList instanceof WebSearchHitList) {
                 $webSearchHitLists->add($webSearchHitList);
             }
@@ -283,7 +284,11 @@ class AIWebSearchService extends Service
             $argusWebPageExtracts->argusLoad();
         }
         foreach ($extractsByPosition as $webPageExtractOrLoader) {
-            $webPageExtract = $webPageExtractOrLoader instanceof ArgusWebPageExtract ? $webPageExtractOrLoader->toEntity() : $webPageExtractOrLoader;
+            $webPageExtract = $webPageExtractOrLoader;
+            if ($webPageExtractOrLoader instanceof ArgusWebPageExtract) {
+                $webPageExtractInstance = WebPageExtract::newInstance();
+                $webPageExtract = $webPageExtractOrLoader->toEntity(entityInstance: $webPageExtractInstance);
+            }
             if ($webPageExtract instanceof WebPageExtract) {
                 $webPageExtracts->add($webPageExtract);
             }
@@ -372,7 +377,8 @@ class AIWebSearchService extends Service
             $argusWebPageMarkdown->getArgusSettings()->timeout = $crawlTimeoutSeconds;
         }
         $argusWebPageMarkdown->argusLoad(useArgusEntityCache: !$noCache, useApiACallCache: !$noCache);
-        $webPageMarkdown = $argusWebPageMarkdown->toEntity();
+        $webPageMarkdownInstance = WebPageMarkdown::newInstance();
+        $webPageMarkdown = $argusWebPageMarkdown->toEntity(entityInstance: $webPageMarkdownInstance);
         if (!$webPageMarkdown instanceof WebPageMarkdown) {
             return WebPageMarkdown::fromRefusedUrl($url, WebPageMarkdown::REASON_FETCH_FAILED);
         }
@@ -444,7 +450,8 @@ class AIWebSearchService extends Service
             }
             /** @var ArgusWebPageMarkdown $argusWebPageMarkdown */
             $argusWebPageMarkdown = $loadersByPosition[$position];
-            $webPageMarkdown = $argusWebPageMarkdown->toEntity();
+            $webPageMarkdownInstance = WebPageMarkdown::newInstance();
+            $webPageMarkdown = $argusWebPageMarkdown->toEntity(entityInstance: $webPageMarkdownInstance);
             if (!$webPageMarkdown instanceof WebPageMarkdown) {
                 $webPageMarkdown = WebPageMarkdown::fromRefusedUrl($url, WebPageMarkdown::REASON_FETCH_FAILED);
             }

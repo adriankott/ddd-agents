@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.19
+
+Every application with web research should adopt this release.
+
+- Fixed: a search, a page read and a page reading return the application's same-path subclass of `WebSearchHitList`,
+  `WebPageMarkdown` and `WebPageExtract` (before, only a refused page did; a crawled page was always the package's
+  class), and a conversation summary the application's `AIConversationSummary`: the package maps every Argus
+  repository with `toEntity(entityInstance: X::newInstance())` (`ArgusRepositoriesAreNeverMappedOntoThePackageClassTest`).
+- Added: `WebSearchHostService::findMaxSearchCallsPerTurn(AgentToolCallProvenance): ?int`, the search limit of a
+  call's turn set by the application (0 = no limit, null = `AI.webSearch.hits.maxSearchCallsPerTurn`).
+- Added: `WebPageMarkdown::buildPlatformLinesBelowHeader()`, the application's own lines between a read page's header
+  and its marked text (empty by default), and `WebPageMarkdown::buildContinueWithoutThePageSentence()`, the sentence
+  after a failed read, for a same-path subclass.
+
 ## 0.1.18
 
 - Fixed: a description of a screenshot part that starts with the `{preCallMessage}` marker counts as a description

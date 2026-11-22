@@ -66,6 +66,14 @@ A host replaces any of them by a same-path subclass `App\Domain\AI\Services\WebS
 | `throwIfWebSearchSpendingIsRefused(WebSearchPayer)` | allows | throw a 4xx framework exception when the AI budget is spent (the model reads the message) |
 | `bookWebSearchRequests(WebSearchPayer, WebSearchHitListFilters, int, float)` | books nothing | write the fee into the host's cost ledger: per real request the fee the endpoint reports (`data.billing.feeUsd`) or else `hits.feeUsdPerRequestByMode`; never a cache hit of the package or of the endpoint (`data.cached`), never a failure |
 | `buildNoteAfterWebPagesRead(WebPageMarkdowns, AgentToolCallProvenance): ?string` | null | store facts verified on the host's own site; the returned line leads the result |
+| `findMaxSearchCallsPerTurn(AgentToolCallProvenance): ?int` | null (`hits.maxSearchCallsPerTurn`, default 3) | more searches for a research sub-agent, fewer in a customer chat; 0 = no limit |
+
+The entities of the research are built as the application's class: a same-path subclass of `WebPageMarkdown`,
+`WebSearchHitList` or `WebPageExtract` is what a search, a read or a reading returns (the package maps every Argus
+repository with `toEntity(entityInstance: X::newInstance())`; `ArgusRepositoriesAreNeverMappedOntoThePackageClassTest`).
+A subclass of `WebPageMarkdown` adds its own lines between the header and the page's marked text
+(`buildPlatformLinesBelowHeader()`, each line ending in a newline; above the marks, so the page cannot imitate them)
+and words the sentence after a failed read (`buildContinueWithoutThePageSentence(bool $noToolCanReachTheAddress)`).
 
 The readings are model calls: ddd-ai's usage recorder books them for the payer set on each reading
 (`billAICostsTo()`), under `AgentAIUsageScope::AI_WEB_PAGE_EXTRACT`, inside the tool call's envelope. Without an

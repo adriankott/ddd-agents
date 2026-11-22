@@ -173,8 +173,20 @@ class WebPageMarkdown extends ValueObject
             $truncationNotice = "\n\n[Page truncated: showing " . number_format($maxContentChars) . ' of '
                 . number_format($totalContentChars) . ' characters — the page continues beyond this point.]';
         }
-        // the page's text is written by the site: marked; how to read the marks is the tool's platform note
-        return $headerLine . "\n\n" . ToolResultUntrustedSegments::wrap((string)$this->url, $markdownContent) . $truncationNotice;
+        // the page's text is written by the site: marked; how to read the marks is the tool's platform note. The
+        // application's own lines sit above the marks, so the page cannot imitate them
+        return $headerLine . "\n\n" . $this->buildPlatformLinesBelowHeader()
+            . ToolResultUntrustedSegments::wrap((string)$this->url, $markdownContent) . $truncationNotice;
+    }
+
+    /**
+     * The application's own lines between the header and the page's marked text (e.g. the verified profile links it
+     * found on the whole page), each ending in a newline; empty by default. Written by the platform, never by the page:
+     * a same-path subclass overrides this method.
+     */
+    public function buildPlatformLinesBelowHeader(): string
+    {
+        return '';
     }
 
     /**
@@ -206,23 +218,31 @@ class WebPageMarkdown extends ValueObject
     }
 
     /**
+     * The sentence after a failed read that says how to go on without the page; `$noToolCanReachTheAddress` for a host
+     * that does not resolve or is no safe public destination (no hint to another reader then). A same-path subclass
+     * replaces the sentence with its own wording.
+     */
+    public function buildContinueWithoutThePageSentence(bool $noToolCanReachTheAddress): string
+    {
+        if ($noToolCanReachTheAddress) {
+            return 'Continue with what you already know and, for a missing fact, searchTheWeb. NEVER '
+                . 'pass this URL to another tool (extractInformationFromWebPagesWithFastLLM, getWebPageAsScreenshot): '
+                . 'no tool can reach it. Do not make the failed read the topic of a message.';
+        }
+        return 'Continue with what you already know and, for a missing fact, searchTheWeb (never for '
+            . 'the content of this page; ONE value asked from exactly this page is read by '
+            . 'extractInformationFromWebPagesWithFastLLM with this URL, when that tool is available to you — it reads such '
+            . 'a page from its search excerpt). Do not make the failed read the topic of a message.';
+    }
+
+    /**
      * Why the fetch failed and what to do about it, for the model: whether ONE retry is worth it (timeout) or not
      * (blocked, unreachable, empty), and to go on without the page. Call when {@see $ok} is false.
      */
     public function buildFailureExplanationForAgent(): string
     {
         $urlLabel = (string)($this->url ?? 'the URL');
-        $continueWithoutThePage = 'Continue with what you already know and, for a missing fact, searchTheWeb (never for '
-            . 'the content of this page; ONE value asked from exactly this page is read by '
-            . 'extractInformationFromWebPagesWithFastLLM with this URL, when that tool is available to you — it reads such '
-            . 'a page from its search excerpt). Do not make the failed read the topic of a message.';
-        // a host that does not resolve or is no safe public destination is read by NO tool: no hint to another reader
-        $continueWithoutTheAddress = 'Continue with what you already know and, for a missing fact, searchTheWeb. NEVER '
-            . 'pass this URL to another tool (extractInformationFromWebPagesWithFastLLM, getWebPageAsScreenshot): '
-            . 'no tool can reach it. Do not make the failed read the topic of a message.';
-        if (in_array($this->reason, static::REASONS_NO_TOOL_CAN_REACH, true)) {
-            $continueWithoutThePage = $continueWithoutTheAddress;
-        }
+        $continueWithoutThePage = $this->buildContinueWithoutThePageSentence(in_array($this->reason, static::REASONS_NO_TOOL_CAN_REACH, true));
         $sharedFailureSentence = WebFetchFailureReasons::findSharedFailureSentence($this->reason, $urlLabel, WebFetchFailureReasons::CAPABILITY_PAGE_READ);
         if ($sharedFailureSentence !== null) {
             return $sharedFailureSentence . ' ' . $continueWithoutThePage;

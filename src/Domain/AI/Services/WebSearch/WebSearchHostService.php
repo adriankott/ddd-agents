@@ -16,7 +16,7 @@ use DDD\Infrastructure\Services\Service;
  * What the application decides around the web research of the package: the search country and the payer of a call,
  * whether the payer may spend, the booking of the search fee, and what follows a page read. An application replaces
  * any of these by a same-path subclass (`App\Domain\AI\Services\WebSearch\WebSearchHostService`); the defaults below
- * work without one: no default country, the signed-in account pays, every spend is allowed, nothing is booked, nothing
+ * work without one: no default country, the configured search limit per turn, the signed-in account pays, every spend is allowed, nothing is booked, nothing
  * follows a page read.
  *
  * The page readings themselves are model calls: their cost is recorded by ddd-ai's usage recorder for the payer the
@@ -29,6 +29,15 @@ class WebSearchHostService extends Service
      * agent space; null leaves it to the engine.
      */
     public function findDefaultCountryCode(?AgentToolCallProvenance $callProvenance): ?string
+    {
+        return null;
+    }
+
+    /**
+     * The most `searchTheWeb` calls one turn of the call's conversation may make (e.g. more for a research sub-agent,
+     * fewer in a customer chat); 0 = no limit, null = `AI.webSearch.hits.maxSearchCallsPerTurn`.
+     */
+    public function findMaxSearchCallsPerTurn(AgentToolCallProvenance $callProvenance): ?int
     {
         return null;
     }

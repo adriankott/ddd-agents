@@ -23,6 +23,7 @@ use DDD\Domain\AI\Entities\WebSearch\WebSearchConfiguration;
 use DDD\Domain\AI\Entities\WebSearch\WebSearchHitListFilters;
 use DDD\Domain\AI\Entities\WebSearch\WebSearchMergedHits;
 use DDD\Domain\AI\Services\WebSearch\AIWebSearchService;
+use DDD\Domain\AI\Services\WebSearch\WebSearchHostService;
 use DDD\Infrastructure\Exceptions\BadRequestException;
 use DDD\Infrastructure\Services\DDDService;
 use DDD\Presentation\Mcp\Client\AI\Dtos\ExtractInformationFromWebPagesRequestDto;
@@ -119,7 +120,7 @@ class WebSearchMCPPackage extends MCPPackage
         if (!$aiWebSearchService->isCapabilityAvailable(AIWebSearchService::CAPABILITY_SEARCH)) {
             throw new BadRequestException('The web search is switched off in this application: nothing was searched. Answer from what you know and say that you could not search.');
         }
-        static::throwIfSearchCallsOfTheTurnAreUsedUp($callProvenance);
+        static::throwIfSearchCallsOfTheTurnAreUsedUp($callProvenance, $aiWebSearchService->getWebSearchHostService());
         $queries = [];
         foreach ($requestDto->queries ?? [] as $query) {
             $query = trim((string)$query);
@@ -389,14 +390,18 @@ class WebSearchMCPPackage extends MCPPackage
     }
 
     /**
-     * Refuses a search beyond `AI.webSearch.hits.maxSearchCallsPerTurn` calls in the current turn (default 3; 0 or
-     * null = no limit). Outside the agent loop there is no turn and no limit.
+     * Refuses a search beyond the limit of the current turn: the application's
+     * {@see WebSearchHostService::findMaxSearchCallsPerTurn()} when it answers, else
+     * `AI.webSearch.hits.maxSearchCallsPerTurn` (default 3; 0 or null = no limit). Outside the agent loop there is no
+     * turn and no limit.
      *
      * @throws BadRequestException
      */
-    public static function throwIfSearchCallsOfTheTurnAreUsedUp(AgentToolCallProvenance $callProvenance): void
+    public static function throwIfSearchCallsOfTheTurnAreUsedUp(AgentToolCallProvenance $callProvenance, ?WebSearchHostService $webSearchHostService = null): void
     {
-        $configuredMaxSearchCallsPerTurn = WebSearchConfiguration::findValue('hits.maxSearchCallsPerTurn', static::DEFAULT_MAX_SEARCH_CALLS_PER_TURN);
+        $hostMaxSearchCallsPerTurn = $webSearchHostService?->findMaxSearchCallsPerTurn($callProvenance);
+        $configuredMaxSearchCallsPerTurn = $hostMaxSearchCallsPerTurn
+            ?? WebSearchConfiguration::findValue('hits.maxSearchCallsPerTurn', static::DEFAULT_MAX_SEARCH_CALLS_PER_TURN);
         $maxSearchCallsPerTurn = is_numeric($configuredMaxSearchCallsPerTurn) ? (int)$configuredMaxSearchCallsPerTurn : 0;
         if ($maxSearchCallsPerTurn < 1) {
             return;
