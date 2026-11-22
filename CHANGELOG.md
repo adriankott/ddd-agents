@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.1.14
+
+- Changed: a screenshot of a host without a DNS record is refused as `UNRESOLVABLE` ("cannot be resolved (check the
+  spelling)"), a private or reserved address as `NOT_PUBLIC`; both decided by `PublicUrlGuard::classifyHost()` like a
+  page read (before, a typo host was told it was not a public web address).
+- Added: `WebFetchFailureReasons`, ONE sentence with the next move per reason a page read and a screenshot share:
+  `UNRESOLVABLE`, `UNSUPPORTED_TYPE` (a screenshot points to `getWebPageAsMarkdown`), `TOO_LARGE` (retrying is
+  pointless), `NO_CONTENT` and `TOO_MANY_REDIRECTS` (no retry); before, the last three got the generic sentence.
+- Fixed: the screenshot line's "Already shown in this turn" counts every earlier call of the turn that did not fail or
+  get refused and leaves out only the calling row by its tool call id (before, a call whose completion had not reached
+  the read set was missing); the device is compared in any letter case.
+- Added: the screenshot line names the conversation's picture budget (`maxToolCallImagesOnWire`, default 2 = one
+  part): the pictures of a part are gone once the next part is open, so the model describes each part first. A host
+  that needs the previous part beside the current one raises `maxToolCallImagesOnWire` to 4.
+- Added: time phrases in English, German, French, Spanish and Italian (`today`, `this week`, `this month`, "past N
+  days") and the name of the current month (in the conversation's zone; `may`, `mars`, `mai` only with the year)
+  become the search's `recency`, with the note; another month with its year gets the `recency` note.
+- Added: a page read that fails (`FETCH_FAILED`) for a URL no search of the conversation listed names the listed pages
+  of the same site (`WebPageUrlCorrection::buildUnlistedFailedUrlNote()`); two or more pages read get a note to name
+  every page's URL in the answer. The skill says never to build a URL.
+- Evaluation template: visual cases judge the calls and the descriptions, never the pictures (the judge does not see
+  them); new cases `websearch.read-url.typo-host`, `websearch.read-url.two-pages-named`,
+  `websearch.urls.no-built-paths`; `websearch.recency.news` counts month names and phrases in any language as FAIL.
+
 ## 0.1.13
 
 - Changed: a failed screenshot names its reason. The reason of the answer (`reason` at the top, under `data` or under

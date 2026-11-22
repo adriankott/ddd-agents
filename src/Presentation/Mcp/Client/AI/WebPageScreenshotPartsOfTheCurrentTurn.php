@@ -13,9 +13,11 @@ use DDD\Domain\AI\Entities\WebSearch\WebPageMarkdown;
 /**
  * The parts of one page and device that `getWebPageAsScreenshot` already showed in the CURRENT turn, so the tool line
  * can say so: a model whose earlier pictures left its view tends to reopen part 1, 2, 3 again. Read like
- * {@see ToolCallsOfTheCurrentTurn}: the current turn's rows, only COMPLETED calls (a failed render showed nothing; the
- * calling row itself is still pending and is left out). The page is compared by its canonical URL. Outside the
- * agent loop there is nothing to read.
+ * {@see ToolCallsOfTheCurrentTurn}: the current turn's rows, every call that did not fail or get refused (a failed
+ * render showed nothing). The calling row itself is left out by its tool call id; without that id every call that is
+ * not COMPLETED yet is left out (the calling row is still pending). A row whose completion has not reached the read
+ * set yet still counts. The page is compared by its canonical URL, the device in any letter case. Outside the agent
+ * loop there is nothing to read.
  */
 class WebPageScreenshotPartsOfTheCurrentTurn
 {
@@ -32,25 +34,38 @@ class WebPageScreenshotPartsOfTheCurrentTurn
         if (!$messages instanceof AIConversationMessages) {
             return [];
         }
-        return self::findPartNumbersShownInMessages($messages, $url, $device);
+        return self::findPartNumbersShownInMessages($messages, $url, $device, $callProvenance->toolCallId);
     }
 
-    /** @return int[] The part numbers of `$url` on `$device` shown in the current turn of `$messages`. Pure. */
-    public static function findPartNumbersShownInMessages(AIConversationMessages $messages, string $url, string $device): array
+    /**
+     * @return int[] The part numbers of `$url` on `$device` shown in the current turn of `$messages`, the call
+     * `$currentToolCallId` left out. Pure.
+     */
+    public static function findPartNumbersShownInMessages(AIConversationMessages $messages, string $url, string $device, ?string $currentToolCallId = null): array
     {
+        $currentToolCallId = $currentToolCallId !== null && $currentToolCallId !== '' ? $currentToolCallId : null;
         $canonicalUrlKey = WebPageMarkdown::canonicalUrlKey($url);
         $partNumbers = [];
         foreach ($messages->buildCurrentTurn()->getRows() as $message) {
             $toolCall = isset($message->toolCall) ? $message->toolCall : null;
             if ($toolCall === null || ($toolCall->name ?? null) !== self::TOOL_NAME
-                || $toolCall->status !== AIConversationMessage::STATUS_COMPLETED
+                || in_array($toolCall->status, [AIConversationMessage::STATUS_FAILED, AIConversationMessage::STATUS_CANCELLED, AIConversationMessage::STATUS_CANCEL_REQUESTED], true)
                 || $toolCall->wasRefusedAsDuplicate || $toolCall->wasRefusedByGate
             ) {
                 continue;
             }
+            $rowToolCallId = (string)($toolCall->toolCallId ?? '');
+            $isTheCallingRow = $currentToolCallId !== null
+                ? $rowToolCallId === $currentToolCallId
+                : $toolCall->status !== AIConversationMessage::STATUS_COMPLETED;
+            if ($isTheCallingRow) {
+                continue;
+            }
             $arguments = $toolCall->arguments;
             $calledUrl = is_string($arguments['url'] ?? null) ? $arguments['url'] : '';
-            $calledDevice = ($arguments['device'] ?? null) === PageScreenshotPart::DEVICE_MOBILE ? PageScreenshotPart::DEVICE_MOBILE : PageScreenshotPart::DEVICE_DESKTOP;
+            $calledDevice = is_string($arguments['device'] ?? null) && strtolower(trim($arguments['device'])) === PageScreenshotPart::DEVICE_MOBILE
+                ? PageScreenshotPart::DEVICE_MOBILE
+                : PageScreenshotPart::DEVICE_DESKTOP;
             if ($calledUrl === '' || $calledDevice !== $device || WebPageMarkdown::canonicalUrlKey($calledUrl) !== $canonicalUrlKey) {
                 continue;
             }

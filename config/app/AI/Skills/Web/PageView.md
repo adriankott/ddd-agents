@@ -36,9 +36,9 @@ the number of parts and the parts you have not seen — so you always know wheth
 | Compare two pages | the same part of each, one after the other |
 
 - Open only the parts the question needs: each part is two pictures, and a new screenshot may push earlier ones out of
-  your view (the conversation keeps only the newest pictures). Describe each part in your reply BEFORE you open the
-  next one, and NEVER open a part you already saw — your description is what you keep. The answer lists the parts
-  already shown in this turn.
+  your view (the answer says how many pictures stay visible). Write down what a part shows as soon as it arrives,
+  BEFORE you open the next one, and NEVER open a part you already saw — your notes are what you keep. The answer lists
+  the parts already shown in this turn.
 - A failed render names its reason and the next move (a bot challenge → read the text with `getWebPageAsMarkdown`;
   a timeout → one retry): follow it, never loop.
 - When the answer says pictures of a result were dropped, say only what you saw — never fill in the rest.

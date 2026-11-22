@@ -54,6 +54,9 @@ class WebPageMarkdownMcpResponseDto extends RestResponseDto implements LlmMarkdo
     /** The note when a URL was put back to the one a search listed ({@see \DDD\Domain\AI\Entities\WebSearch\WebPageUrlCorrection}); null otherwise. */
     public ?string $urlCorrectionNote = null;
 
+    /** @var string[] The notes for failed pages no search listed, naming the listed pages of their site ({@see \DDD\Domain\AI\Entities\WebSearch\WebPageUrlCorrection::buildUnlistedFailedUrlNote()}). */
+    public array $unlistedFailedUrlNotes = [];
+
     public static function of(WebPageMarkdown $page): self
     {
         $responseDto = new self();
@@ -94,6 +97,18 @@ class WebPageMarkdownMcpResponseDto extends RestResponseDto implements LlmMarkdo
             if (!($page->ok ?? false)) {
                 $noteLines[] = $page->buildFailureExplanationForAgent();
             }
+        }
+        foreach ($this->unlistedFailedUrlNotes as $unlistedFailedUrlNote) {
+            $noteLines[] = $unlistedFailedUrlNote;
+        }
+        $readPageUrls = [];
+        foreach ($this->pages?->getElements() ?? [] as $page) {
+            if (($page->ok ?? false) && ($page->url ?? '') !== '') {
+                $readPageUrls[] = (string)$page->url;
+            }
+        }
+        if (count($readPageUrls) > 1) {
+            $noteLines[] = 'ANSWER: name the URL of every page you use next to what you take from it: ' . implode(', ', $readPageUrls) . '.';
         }
         return implode("\n", $noteLines);
     }

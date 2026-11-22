@@ -83,17 +83,33 @@ capability's answers are cached in the database too (`cacheInDatabase`; a screen
   model reads; the service answers failures on the returned objects (an unanswered hit list, a page with reason
   `CAPABILITY_OFF`, a screenshot part of height 0), never an exception.
 - A page read refuses before any crawl: a search engine's results page, a host without a DNS record, a private address
-  (`PublicUrlGuard`); a screenshot is rendered only when every resolved address of the host is public.
+  (`PublicUrlGuard`); a screenshot is rendered only when every resolved address of the host is public. Both use
+  `PublicUrlGuard::classifyHost()`: a host without a DNS record is `UNRESOLVABLE` ("cannot be resolved (check the
+  spelling)"), only a private or reserved address is `NOT_PUBLIC` (page read: `BLOCKED`).
 - Without Imagick a screenshot is neither trimmed nor cut: the first part is the whole capture as one picture.
 - A failed render keeps its reason (`reason` of the answer, at the top, under `data` or `error`; a rejected call:
   `TIMEOUT` or `FETCH_FAILED`; the package's own `NOT_PUBLIC` and `CAPABILITY_OFF`) and the model reads one sentence per
   reason with the next move (`BOT_CHALLENGE` → the text with `getWebPageAsMarkdown`; `TIMEOUT` → one retry; `BLOCKED`,
-  `UNRESOLVABLE` → no retry); an unknown code is named in the generic sentence. A failed render is never cached.
+  `UNRESOLVABLE` → no retry); an unknown code is named in the generic sentence. A failed render is never cached. The
+  reasons a page read and a screenshot share have ONE sentence each in `WebFetchFailureReasons` (`UNRESOLVABLE`,
+  `UNSUPPORTED_TYPE` → for a screenshot `getWebPageAsMarkdown`, `TOO_LARGE` → retrying is pointless, `NO_CONTENT`,
+  `TOO_MANY_REDIRECTS` → no retry); add a shared code there, a capability's own code in its entity.
 - The screenshot line names the parts of the same page and device already shown in the turn
-  (`WebPageScreenshotPartsOfTheCurrentTurn`); reopening one gets a note, never a refusal (its pictures may have left the
-  model's view).
-- A query that names an unambiguous time window (`today`, `this week`, `this month`) without `recency` is searched with
-  that window, and the note says so; news words without a window get a note suggesting `recency`. A reading's facts
+  (`WebPageScreenshotPartsOfTheCurrentTurn`: every earlier call of the turn that did not fail, the calling row left out
+  by its tool call id); reopening one gets a note, never a refusal (its pictures may have left the model's view).
+- The line names the conversation's picture budget (`maxToolCallImagesOnWire` of the context retention settings,
+  default 2): a part is two pictures, so with the default the pictures of a part are gone once the next part is open,
+  and the model is told to describe each part before it opens the next. A host whose page reviews need the previous
+  part beside the current one raises `maxToolCallImagesOnWire` to 4 (each picture is input tokens on every later
+  model call of the turn).
+- A query that names an unambiguous time window without `recency` is searched with that window, and the note says
+  so: `today`, `this week`, `this month`, "past N days" in English, German, French, Spanish and Italian
+  (`WebSearchCallQueries::RECENCY_WINDOWS_BY_PHRASE`, `PAST_DAYS_PATTERNS`), and the name of the current month in the
+  conversation's zone (`November 2026` in November 2026 → month; `may`, `mars`, `mai` only with the year). Another
+  month with its year, and news words without a window, get a note suggesting `recency`.
+- A page read that fails as if the page did not exist (`FETCH_FAILED`) for a URL no search of the conversation listed
+  names the listed pages of the same site (`WebPageUrlCorrection::buildUnlistedFailedUrlNote()`): the model built a
+  path segment itself. Two or more pages read: the note asks for every page's URL in the answer. A reading's facts
   end with `[source: site, Reading n]`, so the source travels into a table row.
 - A crawl or a search that times out is not cached; the next call asks again.
 
@@ -103,3 +119,5 @@ capability's answers are cached in the database too (`cacheInDatabase`; a screen
 - The tools call the live internet and bill: run the evaluation template with `--ignore-budget`, translated into the
   host's language and with the host's space key on every case.
 - Changed wording of the skill or a tool description is model-facing: rerun the evaluation before release.
+- The judge reads the run's text trace, never the pictures: a visual case judges the calls (parts, device, no part
+  reopened) and that each opened part was described, never whether a visual statement is right.

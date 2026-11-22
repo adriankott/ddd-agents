@@ -25,7 +25,7 @@ class WebPageMarkdown extends ValueObject
     public const string REASON_FETCH_FAILED = 'FETCH_FAILED';
 
     /** The endpoint's failure reason: the page yielded empty markdown. */
-    public const string REASON_NO_CONTENT = 'NO_CONTENT';
+    public const string REASON_NO_CONTENT = WebFetchFailureReasons::NO_CONTENT;
 
     /**
      * Detected here ({@see downgradeBotChallengeToFailure()}): the crawler received a bot-protection challenge page
@@ -34,7 +34,7 @@ class WebPageMarkdown extends ValueObject
     public const string REASON_BOT_CHALLENGE = 'BOT_CHALLENGE';
 
     /** Detected before any crawl: the host has no DNS record (no such website, or a typo in the address). */
-    public const string REASON_UNRESOLVABLE = 'UNRESOLVABLE';
+    public const string REASON_UNRESOLVABLE = WebFetchFailureReasons::UNRESOLVABLE;
 
     /**
      * Detected before any crawl ({@see isSearchEngineResultsPageUrl()}): the URL is a search engine's results page.
@@ -46,7 +46,11 @@ class WebPageMarkdown extends ValueObject
     public const string REASON_CAPABILITY_OFF = 'CAPABILITY_OFF';
 
     /** The address serves something other than a web page (a PDF, an image, a download). */
-    public const string REASON_UNSUPPORTED_TYPE = 'UNSUPPORTED_TYPE';
+    public const string REASON_UNSUPPORTED_TYPE = WebFetchFailureReasons::UNSUPPORTED_TYPE;
+
+    /** The endpoint's failure reasons shared with the screenshot ({@see WebFetchFailureReasons}). */
+    public const string REASON_TOO_LARGE = WebFetchFailureReasons::TOO_LARGE;
+    public const string REASON_TOO_MANY_REDIRECTS = WebFetchFailureReasons::TOO_MANY_REDIRECTS;
 
     /**
      * @var string[][] Search engine host (a key ending in `.` matches every country domain) => the result-page path
@@ -209,18 +213,18 @@ class WebPageMarkdown extends ValueObject
             . 'the content of this page; ONE value asked from exactly this page is read by '
             . 'extractInformationFromWebPagesWithFastLLM with this URL, when that tool is available to you — it reads such '
             . 'a page from its search excerpt). Do not make the failed read the topic of a message.';
+        $sharedFailureSentence = WebFetchFailureReasons::findSharedFailureSentence($this->reason, $urlLabel, WebFetchFailureReasons::CAPABILITY_PAGE_READ);
+        if ($sharedFailureSentence !== null) {
+            return $sharedFailureSentence . ' ' . $continueWithoutThePage;
+        }
         return match ($this->reason) {
             self::REASON_SEARCH_RESULTS_PAGE => "{$urlLabel} is a search engine's results page, not a source — this tool reads "
                 . 'ONE website page. NEVER read a results page; to search, use searchTheWeb.',
-            self::REASON_UNRESOLVABLE => "The address {$urlLabel} has no DNS record right now — no such website, or a typo "
-                . 'in the address; this is NOT a private address. NEVER retry it. ' . $continueWithoutThePage,
             self::REASON_BLOCKED => "The URL {$urlLabel} was refused for security (no safe public destination). NEVER retry "
                 . 'it. ' . $continueWithoutThePage,
             self::REASON_TIMEOUT => "Fetching {$urlLabel} timed out. You may retry ONCE; if it times out again, "
                 . $continueWithoutThePage,
             self::REASON_FETCH_FAILED => "The page {$urlLabel} could not be fetched (unreachable, or it blocks automated readers). "
-                . 'Do not retry. ' . $continueWithoutThePage,
-            self::REASON_NO_CONTENT => "The page {$urlLabel} loaded but yielded no readable content (empty or fully scripted page). "
                 . 'Do not retry. ' . $continueWithoutThePage,
             self::REASON_BOT_CHALLENGE => "The site {$urlLabel} is protected by a bot-protection challenge — the crawler "
                 . 'only receives a "checking your browser" page, never the content. Do NOT retry this tool on that '
@@ -228,8 +232,6 @@ class WebPageMarkdown extends ValueObject
                 . 'read, read the next one; otherwise say that this site cannot be read automatically.',
             self::REASON_CAPABILITY_OFF => 'Reading web pages is switched off in this application. Do not retry; answer '
                 . 'from the search results or what you already know.',
-            self::REASON_UNSUPPORTED_TYPE => "The address {$urlLabel} is not a web page (a document, image or download) and "
-                . 'cannot be read as text. Do not retry. ' . $continueWithoutThePage,
             default => "The page {$urlLabel} could not be read right now"
                 . (($this->reason ?? '') !== '' ? ' (' . $this->reason . ')' : '') . '. Do not retry immediately. '
                 . $continueWithoutThePage,

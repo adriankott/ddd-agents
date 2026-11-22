@@ -476,6 +476,27 @@ class AIWebSearchService extends Service
     }
 
     /**
+     * Why `$url` is not rendered, decided before the render from its host: a host without a DNS record is
+     * {@see PageScreenshotPart::REASON_UNRESOLVABLE} (a typo, not a private address), a private or reserved address
+     * {@see PageScreenshotPart::REASON_NOT_PUBLIC}. When the resolver gives no answer the guard's own check decides.
+     * Null = render.
+     */
+    protected function findScreenshotRefusalReasonOfHost(string $url): ?string
+    {
+        $hostClass = $this->classifyHostMemoized($url);
+        if ($hostClass === PublicUrlGuard::HOST_UNRESOLVABLE) {
+            return PageScreenshotPart::REASON_UNRESOLVABLE;
+        }
+        if ($hostClass === PublicUrlGuard::HOST_PRIVATE) {
+            return PageScreenshotPart::REASON_NOT_PUBLIC;
+        }
+        if ($hostClass === PublicUrlGuard::HOST_UNKNOWN && !PublicUrlGuard::resolvedHostsAreAllPublic($url)) {
+            return PageScreenshotPart::REASON_NOT_PUBLIC;
+        }
+        return null;
+    }
+
+    /**
      * {@see PublicUrlGuard::classifyHost()} once per host and process: several pages of one site, and every later read
      * of the same site in a worker, ask the resolver once. A resolver failure (UNKNOWN) is not kept.
      */
@@ -543,8 +564,9 @@ class AIWebSearchService extends Service
             $pageScreenshotPart->failureReason = PageScreenshotPart::REASON_CAPABILITY_OFF;
             return $pageScreenshotPart;
         }
-        if (!PublicUrlGuard::resolvedHostsAreAllPublic($pageScreenshotPart->url)) {
-            $pageScreenshotPart->failureReason = PageScreenshotPart::REASON_NOT_PUBLIC;
+        $refusalReason = $this->findScreenshotRefusalReasonOfHost($pageScreenshotPart->url);
+        if ($refusalReason !== null) {
+            $pageScreenshotPart->failureReason = $refusalReason;
             return $pageScreenshotPart;
         }
         $viewportWidth = $isMobile ? PageScreenshotPart::MOBILE_VIEWPORT_WIDTH_PX : PageScreenshotPart::DESKTOP_VIEWPORT_WIDTH_PX;

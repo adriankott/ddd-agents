@@ -53,6 +53,37 @@ class WebPageScreenshotPartsOfTheCurrentTurnTest extends UnitTestCase
         self::assertStringContainsString('never open a part you have already seen', $coverageText);
     }
 
+    public function testWithTheCallIdEveryEarlierCallCountsAndTheCallingRowIsLeftOut(): void
+    {
+        $messages = new AIConversationMessages();
+        $row = $this->buildUserMessage(0);
+        $messages->add($row);
+        // part 1's completion has not reached the read set yet: it still counts, the calling row (call_3) does not
+        $row = $this->buildScreenshotCall(1, ['url' => 'https://example.com', 'device' => 'Mobile'], AIConversationMessage::STATUS_RUNNING, 'call_1');
+        $messages->add($row);
+        $row = $this->buildScreenshotCall(2, ['url' => 'https://example.com', 'device' => 'mobile', 'part' => 2], AIConversationMessage::STATUS_COMPLETED, 'call_2');
+        $messages->add($row);
+        $row = $this->buildScreenshotCall(3, ['url' => 'https://example.com', 'device' => 'mobile', 'part' => 3], AIConversationMessage::STATUS_PENDING, 'call_3');
+        $messages->add($row);
+        $row = $this->buildScreenshotCall(4, ['url' => 'https://example.com', 'device' => 'mobile', 'part' => 4], AIConversationMessage::STATUS_FAILED, 'call_4');
+        $messages->add($row);
+
+        self::assertSame([1, 2], WebPageScreenshotPartsOfTheCurrentTurn::findPartNumbersShownInMessages($messages, 'https://example.com', PageScreenshotPart::DEVICE_MOBILE, 'call_3'));
+    }
+
+    public function testTheLineNamesThePictureBudget(): void
+    {
+        $pageScreenshotPart = new PageScreenshotPart();
+        $pageScreenshotPart->url = 'https://example.com';
+        $pageScreenshotPart->pageHeightPx = 9000;
+        $pageScreenshotPart->base64Images = ['a', 'b'];
+        $pageScreenshotPart->picturesKeptInView = 2;
+        self::assertStringContainsString('Only the newest 2 picture(s) stay in your view (this part has 2)', $pageScreenshotPart->toCoverageText());
+
+        $pageScreenshotPart->picturesKeptInView = null;
+        self::assertStringContainsString('Earlier screenshots leave your view when the picture budget is exceeded', $pageScreenshotPart->toCoverageText());
+    }
+
     public function testNothingOutsideTheLoop(): void
     {
         self::assertSame([], WebPageScreenshotPartsOfTheCurrentTurn::findPartNumbersShownInTurn(new AgentToolCallProvenance(), 'https://example.com', PageScreenshotPart::DEVICE_DESKTOP));
@@ -76,7 +107,7 @@ class WebPageScreenshotPartsOfTheCurrentTurnTest extends UnitTestCase
     }
 
     /** @param array<string, mixed> $arguments */
-    protected function buildScreenshotCall(int $index, array $arguments, string $status): AIConversationMessage
+    protected function buildScreenshotCall(int $index, array $arguments, string $status, ?string $toolCallId = null): AIConversationMessage
     {
         $message = $this->buildUserMessage($index);
         $message->role = AIConversationMessage::ROLE_ASSISTANT;
@@ -87,6 +118,7 @@ class WebPageScreenshotPartsOfTheCurrentTurnTest extends UnitTestCase
         $toolCall->name = WebPageScreenshotPartsOfTheCurrentTurn::TOOL_NAME;
         $toolCall->status = $status;
         $toolCall->arguments = $arguments;
+        $toolCall->toolCallId = $toolCallId;
         $message->toolCall = $toolCall;
         return $message;
     }

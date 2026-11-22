@@ -47,7 +47,7 @@
       "prompt": "What was new this week about the European AI Act?",
       "goal": "The user wants news of the current week.",
       "userFacts": "You only want news of this week, with date and source.",
-      "successRubric": "The agent searches with searchTheWeb and the recency filter 'week' (or 'day') set in the call itself, names EVERY item with the date its page list states (or says it is undated) and places it against today; when nothing happened inside the week it says so first and names the newest older item with its date. FAIL: an item without a date or an 'undated' mark; undated items presented as this week's news; no recency filter; a date, year or 'this week' written into the query text instead of the filter.",
+      "successRubric": "The agent searches with searchTheWeb and the recency filter 'week' (or 'day') set in the call itself, names EVERY item with the date its page list states (or says it is undated) and places it against today; when nothing happened inside the week it says so first and names the newest older item with its date. FAIL: an item without a date or an 'undated' mark; undated items presented as this week's news; no recency filter; a date, a month name, a year or 'this week' (in any language) written into the query text instead of the filter.",
       "expect": {"skill": "Web.Search", "tool": "searchTheWeb", "status": "COMPLETED"}
     },
     {
@@ -95,7 +95,7 @@
       "prompt": "Show me how the homepage of https://www.example.org looks on a phone.",
       "goal": "A screenshot request whose render fails with a named reason (the endpoint answers BOT_CHALLENGE).",
       "userFacts": "You want to know how the page looks on mobile.",
-      "successRubric": "The render fails; the agent follows the reason's next move (bot protection: no retry of the screenshot, it offers or uses getWebPageAsMarkdown for the text) and says plainly that it could not see the page. FAIL: the screenshot retried; a description of how the page looks without having seen it.",
+      "successRubric": "The render fails; the agent follows the reason's next move (bot protection: no retry of the screenshot, it offers or uses getWebPageAsMarkdown for the text) and says plainly that it could not see the page. FAIL: the screenshot retried; a description of how the page looks without having seen it. The judge does not see pictures; judge the calls and the stated reason only.",
       "expect": {"skill": "Web.PageView", "tool": "getWebPageAsScreenshot"}
     },
     {
@@ -103,8 +103,32 @@
       "prompt": "Go through the whole mobile version of https://www.example.com from top to bottom and tell me what each section shows.",
       "goal": "A long mobile page read part by part.",
       "userFacts": "You want a section-by-section description of the whole mobile page.",
-      "successRubric": "The agent opens part 1, 2, … in order with device mobile, describes each part before it opens the next, and opens no part twice in the turn. FAIL: a part opened twice; five or more screenshot calls for a page of three parts; parts skipped without saying so.",
+      "successRubric": "The agent opens part 1, 2, … in order with device mobile, describes each part before it opens the next, and opens no part twice in the turn. FAIL: a part opened twice; five or more screenshot calls for a page of three parts; parts skipped without saying so. The judge does not see the pictures: judge the calls (which parts, which device, no part reopened) and that a description of each opened part exists — never rate a visual statement as invented or wrong.",
       "expect": {"skill": "Web.PageView", "tool": "getWebPageAsScreenshot", "status": "COMPLETED"}
+    },
+    {
+      "id": "websearch.read-url.typo-host",
+      "prompt": "Read https://www.exmaple-typo-shop.com/pricing and tell me the prices.",
+      "goal": "A page read of a host that does not exist (a typo).",
+      "userFacts": "You typed the address from memory; you do not know it is wrong.",
+      "successRubric": "The read fails as an address that cannot be resolved; the agent says the address may be misspelled and asks for the correct one or offers to search for the shop — it does not call the address private or not public, does not retry it unchanged and does not invent prices. FAIL: 'not a public address'; the same URL read again; prices without a read page.",
+      "expect": {"skill": "Web.Search", "tool": "getWebPageAsMarkdown"}
+    },
+    {
+      "id": "websearch.read-url.two-pages-named",
+      "prompt": "Compare what https://www.example.com/ and https://www.example.org/ say about themselves.",
+      "goal": "Two pasted pages read and compared.",
+      "userFacts": "You pasted both URLs and want a short comparison.",
+      "successRubric": "The agent reads BOTH pages in ONE getWebPageAsMarkdown call (`urls`) and names each URL next to what it takes from that page. FAIL: two single-page calls; an answer that names only one URL or none.",
+      "expect": {"skill": "Web.Search", "tool": "getWebPageAsMarkdown", "status": "COMPLETED"}
+    },
+    {
+      "id": "websearch.urls.no-built-paths",
+      "prompt": "Find the application deadline of the 2026 small business energy grant on the official site and read that page.",
+      "goal": "A page found by search and read; the model must not build a URL itself.",
+      "userFacts": "You want the deadline from the official page.",
+      "successRubric": "The agent reads only URLs the search returned (copied exactly); when a read fails it follows the note and reads a listed page of the same site instead of a path it built. FAIL: a read of a URL that no tool returned (an invented path segment).",
+      "expect": {"skill": "Web.Search", "tool": "getWebPageAsMarkdown"}
     }
   ]
 }

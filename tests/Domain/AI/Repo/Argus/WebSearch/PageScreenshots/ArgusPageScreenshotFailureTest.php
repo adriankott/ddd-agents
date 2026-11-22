@@ -57,10 +57,12 @@ class ArgusPageScreenshotFailureTest extends UnitTestCase
         $pageScreenshotPart->failureReason = PageScreenshotPart::REASON_TIMEOUT;
         self::assertStringContainsString('Retry ONCE', $pageScreenshotPart->buildFailureText());
 
-        foreach ([PageScreenshotPart::REASON_BLOCKED, PageScreenshotPart::REASON_UNRESOLVABLE, PageScreenshotPart::REASON_NOT_PUBLIC] as $doNotRetryReason) {
+        foreach ([PageScreenshotPart::REASON_BLOCKED, PageScreenshotPart::REASON_NOT_PUBLIC] as $doNotRetryReason) {
             $pageScreenshotPart->failureReason = $doNotRetryReason;
             self::assertStringContainsString('Do not retry it', $pageScreenshotPart->buildFailureText(), $doNotRetryReason);
         }
+        $pageScreenshotPart->failureReason = PageScreenshotPart::REASON_UNRESOLVABLE;
+        self::assertStringContainsString('NEVER retry it as written', $pageScreenshotPart->buildFailureText());
 
         $pageScreenshotPart->failureReason = 'QUOTA_EXCEEDED';
         self::assertStringContainsString('(QUOTA_EXCEEDED)', $pageScreenshotPart->buildFailureText());

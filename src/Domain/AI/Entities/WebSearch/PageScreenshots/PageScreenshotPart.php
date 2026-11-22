@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DDD\Domain\AI\Entities\WebSearch\PageScreenshots;
 
+use DDD\Domain\AI\Entities\WebSearch\WebFetchFailureReasons;
 use DDD\Domain\AI\Entities\MCPPackages\ToolResultUntrustedSegments;
 use DDD\Domain\Base\Entities\ValueObject;
 
@@ -42,10 +43,14 @@ class PageScreenshotPart extends ValueObject
     public const string REASON_BOT_CHALLENGE = 'BOT_CHALLENGE';
     public const string REASON_TIMEOUT = 'TIMEOUT';
     public const string REASON_BLOCKED = 'BLOCKED';
-    public const string REASON_UNRESOLVABLE = 'UNRESOLVABLE';
+    public const string REASON_UNRESOLVABLE = WebFetchFailureReasons::UNRESOLVABLE;
     public const string REASON_FETCH_FAILED = 'FETCH_FAILED';
     public const string REASON_NOT_PUBLIC = 'NOT_PUBLIC';
     public const string REASON_CAPABILITY_OFF = 'CAPABILITY_OFF';
+    public const string REASON_UNSUPPORTED_TYPE = WebFetchFailureReasons::UNSUPPORTED_TYPE;
+    public const string REASON_TOO_LARGE = WebFetchFailureReasons::TOO_LARGE;
+    public const string REASON_NO_CONTENT = WebFetchFailureReasons::NO_CONTENT;
+    public const string REASON_TOO_MANY_REDIRECTS = WebFetchFailureReasons::TOO_MANY_REDIRECTS;
 
     /** @var string The rendered URL */
     public string $url = '';
@@ -73,6 +78,12 @@ class PageScreenshotPart extends ValueObject
 
     /** @var int[] The parts of this page and device already shown earlier in the current turn (ascending) */
     public array $partNumbersAlreadyShownInTurn = [];
+
+    /**
+     * @var int|null How many tool pictures stay in the model's view on one model call (the conversation's
+     * `maxToolCallImagesOnWire`); null when unknown (outside the agent loop)
+     */
+    public ?int $picturesKeptInView = null;
 
     public static function partCountForHeight(int $pageHeightPx): int
     {
@@ -114,13 +125,16 @@ class PageScreenshotPart extends ValueObject
     {
         $urlLabel = $this->url !== '' ? $this->url : 'the page';
         $noGuessing = ' Do not guess how it looks.';
+        $sharedFailureSentence = WebFetchFailureReasons::findSharedFailureSentence($this->failureReason, $urlLabel, WebFetchFailureReasons::CAPABILITY_SCREENSHOT);
+        if ($sharedFailureSentence !== null) {
+            return $sharedFailureSentence . $noGuessing;
+        }
         return match ($this->failureReason) {
             self::REASON_BOT_CHALLENGE => "The site {$urlLabel} protects itself against bots: the renderer only gets a "
                 . 'challenge page. Do not retry the screenshot; read its text with getWebPageAsMarkdown or use another source.' . $noGuessing,
             self::REASON_TIMEOUT => "Rendering {$urlLabel} timed out. Retry ONCE; if it times out again, read the text with "
                 . 'getWebPageAsMarkdown instead.' . $noGuessing,
             self::REASON_BLOCKED => "The renderer refused {$urlLabel} (blocked destination). Do not retry it." . $noGuessing,
-            self::REASON_UNRESOLVABLE => "The address {$urlLabel} has no DNS record: no such website, or a typo. Do not retry it." . $noGuessing,
             self::REASON_FETCH_FAILED => "The page {$urlLabel} could not be loaded by the renderer (unreachable or refused). "
                 . 'Do not retry it now; getWebPageAsMarkdown may still read its text.' . $noGuessing,
             self::REASON_NOT_PUBLIC => "{$urlLabel} is not a public web address, so it is not rendered. Do not retry it." . $noGuessing,
@@ -130,6 +144,24 @@ class PageScreenshotPart extends ValueObject
                 . ' — the page may be unreachable, not public, blocked, or not an HTML page. Say that you could not load it '
                 . 'visually.' . $noGuessing,
         };
+    }
+
+    /**
+     * The line about the picture budget: with the conversation's budget known, how many pictures stay in view and that
+     * the pictures of earlier parts are gone at the next step; else the general rule.
+     */
+    public function buildPictureBudgetText(): string
+    {
+        $describeNow = ' write down what this part shows NOW, before you open the next one, and never open a part you have already seen.';
+        if ($this->picturesKeptInView === null || $this->picturesKeptInView < 1) {
+            return ' Earlier screenshots leave your view when the picture budget is exceeded:' . $describeNow;
+        }
+        return sprintf(
+            ' Only the newest %d picture(s) stay in your view (this part has %d): once you open another part, the pictures of this one are gone —%s',
+            $this->picturesKeptInView,
+            count($this->base64Images),
+            $describeNow
+        );
     }
 
     /** The line about parts already shown in this turn; empty when none was. */
@@ -177,8 +209,8 @@ class PageScreenshotPart extends ValueObject
         return sprintf('Screenshot of %s (%s, %d px wide). ', ToolResultUntrustedSegments::wrapSingleLine($this->url, $this->url), $this->device, $this->pageWidthPx) . $coverage . $tallWindowNote
             . $this->buildAlreadyShownText()
             . ' Describe / judge what you actually SEE (layout, colours, text, images, visual issues); do not infer from the URL.'
-            . ' Earlier screenshots leave your view when the picture budget is exceeded: write down what this part shows'
-            . ' BEFORE you open the next one, and never open a part you have already seen. The render may be up to 10 minutes old; pass noCache: true for a fresh one'
+            . $this->buildPictureBudgetText()
+            . ' The render may be up to 10 minutes old; pass noCache: true for a fresh one'
             . ' (after a change to the page).';
     }
 }

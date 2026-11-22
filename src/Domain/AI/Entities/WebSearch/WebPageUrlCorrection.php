@@ -24,6 +24,15 @@ class WebPageUrlCorrection extends ValueObject
     /** @var string[] The listed hit URLs that replaced an inexact copy. */
     public array $correctedUrls = [];
 
+    /** @var string[] The page URLs the searches of the conversation listed. */
+    public array $listedHitUrls = [];
+
+    /** The failure reasons after which a URL no search listed is named as such, with the listed pages of its site. */
+    public const array REASONS_OF_A_PAGE_THAT_MAY_NOT_EXIST = [WebPageMarkdown::REASON_FETCH_FAILED, 'NOT_FOUND'];
+
+    /** How many listed pages of the site the note names at most. */
+    public const int MAX_LISTED_PAGES_OF_THE_SITE_NAMED = 5;
+
     /**
      * @param string[] $requestedUrls
      * @param string[] $earlierSearchHitUrls the page URLs the searches of the conversation listed
@@ -31,6 +40,7 @@ class WebPageUrlCorrection extends ValueObject
     public static function fromRequestedUrls(array $requestedUrls, array $earlierSearchHitUrls): static
     {
         $urlCorrection = static::newInstance();
+        $urlCorrection->listedHitUrls = array_values(array_map('strval', $earlierSearchHitUrls));
         $hitUrlsByCanonicalKey = [];
         $hitUrlsByFoldedKey = [];
         foreach ($earlierSearchHitUrls as $hitUrl) {
@@ -62,6 +72,47 @@ class WebPageUrlCorrection extends ValueObject
         }
         return 'NOTE: read the URL as the search listed it (' . implode(', ', $this->correctedUrls)
             . ') — copy URLs character for character, never decode, transliterate or shorten them.';
+    }
+
+    /**
+     * For a page that failed as if it did not exist ({@see REASONS_OF_A_PAGE_THAT_MAY_NOT_EXIST}) and that no search
+     * listed: the note that names the listed pages of the same site, so the model reads one of those instead of an
+     * address it built itself. Null when the URL was listed, the read failed otherwise, or no page of its site was
+     * listed.
+     */
+    public function buildUnlistedFailedUrlNote(WebPageMarkdown $failedWebPageMarkdown): ?string
+    {
+        $failedUrl = (string)($failedWebPageMarkdown->url ?? '');
+        if ($failedUrl === '' || ($failedWebPageMarkdown->ok ?? false)
+            || !in_array($failedWebPageMarkdown->reason, static::REASONS_OF_A_PAGE_THAT_MAY_NOT_EXIST, true)
+        ) {
+            return null;
+        }
+        $failedCanonicalKey = WebPageMarkdown::canonicalUrlKey($failedUrl);
+        $failedHost = static::findHostOfCanonicalKey($failedCanonicalKey);
+        $listedPagesOfTheSite = [];
+        foreach ($this->listedHitUrls as $listedHitUrl) {
+            $listedCanonicalKey = WebPageMarkdown::canonicalUrlKey($listedHitUrl);
+            if ($listedCanonicalKey === $failedCanonicalKey) {
+                return null;
+            }
+            if ($failedHost !== '' && static::findHostOfCanonicalKey($listedCanonicalKey) === $failedHost
+                && !in_array($listedHitUrl, $listedPagesOfTheSite, true)
+            ) {
+                $listedPagesOfTheSite[] = $listedHitUrl;
+            }
+        }
+        if ($listedPagesOfTheSite === []) {
+            return null;
+        }
+        return 'NOTE: ' . $failedUrl . ' was not in the search results — never build a URL yourself. Listed pages of this site: '
+            . implode(', ', array_slice($listedPagesOfTheSite, 0, static::MAX_LISTED_PAGES_OF_THE_SITE_NAMED)) . '.';
+    }
+
+    /** The host part of a {@see WebPageMarkdown::canonicalUrlKey()}. */
+    protected static function findHostOfCanonicalKey(string $canonicalKey): string
+    {
+        return strtolower((string)preg_replace('~[/?].*$~s', '', $canonicalKey));
     }
 
     /** The URL without scheme, `www.`, fragment and trailing slash, percent-decoded, lower case, transliterated. */

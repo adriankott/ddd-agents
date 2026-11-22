@@ -12,6 +12,7 @@ use DDD\Domain\AI\Entities\MCPPackages\MCPToolExecutionTimeout;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolRefreshesState;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolReturnsUntrustedContent;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolSummary;
+use DDD\Domain\AI\Entities\Conversations\Messages\ContextRetentionSettings;
 use DDD\Domain\AI\Entities\WebSearch\PageScreenshots\PageScreenshotPart;
 use DDD\Domain\AI\Services\WebSearch\AIWebSearchService;
 use DDD\Infrastructure\Services\DDDService;
@@ -84,6 +85,12 @@ class WebPageScreenshotMCPPackage extends MCPPackage
             $pageScreenshotPart->url,
             $pageScreenshotPart->device
         );
+        $conversation = $callProvenance->conversation;
+        if ($conversation !== null && !$callProvenance->isEvalHarnessCall) {
+            $pageScreenshotPart->picturesKeptInView = isset($conversation->contextRetentionSettings)
+                ? $conversation->contextRetentionSettings->getMaxToolCallImagesOnWire()
+                : ContextRetentionSettings::DEFAULT_MAX_TOOL_CALL_IMAGES_ON_WIRE;
+        }
         if ($pageScreenshotPart->base64Images === []) {
             return MCPToolResponse::error(sprintf(
                 'The page %s is %s px tall = %d part(s); part %d does not exist. Open part=1 … part=%d.',
