@@ -328,8 +328,9 @@ adds its own dated folders through `getRetainedFolderNamePatterns()`.
 ## The case's own workspace
 
 Every case run (each repetition, each child process) gets a workspace key of its own,
-`eval-<case>-r<repetition>-<runToken>` (lower case, `[a-z0-9-]`, the case part at most 60 characters; the repetition
-is 1 where the process does not know it, the random run token keeps every run apart). The runner puts it on the run
+`eval-<case>-r<repetition>-<runToken>` (lower case, `[a-z0-9-]`, the case part at most 60 characters; a `--repeat`
+run tells each child its repetition with `--repetition`; a run that counts none has no `-r<repetition>` segment; the
+random run token keeps every run apart). The runner puts it on the run
 options and the conversation's run settings, so every WORKSPACE tool of the case (and of its sub-agents) receives it
 as `AgentToolCallProvenance::$workspaceKey` and never touches the space's own workspace. Before the conversation is
 assembled the runner calls `AgentEvalRunHooksService::prepareWorkspaceOfCase(scope, key, scratchFiles, reporter)`

@@ -840,7 +840,7 @@ class AgentEvalRunnerService extends Service
         if ($agentEvalRunOptions->workspaceKey !== null) {
             return;
         }
-        $agentEvalRunOptions->workspaceKey = $this->buildWorkspaceKeyOfCase($agentEvalCase->getId(), $agentEvalRunOptions->repetition ?? 1, bin2hex(random_bytes(4)));
+        $agentEvalRunOptions->workspaceKey = $this->buildWorkspaceKeyOfCase($agentEvalCase->getId(), $agentEvalRunOptions->repetition, bin2hex(random_bytes(4)));
         try {
             foreach ($this->getAgentEvalRunHooksService()->prepareWorkspaceOfCase($agentEvalScope, $agentEvalRunOptions->workspaceKey, $agentEvalCase->getScratchFiles(), $agentEvalRunOptions) as $preparedLine) {
                 $agentEvalRunOptions->reportProgress(static::WORKSPACE_REPORT_LINE_PREFIX . $preparedLine);
@@ -850,13 +850,16 @@ class AgentEvalRunnerService extends Service
         }
     }
 
-    /** The workspace key of a case's run: `eval-<case>-r<repetition>-<runToken>`, lower case `[a-z0-9-]`, the case part at most 60 characters. */
-    public function buildWorkspaceKeyOfCase(string $caseId, int $repetition, string $runToken): string
+    /**
+     * The workspace key of a case's run: `eval-<case>-r<repetition>-<runToken>`, or `eval-<case>-<runToken>` when the
+     * caller does not count repetitions (`$repetition` null); lower case `[a-z0-9-]`, the case part at most 60 characters.
+     */
+    public function buildWorkspaceKeyOfCase(string $caseId, ?int $repetition, string $runToken): string
     {
         $caseKey = trim((string)preg_replace('/[^a-z0-9]+/', '-', strtolower($caseId)), '-');
         $caseKey = trim(substr($caseKey !== '' ? $caseKey : 'case', 0, 60), '-');
         $runKey = trim((string)preg_replace('/[^a-z0-9]+/', '-', strtolower($runToken)), '-');
-        return 'eval-' . $caseKey . '-r' . max(1, $repetition) . '-' . $runKey;
+        return 'eval-' . $caseKey . ($repetition !== null ? '-r' . max(1, $repetition) : '') . '-' . $runKey;
     }
 
     /** Removes the run's own workspace ({@see AgentEvalRunHooksService::cleanUpWorkspaceOfCase()}) and forgets its key; never fails the case. */

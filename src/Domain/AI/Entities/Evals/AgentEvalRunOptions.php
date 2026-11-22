@@ -55,7 +55,7 @@ class AgentEvalRunOptions implements AIConversationProgressReporterInterface
     public ?int $repetition = null;
 
     /**
-     * @var string|null The case's own workspace of this run (`eval-<case>-r<repetition>-<runToken>`), set when the case
+     * @var string|null The case's own workspace of this run (`eval-<case>-r<repetition>-<runToken>`, without `-r<repetition>` when the repetition is not counted), set when the case
      * starts ({@see \DDD\Domain\AI\Services\Eval\AgentEvalRunnerService::prepareWorkspaceOfCase()}) and cleared
      * after its clean-up; the conversation carries it in its run settings
      */

@@ -78,6 +78,7 @@ class WorkspaceToolEffectTest extends UnitTestCase
     {
         $agentEvalRunnerService = new AgentEvalRunnerService();
         self::assertSame('eval-workspace-shell-csv-summary-r2-a1b2c3d4', $agentEvalRunnerService->buildWorkspaceKeyOfCase('Workspace.Shell/csv summary', 2, 'a1b2c3d4'));
+        self::assertSame('eval-workspace-shell-csv-summary-a1b2c3d4', $agentEvalRunnerService->buildWorkspaceKeyOfCase('Workspace.Shell/csv summary', null, 'a1b2c3d4'), 'no repetition counted: no r segment');
         self::assertNotSame(
             $agentEvalRunnerService->buildWorkspaceKeyOfCase('Workspace.Shell/csv summary', 1, 'a1b2c3d4'),
             $agentEvalRunnerService->buildWorkspaceKeyOfCase('Workspace.Shell/csv summary', 1, 'e5f6a7b8')

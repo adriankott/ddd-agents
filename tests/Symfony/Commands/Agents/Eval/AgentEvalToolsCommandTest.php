@@ -278,6 +278,11 @@ class AgentEvalToolsCommandTest extends AgentEvalResultFilesTestCase
         self::assertSame('--transient', $childArguments[array_key_last($childArguments)]);
         self::assertNotContains('--judge', $childArguments);
         self::assertNotContains('--ignore-budget', $childArguments);
+        self::assertSame([], preg_grep('/^--repetition=/', $childArguments), 'a run without --repeat names no repetition');
+
+        $runSettings->repeat = 3;
+        $childArguments = $probeCommand->buildChildProcessArgumentsOfTask($agentEvalSuiteTask->buildRepetition(2), new ArrayInput([], $probeCommand->getDefinition()), $runSettings);
+        self::assertContains('--repetition=2', $childArguments, 'a repeated case tells its child the repetition: it names the case\'s workspace');
     }
 
     public function testARunWithACaseFilterRunsInThisProcessAndARepeatedOneInChildProcesses(): void

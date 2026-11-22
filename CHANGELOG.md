@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.25
+
+- Fixed: the eval workspace key of a repeated case names its real repetition: `app:ai-agent:eval-tools --repeat`
+  passes `--repetition=<k>` to each child process; a run that counts no repetitions has no `-r<k>` segment
+  (`eval-<case>-<runToken>`, `AgentEvalRunnerService::buildWorkspaceKeyOfCase(string, ?int, string)`). Before,
+  every repetition showed `r1`.
+
 ## 0.1.24
 
 - Fixed: the harness calls of an evaluation (restore, `stateAfterRun` read and cleanup, the judge's end-state reads)
