@@ -86,7 +86,8 @@ class AIConversationAuditRenderService extends Service
         foreach (($conversation->messages?->getElements() ?? []) as $i => $message) {
             $toolCall = isset($message->toolCall) ? $message->toolCall : null;
             $toolName = (string)($toolCall?->name ?? '');
-            if ($toolCall === null || $toolName === '' || self::isReadOnlyToolName($toolName)
+            // a WORKSPACE call saved nothing on the record: not in the ledger (the counts list it as a workspace change)
+            if ($toolCall === null || $toolName === '' || self::isReadOnlyToolName($toolName) || $toolCall->changesOnlyTheWorkspace()
                 || in_array($toolName, TaskPlan::PLAN_TOOL_NAMES, true) || $toolName === 'load_skills'
                 || $toolCall->status !== AIConversationMessage::STATUS_COMPLETED || $toolCall->wasRefusedAsDuplicate
             ) {

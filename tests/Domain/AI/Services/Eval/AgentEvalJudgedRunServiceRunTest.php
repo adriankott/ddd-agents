@@ -272,7 +272,10 @@ class AgentEvalJudgedRunServiceRunTest extends IntegrationTestCase
 
         $conversation = $agentEvalJudgedRunService->runSim($this->buildScope(), $this->buildSimCase(), $agentEvalJudgedRunOptions)->getConversation();
 
-        self::assertEquals((new AgentEvalJudgedRunService())->buildEvalRunSettings(AgentEvalJudgedRunOptions::forArms()), $conversation->runSettings, 'the evaluation marker and no arm');
+        $expectedRunSettings = (new AgentEvalJudgedRunService())->buildEvalRunSettings(AgentEvalJudgedRunOptions::forArms());
+        self::assertMatchesRegularExpression('/^eval-[a-z0-9-]+-r1-[a-f0-9]{8}$/', (string)$conversation->runSettings->workspaceKey, 'the case\'s own workspace');
+        $expectedRunSettings->workspaceKey = $conversation->runSettings->workspaceKey;
+        self::assertEquals($expectedRunSettings, $conversation->runSettings, 'the evaluation marker and no arm');
         self::assertEquals(ContextRetentionSettings::buildForNewConversation(null, null), $conversation->contextRetentionSettings, 'the platform\'s creation stamps');
         self::assertFalse(isset($conversation->id), 'a transient run stores nothing');
         self::assertSame(5, $conversation->accountId);

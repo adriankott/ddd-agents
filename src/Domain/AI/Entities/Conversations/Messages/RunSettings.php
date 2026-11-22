@@ -53,6 +53,15 @@ class RunSettings extends ValueObject
     public ?int $maxStepsPerTurn = null;
 
     /**
+     * @var string|null The workspace a WORKSPACE tool of this conversation works in
+     * ({@see \DDD\Domain\AI\Entities\MCPPackages\MCPToolEffect::WORKSPACE}); null = the tool derives its own (from the
+     * agent space or the account). Set by an evaluation for each case and repetition
+     * (`eval-<case>-r<repetition>-<runToken>`), so cases never share a workspace; inherited by delegation children (one
+     * run tree, one workspace). Reaches the tool as {@see \DDD\Domain\AI\Entities\Conversations\Agent\AgentToolCallProvenance::$workspaceKey}.
+     */
+    public ?string $workspaceKey = null;
+
+    /**
      * @var float|null Cost ceiling in USD for ONE user turn: Σ of the turn's own model-call costs plus the
      * delegation children's spend carried in their settle slices ({@see \DDD\Domain\AI\Entities\Conversations\AIConversation::buildDelegationResultSlice()}).
      * The child share is enforceable only at FOLD time (the children already ran); a breach is a GRACEFUL terminal
@@ -444,7 +453,8 @@ class RunSettings extends ValueObject
         if (in_array($toolName, $blockedToolNames, true)) {
             return $blockedToolSimulatedErrors[$toolName] ?? "Tool '{$toolName}': " . static::EVAL_TOOL_REFUSAL_SENTENCE;
         }
-        if ($everyWriteToolBlocked && !MCPToolEffectCatalog::isReadOnlyToolName($toolName)) {
+        // a WORKSPACE tool changes only the case's own workspace: let through like a read
+        if ($everyWriteToolBlocked && !MCPToolEffectCatalog::changesNoSharedDataForToolName($toolName)) {
             return "Tool '{$toolName}': " . static::EVAL_TOOL_REFUSAL_SENTENCE;
         }
         return null;

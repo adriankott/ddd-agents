@@ -10,7 +10,9 @@ use DDD\Domain\AI\Entities\Conversations\Agent\Tools\AgentMetaTools;
  * The declared {@see MCPToolEffect} of every agent tool, by tool name — for the readers that hold only a STORED tool
  * call (its name), not its definition: the supervisor, the paused-turn record, the write-less owner-turn windows, the
  * compaction telemetry, the identical-write repeat refusal, the record-change check after a completed call, the
- * fork-join, the per-turn read reuse, the eval read-only gate.
+ * fork-join, the per-turn read reuse, the eval read-only gate. A WORKSPACE tool ({@see MCPToolEffect::WORKSPACE}) is
+ * neither a read nor a state change for any of them: the supervisor and the compaction telemetry do not count it as a
+ * write, the eval gate lets it through ({@see changesNoSharedDataForToolName()}).
  *
  * Built once per process from the `#[MCPToolEffect]` attributes of the tool methods {@see MCPToolAttributeCatalog} found
  * in the packages every skill carries (one reflection walk shared by both catalogs) — code metadata, the same in every
@@ -48,6 +50,18 @@ class MCPToolEffectCatalog
     public static function changesStateForToolName(string $toolName): bool
     {
         return self::getEffectForToolName($toolName)?->changesState() === true;
+    }
+
+    /** True when the named tool changes only the agent's own workspace ({@see MCPToolEffect::WORKSPACE}). */
+    public static function changesOnlyTheWorkspaceForToolName(string $toolName): bool
+    {
+        return self::getEffectForToolName($toolName)?->changesOnlyTheWorkspace() === true;
+    }
+
+    /** True when the named tool changes no domain data and makes nothing visible (READ or WORKSPACE); false for an unknown name. */
+    public static function changesNoSharedDataForToolName(string $toolName): bool
+    {
+        return self::getEffectForToolName($toolName)?->changesNoSharedData() === true;
     }
 
     /** True when the named tool removes something — its "not found" after an identical completed call means it is gone. */

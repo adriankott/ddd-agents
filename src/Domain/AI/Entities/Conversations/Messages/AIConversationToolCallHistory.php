@@ -551,7 +551,7 @@ class AIConversationToolCallHistory extends ValueObject
      * - a signal row of any source or a user-role row ({@see AIConversationMessage::isSignalOrUserRoleRow()}): a
      *   message to a sub-agent, an owner's confirmation or widget click, a connected channel may bring what was missing;
      * - a completed call that changes state and was not refused as a repeat ({@see ToolCall::changesState()}): a granted
-     *   mandate, a changed setting;
+     *   mandate, a changed setting; or a completed workspace change ({@see ToolCall::changesOnlyTheWorkspace()});
      * - the newest identical call when it was not refused finally (it ran, or failed otherwise).
      * An identical call the loop refused as a repeat ran nothing and is passed over, so a third identical call meets the
      * executor's own refusal, never the loop's answer to the second. `$toolCall` itself is skipped.
@@ -573,7 +573,8 @@ class AIConversationToolCallHistory extends ValueObject
             if ($isIdenticalCall) {
                 return $priorCall->isRefusedAsFinal() ? $priorCall : null;
             }
-            if ($priorCall->status === AIConversationMessage::STATUS_COMPLETED && $priorCall->changesState()) {
+            // a workspace change ends the scan too: a file the refused call missed may exist now
+            if ($priorCall->status === AIConversationMessage::STATUS_COMPLETED && ($priorCall->changesState() || $priorCall->changesOnlyTheWorkspace())) {
                 return null;
             }
         }
@@ -719,6 +720,7 @@ class AIConversationToolCallHistory extends ValueObject
                 $picturesRidingAfterMatch += $priorCall->countPicturesStillRiding($transientImageToolCallIds);
             }
             // a completed write (any non-read work tool) after the match changed the account data → re-fetch needed.
+            // A WORKSPACE call blinds every earlier read too (the safe rule: which reads read the workspace is unknown).
             // The plan tools are META: a plan tick mutates NO account data and must not blind the dedup.
             // A write REFUSED as a duplicate persisted nothing — it must not blind the dedup either (otherwise two
             // refused repeats of a write would allow a re-fetch of a read that is still current).

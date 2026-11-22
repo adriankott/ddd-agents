@@ -35,6 +35,7 @@ class AgentEvalRunCountsTest extends UnitTestCase
             'failedTicks' => 1,
             'rejectedTicks' => 2,
             'outwardWrites' => 2,
+            'workspaceChanges' => 0,
             'mandatesGranted' => 1,
             'repeatedTextsSuppressed' => 1,
             'loopCorrectives' => 1,
@@ -84,7 +85,7 @@ class AgentEvalRunCountsTest extends UnitTestCase
         self::assertSame(
             "\n[COUNTS — machine-counted and AUTHORITATIVE, never recount]\n"
             . "- ownerReplies: 2\n- agentMessages: 1\n- statusOnlyMessages: 1\n- toolWidgets: 1\n- failedTicks: 1\n- rejectedTicks: 2\n"
-            . "- outwardWrites: 2\n- mandatesGranted: 1\n- repeatedTextsSuppressed: 1\n- loopCorrectives: 1\n- supervisorSteers: 1",
+            . "- outwardWrites: 2\n- workspaceChanges: 0\n- mandatesGranted: 1\n- repeatedTextsSuppressed: 1\n- loopCorrectives: 1\n- supervisorSteers: 1",
             $agentEvalRunCounts->toJudgeText()
         );
         self::assertSame(array_values($agentEvalRunCounts->toArray()), array_values($agentEvalRunCounts->buildCountsByJudgeLabel()));

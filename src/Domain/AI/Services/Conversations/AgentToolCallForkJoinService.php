@@ -76,7 +76,7 @@ class AgentToolCallForkJoinService extends Service
 
     /**
      * The calls of one model response the fork may run: every call whose tool declares `#[MCPToolParallelSafe]`
-     * among the conversation's loaded packages; empty below {@see MIN_FORKABLE_CALLS}. The caller has already
+     * among the conversation's loaded packages, never a WORKSPACE call ({@see \DDD\Domain\AI\Entities\MCPPackages\MCPToolEffect::WORKSPACE}); empty below {@see MIN_FORKABLE_CALLS}. The caller has already
      * excluded the calls the loop's guards intercept (repeats, deduplicated reads, unloaded skills) — those never
      * execute at all, so they never fork.
      *
@@ -101,6 +101,11 @@ class AgentToolCallForkJoinService extends Service
             }
             $toolDefinition = $toolDefinitions->getByName($toolName);
             if ($toolDefinition === null || !$toolDefinition->isParallelSafe) {
+                continue;
+            }
+            // A WORKSPACE call never forks, even when declared parallel-safe: the calls of one conversation share one
+            // workspace and its shell session (working directory, environment), so they run one after the other
+            if ($toolCall->changesOnlyTheWorkspace()) {
                 continue;
             }
             // Two calls of the SAME tool never fork: the admission declares the tool's rows disjoint from OTHER
@@ -135,6 +140,10 @@ class AgentToolCallForkJoinService extends Service
                 continue;
             }
             if (in_array($toolName, AIConversationMessage::META_TOOL_NAMES, true) || $toolCall->isReadOnly()) {
+                continue;
+            }
+            // an inline WORKSPACE call writes no row a forked call reads: the children need not wait for it
+            if ($toolCall->changesOnlyTheWorkspace()) {
                 continue;
             }
             // a writer of agent memory rows only never writes a row a forked call reads: it does not defer the children

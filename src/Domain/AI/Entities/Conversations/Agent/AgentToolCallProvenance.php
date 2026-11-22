@@ -100,6 +100,15 @@ class AgentToolCallProvenance extends ValueObject implements MCPServerProvidedIn
     public bool $isEvalHarnessCall = false;
 
     /**
+     * @var string|null The workspace a WORKSPACE tool works in for this call
+     * ({@see \DDD\Domain\AI\Entities\MCPPackages\MCPToolEffect::WORKSPACE}): the conversation's
+     * {@see \DDD\Domain\AI\Entities\Conversations\Messages\RunSettings::$workspaceKey} — an evaluation sets one per
+     * case and repetition. Null = the tool derives its own key (from the agent space, or the account at account level).
+     * The package owns no workspace: the key is the application's to interpret.
+     */
+    public ?string $workspaceKey = null;
+
+    /**
      * The provenance of a deterministic eval-harness call on one space (null: account level) — with the JUDGED conversation when the
      * call reads the end state for the judge: the read tools then see what the agent sees on a resumed turn (the
      * decided variants, the owner rows), while the tool writer writes no row for it (a harness read never writes the

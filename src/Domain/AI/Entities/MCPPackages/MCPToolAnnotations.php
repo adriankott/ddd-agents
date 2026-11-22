@@ -43,7 +43,8 @@ class MCPToolAnnotations extends ValueObject
         $annotations = new static();
         $annotations->readOnlyHint = $effect->isReadOnly();
         $annotations->destructiveHint = $effect->effect === MCPToolEffect::DELETE || $effect->isOutwardAction;
-        $annotations->idempotentHint = $effect->isReadOnly() || !$effect->identicalRepeatDoesNewWork;
+        // a workspace call (a shell command) is no idempotent write: its repeat is new work
+        $annotations->idempotentHint = $effect->isReadOnly() || ($effect->changesState() && !$effect->identicalRepeatDoesNewWork);
         $annotations->openWorldHint = $effect->isOutwardAction || $returnsUntrustedContent;
         return $annotations;
     }

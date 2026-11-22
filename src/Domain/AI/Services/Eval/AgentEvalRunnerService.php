@@ -99,6 +99,9 @@ class AgentEvalRunnerService extends Service
     /** @var string The prefix of every teardown report line */
     public const string TEARDOWN_REPORT_LINE_PREFIX = 'restore teardown: ';
 
+    /** @var string The prefix of a line about the case's own workspace (prepared, removed, failed) */
+    public const string WORKSPACE_REPORT_LINE_PREFIX = 'workspace: ';
+
     /**
      * The scope of a run of `$agentEvalCase`, resolved by the application's hooks: the first call for every case, also
      * before the applicability check. Reads only.
@@ -154,6 +157,7 @@ class AgentEvalRunnerService extends Service
     public function runCase(AgentEvalScope $agentEvalScope, AgentEvalCase $agentEvalCase, AgentEvalRunOptions $agentEvalRunOptions): AgentEvalRunOutcome
     {
         $agentEvalCase = $this->resolveRecordReferencesOfCase($agentEvalScope, $agentEvalCase);
+        $this->prepareWorkspaceOfCase($agentEvalScope, $agentEvalCase, $agentEvalRunOptions);
         if ($agentEvalCase->getRestore() !== null) {
             return $this->runWithRestore($agentEvalScope, $agentEvalCase, $agentEvalRunOptions);
         }
@@ -814,7 +818,59 @@ class AgentEvalRunnerService extends Service
     public function tearDownResidueOfRun(AgentEvalRunOptions $agentEvalRunOptions): array
     {
         $conversation = $agentEvalRunOptions->takeBuiltConversation();
-        return $conversation !== null ? $this->tearDownResidueOfConversation($conversation, $agentEvalRunOptions) : [];
+        $closedLines = $conversation !== null ? $this->tearDownResidueOfConversation($conversation, $agentEvalRunOptions) : [];
+        return array_merge($closedLines, $this->cleanUpWorkspaceOfRun($agentEvalRunOptions));
+    }
+
+    /**
+     * Gives the case its own workspace for this run: the key `eval-<case>-r<repetition>-<runToken>`
+     * ({@see buildWorkspaceKeyOfCase()}) on the options (the conversation carries it in its run settings, the tools
+     * receive it on their provenance), and the application prepares it with the case's `scratchFiles`
+     * ({@see AgentEvalRunHooksService::prepareWorkspaceOfCase()}). A run that already has a key keeps it (the restore
+     * path calls back in). Never fails the case.
+     */
+    public function prepareWorkspaceOfCase(AgentEvalScope $agentEvalScope, AgentEvalCase $agentEvalCase, AgentEvalRunOptions $agentEvalRunOptions): void
+    {
+        if ($agentEvalRunOptions->workspaceKey !== null) {
+            return;
+        }
+        $agentEvalRunOptions->workspaceKey = $this->buildWorkspaceKeyOfCase($agentEvalCase->getId(), $agentEvalRunOptions->repetition ?? 1, bin2hex(random_bytes(4)));
+        try {
+            foreach ($this->getAgentEvalRunHooksService()->prepareWorkspaceOfCase($agentEvalScope, $agentEvalRunOptions->workspaceKey, $agentEvalCase->getScratchFiles(), $agentEvalRunOptions) as $preparedLine) {
+                $agentEvalRunOptions->reportProgress(static::WORKSPACE_REPORT_LINE_PREFIX . $preparedLine);
+            }
+        } catch (Throwable $throwable) {
+            $agentEvalRunOptions->reportProgress(static::WORKSPACE_REPORT_LINE_PREFIX . '[ERROR] ' . $throwable->getMessage());
+        }
+    }
+
+    /** The workspace key of a case's run: `eval-<case>-r<repetition>-<runToken>`, lower case `[a-z0-9-]`, the case part at most 60 characters. */
+    public function buildWorkspaceKeyOfCase(string $caseId, int $repetition, string $runToken): string
+    {
+        $caseKey = trim((string)preg_replace('/[^a-z0-9]+/', '-', strtolower($caseId)), '-');
+        $caseKey = trim(substr($caseKey !== '' ? $caseKey : 'case', 0, 60), '-');
+        $runKey = trim((string)preg_replace('/[^a-z0-9]+/', '-', strtolower($runToken)), '-');
+        return 'eval-' . $caseKey . '-r' . max(1, $repetition) . '-' . $runKey;
+    }
+
+    /** Removes the run's own workspace ({@see AgentEvalRunHooksService::cleanUpWorkspaceOfCase()}) and forgets its key; never fails the case. */
+    protected function cleanUpWorkspaceOfRun(AgentEvalRunOptions $agentEvalRunOptions): array
+    {
+        $workspaceKey = $agentEvalRunOptions->workspaceKey;
+        if ($workspaceKey === null) {
+            return [];
+        }
+        $agentEvalRunOptions->workspaceKey = null;
+        try {
+            $removedLines = $this->getAgentEvalRunHooksService()->cleanUpWorkspaceOfCase($workspaceKey, $agentEvalRunOptions);
+        } catch (Throwable $throwable) {
+            $agentEvalRunOptions->reportProgress(static::WORKSPACE_REPORT_LINE_PREFIX . '[ERROR] ' . $throwable->getMessage());
+            return [];
+        }
+        foreach ($removedLines as $removedLine) {
+            $agentEvalRunOptions->reportProgress(static::WORKSPACE_REPORT_LINE_PREFIX . $removedLine);
+        }
+        return $removedLines;
     }
 
     /**
@@ -1367,6 +1423,8 @@ class AgentEvalRunnerService extends Service
         $this->getAgentEvalRunHooksService()->attachNewConversationToScope($conversation, $agentEvalScope);
         $conversation->messages = AIConversationMessages::newInstance();
         $conversation->runSettings = $this->buildEvalRunSettings($agentEvalRunOptions);
+        // the case's own workspace: the conversation's tools (and its sub-agents) work there, never in the space's own
+        $conversation->runSettings->workspaceKey = $agentEvalRunOptions->workspaceKey;
         $agentEvalArms = $agentEvalRunOptions->getAgentEvalArms();
         $conversation->contextRetentionSettings = ContextRetentionSettings::buildForNewConversation(
             null,

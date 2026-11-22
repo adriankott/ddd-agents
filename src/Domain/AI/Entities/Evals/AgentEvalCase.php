@@ -44,6 +44,9 @@ class AgentEvalCase extends ValueObject
     /** @var string The key that names the resource group of a case in a suite */
     public const string KEY_LANE = 'lane';
 
+    /** @var string The files the case puts into its own workspace before the agent runs ({@see AgentEvalScratchFiles}) */
+    public const string KEY_SCRATCH_FILES = 'scratchFiles';
+
     /** @var string The key that names the skill a selection case expects */
     public const string KEY_EXPECTED_SKILL = 'expectedSkill';
 
@@ -421,6 +424,12 @@ class AgentEvalCase extends ValueObject
         return ($this->caseFields[static::KEY_EXCLUSIVE] ?? false) === true;
     }
 
+    /** The files the case puts into its own workspace before the agent runs; empty without `scratchFiles`. */
+    public function getScratchFiles(): AgentEvalScratchFiles
+    {
+        return AgentEvalScratchFiles::fromFixtureEntries($this->caseFields[static::KEY_SCRATCH_FILES] ?? null);
+    }
+
     /** `lane`: the resource group the case names itself, trimmed; empty when it names none. */
     public function getDeclaredLane(): string
     {
@@ -438,7 +447,7 @@ class AgentEvalCase extends ValueObject
     {
         $expectedToolNames = array_merge($this->getExpectedAnyOfToolNames(), $this->getExpectedRequiredToolNames());
         foreach ($expectedToolNames as $expectedToolName) {
-            if ($expectedToolName !== '' && !in_array($expectedToolName, $loopToolNames, true) && !MCPToolEffectCatalog::isReadOnlyToolName($expectedToolName)) {
+            if ($expectedToolName !== '' && !in_array($expectedToolName, $loopToolNames, true) && !MCPToolEffectCatalog::changesNoSharedDataForToolName($expectedToolName)) {
                 return true;
             }
         }

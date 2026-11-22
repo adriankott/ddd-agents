@@ -1065,6 +1065,12 @@ class ToolCall extends ValueObject
         return $this->getEffect()?->changesState() === true;
     }
 
+    /** True when the call's tool changes only the agent's own workspace ({@see MCPToolEffect::WORKSPACE}). */
+    public function changesOnlyTheWorkspace(): bool
+    {
+        return $this->getEffect()?->changesOnlyTheWorkspace() === true;
+    }
+
     /** True when the call's tool is a DELETE. */
     public function isDelete(): bool
     {
@@ -1348,7 +1354,8 @@ class ToolCall extends ValueObject
         if ($toolName === AskOwnerTool::NAME) {
             return false; // a recorded question — the widget comes at turn end, nothing on the record moves
         }
-        if ($toolName === '' || !$this->isReadOnly()) {
+        // a workspace change moves nothing the criteria read (domain data); like a read, only a widget row counts
+        if ($toolName === '' || (!$this->isReadOnly() && !$this->changesOnlyTheWorkspace())) {
             return true;
         }
         if ($this->platformStoredSomethingOnTheRecord()) {

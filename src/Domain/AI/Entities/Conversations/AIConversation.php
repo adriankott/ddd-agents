@@ -909,7 +909,8 @@ class AIConversation extends Entity
         if (isset($parentConversation->runSettings)
             && ($parentConversation->runSettings->maxStepsPerTurn !== null || $parentConversation->runSettings->fixedReasoningEffort !== null
                 || $parentConversation->runSettings->agentWireApi !== null || $parentConversation->runSettings->previousReasoningCarryOver !== null
-                || $parentConversation->runSettings->previousReasoningCapTokens !== null)
+                || $parentConversation->runSettings->previousReasoningCapTokens !== null
+                || $parentConversation->runSettings->workspaceKey !== null)
         ) {
             $childRunSettings = RunSettings::newInstance();
             $childRunSettings->maxStepsPerTurn = $parentConversation->runSettings->maxStepsPerTurn;
@@ -917,6 +918,8 @@ class AIConversation extends Entity
             $childRunSettings->agentWireApi = $parentConversation->runSettings->agentWireApi;
             $childRunSettings->previousReasoningCarryOver = $parentConversation->runSettings->previousReasoningCarryOver;
             $childRunSettings->previousReasoningCapTokens = $parentConversation->runSettings->previousReasoningCapTokens;
+            // one run tree works in one workspace (an evaluation's case workspace reaches the sub-agents)
+            $childRunSettings->workspaceKey = $parentConversation->runSettings->workspaceKey;
             $this->runSettings = $childRunSettings;
         }
         // a child loads skills the way its parent does (its own prefix epoch, seeded with its skills) —

@@ -21,7 +21,7 @@ class ToolCallEffect extends ValueObject
     /** The tool declared no effect when the call was appended: neither a read nor a write. */
     public const string NONE = 'NONE';
 
-    #[Choice(choices: [MCPToolEffect::READ, MCPToolEffect::WRITE, MCPToolEffect::DELETE, self::NONE])]
+    #[Choice(choices: [MCPToolEffect::READ, MCPToolEffect::WORKSPACE, MCPToolEffect::WRITE, MCPToolEffect::DELETE, self::NONE])]
     public string $effect = self::NONE;
 
     /** {@see MCPToolEffect::$identicalRepeatDoesNewWork} */

@@ -51,6 +51,16 @@ class AgentEvalRunOptions implements AIConversationProgressReporterInterface
     /** @var AIConversationProgressReporterInterface|null Takes the run's report lines; null = the lines are dropped */
     public ?AIConversationProgressReporterInterface $progressReporter = null;
 
+    /** @var int|null The repetition of the case this run is (1 = the first); null when the caller does not count them */
+    public ?int $repetition = null;
+
+    /**
+     * @var string|null The case's own workspace of this run (`eval-<case>-r<repetition>-<runToken>`), set when the case
+     * starts ({@see \DDD\Domain\AI\Services\Eval\AgentEvalRunnerService::prepareWorkspaceOfCase()}) and cleared
+     * after its clean-up; the conversation carries it in its run settings
+     */
+    public ?string $workspaceKey = null;
+
     /** @var string[] The tools the runner blocked for the agent's run of the case (set when the block is applied) */
     public array $blockedToolNames = [];
 

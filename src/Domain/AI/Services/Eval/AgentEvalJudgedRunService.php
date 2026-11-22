@@ -193,6 +193,7 @@ class AgentEvalJudgedRunService extends AgentEvalRunnerService
         $this->authenticateOwnerOfScope($agentEvalScope);
         $this->refuseUnknownModelNamesOfRun($agentEvalJudgedRunOptions);
         $this->applyToolBlockOfCase($this->buildRunCaseOfSimCase($agentEvalSimCase), $agentEvalJudgedRunOptions);
+        $this->prepareWorkspaceOfCase($agentEvalScope, $this->buildRunCaseOfSimCase($agentEvalSimCase), $agentEvalJudgedRunOptions);
         $harnessCostsOfOuterRun = $this->harnessCostsOfCurrentRun;
         $this->harnessCostsOfCurrentRun = AgentEvalHarnessCosts::newInstance();
         try {

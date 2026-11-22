@@ -409,7 +409,9 @@ class MCPToolExecutorService extends Service
     public static array $blockedToolSimulatedErrors = [];
 
     /**
-     * Eval only: refuse EVERY tool that is not a declared read ({@see \DDD\Domain\AI\Entities\MCPPackages\MCPToolEffectCatalog::isReadOnlyToolName()}).
+     * Eval only: refuse EVERY tool that changes shared data — not a declared READ or WORKSPACE
+     * ({@see \DDD\Domain\AI\Entities\MCPPackages\MCPToolEffectCatalog::changesNoSharedDataForToolName()}; a WORKSPACE call
+     * changes only the case's own workspace).
      * Set for a case that may only read the live data it runs on — a read case that drifts into a write (a publish, a
      * schedule, an edit) must never change what other cases read at the same time. Process-static,
      * false in production (nothing sets it outside the eval path); the harness's own calls are exempt.
@@ -604,7 +606,7 @@ class MCPToolExecutorService extends Service
 
     /**
      * Whether the tool runs under the environment-wide write lock: its method declares `#[MCPToolEffect]` with the
-     * effect READ (an undeclared tool counts as a write). The effect catalog answers for a method without the attribute
+     * effect READ or WORKSPACE (an undeclared tool counts as a write). The effect catalog answers for a method without the attribute
      * on its own declaration.
      *
      * @param string $toolName
@@ -613,11 +615,12 @@ class MCPToolExecutorService extends Service
      */
     protected function isToolReadOnlyUnderEnvironmentWideWriteLock(string $toolName, ReflectionMethod $method): bool
     {
+        // a WORKSPACE tool changes only its own agent space's workspace (an evaluation gives each case its own): no shared data
         $toolEffectAttributes = $method->getAttributes(MCPToolEffect::class);
         if ($toolEffectAttributes !== []) {
-            return $toolEffectAttributes[0]->newInstance()->isReadOnly();
+            return $toolEffectAttributes[0]->newInstance()->changesNoSharedData();
         }
-        return MCPToolEffectCatalog::isReadOnlyToolName($toolName);
+        return MCPToolEffectCatalog::changesNoSharedDataForToolName($toolName);
     }
 
     /**

@@ -76,6 +76,9 @@ class AgentEvalJudgeTraceMessageLines extends ValueObject
     /** @var string The marker of a tool call that persists nothing */
     public const string READ_MARKER = ' (READ — persists nothing)';
 
+    /** @var string The marker of a call that changed only the agent's own workspace */
+    public const string WORKSPACE_MARKER = ' (WORKSPACE — changes only the agent\'s own workspace, saves nothing, shows nothing to anyone)';
+
     /** @var string The line of a repeat the loop suppressed; `%d` = the index */
     public const string SYSTEM_NOTE_LINE = '[%d] SYSTEM NOTE (loop bookkeeping, NOT an agent message, invisible to the owner): the agent '
         . 'wanted to send a text that repeats a message already DELIVERED in THIS turn — the system dropped the duplicate. The '
@@ -319,7 +322,7 @@ class AgentEvalJudgeTraceMessageLines extends ValueObject
             $message->toolCall->argumentsAsJson(),
             $message->toolCall->status ?? '?',
             $skillsText,
-            $aIConversationAuditRenderService::isReadOnlyToolName($toolName) ? static::READ_MARKER : '',
+            $aIConversationAuditRenderService::isReadOnlyToolName($toolName) ? static::READ_MARKER : ($message->toolCall->changesOnlyTheWorkspace() ? static::WORKSPACE_MARKER : ''),
             $this->getToolResultTextAsTheModelReceivedIt($message)
         );
     }

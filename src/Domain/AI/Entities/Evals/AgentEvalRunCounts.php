@@ -69,6 +69,9 @@ class AgentEvalRunCounts extends ValueObject
     /** @var int Completed calls of a tool that acts outward */
     public int $outwardWrites = 0;
 
+    /** @var int Completed calls that changed only the agent's workspace ({@see \DDD\Domain\AI\Entities\MCPPackages\MCPToolEffect::WORKSPACE}); no writes */
+    public int $workspaceChanges = 0;
+
     /** @var int Completed mandate grants */
     public int $mandatesGranted = 0;
 
@@ -142,6 +145,9 @@ class AgentEvalRunCounts extends ValueObject
         if ($toolName === static::GRANT_MANDATE_TOOL_NAME) {
             $this->mandatesGranted++;
         }
+        if ($toolCall->changesOnlyTheWorkspace()) {
+            $this->workspaceChanges++;
+        }
         /** @var AIConversationAuditRenderService $aIConversationAuditRenderService */
         $aIConversationAuditRenderService = DDDService::instance()->getService(AIConversationAuditRenderService::class);
         if ($aIConversationAuditRenderService::isOutwardActionToolName($toolName)) {
@@ -176,6 +182,7 @@ class AgentEvalRunCounts extends ValueObject
             'failedTicks' => $this->failedTicks,
             'rejectedTicks' => $this->rejectedTicks,
             'outwardWrites' => $this->outwardWrites,
+            'workspaceChanges' => $this->workspaceChanges,
             'mandatesGranted' => $this->mandatesGranted,
             'repeatedTextsSuppressed' => $this->repeatedTextsSuppressed,
             'loopCorrectives' => $this->loopCorrectives,
@@ -198,6 +205,7 @@ class AgentEvalRunCounts extends ValueObject
             'failedTicks' => $this->failedTicks,
             'rejectedTicks' => $this->rejectedTicks,
             'outwardWrites' => $this->outwardWrites,
+            'workspaceChanges' => $this->workspaceChanges,
             'mandatesGranted' => $this->mandatesGranted,
             'repeatedTextsSuppressed' => $this->repeatedTextsSuppressed,
             'loopCorrectives' => $this->loopCorrectives,

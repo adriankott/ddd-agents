@@ -13,6 +13,7 @@ use DDD\Domain\AI\Entities\Evals\AgentEvalCase;
 use DDD\Domain\AI\Entities\Evals\AgentEvalNotApplicableReason;
 use DDD\Domain\AI\Entities\Evals\AgentEvalNotApplicableReasons;
 use DDD\Domain\AI\Entities\Evals\AgentEvalScope;
+use DDD\Domain\AI\Entities\Evals\AgentEvalScratchFiles;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolAttributeCatalog;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolEffect;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolEffectCatalog;
@@ -33,7 +34,8 @@ use RuntimeException;
  * a case applies, the arguments the platform fills on a tool call of the space, the channel of a simulated owner
  * device, the memory curation after a turn, the tools that write to a real external profile, the entity a probe call
  * of the scope is billed to, how a schedule an evaluation creates is attached to the scope and the records a fixture
- * names by reference ({@see resolveRecordReference()}).
+ * names by reference ({@see resolveRecordReference()}), and each case's own workspace ({@see prepareWorkspaceOfCase()},
+ * {@see cleanUpWorkspaceOfCase()}).
  *
  * The defaults know only what the module knows: the scope is a stored agent space named by the case or the caller,
  * a conversation gets the scope's stored space, the module never creates a space, a harness tool call gets no argument
@@ -267,6 +269,48 @@ class AgentEvalRunHooksService extends Service
         array $conversationIdsOfTree,
         AIConversationProgressReporterInterface $progressReporter
     ): array {
+        return [];
+    }
+
+    /**
+     * Prepares the case's OWN workspace before the agent runs: creates the workspace `$workspaceKey` empty and writes
+     * the case's `scratchFiles` into it. Called by the runner once per case and repetition, before the conversation is
+     * assembled, only when the application gives workspaces at all — every run gets a key, the application decides
+     * whether it has a workspace for it. The key is `eval-<case>-r<repetition>-<runToken>` (lower case, `[a-z0-9-]`):
+     * unique per run, so parallel cases and repetitions never share files or a shell. Never fails the case: a failed
+     * step is reported.
+     *
+     * The default: nothing (the module owns no workspace store).
+     *
+     * @param AgentEvalScope $agentEvalScope the scope of the case
+     * @param string $workspaceKey the case's workspace, as the conversation's tools receive it
+     *     ({@see \DDD\Domain\AI\Entities\Conversations\Agent\AgentToolCallProvenance::$workspaceKey})
+     * @param AgentEvalScratchFiles $agentEvalScratchFiles the files to put in, paths relative to the workspace root
+     * @param AIConversationProgressReporterInterface $progressReporter takes one `workspace: …` line per step
+     * @return string[] what was prepared, one line each
+     */
+    public function prepareWorkspaceOfCase(
+        AgentEvalScope $agentEvalScope,
+        string $workspaceKey,
+        AgentEvalScratchFiles $agentEvalScratchFiles,
+        AIConversationProgressReporterInterface $progressReporter
+    ): array {
+        return [];
+    }
+
+    /**
+     * Removes the case's own workspace `$workspaceKey` with everything in it (files, the shell session, background
+     * jobs). Called by the runner at the end of every case that got a workspace, after the case's teardown — also when
+     * the run threw, and for a transient conversation. Never fails the case.
+     *
+     * The default: nothing.
+     *
+     * @param string $workspaceKey the key {@see prepareWorkspaceOfCase()} was called with
+     * @param AIConversationProgressReporterInterface $progressReporter takes one `workspace: …` line per step
+     * @return string[] what was removed, one line each
+     */
+    public function cleanUpWorkspaceOfCase(string $workspaceKey, AIConversationProgressReporterInterface $progressReporter): array
+    {
         return [];
     }
 

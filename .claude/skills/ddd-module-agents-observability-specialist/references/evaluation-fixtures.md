@@ -84,6 +84,7 @@ children of kind `toolsCase`; "runner" = `AgentEvalRunnerService`.
 | `access` | `read`, `write`, `exclusive` | derived | planning and eval-tools: how the case touches its space ([how a suite plans a case](#how-a-suite-plans-a-case)) |
 | `exclusive` | `true` | false | planning: a writing case runs alone on its space |
 | `lane` | string | the fixture's resource group | planning: the resource group of the case |
+| `scratchFiles` | list of `{path, content}` or `{path, contentBase64}` | none | tools, judged: the files put into the case's own workspace before the agent runs (`AgentEvalRunHooksService::prepareWorkspaceOfCase()`); paths relative to the workspace root |
 | `turns` | list of strings | none | planning: marks a scripted multi-turn flow (it writes, exclusively); the package's runner does not drive it — an application's `runCaseOfOwnShape()` does |
 | `expect` | object | `{}` | [the expect block](#the-expect-block) |
 | `restore` | object | none | [the restore block](#the-restore-block) |
@@ -206,9 +207,9 @@ row carries it as `judgeCostUsd` and `driverCostUsd` (the provider-reported cost
 
 - `access` given → it decides;
 - else the case WRITES when it has `restore`, `turns`, `expect.stateAfterRun`, `sequential: true`, or expects (`tool`,
-  `requiredTools`) a tool that is neither a loop tool nor declared read-only; a writing case is EXCLUSIVE when it has
+  `requiredTools`) a tool that is neither a loop tool nor declared READ or WORKSPACE (a WORKSPACE tool changes only the case's own workspace); a writing case is EXCLUSIVE when it has
   `turns`, `exclusive: true` or its fixture is in `AI.evalSuite.exclusiveFixtures`;
-- every other case READS and runs with every write tool refused (also in eval-tools);
+- every other case READS and runs with every write tool refused (also in eval-tools; READ and WORKSPACE tools run);
 - the resource: `lane`, else `AI.evalSuite.resourceGroupByFixture[<fixture name>]`, else the fixture name. A write never
   runs beside a read or write of the same resource on the same space; with `--isolate-scopes` a write excludes every read
   of its space;
@@ -323,3 +324,17 @@ adds its own dated folders through `getRetainedFolderNamePatterns()`.
 `DDD\Domain\AI\Entities\Evals\Guard\AgentEvalGuardCells` ·
 `DDD\Domain\AI\Services\Eval\{AgentEvalRunnerService, AgentEvalJudgedRunService, AgentEvalSuitePlanService, AgentEvalResultFilesService, AgentEvalRunHooksService}` ·
 `DDD\Symfony\Commands\Agents\Eval\AgentEvalCompactionTreeCaseFile` · `DDD\Symfony\Commands\Agents\DecisionFixtures\AgentDecisionFixture`
+
+## The case's own workspace
+
+Every case run (each repetition, each child process) gets a workspace key of its own,
+`eval-<case>-r<repetition>-<runToken>` (lower case, `[a-z0-9-]`, the case part at most 60 characters; the repetition
+is 1 where the process does not know it, the random run token keeps every run apart). The runner puts it on the run
+options and the conversation's run settings, so every WORKSPACE tool of the case (and of its sub-agents) receives it
+as `AgentToolCallProvenance::$workspaceKey` and never touches the space's own workspace. Before the conversation is
+assembled the runner calls `AgentEvalRunHooksService::prepareWorkspaceOfCase(scope, key, scratchFiles, reporter)`
+(create it empty, write `scratchFiles`); at the end of the case — after the teardown, also when the run threw and for a
+transient conversation — `cleanUpWorkspaceOfCase(key, reporter)`. Both default to nothing; the application that has
+workspaces implements them. Report lines start with `workspace: `. A case whose expected tools are only READ and
+WORKSPACE tools is a read case: it runs in parallel lanes and passes the read-only gate.
+

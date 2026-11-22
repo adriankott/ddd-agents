@@ -36,9 +36,59 @@ All live in `DDD\Domain\AI\Entities\MCPPackages`. They are read by reflection, n
 | Attribute | Target | At run time |
 |---|---|---|
 | `MCPTool` | method | Makes the method a tool. The method name is the tool name; the method docblock (without `@example`) is the description; `@example` lines become schema examples. |
-| `MCPToolEffect(effect, identicalRepeatDoesNewWork, resultIsReusedWithinTurn, isOutwardAction, keepsEarlierReadsReusable)` | method only | `READ`, `WRITE` or `DELETE`. Declare it on every tool: without it the tool is neither a read nor a write for every stored-call reader, and `MCPToolAnnotations` stays null. Readers: the identical-write refusal (a WRITE/DELETE repeated with byte-identical arguments is refused unless `identicalRepeatDoesNewWork`), the per-turn read reuse (an identical READ later in the same owner turn gets the earlier result unless `resultIsReusedWithinTurn: false`), the fork-join's inline-write rule, the delete-retry rule (a failed DELETE whose identical call completed earlier is reported as success), the outward-action list of the audit (`isOutwardAction`), the read-reuse invalidation (`keepsEarlierReadsReusable` for a write that changes no account data), the eval read-only gate. |
+| `MCPToolEffect(effect, identicalRepeatDoesNewWork, resultIsReusedWithinTurn, isOutwardAction, keepsEarlierReadsReusable)` | method only | `READ`, `WORKSPACE`, `WRITE` or `DELETE` (order of harm READ < WORKSPACE < WRITE < DELETE; `WORKSPACE` below). Declare it on every tool: without it the tool is neither a read nor a write for every stored-call reader, and `MCPToolAnnotations` stays null. Readers: the identical-write refusal (a WRITE/DELETE repeated with byte-identical arguments is refused unless `identicalRepeatDoesNewWork`), the per-turn read reuse (an identical READ later in the same owner turn gets the earlier result unless `resultIsReusedWithinTurn: false`), the fork-join's inline-write rule, the delete-retry rule (a failed DELETE whose identical call completed earlier is reported as success), the outward-action list of the audit (`isOutwardAction`), the read-reuse invalidation (`keepsEarlierReadsReusable` for a write that changes no account data), the eval read-only gate. |
 | `MCPToolAnnotations` (not an attribute) | — | Derived from the effect and `MCPToolReturnsUntrustedContent` for external clients on `tools/list`: `readOnlyHint`, `destructiveHint` (a DELETE or an outward action), `idempotentHint`, `openWorldHint`. Hints only; they authorize nothing. |
 | `MCPToolReturnsUntrustedContent(reason)` | method or class | The loop screens every completed result in the background (`AgentToolResultScreeningService`); a hit replaces the stored result by a removal notice. Only for text written by third parties and fetched from outside. The screening is the decisions-and-guards skill's. |
+
+## The WORKSPACE effect
+
+`MCPToolEffect::WORKSPACE`: "changes only the agent's private working area of this agent space — nothing and no one
+else." A tool has this effect only when ALL four conditions hold:
+
+1. It changes only the workspace of its agent space: files, folders, the shell session (its working directory and
+   environment), background jobs running in it.
+2. It changes no domain data: no database row, no store other than the workspace store, no external service, no
+   conversation, memory or widget.
+3. It makes nothing visible to anyone else: no message, mail or push, no file for partners or in the chat. Something
+   becomes visible only when ANOTHER tool hands it out explicitly (a tool that saves a workspace file to the owner's
+   drive — that tool is WRITE and an outward action).
+4. Its effect stays inside that one workspace: a call on workspace A can never change workspace B.
+
+Conditions 2 and 3 do not rest on the tool's discipline: the sandbox enforces them — no network, no credentials, none
+of the agent's tools inside the shell, exactly one way out (the hand-out tool of condition 3). A tool that cannot
+guarantee all four (one that writes a file AND books something, one whose shell can reach the network) is WRITE.
+
+| Tool | Effect |
+|---|---|
+| a shell command, writing a file, editing a file in the workspace | WORKSPACE |
+| reading a file, searching the files, viewing an image of the workspace | READ |
+| saving a workspace file to the owner's drive (or anywhere the owner, a partner or the chat sees it) | WRITE, `isOutwardAction: true` |
+| copying a mounted file into the workspace | READ for the source, WORKSPACE for the copy |
+| writing an agent memory | WRITE |
+
+How the package treats a WORKSPACE call — never as a write of the turn, never as a pure read:
+
+| Reader | WORKSPACE |
+|---|---|
+| `isReadOnly()` / `changesState()` | both false; `changesOnlyTheWorkspace()` true, `changesNoSharedData()` true (with READ) |
+| Owner confirmation, mandates, outward actions | never needed, also in a scheduled run without an operator; never outward |
+| Identical-write repeat refusal | not refused (a repeated shell command is real work) |
+| Write ledger of the audit, supervisor's supervised writes | not listed; the run counts show `workspaceChanges` |
+| Paused-turn record | its own bucket `workspaceChanges`, printed as WORKSPACE CHANGE (never as SAVED) |
+| Record change after a completed call (task-plan criteria) | no change of the record (only a widget row it wrote counts) |
+| Per-turn read reuse | ends the reuse of EVERY earlier read (the safe rule: which reads read the workspace is unknown) |
+| Scan for an earlier final refusal | ends it (a file the refusal missed may exist now) |
+| Parallel calls of one step | never forked, also when `MCPToolParallelSafe`: one conversation shares one workspace and shell; READ calls of the step may still fork; an inline WORKSPACE call does not hold the forked children back |
+| Eval read-only gate, environment-wide write lock | let through: each case and repetition works in its own workspace |
+| Eval lanes | a case whose expected tools are READ / WORKSPACE only is a read case and runs in parallel |
+| MCP annotations | `readOnlyHint` false, `destructiveHint` false, `idempotentHint` false |
+| A per-execution write cap (a script calling tools) | counts WRITE and DELETE only |
+
+The workspace a call works in: `AgentToolCallProvenance::$workspaceKey`, from the conversation's
+`RunSettings::$workspaceKey` (inherited by delegation children). Null in live use — the tool derives its own key from
+the agent space or the account. An evaluation sets `eval-<case>-r<repetition>-<runToken>` per case run and calls the
+application's `AgentEvalRunHooksService::prepareWorkspaceOfCase()` / `cleanUpWorkspaceOfCase()`. The package owns no
+workspace store.
 
 ## Disclosure, residency and wire
 

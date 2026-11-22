@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.1.23
+
+- Added: `MCPToolEffect::WORKSPACE` — "changes only the agent's private working area of this agent space — nothing and
+  no one else". A tool has it only when all four conditions of the constant's docblock hold (only the space's
+  workspace; no domain data; nothing visible to anyone; never another workspace), enforced by the sandbox, not by the
+  tool. Order of harm READ < WORKSPACE < WRITE < DELETE (`getHarmRank()`); `changesOnlyTheWorkspace()`,
+  `changesNoSharedData()` (READ or WORKSPACE) on the effect, the catalog and the stored tool call.
+- How the package treats a WORKSPACE call: no owner confirmation, no mandate, never outward; not in the write ledger,
+  not under the identical-write refusal, not a supervised write, not a change of the record a task plan reads; its own
+  bucket in the paused-turn record and its own count `workspaceChanges` in the run counts; it ends the per-turn reuse
+  of every earlier read and the scan for an earlier final refusal; it never forks (one conversation, one workspace and
+  shell) and does not hold forked reads back; the eval read-only gate and the environment-wide write lock let it
+  through, and a case whose expected tools are READ / WORKSPACE only is a read case; MCP hints readOnly, destructive
+  and idempotent false; the judge trace marks it `(WORKSPACE — …)`. `EveryToolEffectIsHandledTest` fails for a new
+  effect value until each reader is decided.
+- Added: `AgentToolCallProvenance::$workspaceKey` from `RunSettings::$workspaceKey` (inherited by delegation
+  children; null = the tool derives its own key). An evaluation gives each case run its own workspace
+  `eval-<case>-r<repetition>-<runToken>`, prepares it with the case's `scratchFiles` (`{path, content}` or
+  `{path, contentBase64}`) through `AgentEvalRunHooksService::prepareWorkspaceOfCase()` and removes it after the
+  case through `cleanUpWorkspaceOfCase()` (both no-ops by default; the package owns no workspace store).
+
 ## 0.1.22
 
 - Fixed: `app:ai-agent:eval-tools` and `app:ai-agent:eval-suite` without `--model` / `--models` run a case with

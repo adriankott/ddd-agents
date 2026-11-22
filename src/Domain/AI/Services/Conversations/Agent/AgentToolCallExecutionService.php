@@ -58,6 +58,7 @@ class AgentToolCallExecutionService extends Service
             $conversation,
         );
         $provenance->toolCallId = isset($toolCall->toolCallId) && $toolCall->toolCallId !== '' ? $toolCall->toolCallId : null;
+        $provenance->workspaceKey = isset($conversation->runSettings) ? $conversation->runSettings->workspaceKey : null;
         $startedAt = microtime(true);
         // The Argus request journal runs ONLY for a conversation that stores request snapshots (debug/eval), and only
         // for the duration of this call — never globally.

@@ -20,13 +20,14 @@ use DDD\Infrastructure\Services\DDDService;
  * record, not owner speech.
  *
  * Buckets, decided from the tool-call rows alone:
- *  - saved: a COMPLETED call of a tool not declared a read ({@see ToolCall::isReadOnly()}) whose facts do not say
+ *  - saved: a COMPLETED call of a tool not declared a read or a workspace change ({@see ToolCall::isReadOnly()}) whose facts do not say
  *    the write stayed out (`saved=no`, a BLOCKED outcome) — with the facts the tool preserved, else the result's head;
  *  - validatedNotSaved: a COMPLETED call whose facts say `saved=no` (a value validated, not stored);
  *  - blocked: a COMPLETED call whose `outcome` starts with BLOCKED — the write did not happen, the result says why;
  *  - refused: a FAILED call (a gate, a contract) or a write that said `applied: false` — the head of the refusal names
  *    the rule; a later save of the same tool settles an `applied: false` entry;
  *  - widgets: TOOL_MESSAGE rows (a widget a tool wrote into the chat) with their widget type;
+ *  - workspaceChanges: COMPLETED calls of a WORKSPACE tool ({@see ToolCall::changesOnlyTheWorkspace()}) — never a save;
  *  - reads: COMPLETED calls of read tools — their results still hold, the model need not read again;
  *  - ownerInput: the owner rows of the turn (a correction, an approval) — quoted, never interpreted.
  *
@@ -55,6 +56,8 @@ class AgentPausedTurnRecord extends ValueObject
     public array $refused = [];
     /** @var AgentPausedTurnRecordedWidget[] The widgets tools wrote into the chat, in the order of the rows */
     public array $widgets = [];
+    /** @var AgentPausedTurnRecordedToolCall[] The completed calls that changed only the agent's workspace, in the order of the rows */
+    public array $workspaceChanges = [];
     /** @var AgentPausedTurnRecordedRead[] The completed calls of read tools, newest last */
     public array $reads = [];
     /** @var AgentPausedTurnRecordedOwnerInput[] The owner's messages of the turn, in the order of the rows */
@@ -134,7 +137,13 @@ class AgentPausedTurnRecord extends ValueObject
             $this->blocked[] = $recordedToolCall;
             return;
         }
-        // A write is every tool that is not declared a read (a scheduled task, a build, a mandate)
+        // A workspace change saved nothing and showed nothing to anyone: its own bucket, never a save
+        if ($toolCall->changesOnlyTheWorkspace()) {
+            $recordedToolCall->text = self::cut(self::firstSentence($toolCall->getResultTextHead(400)), self::MAX_HEAD_CHARS);
+            $this->workspaceChanges[] = $recordedToolCall;
+            return;
+        }
+        // A write is every tool that is not declared a read or a workspace change (a scheduled task, a build, a mandate)
         if (!$toolCall->isReadOnly()) {
             $structuredContent = $toolCall->getDecodedResult()->structuredContent ?? [];
             if (($structuredContent['applied'] ?? null) === false) {
@@ -170,7 +179,7 @@ class AgentPausedTurnRecord extends ValueObject
     public function isEmpty(): bool
     {
         return $this->saved === [] && $this->validatedNotSaved === [] && $this->blocked === [] && $this->refused === []
-            && $this->widgets === [] && $this->reads === [] && $this->ownerInput === [];
+            && $this->widgets === [] && $this->workspaceChanges === [] && $this->reads === [] && $this->ownerInput === [];
     }
 
     /** Whether a write of the turn did NOT land and the next move is the owner's or the model's (a block, a refusal). */
@@ -203,6 +212,9 @@ class AgentPausedTurnRecord extends ValueObject
         }
         if (count($this->saved) > self::MAX_LINES_PER_BUCKET) {
             $lines[] = 'RECORD: … and ' . (count($this->saved) - self::MAX_LINES_PER_BUCKET) . ' more saves (their results are above)';
+        }
+        foreach (array_slice($this->workspaceChanges, -self::MAX_LINES_PER_BUCKET) as $workspaceToolCall) {
+            $lines[] = "RECORD: {$workspaceToolCall->toolName} @{$workspaceToolCall->messageIndex} WORKSPACE CHANGE (your own workspace only — nothing was saved or shown to anyone): {$workspaceToolCall->text}";
         }
         foreach ($this->widgets as $recordedWidget) {
             $lines[] = "RECORD: widget {$recordedWidget->widgetType} @{$recordedWidget->messageIndex} is in the chat — the owner sees it; one sentence about it is still owed unless already written";
