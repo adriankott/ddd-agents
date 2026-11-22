@@ -45,6 +45,9 @@ class WebPageMarkdown extends ValueObject
     /** Detected before any crawl: the application has switched page reads off (`AI.webSearch.capabilities.urlToMarkdown`). */
     public const string REASON_CAPABILITY_OFF = 'CAPABILITY_OFF';
 
+    /** The address serves something other than a web page (a PDF, an image, a download). */
+    public const string REASON_UNSUPPORTED_TYPE = 'UNSUPPORTED_TYPE';
+
     /**
      * @var string[][] Search engine host (a key ending in `.` matches every country domain) => the result-page path
      * prefixes on that host. Only the well-known engines.
@@ -225,7 +228,11 @@ class WebPageMarkdown extends ValueObject
                 . 'read, read the next one; otherwise say that this site cannot be read automatically.',
             self::REASON_CAPABILITY_OFF => 'Reading web pages is switched off in this application. Do not retry; answer '
                 . 'from the search results or what you already know.',
-            default => "The page {$urlLabel} could not be read right now. Do not retry immediately. " . $continueWithoutThePage,
+            self::REASON_UNSUPPORTED_TYPE => "The address {$urlLabel} is not a web page (a document, image or download) and "
+                . 'cannot be read as text. Do not retry. ' . $continueWithoutThePage,
+            default => "The page {$urlLabel} could not be read right now"
+                . (($this->reason ?? '') !== '' ? ' (' . $this->reason . ')' : '') . '. Do not retry immediately. '
+                . $continueWithoutThePage,
         };
     }
 }

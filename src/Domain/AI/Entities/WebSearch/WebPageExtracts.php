@@ -65,6 +65,9 @@ class WebPageExtracts extends ObjectSet
         }
         if ($sourceNumber === 0) {
             $sections[] = 'No page states what the task asks for.';
+        } else {
+            $sections[] = 'Each figure above ends with its [source]: keep that source next to the figure (in a table, in the '
+                . 'row of the figure). Report a value as not stated only when no reading above lists it.';
         }
         if ($pagesWithoutTheAnswer !== []) {
             $sections[] = 'Read, nothing on the task: ' . implode(', ', $pagesWithoutTheAnswer);

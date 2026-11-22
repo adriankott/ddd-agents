@@ -46,7 +46,8 @@ class WebSearchCallQueriesTest extends UnitTestCase
         $callQueries = WebSearchCallQueries::fromRawQueries(['site:example.org pricing', 'average plan price 2026'], []);
 
         self::assertSame([], $callQueries->domains, 'the filter applies to every query of the call');
-        self::assertStringContainsString('were dropped', (string)$callQueries->noteForModel);
+        self::assertStringContainsString('was dropped this time', (string)$callQueries->noteForModel);
+        self::assertStringContainsString('Next time pass "domains": ["example.org"]', (string)$callQueries->noteForModel);
 
         $withRequestedDomains = WebSearchCallQueries::fromRawQueries(['site:example.org pricing'], ['example.net']);
         self::assertSame(['example.net'], $withRequestedDomains->domains, 'the requested filter wins');
@@ -63,5 +64,38 @@ class WebSearchCallQueriesTest extends UnitTestCase
         $callQueries = WebSearchCallQueries::fromRawQueries(['heat pump cost lifespan efficiency maintenance noise subsidy installation brand comparison test 2026'], []);
 
         self::assertStringContainsString('long keyword chains', (string)$callQueries->noteForModel);
+    }
+
+    public function testTheSiteCorrectionNamesTheDomainsArgument(): void
+    {
+        $callQueries = WebSearchCallQueries::fromRawQueries(['site:example.org pricing'], []);
+
+        self::assertStringStartsWith('NOTE: CORRECTION:', (string)$callQueries->noteForModel);
+        self::assertStringContainsString('Next time pass "domains": ["example.org"] instead of `site:`', (string)$callQueries->noteForModel);
+    }
+
+    public function testAnUnambiguousTimePhraseBecomesTheRecencyWindow(): void
+    {
+        $callQueries = WebSearchCallQueries::fromRawQueries(['electric car registrations this week'], []);
+
+        self::assertSame('week', $callQueries->recency);
+        self::assertStringContainsString('"recency": "week"', (string)$callQueries->noteForModel);
+
+        $requested = WebSearchCallQueries::fromRawQueries(['electric car registrations this week'], [], 'month');
+        self::assertSame('month', $requested->recency, 'the requested window wins');
+        self::assertNull($requested->noteForModel);
+    }
+
+    public function testNewsWithoutAWindowGetsTheRecencyNoteOnly(): void
+    {
+        $callQueries = WebSearchCallQueries::fromRawQueries(['heat pump subsidy news'], []);
+
+        self::assertNull($callQueries->recency);
+        self::assertStringContainsString('pass `recency`', (string)$callQueries->noteForModel);
+        self::assertStringContainsString('"undated"', (string)$callQueries->noteForModel);
+
+        $twoWindows = WebSearchCallQueries::fromRawQueries(['prices today', 'prices this month'], []);
+        self::assertNull($twoWindows->recency, 'two different windows: nothing is guessed');
+        self::assertNull(WebSearchCallQueries::fromRawQueries(['heat pump prices 2026'], [])->noteForModel, 'a year alone is no news request');
     }
 }

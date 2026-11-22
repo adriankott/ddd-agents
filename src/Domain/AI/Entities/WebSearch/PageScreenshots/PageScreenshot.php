@@ -19,6 +19,13 @@ class PageScreenshot extends ValueObject
     /** @var string|null base64-encoded image content, exactly as the endpoint delivered it. */
     public ?string $content = null;
 
+    /**
+     * @var string|null Why nothing was captured, as the endpoint (or the package before the render) names it: one of
+     * the `REASON_*` constants of {@see PageScreenshotPart} or the endpoint's own code; null on success or when no
+     * reason is known.
+     */
+    public ?string $failureReason = null;
+
     /** The raw decoded image bytes, or null when nothing was captured (empty / invalid base64). */
     public function getImageBlob(): ?string
     {

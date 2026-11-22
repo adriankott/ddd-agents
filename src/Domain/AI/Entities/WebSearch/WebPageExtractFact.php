@@ -155,8 +155,12 @@ class WebPageExtractFact extends ValueObject
         return trim((string)preg_replace('/\s+/u', ' ', $text));
     }
 
-    /** One line for the agent: `- what: value (applies to …; basis) — "quote"`, unverified quotes marked. */
-    public function buildLlmMarkdownLine(): string
+    /**
+     * One line for the agent: `- what: value (applies to …; basis) — "quote" [source: site]`, unverified quotes
+     * marked. `$sourceLabel` (the page's site) closes the line, so the source travels with the figure into a sentence or
+     * a table row.
+     */
+    public function buildLlmMarkdownLine(?string $sourceLabel = null): string
     {
         $details = array_filter([
             $this->appliesTo !== null ? 'applies to ' . $this->appliesTo : null,
@@ -165,6 +169,9 @@ class WebPageExtractFact extends ValueObject
         $line = '- ' . ($this->what !== null ? $this->what . ': ' : '') . $this->value . ($details !== [] ? ' (' . implode('; ', $details) . ')' : '');
         if ($this->quote !== null) {
             $line .= ' — "' . $this->quote . '"' . ($this->evidenceKind === self::EVIDENCE_SNIPPET ? ' [from the search excerpt]' : '') . ($this->quoteVerified ? '' : ' [quote not found in the source text]');
+        }
+        if ($sourceLabel !== null && $sourceLabel !== '') {
+            $line .= ' [source: ' . $sourceLabel . ']';
         }
         return $line;
     }

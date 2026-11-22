@@ -99,6 +99,8 @@ class WebSearchMCPPackage extends MCPPackage
      * Say the answer in two or three sentences and name the main source by its site name — never read out a URL.
      *
      * @example {"query": "public holidays 2027 Bavaria"}
+     * @example {"queries": ["plan prices", "free trial length"], "domains": ["example.com"]}
+     * @example {"query": "electric car registrations", "recency": "week"}
      * @example {"queries": ["electric heat pump average running cost per year 2026", "air source heat pump lifespan years", "heat pump installation cost range 2026"], "countryCode": "GB"}
      * @example {"queries": ["Product A battery life test", "Product B battery life test"], "extractInformationFromResultPagesWithFastLLM": true, "extractionTask": "measured battery life in hours of Product A and Product B, with the test or source"}
      */
@@ -141,7 +143,7 @@ class WebSearchMCPPackage extends MCPPackage
                 . ' — put them all into `queries`, leave `query` empty, and merge or drop the rest.'
             );
         }
-        $webSearchCallQueries = WebSearchCallQueries::fromRawQueries($queries, $requestDto->domains ?? []);
+        $webSearchCallQueries = WebSearchCallQueries::fromRawQueries($queries, $requestDto->domains ?? [], $requestDto->recency);
         $queries = $webSearchCallQueries->queries;
         if ($queries === []) {
             throw new BadRequestException('The queries held only search operators: nothing was searched. Write the words to search for; a site goes into `domains`.');
@@ -155,7 +157,7 @@ class WebSearchMCPPackage extends MCPPackage
         $webSearchHitListFilters = WebSearchHitListFilters::fromToolArguments(
             $requestDto->mode ?? (string)WebSearchConfiguration::findValue('hits.defaultMode', WebSearchHitListFilters::MODE_FAST),
             $requestDto->countryCode ?? $webSearchHostService->findDefaultCountryCode($callProvenance),
-            $requestDto->recency,
+            $webSearchCallQueries->recency,
             $webSearchCallQueries->domains,
             [],
             $requestDto->maxHits,

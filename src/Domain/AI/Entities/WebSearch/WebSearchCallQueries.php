@@ -24,13 +24,37 @@ class WebSearchCallQueries extends ValueObject
     public ?string $noteForModel = null;
 
     /**
+     * @var string|null The `recency` window the call searches with: the requested one, or the window a query named
+     * unambiguously (`today` → day, `this week` → week, `this month` → month) when none was requested.
+     */
+    public ?string $recency = null;
+
+    /** Unambiguous time phrases of a query → the `recency` window they mean. */
+    public const array RECENCY_WINDOWS_BY_PHRASE_PATTERN = [
+        '/\b(today|past 24 hours|last 24 hours)\b/iu' => 'day',
+        '/\b(this week|past week|past 7 days|last 7 days)\b/iu' => 'week',
+        '/\b(this month|past month|past 30 days|last 30 days)\b/iu' => 'month',
+    ];
+
+    /**
+     * Words that ask for current items without saying how current: the note suggests `recency`. A year alone does not
+     * count: "prices 2026" or "trends 2026" are facts whose best sources may be months old.
+     */
+    public const string CURRENT_ITEMS_PATTERN = '/\b(news|latest|breaking|headlines?|yesterday)\b/iu';
+
+    /**
      * @param string[] $rawQueries the queries as the model wrote them (deduplicated, non-empty)
      * @param string[] $requestedDomains the `domains` argument of the call
+     * @param string|null $requestedRecency the `recency` argument of the call
      */
-    public static function fromRawQueries(array $rawQueries, array $requestedDomains): static
+    public static function fromRawQueries(array $rawQueries, array $requestedDomains, ?string $requestedRecency = null): static
     {
         $callQueries = static::newInstance();
         $callQueries->domains = array_values($requestedDomains);
+        $requestedRecency = $requestedRecency !== null && trim($requestedRecency) !== '' ? trim($requestedRecency) : null;
+        $callQueries->recency = $requestedRecency;
+        $impliedRecencyWindows = [];
+        $asksForCurrentItems = false;
         $removedOperators = [];
         $siteDomains = [];
         $everyQueryNamedASite = true;
@@ -49,20 +73,42 @@ class WebSearchCallQueries extends ValueObject
             if ($normalization->isKeywordChain()) {
                 $keywordChainQueries[] = $query;
             }
+            foreach (static::RECENCY_WINDOWS_BY_PHRASE_PATTERN as $phrasePattern => $recencyWindow) {
+                if (preg_match($phrasePattern, (string)$rawQuery) === 1) {
+                    $impliedRecencyWindows[] = $recencyWindow;
+                }
+            }
+            if (preg_match(static::CURRENT_ITEMS_PATTERN, (string)$rawQuery) === 1) {
+                $asksForCurrentItems = true;
+            }
         }
+        $impliedRecencyWindows = array_values(array_unique($impliedRecencyWindows));
         $noteParts = [];
         if ($removedOperators !== []) {
             $siteDomainsApplied = $siteDomains !== [] && $requestedDomains === [] && $everyQueryNamedASite;
             if ($siteDomainsApplied) {
                 $callQueries->domains = $siteDomains;
             }
-            $notePart = 'search operators removed from the queries (' . implode(', ', $removedOperators) . ') — the engine takes plain words';
-            if ($siteDomainsApplied) {
-                $notePart .= '; the `site:` domains were applied as `domains`';
-            } elseif ($siteDomains !== []) {
-                $notePart .= '; the `site:` domains were dropped: a site goes into `domains`, which applies to every query of the call';
+            $notePart = 'CORRECTION: search operators removed from the queries (' . implode(', ', $removedOperators) . ') — the engine takes plain words';
+            if ($siteDomains !== []) {
+                $includedSiteDomains = [];
+                foreach ($siteDomains as $siteDomain) {
+                    $includedSiteDomains[] = '"' . $siteDomain . '"';
+                }
+                $notePart .= $siteDomainsApplied
+                    ? '; `site:` was applied as `domains` this time'
+                    : '; `site:` was dropped this time (`domains` applies to every query of the call: search that site in its own call)';
+                $notePart .= '. Next time pass "domains": [' . implode(', ', $includedSiteDomains) . '] instead of `site:`';
             }
             $noteParts[] = $notePart;
+        }
+        if ($requestedRecency === null && count($impliedRecencyWindows) === 1) {
+            $callQueries->recency = $impliedRecencyWindows[0];
+            $noteParts[] = 'a query named a time window, so the search ran with "recency": "' . $impliedRecencyWindows[0]
+                . '" — pass `recency` yourself next time';
+        } elseif ($requestedRecency === null && ($impliedRecencyWindows !== [] || $asksForCurrentItems)) {
+            $noteParts[] = 'for news and current events pass `recency` (day, week, month, year) instead of a date or year in '
+                . 'the query, and give every news item its date from the page list (or "undated")';
         }
         if ($keywordChainQueries !== []) {
             $noteParts[] = 'long keyword chains find less than one short query per aspect (more than '

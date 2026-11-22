@@ -5,13 +5,15 @@ declare(strict_types=1);
 namespace DDD\Domain\AI\Repo\Argus\WebSearch;
 
 use DDD\Domain\AI\Entities\WebSearch\WebSearchConfiguration;
+use DDD\Domain\Base\Repo\Argus\Utils\ArgusCache;
 
 /**
  * The load endpoint of a web-research repository comes from the application's configuration, not from the class:
  * `AI.webSearch.endpoints.<capability>` (the using class names its capability in `WEB_SEARCH_CAPABILITY`). A value
  * without a method is sent as POST; a relative path goes through the Argus gateway, an absolute URL is called
  * directly. `AI.webSearch.cacheTtlSeconds.<capability>` and `AI.webSearch.timeoutSeconds.<capability>` replace the
- * class defaults when set. Everything is set on THIS instance's settings (a copy of the attribute), never on the class.
+ * class defaults when set; `AI.webSearch.cacheInDatabase.<capability>` (true / false) adds or drops the database cache
+ * beside the memory cache. Everything is set on THIS instance's settings (a copy of the attribute), never on the class.
  */
 trait ArgusWebSearchConfiguredEndpointTrait
 {
@@ -50,6 +52,10 @@ trait ArgusWebSearchConfiguredEndpointTrait
         $configuredCacheTtlSeconds = WebSearchConfiguration::findValue('cacheTtlSeconds.' . static::WEB_SEARCH_CAPABILITY);
         if (is_numeric($configuredCacheTtlSeconds) && (int)$configuredCacheTtlSeconds >= 0) {
             $argusSettings->argusLoad->cacheTtl = (int)$configuredCacheTtlSeconds;
+        }
+        $configuredCacheInDatabase = WebSearchConfiguration::findValue('cacheInDatabase.' . static::WEB_SEARCH_CAPABILITY);
+        if (is_bool($configuredCacheInDatabase) && $argusSettings->argusLoad->cacheLevel !== ArgusCache::CACHELEVEL_NONE) {
+            $argusSettings->argusLoad->cacheLevel = $configuredCacheInDatabase ? ArgusCache::CACHELEVEL_MEMORY_AND_DB : ArgusCache::CACHELEVEL_MEMORY;
         }
         $configuredTimeoutSeconds = static::findConfiguredTimeoutSeconds();
         if ($configuredTimeoutSeconds !== null) {

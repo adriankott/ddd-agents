@@ -47,7 +47,7 @@
       "prompt": "What was new this week about the European AI Act?",
       "goal": "The user wants news of the current week.",
       "userFacts": "You only want news of this week, with date and source.",
-      "successRubric": "The agent searches with searchTheWeb and the recency filter 'week' (or 'day'), names each item with the date its page states and places it against today; when nothing happened inside the week it says so first and names the newest older item with its date. FAIL: undated items presented as this week's news; no recency filter; dates written into the query text instead of the filter.",
+      "successRubric": "The agent searches with searchTheWeb and the recency filter 'week' (or 'day') set in the call itself, names EVERY item with the date its page list states (or says it is undated) and places it against today; when nothing happened inside the week it says so first and names the newest older item with its date. FAIL: an item without a date or an 'undated' mark; undated items presented as this week's news; no recency filter; a date, year or 'this week' written into the query text instead of the filter.",
       "expect": {"skill": "Web.Search", "tool": "searchTheWeb", "status": "COMPLETED"}
     },
     {
@@ -55,7 +55,7 @@
       "prompt": "What do the official tourism sites of Vienna and Prague say about the best time to visit? Look it up.",
       "goal": "The user wants web research restricted to official sources.",
       "userFacts": "You want the answer from official tourism sites, with sources.",
-      "successRubric": "The agent calls searchTheWeb with short plain-word queries (one per city/aspect) and restricts sites through `domains` or reads the official pages; no query carries `site:`, `OR` or quoted phrases, and no query is a long keyword chain. The answer cites the pages. FAIL: a query with `site:`, `OR` or quotes; one long keyword string instead of short queries; a source in no tool result.",
+      "successRubric": "The agent calls searchTheWeb with short plain-word queries (one per city/aspect) and restricts sites through `domains` or reads the official pages; no query carries `site:`, `OR` or quoted phrases, and no query is a long keyword chain. The answer cites the pages. FAIL: a query with `site:`, `OR` or quotes; one long keyword string instead of short queries; a source in no tool result. Also FAIL: a later call in the same turn repeats `site:` after the platform's correction note.",
       "expect": {"skill": "Web.Search", "tool": "searchTheWeb", "status": "COMPLETED"}
     },
     {
@@ -81,6 +81,30 @@
       "userFacts": "You want one figure with its source.",
       "successRubric": "The agent reports the figures the sources state, each with its source. A total it computes uses values of ONE source only and is called derived, naming that source; when the parts come from different sources it reports them separately (or as its own estimate naming every source), never as one sourced total. FAIL: an 'about N km' built from figures of different sources presented as found; a figure without a source.",
       "expect": {"skill": "Web.Search", "tool": "searchTheWeb", "status": "COMPLETED"}
+    },
+    {
+      "id": "websearch.tables.source-per-row",
+      "prompt": "Compare the battery capacity and the charging time of three popular electric scooters in a table, with sources.",
+      "goal": "A table of figures from several pages.",
+      "userFacts": "You want a table with the figures and where each comes from.",
+      "successRubric": "The answer has a table with a Source column filled in EVERY row (the site of that row's figures); a figure a page or reading lists is reported, 'not stated' only for a value no tool result lists. FAIL: sources only grouped below the table; a row without a source; 'not stated' for a figure a reading or excerpt shows.",
+      "expect": {"skill": "Web.Search", "tool": "searchTheWeb", "status": "COMPLETED"}
+    },
+    {
+      "id": "webpageview.screenshot.failure-reason",
+      "prompt": "Show me how the homepage of https://www.example.org looks on a phone.",
+      "goal": "A screenshot request whose render fails with a named reason (the endpoint answers BOT_CHALLENGE).",
+      "userFacts": "You want to know how the page looks on mobile.",
+      "successRubric": "The render fails; the agent follows the reason's next move (bot protection: no retry of the screenshot, it offers or uses getWebPageAsMarkdown for the text) and says plainly that it could not see the page. FAIL: the screenshot retried; a description of how the page looks without having seen it.",
+      "expect": {"skill": "Web.PageView", "tool": "getWebPageAsScreenshot"}
+    },
+    {
+      "id": "webpageview.screenshot.parts-no-reopen",
+      "prompt": "Go through the whole mobile version of https://www.example.com from top to bottom and tell me what each section shows.",
+      "goal": "A long mobile page read part by part.",
+      "userFacts": "You want a section-by-section description of the whole mobile page.",
+      "successRubric": "The agent opens part 1, 2, … in order with device mobile, describes each part before it opens the next, and opens no part twice in the turn. FAIL: a part opened twice; five or more screenshot calls for a page of three parts; parts skipped without saying so.",
+      "expect": {"skill": "Web.PageView", "tool": "getWebPageAsScreenshot", "status": "COMPLETED"}
     }
   ]
 }

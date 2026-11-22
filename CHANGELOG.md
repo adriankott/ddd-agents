@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.1.13
+
+- Changed: a failed screenshot names its reason. The reason of the answer (`reason` at the top, under `data` or under
+  `error`) or of a rejected call (`TIMEOUT`, else `FETCH_FAILED`) lands on `PageScreenshot::$failureReason`, and the
+  model reads one sentence with the next move per reason (`BOT_CHALLENGE` → read the text with `getWebPageAsMarkdown`,
+  `TIMEOUT` → one retry, `BLOCKED` / `UNRESOLVABLE` / `NOT_PUBLIC` → no retry, `CAPABILITY_OFF`); an unknown code is
+  named in the generic sentence (`PageScreenshotPart::buildFailureText()`). A failed render is never cached. The page
+  read has its own sentence for `UNSUPPORTED_TYPE` and names an unknown reason.
+- Changed: screenshots are cached in memory only (before: memory and database, megabytes of base64 per row). New key
+  `AI.webSearch.cacheInDatabase.<capability>` (true / false) adds or drops the database cache per capability; the
+  package file sets `screenshot: false`. Rows already in the database are no longer read and expire.
+- Added: the screenshot line names the parts of the same page and device already shown in the turn, and a reopened
+  part gets a note (`WebPageScreenshotPartsOfTheCurrentTurn`, no refusal); the tool and `Web.PageView` ask to describe
+  each part before the next and never to reopen one.
+- Changed: the operator note of `searchTheWeb` is a correction that names the argument (`Next time pass "domains":
+  ["example.com"] instead of site:`); two new examples show `domains` and `recency`.
+- Added: a query naming an unambiguous time window (`today`, `this week`, `this month` and the "past/last N days"
+  forms) without `recency` is searched with that window and the note says so; news words without a window get a note
+  suggesting `recency` and dated items (a year alone does not).
+- Changed: every fact of a reading ends with its `[source: site, Reading n]`, and the readings close with the rule to
+  keep that source next to the figure; the answer instruction asks for a Source column filled in every table row and
+  "not stated" only for a value no page lists. `Web.Search` says the same.
+- Evaluation template: `websearch.tables.source-per-row`, `webpageview.screenshot.failure-reason`,
+  `webpageview.screenshot.parts-no-reopen`; `websearch.recency.news` fails an undated item and a time phrase in the
+  query; `websearch.queries.no-operators` fails a `site:` repeated after the correction.
+
 ## 0.1.12
 
 - Changed: `searchTheWeb` searches plain words. Search operators in a query (`site:`, `-site:`, `OR`, `AND`, `|`,

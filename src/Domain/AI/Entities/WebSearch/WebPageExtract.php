@@ -185,6 +185,14 @@ class WebPageExtract extends ValueObject
         return ($this->facts?->count() ?? 0) > 0;
     }
 
+    /** The source tag of this page's facts: its host without `www.` and the reading's number (`example.com, Reading 2`). */
+    public function buildSourceLabel(int $sourceNumber): string
+    {
+        $host = strtolower((string)(parse_url((string)$this->url, PHP_URL_HOST) ?: ''));
+        $host = (string)preg_replace('/^www\./', '', $host);
+        return ($host !== '' ? $host . ', ' : '') . 'Reading ' . $sourceNumber;
+    }
+
     /**
      * The agent's view of this page: `Reading n: title — url` (numbered apart from a search's `[n]` page list), a line with the status, the kind of source and its date, the
      * facts one per line, the caveats; cut at `$charCap` characters with a visible marker.
@@ -203,8 +211,9 @@ class WebPageExtract extends ValueObject
             $statusFacts[] = 'as of ' . $this->asOf;
         }
         $lines[] = implode(' · ', $statusFacts);
+        $sourceLabel = $this->buildSourceLabel($sourceNumber);
         foreach ($this->facts?->getElements() ?? [] as $webPageExtractFact) {
-            $lines[] = $webPageExtractFact->buildLlmMarkdownLine();
+            $lines[] = $webPageExtractFact->buildLlmMarkdownLine($sourceLabel);
         }
         if ($this->caveats !== []) {
             $lines[] = 'Caveats: ' . implode('; ', $this->caveats);

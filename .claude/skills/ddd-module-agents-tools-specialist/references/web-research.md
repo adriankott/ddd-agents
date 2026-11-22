@@ -73,7 +73,9 @@ account no page is read by a model (the reading fails with "no account to bill t
 
 The reading model is `reading.modelName` (default: the package's fast model without reasoning). Every limit of the tools
 is in the configuration: queries per search (5), pages per read (5), pages per reading (10), the render budget
-(48,000 characters), cache lifetimes and timeouts per capability (`cacheTtlSeconds`, `timeoutSeconds`).
+(48,000 characters), cache lifetimes and timeouts per capability (`cacheTtlSeconds`, `timeoutSeconds`), and whether a
+capability's answers are cached in the database too (`cacheInDatabase`; a screenshot is cached in memory only unless
+`screenshot: true` — megabytes of base64 per capture).
 
 ## Degrading
 
@@ -83,6 +85,16 @@ is in the configuration: queries per search (5), pages per read (5), pages per r
 - A page read refuses before any crawl: a search engine's results page, a host without a DNS record, a private address
   (`PublicUrlGuard`); a screenshot is rendered only when every resolved address of the host is public.
 - Without Imagick a screenshot is neither trimmed nor cut: the first part is the whole capture as one picture.
+- A failed render keeps its reason (`reason` of the answer, at the top, under `data` or `error`; a rejected call:
+  `TIMEOUT` or `FETCH_FAILED`; the package's own `NOT_PUBLIC` and `CAPABILITY_OFF`) and the model reads one sentence per
+  reason with the next move (`BOT_CHALLENGE` → the text with `getWebPageAsMarkdown`; `TIMEOUT` → one retry; `BLOCKED`,
+  `UNRESOLVABLE` → no retry); an unknown code is named in the generic sentence. A failed render is never cached.
+- The screenshot line names the parts of the same page and device already shown in the turn
+  (`WebPageScreenshotPartsOfTheCurrentTurn`); reopening one gets a note, never a refusal (its pictures may have left the
+  model's view).
+- A query that names an unambiguous time window (`today`, `this week`, `this month`) without `recency` is searched with
+  that window, and the note says so; news words without a window get a note suggesting `recency`. A reading's facts
+  end with `[source: site, Reading n]`, so the source travels into a table row.
 - A crawl or a search that times out is not cached; the next call asks again.
 
 ## Testing in a host

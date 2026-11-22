@@ -26,7 +26,7 @@ use DDD\Presentation\Base\OpenApi\Attributes\Parameter;
 class WebSearchHitsMcpResponseDto extends RestResponseDto implements LlmMarkdownRenderable, MCPToolResponsePlatformNoteProvider
 {
     /** How to answer: the result is research material, the answer is the agent's own, its sources are only these pages. */
-    public const string ANSWER_INSTRUCTION = 'Answer from these pages in your own words: every figure with its source next to it (the site name and the URL; in a table one source per row), a value with its qualifier ("about", the variant), every entry found listed or its omission said, what was not found said plainly. A derived figure only from values of ONE source, named as derived — never an estimate from figures of different sources. Cite ONLY pages listed here — never a URL from memory; copy each URL character for character.';
+    public const string ANSWER_INSTRUCTION = 'Answer from these pages in your own words: every figure with its source next to it (the site name and the URL; a table gets a Source column filled in EVERY row — never only a source list below the table), a value with its qualifier ("about", the variant), every entry found listed or its omission said, what was not found said plainly ("not stated" only when no page or reading lists the value). A derived figure only from values of ONE source, named as derived — never an estimate from figures of different sources. Cite ONLY pages listed here — never a URL from memory; copy each URL character for character.';
 
     /**
      * How to show it on a screen: the key statement in prose, the figures in the

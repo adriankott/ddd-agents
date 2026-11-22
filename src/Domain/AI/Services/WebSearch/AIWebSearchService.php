@@ -192,12 +192,11 @@ class AIWebSearchService extends Service
             if ($argusSettings->loadedFromCache || !$argusSettings->isLoadedSuccessfully || !$argusWebSearchHitList->isAnswered()) {
                 continue;
             }
-            if ($argusWebSearchHitList instanceof ArgusWebSearchHitList && $argusWebSearchHitList->answeredFromEndpointCache) {
+            if ($argusWebSearchHitList->answeredFromEndpointCache) {
                 continue;
             }
             $billableRequestCount++;
-            $endpointFeeUsd = $argusWebSearchHitList instanceof ArgusWebSearchHitList ? $argusWebSearchHitList->endpointFeeUsd : null;
-            $feeUsd += $endpointFeeUsd ?? $configuredFeeUsdPerRequest;
+            $feeUsd += $argusWebSearchHitList->endpointFeeUsd ?? $configuredFeeUsdPerRequest;
         }
         if ($billableRequestCount === 0) {
             return;
@@ -510,11 +509,14 @@ class AIWebSearchService extends Service
         $argusPageScreenshot->forceFullPage = true;
         $argusPageScreenshot->isMobile = $isMobile;
         if (!$argusPageScreenshot->applyConfiguredLoadSettings()) {
-            return PageScreenshot::newInstance();
+            $pageScreenshot = PageScreenshot::newInstance();
+            $pageScreenshot->failureReason = PageScreenshotPart::REASON_CAPABILITY_OFF;
+            return $pageScreenshot;
         }
         $argusPageScreenshot->argusLoad(useArgusEntityCache: !$bypassCache, useApiACallCache: !$bypassCache);
         $pageScreenshot = PageScreenshot::newInstance();
         $pageScreenshot->content = $argusPageScreenshot->content;
+        $pageScreenshot->failureReason = ($argusPageScreenshot->content ?? '') === '' ? $argusPageScreenshot->failureReason : null;
         return $pageScreenshot;
     }
 
@@ -527,8 +529,8 @@ class AIWebSearchService extends Service
      * A full-page render exactly one window tall is either a short page (its bottom is empty background) or a page that
      * blocks scrolling (its content runs to the window edge): only the second is rendered again in a
      * {@see PageScreenshotPart::TALL_VIEWPORT_HEIGHT_PX} window, the empty bottom cut off, and kept when it is taller
-     * than one window. A URL that is not public, the capability off or nothing captured → page height 0; a part past
-     * the last one comes back without images.
+     * than one window. A URL that is not public, the capability off or nothing captured → page height 0 and the reason
+     * on {@see PageScreenshotPart::$failureReason}; a part past the last one comes back without images.
      */
     public function capturePagePartForModel(string $url, int $partNumber = 1, string $device = PageScreenshotPart::DEVICE_DESKTOP, bool $bypassCache = false): PageScreenshotPart
     {
@@ -537,7 +539,12 @@ class AIWebSearchService extends Service
         $pageScreenshotPart->url = trim($url);
         $pageScreenshotPart->device = $isMobile ? PageScreenshotPart::DEVICE_MOBILE : PageScreenshotPart::DEVICE_DESKTOP;
         $pageScreenshotPart->partNumber = max(1, $partNumber);
-        if (!$this->isCapabilityAvailable(self::CAPABILITY_SCREENSHOT) || !PublicUrlGuard::resolvedHostsAreAllPublic($pageScreenshotPart->url)) {
+        if (!$this->isCapabilityAvailable(self::CAPABILITY_SCREENSHOT)) {
+            $pageScreenshotPart->failureReason = PageScreenshotPart::REASON_CAPABILITY_OFF;
+            return $pageScreenshotPart;
+        }
+        if (!PublicUrlGuard::resolvedHostsAreAllPublic($pageScreenshotPart->url)) {
+            $pageScreenshotPart->failureReason = PageScreenshotPart::REASON_NOT_PUBLIC;
             return $pageScreenshotPart;
         }
         $viewportWidth = $isMobile ? PageScreenshotPart::MOBILE_VIEWPORT_WIDTH_PX : PageScreenshotPart::DESKTOP_VIEWPORT_WIDTH_PX;
@@ -553,6 +560,9 @@ class AIWebSearchService extends Service
         }
         $pageScreenshotPart->pageWidthPx = $pageScreenshot->getPixelWidth();
         $pageScreenshotPart->pageHeightPx = $pageScreenshot->getPixelHeight();
+        if ($pageScreenshotPart->pageHeightPx <= 0) {
+            $pageScreenshotPart->failureReason = $pageScreenshot->failureReason;
+        }
         if ($pageScreenshotPart->pageHeightPx > 0 && $pageScreenshotPart->partNumber <= $pageScreenshotPart->getPartCount()) {
             $pageScreenshotPart->base64Images = $pageScreenshot->buildSegmentWindowBase64(
                 PageScreenshotPart::SLICE_HEIGHT_PX,

@@ -9,18 +9,24 @@ use DDD\Domain\Base\Repo\Argus\Traits\ArgusTrait;
 use DDD\Domain\Base\Repo\Argus\Utils\ArgusApiOperation;
 use DDD\Domain\Base\Repo\Argus\Utils\ArgusCache;
 use DDD\Domain\AI\Entities\WebSearch\PageScreenshots\PageScreenshot;
+use DDD\Domain\AI\Entities\WebSearch\PageScreenshots\PageScreenshotPart;
 use DDD\Domain\AI\Repo\Argus\WebSearch\ArgusWebSearchConfiguredEndpointTrait;
 
 /**
  * A URL rendered to a base64 PNG through the application's screenshot endpoint (`AI.webSearch.endpoints.screenshot`):
  * the URL and the viewport on the loader, the real page rendered opaquely with JavaScript, full page, waiting for
  * network idle. Answer: `{"status": "success", "content": "<base64>"}`; further fields (`finalUrl`, `width`, `height`,
- * `truncated`, …) are ignored. The bytes land on {@see PageScreenshot::$content}.
+ * `truncated`, …) are ignored. The bytes land on {@see PageScreenshot::$content}. A failure may name its reason
+ * (`reason` at the top, under `data` or `error`, e.g. `BOT_CHALLENGE`, `TIMEOUT`): it lands on
+ * {@see PageScreenshot::$failureReason}; a failure is never cached.
+ *
+ * Cached in memory only by default: a capture is megabytes of base64 and the endpoint usually caches it itself.
+ * `AI.webSearch.cacheInDatabase.screenshot: true` adds the database cache.
  *
  * @method PageScreenshot|null toEntity()
  */
 #[ArgusLoad(
-    cacheLevel: ArgusCache::CACHELEVEL_MEMORY_AND_DB,
+    cacheLevel: ArgusCache::CACHELEVEL_MEMORY,
     cacheTtl: ArgusCache::CACHE_TTL_TEN_MINUTES // a live page changes; a short lifetime keeps repeat views cheap
 )]
 class ArgusPageScreenshot extends PageScreenshot
@@ -56,7 +62,8 @@ class ArgusPageScreenshot extends PageScreenshot
     public string $format = 'png';
 
     /**
-     * Stores the base64 image on success; otherwise the standard error post-processing (the caller reads a null
+     * Stores the base64 image on success. Otherwise the reason the answer or the rejected call names lands on
+     * {@see PageScreenshot::$failureReason} and nothing is cached (the caller reads a null
      * {@see PageScreenshot::getImageBlob()} as "no screenshot").
      */
     public function handleLoadResponse(
@@ -64,11 +71,42 @@ class ArgusPageScreenshot extends PageScreenshot
         ?ArgusApiOperation &$apiOperation = null,
     ): void {
         if (!(is_object($callResponseData) && ($callResponseData->status ?? null) === 'success' && is_string($callResponseData->content ?? null) && $callResponseData->content !== '')) {
-            $this->postProcessLoadResponse($callResponseData, false);
+            $this->content = null;
+            $this->failureReason = static::findFailureReasonOfAnswer($callResponseData, $apiOperation);
+            $this->postProcessLoadResponse($callResponseData, false, cacheFailure: false);
             return;
         }
         $this->content = $callResponseData->content;
+        $this->failureReason = null;
         $this->postProcessLoadResponse($callResponseData);
+    }
+
+    /**
+     * The failure code of a screenshot answer: `reason` at the top, under `data` or under `error` (also an `error`
+     * string that is a code), upper-cased; for a rejected call without an answer TIMEOUT when its reason says so, else
+     * FETCH_FAILED; null when nothing names a reason.
+     */
+    public static function findFailureReasonOfAnswer(mixed $callResponseData, ?ArgusApiOperation $apiOperation = null): ?string
+    {
+        $reasonCandidates = [];
+        if (is_object($callResponseData)) {
+            $reasonCandidates[] = $callResponseData->reason ?? null;
+            $reasonCandidates[] = is_object($callResponseData->data ?? null) ? ($callResponseData->data->reason ?? null) : null;
+            $upstreamError = $callResponseData->error ?? null;
+            $reasonCandidates[] = is_object($upstreamError) ? ($upstreamError->reason ?? $upstreamError->code ?? null) : $upstreamError;
+        }
+        foreach ($reasonCandidates as $reasonCandidate) {
+            if (is_string($reasonCandidate) && preg_match('/^[A-Za-z][A-Za-z0-9_]{1,40}$/', trim($reasonCandidate)) === 1) {
+                return strtoupper(trim($reasonCandidate));
+            }
+        }
+        $rejectionReason = $apiOperation !== null ? trim((string)($apiOperation->rejectionReason ?? '')) : '';
+        if ($rejectionReason !== '') {
+            return stripos($rejectionReason, 'timed out') !== false || stripos($rejectionReason, 'timeout') !== false
+                ? PageScreenshotPart::REASON_TIMEOUT
+                : PageScreenshotPart::REASON_FETCH_FAILED;
+        }
+        return null;
     }
 
     /**

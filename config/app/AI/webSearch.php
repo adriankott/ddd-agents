@@ -20,9 +20,15 @@ declare(strict_types=1);
  *     screenshot:    request {url, responseType: base64, viewport_width, viewport_height, width, height, density, type,
  *                    javascript_enabled, redirect_enabled, dom_timeout, min_wait, is_mobile, force_full_page,
  *                    emulate_full_page, wait_until, omit_background, addPoweredByHeader}; answer {status: success,
- *                    content: <base64 png>} (further fields are ignored)
+ *                    content: <base64 png>} (further fields are ignored); a failure may name `reason` (at the top,
+ *                    under data or error: BOT_CHALLENGE, TIMEOUT, BLOCKED, UNRESOLVABLE, FETCH_FAILED or its own code),
+ *                    which the model reads with the next move
+ *     urlToMarkdown reasons also: BOT_CHALLENGE, UNRESOLVABLE, UNSUPPORTED_TYPE (an unknown code is named as is)
  * - `cacheTtlSeconds` / `timeoutSeconds`: replace the per-capability defaults (search and page read: one hour and
  *   15 s; screenshot: ten minutes and the endpoint's own render time). The tools' own limit is 45 s.
+ * - `cacheInDatabase`: per capability, true adds the database cache beside the memory cache, false keeps memory only;
+ *   unset keeps the class default (search and page read: memory and database). A screenshot is cached in memory only
+ *   (megabytes of base64; the endpoint usually caches it itself) unless `screenshot: true`.
  * - `hits`: the search. `feeUsdPerRequestByMode` is what one real request costs; it is handed to the application's
  *   booking hook (a cache hit or a failure books nothing). `providerName` goes into the references widget.
  *   `renderBudgetChars` caps what the model receives from one call, `snippetCharCapPerHit` one page's excerpts.
@@ -46,6 +52,9 @@ return [
     ],
     'cacheTtlSeconds' => [],
     'timeoutSeconds' => [],
+    'cacheInDatabase' => [
+        'screenshot' => false,
+    ],
     'hits' => [
         'defaultMode' => 'fast',
         'feeUsdPerRequestByMode' => ['fast' => 0.001, 'web' => 0.005],
