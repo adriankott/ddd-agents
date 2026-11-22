@@ -47,7 +47,39 @@
       "prompt": "What was new this week about the European AI Act?",
       "goal": "The user wants news of the current week.",
       "userFacts": "You only want news of this week, with date and source.",
-      "successRubric": "The agent searches with searchTheWeb and the recency filter 'week' (or 'day'), names each item with the date its page states and places it against today; when nothing happened inside the week it says so first and names the newest older item with its date. FAIL: undated items presented as this week's news; no recency filter.",
+      "successRubric": "The agent searches with searchTheWeb and the recency filter 'week' (or 'day'), names each item with the date its page states and places it against today; when nothing happened inside the week it says so first and names the newest older item with its date. FAIL: undated items presented as this week's news; no recency filter; dates written into the query text instead of the filter.",
+      "expect": {"skill": "Web.Search", "tool": "searchTheWeb", "status": "COMPLETED"}
+    },
+    {
+      "id": "websearch.queries.no-operators",
+      "prompt": "What do the official tourism sites of Vienna and Prague say about the best time to visit? Look it up.",
+      "goal": "The user wants web research restricted to official sources.",
+      "userFacts": "You want the answer from official tourism sites, with sources.",
+      "successRubric": "The agent calls searchTheWeb with short plain-word queries (one per city/aspect) and restricts sites through `domains` or reads the official pages; no query carries `site:`, `OR` or quoted phrases, and no query is a long keyword chain. The answer cites the pages. FAIL: a query with `site:`, `OR` or quotes; one long keyword string instead of short queries; a source in no tool result.",
+      "expect": {"skill": "Web.Search", "tool": "searchTheWeb", "status": "COMPLETED"}
+    },
+    {
+      "id": "websearch.batches.limit",
+      "prompt": "Compare the warranty terms, the price and the battery life of the three best-selling robot vacuums of this year, each with sources.",
+      "goal": "A multi-aspect research question.",
+      "userFacts": "You want a comparison with sources; partial results are fine if something is missing.",
+      "successRubric": "The agent puts the aspects into ONE searchTheWeb call's `queries`, uses at most three searchTheWeb calls in the turn, reads pages for missing figures in one batch, and answers with what was found, naming gaps. Each figure has its source next to it (in a table one source per row). FAIL: more than three searchTheWeb calls; a figure without a source; sources only grouped under the table.",
+      "expect": {"skill": "Web.Search", "tool": "searchTheWeb", "status": "COMPLETED"}
+    },
+    {
+      "id": "websearch.urls.exact",
+      "prompt": "Search for the German federal statistics office's page on population figures, then read the page you found and give me the latest total.",
+      "goal": "Search, then read a found page whose URL may carry encoded characters.",
+      "userFacts": "You want the latest total population figure with its source.",
+      "successRubric": "The agent reads a page whose URL is copied character for character from the searchTheWeb result (percent escapes kept, nothing transliterated, shortened or joined) and cites that exact URL. FAIL: a read or cited URL that differs from the listed one; a URL stitched from two results; a URL from memory.",
+      "expect": {"skill": "Web.Search", "tool": "getWebPageAsMarkdown", "status": "COMPLETED"}
+    },
+    {
+      "id": "websearch.figures.derived",
+      "prompt": "How long is the coastline of Portugal including its islands? Look it up.",
+      "goal": "A figure that sources may give in parts.",
+      "userFacts": "You want one figure with its source.",
+      "successRubric": "The agent reports the figures the sources state, each with its source. A total it computes uses values of ONE source only and is called derived, naming that source; when the parts come from different sources it reports them separately (or as its own estimate naming every source), never as one sourced total. FAIL: an 'about N km' built from figures of different sources presented as found; a figure without a source.",
       "expect": {"skill": "Web.Search", "tool": "searchTheWeb", "status": "COMPLETED"}
     }
   ]

@@ -51,6 +51,9 @@ class WebPageMarkdownMcpResponseDto extends RestResponseDto implements LlmMarkdo
      */
     public ?string $noteAfterWebPagesRead = null;
 
+    /** The note when a URL was put back to the one a search listed ({@see \DDD\Domain\AI\Entities\WebSearch\WebPageUrlCorrection}); null otherwise. */
+    public ?string $urlCorrectionNote = null;
+
     public static function of(WebPageMarkdown $page): self
     {
         $responseDto = new self();
@@ -82,6 +85,9 @@ class WebPageMarkdownMcpResponseDto extends RestResponseDto implements LlmMarkdo
         $noteLines = [];
         if ($this->batchAdoptionNote !== null && $this->batchAdoptionNote !== '') {
             $noteLines[] = $this->batchAdoptionNote;
+        }
+        if ($this->urlCorrectionNote !== null && $this->urlCorrectionNote !== '') {
+            $noteLines[] = $this->urlCorrectionNote;
         }
         $noteLines[] = ToolResultUntrustedSegments::READING_RULE;
         foreach ($this->pages?->getElements() ?? [] as $page) {

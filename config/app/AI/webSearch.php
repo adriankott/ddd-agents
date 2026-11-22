@@ -26,6 +26,7 @@ declare(strict_types=1);
  * - `hits`: the search. `feeUsdPerRequestByMode` is what one real request costs; it is handed to the application's
  *   booking hook (a cache hit or a failure books nothing). `providerName` goes into the references widget.
  *   `renderBudgetChars` caps what the model receives from one call, `snippetCharCapPerHit` one page's excerpts.
+ *   `maxSearchCallsPerTurn`: `searchTheWeb` refuses a call beyond it in one turn (0 or null = no limit).
  * - `pageReads`: `getWebPageAsMarkdown`.
  * - `extraction`: the fast-model readings of `extractInformationFromWebPagesWithFastLLM` and of a search with
  *   `extractInformationFromResultPagesWithFastLLM`.
@@ -52,6 +53,7 @@ return [
         'maxHitsPerQuery' => 8,
         'maxTokensPerPage' => 4096,
         'maxQueriesPerCall' => 5,
+        'maxSearchCallsPerTurn' => 3,
         'renderBudgetChars' => 48000,
         'snippetCharCapPerHit' => 1800,
     ],

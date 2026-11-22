@@ -27,6 +27,14 @@ Tool attributes: every tool reads untrusted content (`MCPToolReturnsUntrustedCon
 the pictures are not screened), the three research results are never stubbed by the budget, every tool has 45 s, the
 screenshot refreshes state. The search, the page read and the reading may run in parallel.
 
+What the tools fix themselves instead of trusting the wording:
+
+| Rule | Where it is enforced |
+|---|---|
+| Queries are plain words: `site:`, `-site:`, `OR`, `AND`, `\|`, quotes and `intitle:`-style prefixes are removed; the `site:` domains become the call's `domains` when the call has none and every query named a site, otherwise they are dropped; a note in the platform note says what changed, also for a query of more than 10 words | `WebSearchQueryNormalization`, `WebSearchCallQueries` |
+| At most `hits.maxSearchCallsPerTurn` (3) `searchTheWeb` calls per turn; a further call is refused with the next move (answer from the found pages, or read one). Failed and duplicate calls do not count; outside the agent loop there is no limit; 0 switches it off | `WebSearchMCPPackage::throwIfSearchCallsOfTheTurnAreUsedUp()`, `ToolCallsOfTheCurrentTurn` |
+| A page URL copied inexactly from a search result (percent escapes decoded, `ß` or an umlaut transliterated, another case) is read as the listed URL when exactly one listed hit matches; the platform note names it. A URL no search listed is read as given | `WebPageUrlCorrection` |
+
 ## Switching it on
 
 1. Copy `config/app/AI/webSearch.php` into the host (the host's file replaces the package's whole) and set

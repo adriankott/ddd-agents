@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.1.12
+
+- Changed: `searchTheWeb` searches plain words. Search operators in a query (`site:`, `-site:`, `OR`, `AND`, `|`,
+  quotes, `intitle:`-style prefixes) are removed; the `site:` domains become the call's `domains` when the call has
+  none and every query named a site, otherwise they are dropped. The platform note says what changed, and notes a
+  query of more than 10 words (`WebSearchQueryNormalization`, `WebSearchCallQueries`).
+- Added: at most `AI.webSearch.hits.maxSearchCallsPerTurn` `searchTheWeb` calls per turn (default 3, 0 = no limit); a
+  further call is refused with the next move. Failed and duplicate calls do not count, outside the agent loop there is
+  no limit (`ToolCallsOfTheCurrentTurn`).
+- Changed: `getWebPageAsMarkdown` and `extractInformationFromWebPagesWithFastLLM` read a URL copied inexactly from a
+  search result of the conversation (percent escapes decoded, transliterated, another case) as the listed URL when
+  exactly one listed hit matches, and say so in the platform note (`WebPageUrlCorrection`).
+- Changed: the wording of `Web.Search`, `searchTheWeb` and the answer instruction: plain-word queries, sites in
+  `domains`, a time window in `recency` instead of the query text, a source next to every figure (one per table row),
+  no silently dropped entries, derived figures only from values of one source, URLs copied character for character.
+- The evaluation template has four new cases (operators, the search limit, exact URLs, derived figures) and a sharper
+  recency case. Rerun the evaluation of `Web.Search` after the update.
+
 ## 0.1.11
 
 - Changed: the search fee follows the endpoint's answer. A search answer with `data.cached: true` (the endpoint's own

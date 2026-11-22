@@ -30,6 +30,9 @@ class WebPageExtractsMcpResponseDto extends RestResponseDto implements LlmMarkdo
     /** Characters per page reading. */
     public int $extractCharCapPerPage = 2400;
 
+    /** The note when a URL was put back to the one a search listed ({@see \DDD\Domain\AI\Entities\WebSearch\WebPageUrlCorrection}); null otherwise. */
+    public ?string $urlCorrectionNote = null;
+
     public function toLlmMarkdown(): string
     {
         return ($this->extracts ?? new WebPageExtracts())->buildLlmMarkdown($this->extractionTask, $this->extractCharCapPerPage);
@@ -37,6 +40,7 @@ class WebPageExtractsMcpResponseDto extends RestResponseDto implements LlmMarkdo
 
     public function buildPlatformNoteForModel(): ?string
     {
-        return ToolResultUntrustedSegments::READING_RULE . "\n" . WebSearchHitsMcpResponseDto::buildAnswerInstruction($this->showAnswerAsWidget);
+        $urlCorrectionLine = $this->urlCorrectionNote !== null && $this->urlCorrectionNote !== '' ? $this->urlCorrectionNote . "\n" : '';
+        return $urlCorrectionLine . ToolResultUntrustedSegments::READING_RULE . "\n" . WebSearchHitsMcpResponseDto::buildAnswerInstruction($this->showAnswerAsWidget);
     }
 }

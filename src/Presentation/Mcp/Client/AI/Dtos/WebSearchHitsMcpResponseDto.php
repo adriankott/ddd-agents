@@ -26,7 +26,7 @@ use DDD\Presentation\Base\OpenApi\Attributes\Parameter;
 class WebSearchHitsMcpResponseDto extends RestResponseDto implements LlmMarkdownRenderable, MCPToolResponsePlatformNoteProvider
 {
     /** How to answer: the result is research material, the answer is the agent's own, its sources are only these pages. */
-    public const string ANSWER_INSTRUCTION = 'Answer from these pages in your own words: every figure with its source (the site name and the URL), a value with its qualifier ("about", the variant), what was not found said plainly. Cite ONLY pages listed here — never a URL from memory.';
+    public const string ANSWER_INSTRUCTION = 'Answer from these pages in your own words: every figure with its source next to it (the site name and the URL; in a table one source per row), a value with its qualifier ("about", the variant), every entry found listed or its omission said, what was not found said plainly. A derived figure only from values of ONE source, named as derived — never an estimate from figures of different sources. Cite ONLY pages listed here — never a URL from memory; copy each URL character for character.';
 
     /**
      * How to show it on a screen: the key statement in prose, the figures in the
@@ -74,6 +74,9 @@ class WebSearchHitsMcpResponseDto extends RestResponseDto implements LlmMarkdown
     /** The leading corrective line of a repeated single-query search in this turn; null otherwise. */
     public ?string $batchAdoptionNote = null;
 
+    /** What was changed in the queries (operators removed, `site:` applied as `domains`) or a keyword-chain note; null otherwise. */
+    public ?string $queryNote = null;
+
     /** Characters the merged page list may take ({@see WebSearchHitLists::buildLlmMarkdown()}). */
     public int $renderBudgetChars = 48000;
 
@@ -97,6 +100,9 @@ class WebSearchHitsMcpResponseDto extends RestResponseDto implements LlmMarkdown
         $noteLines = [];
         if ($this->batchAdoptionNote !== null && $this->batchAdoptionNote !== '') {
             $noteLines[] = $this->batchAdoptionNote;
+        }
+        if ($this->queryNote !== null && $this->queryNote !== '') {
+            $noteLines[] = $this->queryNote;
         }
         $noteLines[] = ToolResultUntrustedSegments::READING_RULE;
         $noteLines[] = self::buildAnswerInstruction($this->showAnswerAsWidget);
