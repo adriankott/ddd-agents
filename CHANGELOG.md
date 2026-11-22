@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.1.10
+
+- Added: the package's web research, off by default (`config/app/AI/webSearch.php`, `'enabled' => false`, no
+  endpoints): while it is off nothing is offered and no request is made. Switched on, with an endpoint per capability
+  (`endpoints.search`, `endpoints.urlToMarkdown`, `endpoints.screenshot`; relative = through the Argus gateway, absolute
+  = direct; a capability can be switched off with `capabilities.*`):
+  - `WebSearchMCPPackage` (id `agent.webSearch`, skill `Web.Search`): `searchTheWeb` (up to 5 queries in parallel,
+    one merged page list round robin over the queries, the engine's excerpts, a render budget),
+    `extractInformationFromWebPagesWithFastLLM` (a fast model reads up to 10 pages for one task; every quote checked
+    against the page and the excerpts, an unverified quote marked, never dropped; an uncrawlable page read from its
+    search excerpt), `getWebPageAsMarkdown` (up to 5 pages in parallel; refused before any crawl: a search engine's
+    results page, a host without DNS record, a private address);
+  - `WebPageScreenshotMCPPackage` (id `agent.webPageScreenshot`, sub-skill `Web.PageView`, needs vision):
+    `getWebPageAsScreenshot` (parts of two 2000-px slices, desktop and mobile, the re-render of a page that blocks
+    scrolling; rendered only for a public host; without Imagick the first part is the whole capture);
+  - the tools read untrusted content, the research results are never stubbed by the budget, every tool has 45 s;
+  - `AIWebSearchService` (search, readings, page reads, screenshot parts) and the host hooks `WebSearchHostService`
+    (same-path subclass): default country, payer (`WebSearchPayer`; default the signed-in account), spend check,
+    booking of the search fee (`hits.feeUsdPerRequestByMode` per real request, never a cache hit or a failure), a line
+    after a page read. The readings are billed by ddd-ai's usage recorder to the payer (usage scope
+    `AI.WEB_PAGE.EXTRACT`, prompt `AI.WebSearch.PageExtract`, model `reading.modelName`);
+  - every limit, cache lifetime and timeout in the configuration; both skills bound in the package's default
+    `skillPackages.php` (offered only while their packages are available).
+- Host duty when switching it on: ship `webSearch.php` with `enabled` and the endpoints, list
+  `AISkill::WEB_SEARCH => ['agent.webSearch']` and `AISkill::WEB_PAGE_VIEW => ['agent.webPageScreenshot']` when the
+  host's `skillPackages.php` replaces the package's, override `WebSearchHostService` for country, payer and booking.
+  Reference: `ddd-module-agents-tools-specialist`, `references/web-research.md`.
+
 ## 0.1.9
 
 - Added: the package's memory store, the default implementation behind `AgentMemoriesService`. Off by default
