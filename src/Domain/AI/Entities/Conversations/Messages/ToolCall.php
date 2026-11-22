@@ -856,8 +856,7 @@ class ToolCall extends ValueObject
         // gone) is told so at the picture's position — the caption above still says "look", the marker says "not here".
         if ($imagesDroppedFromWire && !$capturedUnsentImage && $full && $resolvedImages === []) {
             $content = ($content === '' ? '' : $content . "\n\n")
-                . "[the $pictureWord this result carried " . ($pictureCount === 1 ? 'is' : 'are') . ' no longer on the wire — only the newest pictures ride with each model call. '
-                . 'Do not describe or rely on what they showed; if you still need to SEE, call a preview tool for exactly what you are deciding now (a narrower request, not this same call).]';
+                . static::buildImagesDroppedFromWireMarker($pictureWord, $pictureCount);
         }
         // The wire kept only SOME of this result's pictures (a result over the conversation's picture
         // budget is cut to its first N) — say so, or the model reads "3 segments" and believes it saw all three.
@@ -1367,5 +1366,19 @@ class ToolCall extends ValueObject
     public function onlyRepeatedASkillLoad(): bool
     {
         return ($this->name ?? null) === LoadSkillsTool::NAME && $this->loadSkillsCallLoadedNothing && !$this->loadSkillsCallNamedNoSkill;
+    }
+
+    /**
+     * The marker of a result whose pictures no longer ride with the model call. The model DID see them in an earlier
+     * step: what it wrote about them after that result is its record and stays valid; only details it never wrote
+     * down are gone. Without that, models read the marker as "the picture was never there" and take back their own
+     * correct descriptions.
+     */
+    public static function buildImagesDroppedFromWireMarker(string $pictureWord, int $pictureCount): string
+    {
+        return "[the $pictureWord this result carried " . ($pictureCount === 1 ? 'is' : 'are') . ' no longer on the wire — only the newest pictures ride with each model call. '
+            . 'You saw ' . ($pictureCount === 1 ? 'it' : 'them') . ' in an earlier step: what you wrote about ' . ($pictureCount === 1 ? 'it' : 'them')
+            . ' after this result is your record and stays valid — rely on it and never say you could not see ' . ($pictureCount === 1 ? 'it' : 'them') . '. '
+            . 'Do not add details you did not write down then; if you still need to SEE, call a preview tool for exactly what you are deciding now (a narrower request, not this same call).]';
     }
 }

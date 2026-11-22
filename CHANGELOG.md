@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.20
+
+- Changed: the marker of a tool result whose pictures no longer ride with the model call says that the model saw them
+  in an earlier step and that what it wrote about them stays its record (`ToolCall::buildImagesDroppedFromWireMarker()`);
+  only details it never wrote down are barred. Before, "Do not describe or rely on what they showed" made models take
+  back their own correct descriptions of earlier screenshot parts in the final summary.
+- Changed: the skill `Web.PageView` asks for one part per step, never two parts in the same message.
+
 ## 0.1.19
 
 Every application with web research should adopt this release.

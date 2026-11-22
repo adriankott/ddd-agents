@@ -81,7 +81,9 @@ inline picture (a browser viewport) is gone once its invocation ended. The cap c
 (`ContextRetentionSettings::getMaxToolCallImagesOnWire()`, default 2, a purpose's `contextRetention:` map can raise
 it): newest results first and whole, the newest result always rides, truncated to the cap
 (`AgentModelInput::selectToolCallImagesForWire()`). A candidate that does not ride is listed in
-`AgentModelInput::$droppedImageToolCallIds` and its result gets a "no longer on the wire" marker; on a model without
+`AgentModelInput::$droppedImageToolCallIds` and its result gets a "no longer on the wire" marker
+(`ToolCall::buildImagesDroppedFromWireMarker()`: the model saw the pictures in an earlier step, what it wrote about
+them stays its record, only new details are barred); on a model without
 vision no bytes ride (`AgentModelInput::$blindCapturedToolCallIds`) and every candidate gets the downgrade note. The
 read reuse counts the pictures that still ride ([tool-call-efficiency.md](tool-call-efficiency.md)).
 
