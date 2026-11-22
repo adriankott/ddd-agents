@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DDD\Tests\Agents\Symfony\Commands\Agents\Eval;
 
+use DDD\Domain\AI\Services\AIModelsService;
 use ReflectionMethod;
 use DDD\Symfony\Commands\Agents\Eval\AgentEvalSuiteRunningCase;
 use DDD\Domain\AI\Entities\Evals\AgentEvalCaseRow;
@@ -353,5 +354,19 @@ class AgentEvalToolsCommandTest extends AgentEvalResultFilesTestCase
         $commandTester = new CommandTester($probeCommand);
         $commandTester->execute($commandInput, ['capture_stderr_separately' => true]);
         return $commandTester;
+    }
+
+    public function testARunWithoutModelJudgesVisionByTheAgentsDefaultModel(): void
+    {
+        $agentEvalToolsProbeCommand = new AgentEvalToolsProbeCommand();
+        $agentEvalToolsProbeCommand->usesScriptedDefaultAgentModel = false;
+        $defaultAgentModelName = $agentEvalToolsProbeCommand->findDefaultAgentModelNameOfARunWithoutModel();
+        self::assertNotNull($defaultAgentModelName, 'the agent egress declares a default model');
+        /** @var AIModelsService $aIModelsService */
+        $aIModelsService = DDDService::instance()->getService(AIModelsService::class);
+        self::assertSame(
+            $aIModelsService->getAIModelByName($defaultAgentModelName)?->hasVisionCapabilities === true,
+            $agentEvalToolsProbeCommand->canTheModelOfARunWithoutModelSeeImages()
+        );
     }
 }

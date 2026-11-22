@@ -293,7 +293,7 @@ class AgentEvalSuiteCommand extends AgentEvalConsoleCommand
     }
 
     /**
-     * Model name → whether it can see images (the conversation default is not looked up).
+     * Model name → whether it can see images; the conversation default (null) is the agent's default model, under ''.
      *
      * @param array $modelNames model names; null = the conversation default
      * @return bool[]
@@ -305,6 +305,10 @@ class AgentEvalSuiteCommand extends AgentEvalConsoleCommand
         $aIModelsService = $this->getAIModelsService();
         foreach ($modelNames as $modelName) {
             if ($modelName === null) {
+                // the conversation default: the agent's default model, filed under '' (the plan reads a null name as '')
+                $defaultAgentModelName = $this->findDefaultAgentModelName();
+                $defaultAIModel = $defaultAgentModelName !== null ? $aIModelsService->getAIModelByName($defaultAgentModelName) : null;
+                $visionCapabilityByModelName[''] = $defaultAIModel?->hasVisionCapabilities === true;
                 continue;
             }
             $aIModel = $aIModelsService->getAIModelByName($modelName);

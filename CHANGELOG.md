@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.22
+
+- Fixed: `app:ai-agent:eval-tools` and `app:ai-agent:eval-suite` without `--model` / `--models` run a case with
+  `requiresVision` when the agent's default model can see images: the model the egress would take (its `modelScope`,
+  else its `defaultAIModelName`, the application's `ArgusAIAgentConversation` when it has one;
+  `AgentEvalConsoleCommand::findDefaultAgentModelName()`). Before, every such case was skipped as if the default model
+  were blind. The tools command resolves it only when a case of the run needs vision.
+
 ## 0.1.21
 
 - Fixed: a tool parameter typed on a package service (`AIWebSearchService`, `WebSearchHostService`, any other)

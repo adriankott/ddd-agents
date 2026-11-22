@@ -58,6 +58,29 @@ class AgentEvalToolsProbeCommand extends AgentEvalToolsCommand
         $this->suiteRunsServiceDouble = new AgentEvalSuiteRunsServiceWithoutDatabaseDouble();
     }
 
+    /** @var bool Whether a run without `--model` takes the scripted default model below instead of resolving the agent's */
+    public bool $usesScriptedDefaultAgentModel = true;
+
+    /** @var string|null The scripted default model: none, so a run without `--model` sees no images */
+    public ?string $scriptedDefaultAgentModelName = null;
+
+    protected function findDefaultAgentModelName(): ?string
+    {
+        return $this->usesScriptedDefaultAgentModel ? $this->scriptedDefaultAgentModelName : parent::findDefaultAgentModelName();
+    }
+
+    /** The agent's default model, as a run without `--model` uses it */
+    public function findDefaultAgentModelNameOfARunWithoutModel(): ?string
+    {
+        return $this->findDefaultAgentModelName();
+    }
+
+    /** Whether a run without `--model` counts as one whose model can see images */
+    public function canTheModelOfARunWithoutModelSeeImages(): bool
+    {
+        return $this->modelCanSeeImages(null);
+    }
+
     /**
      * The child's command line as the command builds it.
      *

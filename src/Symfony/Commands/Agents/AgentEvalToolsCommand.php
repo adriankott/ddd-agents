@@ -163,6 +163,9 @@ class AgentEvalToolsCommand extends AgentEvalConsoleCommand
             $output->writeln('<error>No tool-eval fixtures found</error>');
             return Command::FAILURE;
         }
+        if (($runSettings->modelName ?? '') === '' && $this->anyCaseOfFixturesRequiresVision($agentEvalFixtures)) {
+            $runSettings->modelCanSeeImages = $this->modelCanSeeImages(null);
+        }
         if (!$runSettings->noSave && !$runSettings->noPrune) {
             $this->sweepResultsFolder($runSettings, $output);
         }
@@ -223,7 +226,8 @@ class AgentEvalToolsCommand extends AgentEvalConsoleCommand
         $runSettings->simulatedOwnerDevice = $this->buildSimulatedOwnerDevice($runSettings->ownerDeviceSurface);
         $runSettings->fallbackAgentSpaceId = $this->resolveFallbackAgentSpaceId($input);
         $runSettings->fallbackAccountId = $this->resolveFallbackAccountId($input);
-        $runSettings->modelCanSeeImages = $this->modelCanSeeImages($runSettings->modelName);
+        // without --model the vision of the agent's default model is resolved once the fixtures show a case needs it
+        $runSettings->modelCanSeeImages = ($runSettings->modelName ?? '') !== '' && $this->modelCanSeeImages($runSettings->modelName);
         $runSettings->scopeTag = $this->getResultFilesService()->getScopeTagOfToolsRun($runSettings->skillFilter, $runSettings->caseFilter);
         return $runSettings;
     }
@@ -245,10 +249,26 @@ class AgentEvalToolsCommand extends AgentEvalConsoleCommand
         return $simulatedOwnerDevice;
     }
 
-    /** Whether the model under test can see images: a case that requires vision runs only then (the default model cannot). */
+    /** Whether a case of the fixtures needs a vision-capable model. */
+    protected function anyCaseOfFixturesRequiresVision(AgentEvalFixtures $agentEvalFixtures): bool
+    {
+        foreach ($agentEvalFixtures->getElements() as $agentEvalFixture) {
+            foreach ($agentEvalFixture->getCases()->getElements() as $agentEvalCase) {
+                if ($agentEvalCase->requiresVision()) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Whether the model under test can see images: a case that requires vision runs only then; without `--model` the agent's default model decides. */
     protected function modelCanSeeImages(?string $modelName): bool
     {
         if ($modelName === null || $modelName === '') {
+            $modelName = $this->findDefaultAgentModelName();
+        }
+        if ($modelName === null) {
             return false;
         }
         return $this->getAIModelsService()->getAIModelByName($modelName)?->hasVisionCapabilities === true;

@@ -6,6 +6,9 @@ namespace DDD\Symfony\Commands\Agents;
 
 use DDD\Domain\AI\Entities\AgentSpaces\AgentSpace;
 use DDD\Domain\AI\Exceptions\Evals\AgentEvalUnknownModelNameException;
+use DDD\Domain\AI\Repo\Argus\Attributes\ArgusLanguageModel;
+use DDD\Domain\AI\Repo\Argus\Conversations\ArgusAIAgentConversation;
+use DDD\Domain\AI\Services\AIModelsService;
 use DDD\Domain\AI\Services\Eval\AgentEvalJudgedRunService;
 use DDD\Infrastructure\Exceptions\BadRequestException;
 use DDD\Infrastructure\Exceptions\InternalErrorException;
@@ -124,6 +127,34 @@ abstract class AgentEvalConsoleCommand extends AgentConsoleCommand implements Si
      *
      * @return AgentEvalJudgedRunService
      */
+    /**
+     * The agent model a run without `--model` / `--models` uses, resolved like the egress does: the model of its
+     * `modelScope`, else its `defaultAIModelName` (`ArgusAIAgentConversation`, the application's class when it has
+     * one); null when none is declared. A space or
+     * prompt extension may still choose another model per conversation.
+     */
+    protected function findDefaultAgentModelName(): ?string
+    {
+        // the application's egress class may declare another model: its attribute, read without building the repository
+        $egressClassName = DDDService::instance()->getContainerServiceClassNameForClass(ArgusAIAgentConversation::class) ?? ArgusAIAgentConversation::class;
+        $languageModelAttributes = (new \ReflectionClass($egressClassName))->getAttributes(ArgusLanguageModel::class);
+        if ($languageModelAttributes === []) {
+            return null;
+        }
+        /** @var ArgusLanguageModel $argusLanguageModel */
+        $argusLanguageModel = $languageModelAttributes[0]->newInstance();
+        if (isset($argusLanguageModel->modelScope) && $argusLanguageModel->modelScope !== '') {
+            /** @var AIModelsService $aIModelsService */
+            $aIModelsService = DDDService::instance()->getService(AIModelsService::class);
+            $scopeModelName = $aIModelsService->getModelForScope($argusLanguageModel->modelScope)?->name ?? null;
+            if (is_string($scopeModelName) && $scopeModelName !== '') {
+                return $scopeModelName;
+            }
+        }
+        $defaultAIModelName = isset($argusLanguageModel->defaultAIModelName) ? (string)$argusLanguageModel->defaultAIModelName : '';
+        return $defaultAIModelName !== '' ? $defaultAIModelName : null;
+    }
+
     protected function getJudgedRunServiceForModelNameCheck(): AgentEvalJudgedRunService
     {
         /** @var AgentEvalJudgedRunService $agentEvalJudgedRunService */
