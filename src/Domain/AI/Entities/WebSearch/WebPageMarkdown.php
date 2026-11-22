@@ -45,6 +45,9 @@ class WebPageMarkdown extends ValueObject
     /** Detected before any crawl: the application has switched page reads off (`AI.webSearch.capabilities.urlToMarkdown`). */
     public const string REASON_CAPABILITY_OFF = 'CAPABILITY_OFF';
 
+    /** @var string[] The reasons no tool can get past (the host does not resolve, or is no safe public destination). */
+    public const array REASONS_NO_TOOL_CAN_REACH = [self::REASON_UNRESOLVABLE, self::REASON_BLOCKED, 'NOT_PUBLIC'];
+
     /** The address serves something other than a web page (a PDF, an image, a download). */
     public const string REASON_UNSUPPORTED_TYPE = WebFetchFailureReasons::UNSUPPORTED_TYPE;
 
@@ -213,6 +216,13 @@ class WebPageMarkdown extends ValueObject
             . 'the content of this page; ONE value asked from exactly this page is read by '
             . 'extractInformationFromWebPagesWithFastLLM with this URL, when that tool is available to you — it reads such '
             . 'a page from its search excerpt). Do not make the failed read the topic of a message.';
+        // a host that does not resolve or is no safe public destination is read by NO tool: no hint to another reader
+        $continueWithoutTheAddress = 'Continue with what you already know and, for a missing fact, searchTheWeb. NEVER '
+            . 'pass this URL to another tool (extractInformationFromWebPagesWithFastLLM, getWebPageAsScreenshot): '
+            . 'no tool can reach it. Do not make the failed read the topic of a message.';
+        if (in_array($this->reason, static::REASONS_NO_TOOL_CAN_REACH, true)) {
+            $continueWithoutThePage = $continueWithoutTheAddress;
+        }
         $sharedFailureSentence = WebFetchFailureReasons::findSharedFailureSentence($this->reason, $urlLabel, WebFetchFailureReasons::CAPABILITY_PAGE_READ);
         if ($sharedFailureSentence !== null) {
             return $sharedFailureSentence . ' ' . $continueWithoutThePage;

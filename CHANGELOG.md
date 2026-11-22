@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.15
+
+- Changed: a page read refused because the address cannot be resolved, is blocked or is no public address no longer
+  points the model to `extractInformationFromWebPagesWithFastLLM` with the same URL; the text says that no tool can
+  reach it and to go on with a search (`WebPageMarkdown::REASONS_NO_TOOL_CAN_REACH`). A timeout or a fetch failure
+  keeps the hint.
+
 ## 0.1.14
 
 - Changed: a screenshot of a host without a DNS record is refused as `UNRESOLVABLE` ("cannot be resolved (check the

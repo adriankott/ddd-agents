@@ -46,4 +46,15 @@ class WebFetchFailureReasonsTest extends UnitTestCase
         self::assertStringContainsString('(SOMETHING_NEW)', $pageScreenshotPart->buildFailureText());
         self::assertNull(WebFetchFailureReasons::findSharedFailureSentence('SOMETHING_NEW', 'x', WebFetchFailureReasons::CAPABILITY_PAGE_READ));
     }
+
+    public function testAnUnreachableAddressIsNeverSentToAnotherReader(): void
+    {
+        foreach ([WebPageMarkdown::REASON_UNRESOLVABLE, WebPageMarkdown::REASON_BLOCKED, 'NOT_PUBLIC'] as $reason) {
+            $pageText = WebPageMarkdown::fromRefusedUrl('https://exmaple.invalid/a', $reason)->buildFailureExplanationForAgent();
+            self::assertStringNotContainsString('is read by extractInformationFromWebPagesWithFastLLM with this URL', $pageText, $reason);
+            self::assertStringContainsString('NEVER pass this URL to another tool', $pageText, $reason);
+        }
+        $timeoutText = WebPageMarkdown::fromRefusedUrl('https://example.com/a', WebPageMarkdown::REASON_TIMEOUT)->buildFailureExplanationForAgent();
+        self::assertStringContainsString('extractInformationFromWebPagesWithFastLLM with this URL', $timeoutText);
+    }
 }
