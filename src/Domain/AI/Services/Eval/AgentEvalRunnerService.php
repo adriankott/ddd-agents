@@ -441,6 +441,8 @@ class AgentEvalRunnerService extends Service
      */
     public function runWithRestore(AgentEvalScope $agentEvalScope, AgentEvalCase $agentEvalCase, AgentEvalRunOptions $agentEvalRunOptions): AgentEvalRunOutcome
     {
+        // the workspace first: the restore's harness calls run in it (run() keeps the key)
+        $this->prepareWorkspaceOfCase($agentEvalScope, $agentEvalCase, $agentEvalRunOptions);
         $agentEvalRestoreBracket = $this->openRestoreBracket($agentEvalScope, $agentEvalCase, $agentEvalRunOptions);
         try {
             $agentEvalRunOutcome = $this->run($agentEvalScope, $agentEvalCase, $agentEvalRunOptions);
@@ -469,7 +471,7 @@ class AgentEvalRunnerService extends Service
         $this->authenticateOwnerOfScope($agentEvalScope);
         $harnessCallsStartedAt = new DateTime();
         $agentEvalRestorePlan = AgentEvalRestorePlan::fromRestoreBlock($agentEvalCase->getRestore() ?? []);
-        $harnessToolCallProvenance = $this->buildHarnessToolCallProvenance($agentEvalScope);
+        $harnessToolCallProvenance = $this->buildHarnessToolCallProvenance($agentEvalScope, $agentEvalRunOptions->workspaceKey);
         // the harness prepares and restores through any tool of the platform, whatever skill the case tests; tool
         // names are unique across all packages
         $packageClasses = $this->getPackageClassesOfEverySkill();
@@ -710,12 +712,15 @@ class AgentEvalRunnerService extends Service
      * The provenance of the harness tool calls of a case: the stored agent space of the scope, which the hooks store
      * now when the scope has none yet ({@see AgentEvalRunHooksService::findOrStoreAgentSpaceForHarnessToolCalls()}).
      *
+     * The calls run in the workspace of the case run (`$workspaceKey`, {@see AgentToolCallProvenance::$workspaceKey}).
+     *
      * @param AgentEvalScope $agentEvalScope
+     * @param string|null $workspaceKey the workspace of the case run; null outside one
      * @return AgentToolCallProvenance
      */
-    public function buildHarnessToolCallProvenance(AgentEvalScope $agentEvalScope): AgentToolCallProvenance
+    public function buildHarnessToolCallProvenance(AgentEvalScope $agentEvalScope, ?string $workspaceKey = null): AgentToolCallProvenance
     {
-        return AgentToolCallProvenance::forEvalHarness($this->getAgentEvalRunHooksService()->findOrStoreAgentSpaceForHarnessToolCalls($agentEvalScope));
+        return AgentToolCallProvenance::forEvalHarness($this->getAgentEvalRunHooksService()->findOrStoreAgentSpaceForHarnessToolCalls($agentEvalScope), null, $workspaceKey);
     }
 
     /**
@@ -742,6 +747,7 @@ class AgentEvalRunnerService extends Service
     ): array {
         $treeMessages = $conversation->getAllMessagesIncludingDelegations();
         $harnessToolCallProvenance = null;
+        $workspaceKeyOfRun = (isset($conversation->runSettings) ? $conversation->runSettings->workspaceKey : null) ?? $agentEvalRunOptions->workspaceKey;
         $argumentsFilledByThePlatform = $this->getAgentEvalRunHooksService()->getHarnessToolCallArguments($agentEvalScope);
         try {
             if (!$agentEvalStateAfterRunCheck->hasRead()) {
@@ -756,13 +762,13 @@ class AgentEvalRunnerService extends Service
             if ($readCall === null) {
                 return [];
             }
-            $harnessToolCallProvenance = $this->buildHarnessToolCallProvenance($agentEvalScope);
+            $harnessToolCallProvenance = $this->buildHarnessToolCallProvenance($agentEvalScope, $workspaceKeyOfRun);
             $this->executeHarnessToolCall($readCall, $packageClasses, $harnessToolCallProvenance, $argumentsFilledByThePlatform, true);
             return $agentEvalStateAfterRunCheck->evaluateReadResult($readCall);
         } finally {
             $cleanupCall = $agentEvalStateAfterRunCheck->buildCleanupCall($treeMessages);
             if ($cleanupCall !== null) {
-                $harnessToolCallProvenance ??= $this->buildHarnessToolCallProvenance($agentEvalScope);
+                $harnessToolCallProvenance ??= $this->buildHarnessToolCallProvenance($agentEvalScope, $workspaceKeyOfRun);
                 $this->executeHarnessToolCall($cleanupCall, $packageClasses, $harnessToolCallProvenance, $argumentsFilledByThePlatform, true);
                 $agentEvalRunOptions->reportProgress($cleanupCall->buildReportLine());
             }

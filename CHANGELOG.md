@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.24
+
+- Fixed: the harness calls of an evaluation (restore, `stateAfterRun` read and cleanup, the judge's end-state reads)
+  run in the workspace of the case run: `AgentToolCallProvenance::forEvalHarness()` takes the conversation's
+  `runSettings->workspaceKey` (or an explicit `$workspaceKey`), and `AgentEvalRunnerService::buildHarnessToolCallProvenance()`
+  passes the run's key. A case with a `restore` block prepares its workspace before the restore bracket opens. Before,
+  these calls had no key and the tool fell back to the space's own workspace.
+
 ## 0.1.23
 
 - Added: `MCPToolEffect::WORKSPACE` — "changes only the agent's private working area of this agent space — nothing and

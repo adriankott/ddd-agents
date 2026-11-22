@@ -221,6 +221,8 @@ class AgentEvalJudgedRunService extends AgentEvalRunnerService
      */
     public function runSimWithRestore(AgentEvalScope $agentEvalScope, AgentEvalSimCase $agentEvalSimCase, AgentEvalJudgedRunOptions $agentEvalJudgedRunOptions): AgentEvalSimRunResult
     {
+        // the workspace first: the restore's harness calls run in it (runSim() keeps the key)
+        $this->prepareWorkspaceOfCase($agentEvalScope, $this->buildRunCaseOfSimCase($agentEvalSimCase), $agentEvalJudgedRunOptions);
         $agentEvalRestoreBracket = $this->openRestoreBracket($agentEvalScope, $this->buildRunCaseOfSimCase($agentEvalSimCase), $agentEvalJudgedRunOptions);
         try {
             $agentEvalSimRunResult = $this->runSim($agentEvalScope, $agentEvalSimCase, $agentEvalJudgedRunOptions);

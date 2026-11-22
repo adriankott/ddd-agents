@@ -114,7 +114,7 @@ class AgentToolCallProvenance extends ValueObject implements MCPServerProvidedIn
      * decided variants, the owner rows), while the tool writer writes no row for it (a harness read never writes the
      * customer's transcript — {@see \DDD\Domain\AI\Services\Conversations\AIConversationMessagesService::appendWidget()}).
      */
-    public static function forEvalHarness(?AgentSpace $agentSpace, ?AIConversation $conversation = null): static
+    public static function forEvalHarness(?AgentSpace $agentSpace, ?AIConversation $conversation = null, ?string $workspaceKey = null): static
     {
         $provenance = new static(
             conversationId: isset($conversation->id) ? (int)$conversation->id : null,
@@ -124,6 +124,9 @@ class AgentToolCallProvenance extends ValueObject implements MCPServerProvidedIn
             conversation: $conversation,
         );
         $provenance->isEvalHarnessCall = true;
+        // the harness reads and restores in the workspace of the case run, like the agent's own calls
+        $provenance->workspaceKey = $workspaceKey
+            ?? ($conversation !== null && isset($conversation->runSettings) ? $conversation->runSettings->workspaceKey : null);
         return $provenance;
     }
 
