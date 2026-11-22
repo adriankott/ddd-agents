@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.18
+
+- Fixed: a description of a screenshot part that starts with the `{preCallMessage}` marker counts as a description
+  when it carries at least 120 characters beyond the marker
+  (`WebPageScreenshotPartsOfTheCurrentTurn::MIN_DESCRIPTION_CHARS_OF_A_STATUS_LINE`); before, the next part was
+  refused as if only a status line had been written.
+- Changed: the screenshot line of a page's last part names the earlier parts shown in the turn and says that the
+  model's descriptions of them are its record for the summary (`PageScreenshotPart::buildEarlierDescriptionsAreTheRecordText()`).
+
 ## 0.1.17
 
 - Changed: while the picture budget holds less than two parts, the screenshot line of every part but the last says

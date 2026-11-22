@@ -165,6 +165,31 @@ class PageScreenshotPart extends ValueObject
     }
 
     /**
+     * On the last part of a page whose earlier parts were shown in this turn: the model's descriptions of those parts
+     * are its record, the summary is built from them. Empty otherwise.
+     */
+    public function buildEarlierDescriptionsAreTheRecordText(): string
+    {
+        $partCount = $this->getPartCount();
+        if ($partCount < 2 || $this->partNumber < $partCount) {
+            return '';
+        }
+        $earlierPartNumbers = [];
+        foreach ($this->partNumbersAlreadyShownInTurn as $shownPartNumber) {
+            if ($shownPartNumber < $this->partNumber) {
+                $earlierPartNumbers[] = $shownPartNumber;
+            }
+        }
+        if ($earlierPartNumbers === []) {
+            return '';
+        }
+        return sprintf(
+            ' This is the last part. Your descriptions of part %s above are your record of them: build the summary from them and never say you could not inspect those parts.',
+            implode(', ', $earlierPartNumbers)
+        );
+    }
+
+    /**
      * The order for the next step while the budget holds less than two parts and a later part exists: the next message
      * writes what this part shows and may open the next part after that text; a part opened without it is refused.
      * Empty otherwise.
@@ -228,6 +253,7 @@ class PageScreenshotPart extends ValueObject
             . $this->buildAlreadyShownText()
             . ' Describe / judge what you actually SEE (layout, colours, text, images, visual issues); do not infer from the URL.'
             . $this->buildPictureBudgetText()
+            . $this->buildEarlierDescriptionsAreTheRecordText()
             . ' The render may be up to 10 minutes old; pass noCache: true for a fresh one'
             . ' (after a change to the page).';
     }

@@ -104,7 +104,9 @@ capability's answers are cached in the database too (`cacheInDatabase`; a screen
   followed the previous screenshot of the turn that did not fail
   (`WebPageScreenshotPartsOfTheCurrentTurn::findUndescribedScreenshotCallOfTurn()`); nothing is rendered. The line of
   every part but the last says so up front (`PageScreenshotPart::buildDescribeBeforeNextPartText()`: the next message
-  first writes what the part shows and may then open the next one), so the refusal stays a safety net. A connection
+  first writes what the part shows and may then open the next one), so the refusal stays a safety net. A
+  `{preCallMessage}` line with at least 120 characters beyond the marker counts as a description. The line of the
+  last part names the earlier parts shown in the turn: their descriptions are the record the summary is built from. A connection
   error or the client's own timeout (`timeoutSeconds.screenshot`) is a failed render with `TIMEOUT` ("retry once") or
   `FETCH_FAILED`, never an internal error (`ArgusPageScreenshot::findFailureReasonOfTransportError()`). A host whose
   page reviews need the previous part beside the current one raises `maxToolCallImagesOnWire` to 4, which also lifts

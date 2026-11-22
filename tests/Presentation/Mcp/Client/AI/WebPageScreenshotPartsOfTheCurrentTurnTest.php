@@ -104,6 +104,34 @@ class WebPageScreenshotPartsOfTheCurrentTurnTest extends UnitTestCase
         self::assertStringNotContainsString('Your NEXT message', $pageScreenshotPart->toCoverageText(), 'a budget of two parts lets the next part through');
     }
 
+    public function testALongDescriptionThatStartsWithTheMarkerCounts(): void
+    {
+        $messages = new AIConversationMessages();
+        $row = $this->buildUserMessage(0);
+        $messages->add($row);
+        $row = $this->buildScreenshotCall(1, ['url' => 'https://example.com'], AIConversationMessage::STATUS_COMPLETED, 'call_1');
+        $messages->add($row);
+        $row = $this->buildAssistantText(2, AIConversationMessage::PRE_CALL_MESSAGE_MARKER . ' Part 1 shows a dark header with the logo on the left, a search field in the middle, a green call to action and a hero image of a bike.');
+        $messages->add($row);
+        $row = $this->buildScreenshotCall(3, ['url' => 'https://example.com', 'part' => 2], AIConversationMessage::STATUS_PENDING, 'call_3');
+        $messages->add($row);
+        self::assertNull(WebPageScreenshotPartsOfTheCurrentTurn::findUndescribedScreenshotCallInMessages($messages, 'call_3'));
+    }
+
+    public function testTheLastPartPointsToTheDescriptionsOfTheEarlierOnes(): void
+    {
+        $pageScreenshotPart = new PageScreenshotPart();
+        $pageScreenshotPart->url = 'https://example.com';
+        $pageScreenshotPart->pageHeightPx = 9000;
+        $pageScreenshotPart->partNumber = 3;
+        $pageScreenshotPart->base64Images = ['a'];
+        $pageScreenshotPart->partNumbersAlreadyShownInTurn = [1, 2];
+        self::assertStringContainsString('Your descriptions of part 1, 2 above are your record of them', $pageScreenshotPart->toCoverageText());
+
+        $pageScreenshotPart->partNumber = 2;
+        self::assertStringNotContainsString('are your record of them', $pageScreenshotPart->toCoverageText());
+    }
+
     public function testNothingOutsideTheLoop(): void
     {
         self::assertSame([], WebPageScreenshotPartsOfTheCurrentTurn::findPartNumbersShownInTurn(new AgentToolCallProvenance(), 'https://example.com', PageScreenshotPart::DEVICE_DESKTOP));

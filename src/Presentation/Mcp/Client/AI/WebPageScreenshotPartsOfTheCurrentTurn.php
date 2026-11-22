@@ -23,6 +23,9 @@ class WebPageScreenshotPartsOfTheCurrentTurn
 {
     public const string TOOL_NAME = 'getWebPageAsScreenshot';
 
+    /** @var int A status line ({preCallMessage}) with at least this many characters beyond the marker counts as a description */
+    public const int MIN_DESCRIPTION_CHARS_OF_A_STATUS_LINE = 120;
+
     /** @return int[] The part numbers already shown, ascending and unique; empty outside the agent loop. */
     public static function findPartNumbersShownInTurn(AgentToolCallProvenance $callProvenance, string $url, string $device): array
     {
@@ -39,7 +42,8 @@ class WebPageScreenshotPartsOfTheCurrentTurn
 
     /**
      * The earlier screenshot call of the current turn whose pictures the model has not written about yet: the newest
-     * call that did not fail or get refused, when no assistant text (a pure status line does not count) follows it
+     * call that did not fail or get refused, when no assistant text (a short status line does not count; one that carries
+     * {@see MIN_DESCRIPTION_CHARS_OF_A_STATUS_LINE} characters beyond the marker does) follows it
      * before the calling row. Any page and device count: the pictures of every part compete for the same budget.
      * Null outside the agent loop, in the evaluation harness and when every earlier part was followed by text.
      */
@@ -63,7 +67,8 @@ class WebPageScreenshotPartsOfTheCurrentTurn
         $undescribedScreenshotCall = null;
         foreach ($messages->buildCurrentTurn()->getRows() as $message) {
             if ($message->isAssistantText()) {
-                if (trim(AIConversationMessage::stripPreCallMessageMarker((string)($message->message ?? ''))) !== '' && !$message->isStatusOnlyAnnouncementLine()) {
+                $textBeyondTheMarker = trim(AIConversationMessage::stripPreCallMessageMarker((string)($message->message ?? '')));
+                if ($textBeyondTheMarker !== '' && (!$message->isStatusOnlyAnnouncementLine() || mb_strlen($textBeyondTheMarker) >= self::MIN_DESCRIPTION_CHARS_OF_A_STATUS_LINE)) {
                     $undescribedScreenshotCall = null;
                 }
                 continue;
