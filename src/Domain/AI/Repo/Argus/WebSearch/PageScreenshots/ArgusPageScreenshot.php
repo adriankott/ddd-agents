@@ -11,6 +11,7 @@ use DDD\Domain\Base\Repo\Argus\Utils\ArgusCache;
 use DDD\Domain\AI\Entities\WebSearch\PageScreenshots\PageScreenshot;
 use DDD\Domain\AI\Entities\WebSearch\PageScreenshots\PageScreenshotPart;
 use DDD\Domain\AI\Repo\Argus\WebSearch\ArgusWebSearchConfiguredEndpointTrait;
+use Throwable;
 
 /**
  * A URL rendered to a base64 PNG through the application's screenshot endpoint (`AI.webSearch.endpoints.screenshot`):
@@ -107,6 +108,18 @@ class ArgusPageScreenshot extends PageScreenshot
                 : PageScreenshotPart::REASON_FETCH_FAILED;
         }
         return null;
+    }
+
+    /**
+     * The failure code of a call that threw before any answer (a connection error, the client's timeout, e.g. cURL
+     * error 28 after `AI.webSearch.timeoutSeconds.screenshot`): TIMEOUT when the message says so, else FETCH_FAILED.
+     */
+    public static function findFailureReasonOfTransportError(Throwable $throwable): string
+    {
+        $message = $throwable->getMessage();
+        return stripos($message, 'timed out') !== false || stripos($message, 'timeout') !== false || stripos($message, 'cURL error 28') !== false
+            ? PageScreenshotPart::REASON_TIMEOUT
+            : PageScreenshotPart::REASON_FETCH_FAILED;
     }
 
     /**

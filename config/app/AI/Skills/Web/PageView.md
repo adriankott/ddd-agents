@@ -40,6 +40,8 @@ the number of parts and the parts you have not seen — so you always know wheth
   BEFORE you open the next one, and NEVER open a part you already saw — your notes are what you keep. The answer lists
   the parts already shown in this turn. A part opened before you wrote about the previous one is refused: write the
   description, then open it.
+- Your own descriptions of earlier parts are your record of them. Never take them back or call them unreliable
+  because their pictures left your view; build the final answer on them.
 - A failed render names its reason and the next move (a bot challenge → read the text with `getWebPageAsMarkdown`;
   a timeout → one retry): follow it, never loop.
 - When the answer says pictures of a result were dropped, say only what you saw — never fill in the rest.

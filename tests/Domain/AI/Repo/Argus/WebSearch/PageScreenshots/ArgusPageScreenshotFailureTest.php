@@ -10,6 +10,7 @@ use DDD\Domain\Base\Repo\Argus\Utils\ArgusApiOperation;
 use DDD\Domain\Base\Repo\Argus\Utils\ArgusCache;
 use DDD\Tests\Agents\Support\UnitTestCase;
 use DDD\Tests\Agents\Support\WebSearchTestConfiguration;
+use RuntimeException;
 
 /**
  * A failed render keeps the reason the endpoint names (at the top, under data or error; a rejected call: TIMEOUT or
@@ -91,5 +92,21 @@ class ArgusPageScreenshotFailureTest extends UnitTestCase
         } finally {
             WebSearchTestConfiguration::restoreConfigValues($configValuesBefore);
         }
+    }
+
+    public function testAClientTimeoutIsATimeoutAndAnotherTransportErrorAFetchFailure(): void
+    {
+        self::assertSame(
+            PageScreenshotPart::REASON_TIMEOUT,
+            ArgusPageScreenshot::findFailureReasonOfTransportError(new RuntimeException('cURL error 28: Operation timed out after 40001 milliseconds with 0 bytes received'))
+        );
+        self::assertSame(
+            PageScreenshotPart::REASON_FETCH_FAILED,
+            ArgusPageScreenshot::findFailureReasonOfTransportError(new RuntimeException('cURL error 7: Failed to connect to renderer port 443'))
+        );
+        $pageScreenshotPart = new PageScreenshotPart();
+        $pageScreenshotPart->url = 'https://example.com';
+        $pageScreenshotPart->failureReason = PageScreenshotPart::REASON_TIMEOUT;
+        self::assertStringContainsString('Retry ONCE', $pageScreenshotPart->buildFailureText());
     }
 }

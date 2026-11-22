@@ -29,6 +29,7 @@ use DDD\Domain\AI\Repo\Argus\WebSearch\PageScreenshots\ArgusPageScreenshot;
 use DDD\Infrastructure\Http\PublicUrlGuard;
 use DDD\Infrastructure\Services\DDDService;
 use DDD\Infrastructure\Services\Service;
+use DDD\Domain\AI\Exceptions\Conversations\AgentToolExecutionTimeoutException;
 use Throwable;
 
 /**
@@ -534,8 +535,16 @@ class AIWebSearchService extends Service
             $pageScreenshot->failureReason = PageScreenshotPart::REASON_CAPABILITY_OFF;
             return $pageScreenshot;
         }
-        $argusPageScreenshot->argusLoad(useArgusEntityCache: !$bypassCache, useApiACallCache: !$bypassCache);
         $pageScreenshot = PageScreenshot::newInstance();
+        try {
+            $argusPageScreenshot->argusLoad(useArgusEntityCache: !$bypassCache, useApiACallCache: !$bypassCache);
+        } catch (AgentToolExecutionTimeoutException $agentToolExecutionTimeoutException) {
+            throw $agentToolExecutionTimeoutException;
+        } catch (Throwable $throwable) {
+            // a connection error or the client's own timeout is a failed render with its reason, not an internal error
+            $pageScreenshot->failureReason = ArgusPageScreenshot::findFailureReasonOfTransportError($throwable);
+            return $pageScreenshot;
+        }
         $pageScreenshot->content = $argusPageScreenshot->content;
         $pageScreenshot->failureReason = ($argusPageScreenshot->content ?? '') === '' ? $argusPageScreenshot->failureReason : null;
         return $pageScreenshot;

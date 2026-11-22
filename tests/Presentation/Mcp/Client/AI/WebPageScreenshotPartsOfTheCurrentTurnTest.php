@@ -85,6 +85,25 @@ class WebPageScreenshotPartsOfTheCurrentTurnTest extends UnitTestCase
         self::assertStringContainsString('Earlier screenshots leave your view when the picture budget is exceeded', $pageScreenshotPart->toCoverageText());
     }
 
+    public function testTheLineAsksForTheDescriptionBeforeTheNextPartWhileTheBudgetHoldsOnePart(): void
+    {
+        $pageScreenshotPart = new PageScreenshotPart();
+        $pageScreenshotPart->url = 'https://example.com';
+        $pageScreenshotPart->pageHeightPx = 9000;
+        $pageScreenshotPart->partNumber = 2;
+        $pageScreenshotPart->base64Images = ['a', 'b'];
+        $pageScreenshotPart->picturesKeptInView = 2;
+        self::assertStringContainsString('Your NEXT message first writes what part 2 shows; the same message may then open part=3', $pageScreenshotPart->toCoverageText());
+        self::assertStringContainsString('Your descriptions stay your record', $pageScreenshotPart->toCoverageText());
+
+        $pageScreenshotPart->partNumber = 3;
+        self::assertStringNotContainsString('Your NEXT message', $pageScreenshotPart->toCoverageText(), 'the last part has no next one');
+
+        $pageScreenshotPart->partNumber = 1;
+        $pageScreenshotPart->picturesKeptInView = 4;
+        self::assertStringNotContainsString('Your NEXT message', $pageScreenshotPart->toCoverageText(), 'a budget of two parts lets the next part through');
+    }
+
     public function testNothingOutsideTheLoop(): void
     {
         self::assertSame([], WebPageScreenshotPartsOfTheCurrentTurn::findPartNumbersShownInTurn(new AgentToolCallProvenance(), 'https://example.com', PageScreenshotPart::DEVICE_DESKTOP));

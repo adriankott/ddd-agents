@@ -161,6 +161,24 @@ class PageScreenshotPart extends ValueObject
             $this->picturesKeptInView,
             count($this->base64Images),
             $describeNow
+        ) . $this->buildDescribeBeforeNextPartText();
+    }
+
+    /**
+     * The order for the next step while the budget holds less than two parts and a later part exists: the next message
+     * writes what this part shows and may open the next part after that text; a part opened without it is refused.
+     * Empty otherwise.
+     */
+    public function buildDescribeBeforeNextPartText(): string
+    {
+        if ($this->picturesKeptInView === null || $this->picturesKeptInView >= 2 * self::SEGMENTS_PER_PART || $this->partNumber >= $this->getPartCount()) {
+            return '';
+        }
+        return sprintf(
+            ' Your NEXT message first writes what part %1$d shows; the same message may then open part=%2$d (a part opened without that text is refused). '
+            . 'Your descriptions stay your record of each part after its pictures left your view.',
+            $this->partNumber,
+            $this->partNumber + 1
         );
     }
 

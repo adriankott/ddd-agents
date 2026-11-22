@@ -102,7 +102,11 @@ capability's answers are cached in the database too (`cacheInDatabase`; a screen
   and the model is told to describe each part before it opens the next. While the budget holds less than two parts,
   a screenshot is refused ("describe part N of … first") as long as no assistant text (a status line does not count)
   followed the previous screenshot of the turn that did not fail
-  (`WebPageScreenshotPartsOfTheCurrentTurn::findUndescribedScreenshotCallOfTurn()`); nothing is rendered. A host whose
+  (`WebPageScreenshotPartsOfTheCurrentTurn::findUndescribedScreenshotCallOfTurn()`); nothing is rendered. The line of
+  every part but the last says so up front (`PageScreenshotPart::buildDescribeBeforeNextPartText()`: the next message
+  first writes what the part shows and may then open the next one), so the refusal stays a safety net. A connection
+  error or the client's own timeout (`timeoutSeconds.screenshot`) is a failed render with `TIMEOUT` ("retry once") or
+  `FETCH_FAILED`, never an internal error (`ArgusPageScreenshot::findFailureReasonOfTransportError()`). A host whose
   page reviews need the previous part beside the current one raises `maxToolCallImagesOnWire` to 4, which also lifts
   the refusal (each picture is input tokens on every later model call of the turn).
 - A query that names an unambiguous time window without `recency` is searched with that window, and the note says

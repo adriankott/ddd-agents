@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.17
+
+- Changed: while the picture budget holds less than two parts, the screenshot line of every part but the last says
+  that the next message first writes what this part shows and may then open the next one, and that the descriptions
+  stay the model's record; before, the model learned the rule only from a refused call (one extra call per read).
+- Changed: the skill `Web.PageView` tells the model never to take back its own descriptions of earlier parts because
+  their pictures left its view.
+- Fixed: a screenshot call that throws before any answer (the client's timeout after `timeoutSeconds.screenshot`, a
+  connection error) is a failed render with the reason `TIMEOUT` ("retry once") or `FETCH_FAILED`; before, it reached
+  the model as an internal error with an issue id.
+
 ## 0.1.16
 
 - Changed: while the picture budget (`maxToolCallImagesOnWire`) holds less than two screenshot parts, the default,
