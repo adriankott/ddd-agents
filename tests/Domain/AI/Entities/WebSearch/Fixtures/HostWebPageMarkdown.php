@@ -14,6 +14,11 @@ class HostWebPageMarkdown extends WebPageMarkdown
         return "Platform-verified social profile URLs on this page: https://social.example/acme\n";
     }
 
+    public function buildSentenceAfterSearchResultsPageRefusal(): string
+    {
+        return ' Read the profile\'s stored domain instead.';
+    }
+
     public function buildContinueWithoutThePageSentence(bool $noToolCanReachTheAddress): string
     {
         return 'Continue with the facts already on file.';

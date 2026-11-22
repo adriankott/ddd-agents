@@ -73,7 +73,9 @@ The entities of the research are built as the application's class: a same-path s
 repository with `toEntity(entityInstance: X::newInstance())`; `ArgusRepositoriesAreNeverMappedOntoThePackageClassTest`).
 A subclass of `WebPageMarkdown` adds its own lines between the header and the page's marked text
 (`buildPlatformLinesBelowHeader()`, each line ending in a newline; above the marks, so the page cannot imitate them)
-and words the sentence after a failed read (`buildContinueWithoutThePageSentence(bool $noToolCanReachTheAddress)`).
+and words the sentence after a failed read (`buildContinueWithoutThePageSentence(bool $noToolCanReachTheAddress)`) and
+after a refused search results page (`buildSentenceAfterSearchResultsPageRefusal()`). A tool parameter typed on
+`AIWebSearchService` or `WebSearchHostService` receives the application's same-path subclass; no alias is needed.
 
 The readings are model calls: ddd-ai's usage recorder books them for the payer set on each reading
 (`billAICostsTo()`), under `AgentAIUsageScope::AI_WEB_PAGE_EXTRACT`, inside the tool call's envelope. Without an

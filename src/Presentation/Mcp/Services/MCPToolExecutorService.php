@@ -2000,11 +2000,18 @@ class MCPToolExecutorService extends Service
     }
 
     /**
-     * Resolve a service from the Symfony container if available (enables DI for packages + tool params).
+     * Resolve a service from the Symfony container if available (enables DI for packages + tool params). A class an
+     * application replaces by a same-path subclass resolves to the application's class, like
+     * {@see DDDService::getService()}: a tool parameter typed on a package service receives the application's subclass
+     * without an alias in the application's services.
      */
     public function resolveFromContainer(string $serviceId): ?object
     {
         $container = DDDBundle::getContainer();
+        $applicationServiceId = DDDService::instance()->getContainerServiceClassNameForClass($serviceId);
+        if ($applicationServiceId !== null && $applicationServiceId !== $serviceId && $container->has($applicationServiceId)) {
+            return $container->get($applicationServiceId);
+        }
         if (!$container->has($serviceId)) {
             return null;
         }

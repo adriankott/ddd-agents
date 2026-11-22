@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.21
+
+- Fixed: a tool parameter typed on a package service (`AIWebSearchService`, `WebSearchHostService`, any other)
+  receives the application's same-path subclass, as `DDDService::getService()` does
+  (`MCPToolExecutorService::resolveFromContainer()` resolves the application's class name first); before, it got the
+  package's instance unless the application aliased the package id to its class. Such aliases can stay.
+- Added: `WebPageMarkdown::buildSentenceAfterSearchResultsPageRefusal()`, the application's sentence after the refusal
+  of a search engine's results page (empty by default).
+
 ## 0.1.20
 
 - Changed: the marker of a tool result whose pictures no longer ride with the model call says that the model saw them

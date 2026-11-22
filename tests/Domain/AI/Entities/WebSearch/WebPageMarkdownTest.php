@@ -101,6 +101,8 @@ class WebPageMarkdownTest extends UnitTestCase
         $webPageMarkdown->ok = false;
         $webPageMarkdown->reason = WebPageMarkdown::REASON_TIMEOUT;
         self::assertStringContainsString('Continue with the facts already on file.', $webPageMarkdown->buildFailureExplanationForAgent());
+        $webPageMarkdown->reason = WebPageMarkdown::REASON_SEARCH_RESULTS_PAGE;
+        self::assertStringEndsWith("use searchTheWeb. Read the profile's stored domain instead.", $webPageMarkdown->buildFailureExplanationForAgent());
 
         $packageWebPageMarkdown = new WebPageMarkdown();
         $packageWebPageMarkdown->url = 'https://acme.example';

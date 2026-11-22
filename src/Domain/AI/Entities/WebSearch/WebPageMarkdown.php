@@ -218,6 +218,15 @@ class WebPageMarkdown extends ValueObject
     }
 
     /**
+     * The application's sentence after the refusal of a search engine's results page, with a leading space; empty by
+     * default. A same-path subclass overrides it (the continue sentence does not fit there: the page is never read).
+     */
+    public function buildSentenceAfterSearchResultsPageRefusal(): string
+    {
+        return '';
+    }
+
+    /**
      * The sentence after a failed read that says how to go on without the page; `$noToolCanReachTheAddress` for a host
      * that does not resolve or is no safe public destination (no hint to another reader then). A same-path subclass
      * replaces the sentence with its own wording.
@@ -249,7 +258,7 @@ class WebPageMarkdown extends ValueObject
         }
         return match ($this->reason) {
             self::REASON_SEARCH_RESULTS_PAGE => "{$urlLabel} is a search engine's results page, not a source — this tool reads "
-                . 'ONE website page. NEVER read a results page; to search, use searchTheWeb.',
+                . 'ONE website page. NEVER read a results page; to search, use searchTheWeb.' . $this->buildSentenceAfterSearchResultsPageRefusal(),
             self::REASON_BLOCKED => "The URL {$urlLabel} was refused for security (no safe public destination). NEVER retry "
                 . 'it. ' . $continueWithoutThePage,
             self::REASON_TIMEOUT => "Fetching {$urlLabel} timed out. You may retry ONCE; if it times out again, "
