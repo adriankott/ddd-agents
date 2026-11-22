@@ -17,7 +17,9 @@ use DDD\Infrastructure\Exceptions\BadRequestException;
 /**
  * ONE query against the application's search endpoint (`AI.webSearch.endpoints.search`): ranked hits with the engine's
  * query-relevant excerpts, no model in between. Request: {@see WebSearchHitListFilters::buildSearchRequestBody()};
- * answer: `data.results[]` with `title`, `url`, `snippet`, `date`, `last_updated`. The endpoint holds the vendor key.
+ * answer: `data.results[]` with `title`, `url`, `snippet`, `date`, `last_updated`; optional `data.cached` (the endpoint's
+ * own cache answered: nothing is booked) and `data.billing.feeUsd` (the fee the endpoint reports: booked instead of the
+ * configured fee). The endpoint holds the vendor key.
  * One child per query: an engine's multi-query request answers with one merged list without saying which query found
  * which row.
  *
@@ -36,6 +38,12 @@ class ArgusWebSearchHitList extends WebSearchHitList
 
     /** The capability of this repository: its endpoint, cache lifetime and timeout keys under `AI.webSearch`. */
     public const string WEB_SEARCH_CAPABILITY = 'search';
+
+    /** @var bool Whether the endpoint answered from its own cache (`data.cached`): no engine request, no fee to book. */
+    public bool $answeredFromEndpointCache = false;
+
+    /** @var float|null The fee the endpoint reports for this request (`data.billing.feeUsd`); null when it reports none. */
+    public ?float $endpointFeeUsd = null;
 
     /** One search answers in well under a second; past this bound it counts as failed. */
     public const float SEARCH_TIMEOUT_SECONDS = 15;
@@ -78,6 +86,9 @@ class ArgusWebSearchHitList extends WebSearchHitList
         }
         $this->hits = $webSearchHits;
         $this->failureReason = null;
+        $this->answeredFromEndpointCache = (bool)($callResponseData->data->cached ?? false);
+        $reportedFeeUsd = $callResponseData->data->billing->feeUsd ?? null;
+        $this->endpointFeeUsd = is_numeric($reportedFeeUsd) ? (float)$reportedFeeUsd : null;
         $this->postProcessLoadResponse($callResponseData, true);
     }
 }

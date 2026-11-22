@@ -183,15 +183,22 @@ class AIWebSearchService extends Service
      */
     public function bookWebSearchFee(ArgusWebSearchHitLists $argusWebSearchHitLists, WebSearchHitListFilters $webSearchHitListFilters, WebSearchPayer $webSearchPayer): void
     {
+        $feeUsdPerRequestByMode = (array)WebSearchConfiguration::findValue('hits.feeUsdPerRequestByMode', []);
+        $configuredFeeUsdPerRequest = (float)($feeUsdPerRequestByMode[$webSearchHitListFilters->mode] ?? 0.0);
         $billableRequestCount = 0;
+        $feeUsd = 0.0;
         foreach ($argusWebSearchHitLists->getElements() as $argusWebSearchHitList) {
             $argusSettings = $argusWebSearchHitList->getArgusSettings();
-            if (!$argusSettings->loadedFromCache && $argusSettings->isLoadedSuccessfully && $argusWebSearchHitList->isAnswered()) {
-                $billableRequestCount++;
+            if ($argusSettings->loadedFromCache || !$argusSettings->isLoadedSuccessfully || !$argusWebSearchHitList->isAnswered()) {
+                continue;
             }
+            if ($argusWebSearchHitList instanceof ArgusWebSearchHitList && $argusWebSearchHitList->answeredFromEndpointCache) {
+                continue;
+            }
+            $billableRequestCount++;
+            $endpointFeeUsd = $argusWebSearchHitList instanceof ArgusWebSearchHitList ? $argusWebSearchHitList->endpointFeeUsd : null;
+            $feeUsd += $endpointFeeUsd ?? $configuredFeeUsdPerRequest;
         }
-        $feeUsdPerRequestByMode = (array)WebSearchConfiguration::findValue('hits.feeUsdPerRequestByMode', []);
-        $feeUsd = $billableRequestCount * (float)($feeUsdPerRequestByMode[$webSearchHitListFilters->mode] ?? 0.0);
         if ($billableRequestCount === 0) {
             return;
         }

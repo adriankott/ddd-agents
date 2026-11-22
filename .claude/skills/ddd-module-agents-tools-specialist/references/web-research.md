@@ -56,7 +56,7 @@ A host replaces any of them by a same-path subclass `App\Domain\AI\Services\WebS
 | `findDefaultCountryCode(?AgentToolCallProvenance)` | null (the engine decides) | the country of the space's location or world |
 | `findPayer(?AgentToolCallProvenance): WebSearchPayer` | the signed-in account | the space's account, with the entity the costs are attributed to (project, location) |
 | `throwIfWebSearchSpendingIsRefused(WebSearchPayer)` | allows | throw a 4xx framework exception when the AI budget is spent (the model reads the message) |
-| `bookWebSearchRequests(WebSearchPayer, WebSearchHitListFilters, int, float)` | books nothing | write the fee (`hits.feeUsdPerRequestByMode` × real requests; never a cache hit or a failure) into the host's cost ledger |
+| `bookWebSearchRequests(WebSearchPayer, WebSearchHitListFilters, int, float)` | books nothing | write the fee into the host's cost ledger: per real request the fee the endpoint reports (`data.billing.feeUsd`) or else `hits.feeUsdPerRequestByMode`; never a cache hit of the package or of the endpoint (`data.cached`), never a failure |
 | `buildNoteAfterWebPagesRead(WebPageMarkdowns, AgentToolCallProvenance): ?string` | null | store facts verified on the host's own site; the returned line leads the result |
 
 The readings are model calls: ddd-ai's usage recorder books them for the payer set on each reading

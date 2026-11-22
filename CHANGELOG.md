@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.11
+
+- Changed: the search fee follows the endpoint's answer. A search answer with `data.cached: true` (the endpoint's own
+  cache answered) books nothing; a `data.billing.feeUsd` is booked for that request instead of
+  `hits.feeUsdPerRequestByMode`. Both fields are optional; an answer without them is booked as before
+  (`WebSearchHostService::bookWebSearchRequests()` receives only the real requests and their summed fee).
+
 ## 0.1.10
 
 - Added: the package's web research, off by default (`config/app/AI/webSearch.php`, `'enabled' => false`, no
