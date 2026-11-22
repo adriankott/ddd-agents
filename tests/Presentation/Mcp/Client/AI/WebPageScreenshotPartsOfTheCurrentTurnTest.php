@@ -15,6 +15,7 @@ use DDD\Tests\Agents\Support\UnitTestCase;
 /**
  * The screenshot line names the parts of the same page and device already shown in the current turn: completed calls
  * only, the URL compared canonically, an earlier turn and the other device left out; a repeat gets a note, no refusal.
+ * A next part is refused while the previous one was not written about.
  */
 class WebPageScreenshotPartsOfTheCurrentTurnTest extends UnitTestCase
 {
@@ -92,6 +93,67 @@ class WebPageScreenshotPartsOfTheCurrentTurnTest extends UnitTestCase
         $pageScreenshotPart->url = 'https://example.com';
         $pageScreenshotPart->pageHeightPx = 3000;
         self::assertStringNotContainsString('Already shown', $pageScreenshotPart->toCoverageText());
+    }
+
+    public function testANextPartIsRefusedUntilTheModelWroteAboutThePreviousOne(): void
+    {
+        $messages = new AIConversationMessages();
+        $row = $this->buildUserMessage(0);
+        $messages->add($row);
+        $row = $this->buildScreenshotCall(1, ['url' => 'https://example.com', 'device' => 'mobile'], AIConversationMessage::STATUS_COMPLETED, 'call_1');
+        $messages->add($row);
+        $row = $this->buildScreenshotCall(2, ['url' => 'https://example.com', 'device' => 'mobile', 'part' => 2], AIConversationMessage::STATUS_PENDING, 'call_2');
+        $messages->add($row);
+
+        $undescribedCall = WebPageScreenshotPartsOfTheCurrentTurn::findUndescribedScreenshotCallInMessages($messages, 'call_2');
+        self::assertNotNull($undescribedCall, 'part 1 came back and no text followed it');
+        $refusalText = WebPageScreenshotPartsOfTheCurrentTurn::buildDescribeFirstRefusalText($undescribedCall);
+        self::assertStringContainsString('describe part 1 of https://example.com first', $refusalText);
+        self::assertStringContainsString('Do not reopen part 1', $refusalText);
+
+        // a status line is no description
+        $messages = new AIConversationMessages();
+        $row = $this->buildUserMessage(0);
+        $messages->add($row);
+        $row = $this->buildScreenshotCall(1, ['url' => 'https://example.com', 'part' => 2], AIConversationMessage::STATUS_COMPLETED, 'call_1');
+        $messages->add($row);
+        $row = $this->buildAssistantText(2, AIConversationMessage::PRE_CALL_MESSAGE_MARKER . ' Opening part 3');
+        $messages->add($row);
+        $row = $this->buildScreenshotCall(3, ['url' => 'https://example.com', 'part' => 3], AIConversationMessage::STATUS_PENDING, 'call_3');
+        $messages->add($row);
+        self::assertSame($messages->getElements()[1] ?? null, WebPageScreenshotPartsOfTheCurrentTurn::findUndescribedScreenshotCallInMessages($messages, 'call_3'));
+    }
+
+    public function testAPartFollowsWhenTheModelWroteAboutThePreviousOneOrItFailed(): void
+    {
+        $messages = new AIConversationMessages();
+        $row = $this->buildScreenshotCall(0, ['url' => 'https://example.com'], AIConversationMessage::STATUS_COMPLETED, 'call_0');
+        $messages->add($row);
+        $row = $this->buildUserMessage(1);
+        $messages->add($row);
+        $row = $this->buildScreenshotCall(2, ['url' => 'https://example.com'], AIConversationMessage::STATUS_COMPLETED, 'call_2');
+        $messages->add($row);
+        $row = $this->buildAssistantText(3, 'Part 1 shows a dark header with the logo left and a green call to action.');
+        $messages->add($row);
+        $row = $this->buildScreenshotCall(4, ['url' => 'https://example.com', 'part' => 2], AIConversationMessage::STATUS_FAILED, 'call_4');
+        $messages->add($row);
+        $row = $this->buildScreenshotCall(5, ['url' => 'https://example.com', 'part' => 2], AIConversationMessage::STATUS_PENDING, 'call_5');
+        $messages->add($row);
+
+        self::assertNull(
+            WebPageScreenshotPartsOfTheCurrentTurn::findUndescribedScreenshotCallInMessages($messages, 'call_5'),
+            'the earlier turn does not count, part 1 was described, the failed part 2 showed nothing'
+        );
+        self::assertNull(WebPageScreenshotPartsOfTheCurrentTurn::findUndescribedScreenshotCallOfTurn(new AgentToolCallProvenance()));
+    }
+
+    protected function buildAssistantText(int $index, string $text): AIConversationMessage
+    {
+        $message = $this->buildUserMessage($index);
+        $message->role = AIConversationMessage::ROLE_ASSISTANT;
+        $message->authorType = AIConversationMessage::AUTHOR_ASSISTANT;
+        $message->message = $text;
+        return $message;
     }
 
     protected function buildUserMessage(int $index): AIConversationMessage

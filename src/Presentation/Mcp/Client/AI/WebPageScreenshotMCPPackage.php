@@ -16,6 +16,7 @@ use DDD\Domain\AI\Entities\Conversations\Messages\ContextRetentionSettings;
 use DDD\Domain\AI\Entities\WebSearch\PageScreenshots\PageScreenshotPart;
 use DDD\Domain\AI\Services\WebSearch\AIWebSearchService;
 use DDD\Infrastructure\Services\DDDService;
+use DDD\Infrastructure\Exceptions\BadRequestException;
 use DDD\Presentation\Mcp\Client\AI\Dtos\WebPageScreenshotGetRequestDto;
 use DDD\Presentation\Mcp\Dtos\MCPToolResponse;
 
@@ -71,6 +72,7 @@ class WebPageScreenshotMCPPackage extends MCPPackage
         AIWebSearchService $aiWebSearchService,
         AgentToolCallProvenance $callProvenance
     ): MCPToolResponse {
+        static::throwIfThePreviousPartIsNotDescribedYet($callProvenance);
         $pageScreenshotPart = $aiWebSearchService->capturePagePartForModel(
             $requestDto->url,
             $requestDto->part ?? 1,
@@ -85,12 +87,7 @@ class WebPageScreenshotMCPPackage extends MCPPackage
             $pageScreenshotPart->url,
             $pageScreenshotPart->device
         );
-        $conversation = $callProvenance->conversation;
-        if ($conversation !== null && !$callProvenance->isEvalHarnessCall) {
-            $pageScreenshotPart->picturesKeptInView = isset($conversation->contextRetentionSettings)
-                ? $conversation->contextRetentionSettings->getMaxToolCallImagesOnWire()
-                : ContextRetentionSettings::DEFAULT_MAX_TOOL_CALL_IMAGES_ON_WIRE;
-        }
+        $pageScreenshotPart->picturesKeptInView = static::findPicturesKeptInView($callProvenance);
         if ($pageScreenshotPart->base64Images === []) {
             return MCPToolResponse::error(sprintf(
                 'The page %s is %s px tall = %d part(s); part %d does not exist. Open part=1 … part=%d.',
@@ -107,5 +104,36 @@ class WebPageScreenshotMCPPackage extends MCPPackage
             $mcpToolResponse->addImageContent($base64Image, 'image/png');
         }
         return $mcpToolResponse;
+    }
+
+    /** The conversation's picture budget (the newest pictures kept on the wire); null outside the agent loop. */
+    protected static function findPicturesKeptInView(AgentToolCallProvenance $callProvenance): ?int
+    {
+        $conversation = $callProvenance->conversation;
+        if ($conversation === null || $callProvenance->isEvalHarnessCall) {
+            return null;
+        }
+        return isset($conversation->contextRetentionSettings)
+            ? $conversation->contextRetentionSettings->getMaxToolCallImagesOnWire()
+            : ContextRetentionSettings::DEFAULT_MAX_TOOL_CALL_IMAGES_ON_WIRE;
+    }
+
+    /**
+     * Refuses a part while the pictures of the previous screenshot of the turn were not written about: with the
+     * picture budget smaller than two parts, the next part pushes them out of view unseen. A budget of two parts or
+     * more lets the call through.
+     *
+     * @throws BadRequestException
+     */
+    protected static function throwIfThePreviousPartIsNotDescribedYet(AgentToolCallProvenance $callProvenance): void
+    {
+        $picturesKeptInView = static::findPicturesKeptInView($callProvenance);
+        if ($picturesKeptInView === null || $picturesKeptInView >= 2 * PageScreenshotPart::SEGMENTS_PER_PART) {
+            return;
+        }
+        $undescribedScreenshotCall = WebPageScreenshotPartsOfTheCurrentTurn::findUndescribedScreenshotCallOfTurn($callProvenance);
+        if ($undescribedScreenshotCall !== null) {
+            throw new BadRequestException(WebPageScreenshotPartsOfTheCurrentTurn::buildDescribeFirstRefusalText($undescribedScreenshotCall));
+        }
     }
 }

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.16
+
+- Changed: while the picture budget (`maxToolCallImagesOnWire`) holds less than two screenshot parts, the default,
+  `getWebPageAsScreenshot` refuses the next part, before any render, as long as no assistant text followed the
+  previous screenshot of the turn ("describe part N of … first"); a status line does not count, a failed render does
+  not block. Before, models opened part 1, 2 and 3 back to back and described only the last one, whose pictures were
+  the only ones left in view. A budget of four pictures or more lets every call through.
+- Added: the judge of a judged evaluation run reads, under each `delegate` call, the tool calls of every sub-agent it
+  started, results shortened to 1,500 characters, nested up to three levels (`AgentEvalJudgeTraceMessageLines`);
+  before, it saw only the children's verdicts and counted the sources and dates they found as invented.
+
 ## 0.1.15
 
 - Changed: a page read refused because the address cannot be resolved, is blocked or is no public address no longer

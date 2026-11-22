@@ -38,6 +38,73 @@ class WebPageScreenshotPartsOfTheCurrentTurn
     }
 
     /**
+     * The earlier screenshot call of the current turn whose pictures the model has not written about yet: the newest
+     * call that did not fail or get refused, when no assistant text (a pure status line does not count) follows it
+     * before the calling row. Any page and device count: the pictures of every part compete for the same budget.
+     * Null outside the agent loop, in the evaluation harness and when every earlier part was followed by text.
+     */
+    public static function findUndescribedScreenshotCallOfTurn(AgentToolCallProvenance $callProvenance): ?AIConversationMessage
+    {
+        if ($callProvenance->isEvalHarnessCall) {
+            return null;
+        }
+        $conversation = $callProvenance->conversation;
+        $messages = $conversation !== null && isset($conversation->messages) ? $conversation->messages : $callProvenance->conversationMessages;
+        if (!$messages instanceof AIConversationMessages) {
+            return null;
+        }
+        return self::findUndescribedScreenshotCallInMessages($messages, $callProvenance->toolCallId);
+    }
+
+    /** The undescribed earlier screenshot call of the current turn of `$messages`, the call `$currentToolCallId` left out. Pure. */
+    public static function findUndescribedScreenshotCallInMessages(AIConversationMessages $messages, ?string $currentToolCallId = null): ?AIConversationMessage
+    {
+        $currentToolCallId = $currentToolCallId !== null && $currentToolCallId !== '' ? $currentToolCallId : null;
+        $undescribedScreenshotCall = null;
+        foreach ($messages->buildCurrentTurn()->getRows() as $message) {
+            if ($message->isAssistantText()) {
+                if (trim(AIConversationMessage::stripPreCallMessageMarker((string)($message->message ?? ''))) !== '' && !$message->isStatusOnlyAnnouncementLine()) {
+                    $undescribedScreenshotCall = null;
+                }
+                continue;
+            }
+            $toolCall = isset($message->toolCall) ? $message->toolCall : null;
+            if ($toolCall === null || ($toolCall->name ?? null) !== self::TOOL_NAME
+                || in_array($toolCall->status, [AIConversationMessage::STATUS_FAILED, AIConversationMessage::STATUS_CANCELLED, AIConversationMessage::STATUS_CANCEL_REQUESTED], true)
+                || $toolCall->wasRefusedAsDuplicate || $toolCall->wasRefusedByGate
+            ) {
+                continue;
+            }
+            $rowToolCallId = (string)($toolCall->toolCallId ?? '');
+            $isTheCallingRow = $currentToolCallId !== null
+                ? $rowToolCallId === $currentToolCallId
+                : $toolCall->status !== AIConversationMessage::STATUS_COMPLETED;
+            if ($isTheCallingRow) {
+                break;
+            }
+            $undescribedScreenshotCall = $message;
+        }
+        return $undescribedScreenshotCall;
+    }
+
+    /** The refusal text for a part opened before the previous one was described. English: it is model-facing. */
+    public static function buildDescribeFirstRefusalText(AIConversationMessage $undescribedScreenshotCall): string
+    {
+        $arguments = $undescribedScreenshotCall->toolCall->arguments ?? [];
+        $url = is_string($arguments['url'] ?? null) ? $arguments['url'] : 'the previous page';
+        $partNumber = max(1, is_numeric($arguments['part'] ?? null) ? (int)$arguments['part'] : 1);
+        return sprintf(
+            'Nothing was rendered: describe part %d of %s first. Its pictures leave your view as soon as the next part arrives, '
+            . 'so write down now, in a message, what part %d shows (layout, colours, text, images, visual issues); then open the next part. '
+            . 'Do not reopen part %d.',
+            $partNumber,
+            $url,
+            $partNumber,
+            $partNumber
+        );
+    }
+
+    /**
      * @return int[] The part numbers of `$url` on `$device` shown in the current turn of `$messages`, the call
      * `$currentToolCallId` left out. Pure.
      */

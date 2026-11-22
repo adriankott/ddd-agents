@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace DDD\Tests\Agents\Domain\AI\Entities\Evals;
 
+use DDD\Domain\AI\Entities\Conversations\AIConversation;
+use DDD\Domain\AI\Entities\Conversations\AIConversations;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessages;
 use DDD\Domain\AI\Entities\Conversations\Messages\DelegationResults;
@@ -19,7 +21,7 @@ use ReflectionClass;
  * owner-reply numbering, signal rows labelled by their class, `(READ — persists nothing)` on a call that stores
  * nothing, a widget row's writer read from its blocks, the result of a tool call as the model received it (a
  * delegation call's children's verdicts, no field the platform keeps for itself, the platform note the model read),
- * the bookkeeping of a suppressed repeat and of a delivered report, and the lines of the request snapshots.
+ * the tool calls of a delegation call's sub-agents, the bookkeeping of a suppressed repeat and of a delivered report, and the lines of the request snapshots.
  */
 class AgentEvalJudgeTraceMessageLinesTest extends IntegrationTestCase
 {
@@ -77,6 +79,31 @@ class AgentEvalJudgeTraceMessageLinesTest extends IntegrationTestCase
 
         self::assertStringContainsString('34 with differing data', $traceText);
         self::assertStringContainsString('Read the current listing status', $traceText);
+    }
+
+    public function testADelegationCallShowsTheToolCallsOfItsSubAgentsWithShortenedResults(): void
+    {
+        $delegationMessage = $this->buildToolCallMessage(4, 'delegate', [], AIConversationMessage::STATUS_COMPLETED, '');
+        $delegationMessage->delegationResults = new DelegationResults();
+        /** @var AIConversation $childConversation */
+        $childConversation = (new ReflectionClass(AIConversation::class))->newInstanceWithoutConstructor();
+        $childConversation->id = 912;
+        $childConversation->messages = new AIConversationMessages();
+        $childRow = $this->buildMessage(0, AIConversationMessage::MESSAGE_TEXT, AIConversationMessage::ROLE_USER, AIConversationMessage::AUTHOR_AGENT, 'find the opening date');
+        $childConversation->messages->add($childRow);
+        $childRow = $this->buildToolCallMessage(1, 'searchTheWeb', ['query' => 'museum opening'], AIConversationMessage::STATUS_COMPLETED, "Opened on 2026-03-14\n" . str_repeat('x', 2000));
+        $childConversation->messages->add($childRow);
+        $delegationMessage->delegatedConversations = new AIConversations();
+        $delegationMessage->delegatedConversations->add($childConversation);
+
+        $traceText = $this->buildTraceText($delegationMessage);
+
+        self::assertStringContainsString('[4] SUB-AGENT #912 of the delegate call above', $traceText);
+        self::assertStringContainsString('- TOOL searchTheWeb({"query":"museum opening"}) [COMPLETED]', $traceText);
+        self::assertStringContainsString('Opened on 2026-03-14', $traceText);
+        self::assertStringContainsString('…(shortened)', $traceText);
+        self::assertStringNotContainsString(str_repeat('x', 1600), $traceText);
+        self::assertStringNotContainsString('find the opening date', $traceText, 'only the tool calls of the child');
     }
 
     public function testAnOrdinaryToolCallRendersItsStoredResult(): void

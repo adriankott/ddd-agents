@@ -99,9 +99,12 @@ capability's answers are cached in the database too (`cacheInDatabase`; a screen
   by its tool call id); reopening one gets a note, never a refusal (its pictures may have left the model's view).
 - The line names the conversation's picture budget (`maxToolCallImagesOnWire` of the context retention settings,
   default 2): a part is two pictures, so with the default the pictures of a part are gone once the next part is open,
-  and the model is told to describe each part before it opens the next. A host whose page reviews need the previous
-  part beside the current one raises `maxToolCallImagesOnWire` to 4 (each picture is input tokens on every later
-  model call of the turn).
+  and the model is told to describe each part before it opens the next. While the budget holds less than two parts,
+  a screenshot is refused ("describe part N of … first") as long as no assistant text (a status line does not count)
+  followed the previous screenshot of the turn that did not fail
+  (`WebPageScreenshotPartsOfTheCurrentTurn::findUndescribedScreenshotCallOfTurn()`); nothing is rendered. A host whose
+  page reviews need the previous part beside the current one raises `maxToolCallImagesOnWire` to 4, which also lifts
+  the refusal (each picture is input tokens on every later model call of the turn).
 - A query that names an unambiguous time window without `recency` is searched with that window, and the note says
   so: `today`, `this week`, `this month`, "past N days" in English, German, French, Spanish and Italian
   (`WebSearchCallQueries::RECENCY_WINDOWS_BY_PHRASE`, `PAST_DAYS_PATTERNS`), and the name of the current month in the

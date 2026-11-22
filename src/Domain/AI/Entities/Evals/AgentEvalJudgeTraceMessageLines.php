@@ -109,6 +109,18 @@ class AgentEvalJudgeTraceMessageLines extends ValueObject
     /** @var string The line of any other message; index, type, role, text */
     public const string MESSAGE_LINE = '[%d] %s %s: %s';
 
+    /** @var string Headline of a sub-agent's tool calls under the `delegate` call that started it */
+    public const string SUB_AGENT_HEADLINE = '%s[%d] SUB-AGENT %s of the delegate call above — its own tool calls; what their results show counts as GROUNDED for the agent\'s answer:';
+
+    /** @var string One tool call of a sub-agent, its result shortened */
+    public const string SUB_AGENT_TOOL_LINE = "%s- TOOL %s(%s) [%s]\n%s  result: %s";
+
+    /** @var int The characters of a sub-agent's tool result the judge reads */
+    public const int SUB_AGENT_RESULT_MAX_CHARS = 1500;
+
+    /** @var int The nesting depth of sub-agents whose tool calls are shown */
+    public const int SUB_AGENT_MAX_DEPTH = 3;
+
     /** @var string[] The lines, in message order */
     protected array $lines = [];
 
@@ -172,6 +184,7 @@ class AgentEvalJudgeTraceMessageLines extends ValueObject
         }
         if (($message->messageType ?? null) === AIConversationMessage::MESSAGE_TOOL_CALL) {
             $this->lines[] = $this->buildToolCallLine($messageIndex, $message);
+            $this->addSubAgentToolCallLines($messageIndex, $message, 1);
             return;
         }
         if ($this->isOwnerReply($message)) {
@@ -309,6 +322,50 @@ class AgentEvalJudgeTraceMessageLines extends ValueObject
             $aIConversationAuditRenderService::isReadOnlyToolName($toolName) ? static::READ_MARKER : '',
             $this->getToolResultTextAsTheModelReceivedIt($message)
         );
+    }
+
+    /**
+     * Adds, under a `delegate` call, the tool calls of every sub-agent it started, results shortened to
+     * {@see SUB_AGENT_RESULT_MAX_CHARS}: the parent's result carries only the children's verdicts, so without these
+     * lines a source or date a child found reads as invented. Only children already in memory (the evaluation loads
+     * them before judging); nothing is loaded here.
+     *
+     * @param int $messageIndex the stored index of the `delegate` call
+     * @param AIConversationMessage $message
+     * @param int $depth 1 for the children of the judged conversation
+     * @return void
+     */
+    protected function addSubAgentToolCallLines(int $messageIndex, AIConversationMessage $message, int $depth): void
+    {
+        if ($depth > static::SUB_AGENT_MAX_DEPTH || !$message->isDelegationCall() || !isset($message->delegatedConversations)) {
+            return;
+        }
+        $indent = str_repeat('    ', $depth);
+        foreach ($message->delegatedConversations->getElements() as $childConversation) {
+            if (!isset($childConversation->messages)) {
+                continue;
+            }
+            $this->lines[] = sprintf(static::SUB_AGENT_HEADLINE, $indent, $messageIndex, '#' . ($childConversation->id ?? '?'));
+            foreach ($childConversation->messages->getElements() as $childMessage) {
+                if (($childMessage->messageType ?? null) !== AIConversationMessage::MESSAGE_TOOL_CALL || !isset($childMessage->toolCall)) {
+                    continue;
+                }
+                $resultText = $this->getToolResultTextAsTheModelReceivedIt($childMessage);
+                if (mb_strlen($resultText) > static::SUB_AGENT_RESULT_MAX_CHARS) {
+                    $resultText = mb_substr($resultText, 0, static::SUB_AGENT_RESULT_MAX_CHARS) . ' …(shortened)';
+                }
+                $this->lines[] = sprintf(
+                    static::SUB_AGENT_TOOL_LINE,
+                    $indent,
+                    (string)($childMessage->toolCall->name ?? '?'),
+                    $childMessage->toolCall->argumentsAsJson(),
+                    $childMessage->toolCall->status ?? '?',
+                    $indent,
+                    str_replace("\n", "\n" . $indent . '    ', $resultText)
+                );
+                $this->addSubAgentToolCallLines($messageIndex, $childMessage, $depth + 1);
+            }
+        }
     }
 
     /**
