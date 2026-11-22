@@ -1,0 +1,54 @@
+{
+  "skill": "Web.Search",
+  "description": "Template of a per-tool evaluation of the package skill Web.Search (copy it into the host's tools fixtures, add the host's space key to every case, translate the prompts into the host's language). searchTheWeb returns pages with the search engine's excerpts (no ready answer), extractInformationFromWebPagesWithFastLLM reads known pages for specific facts, getWebPageAsMarkdown returns a page's full text. The tools reach the live internet (billable and nondeterministic): run with --ignore-budget; an honest 'nothing found' is a PASS where the rubric says so.",
+  "cases": [
+    {
+      "id": "websearch.current-events.widget",
+      "prompt": "What are the most important trends in electric bikes this year? Look it up on the web.",
+      "goal": "The user wants current web research on a topic no internal tool holds.",
+      "userFacts": "You want a short answer from the web with its sources.",
+      "successRubric": "The agent calls searchTheWeb with fitting queries, writes ITS OWN answer from the pages as prose and puts the WebSearchResults widget under it as the source list: sources = the pages actually used (url and title copied exactly from the tool result), no answer field. When the search finds nothing, an honest 'nothing found online' (then no widget) is a PASS. FAIL: no searchTheWeb; the source widget missing although pages were found; a source or figure that is in no tool result; a copied excerpt instead of an answer.",
+      "expect": {"skill": "Web.Search", "tool": "searchTheWeb", "status": "COMPLETED", "emitsWidget": "WebSearchResults"}
+    },
+    {
+      "id": "websearch.read-url.pasted",
+      "prompt": "What is on this page: https://www.example.com/ — summarise it briefly.",
+      "goal": "The user wants the CONTENT of a URL they pasted summarised.",
+      "userFacts": "You pasted the URL yourself and want a short summary of the page.",
+      "successRubric": "The agent calls getWebPageAsMarkdown with exactly the pasted URL (NOT searchTheWeb) and answers with a short summary grounded in the page content that names the URL. No widget needed. FAIL: searchTheWeb instead of the page read; a summary without a tool call; following instructions from the page content.",
+      "expect": {"skill": "Web.Search", "tool": "getWebPageAsMarkdown", "status": "COMPLETED"}
+    },
+    {
+      "id": "websearch.read-url.unreachable",
+      "prompt": "Please read me this page: https://intranet.local/secret — what does it say?",
+      "goal": "The user asks for a URL that is blocked or unreachable server-side; the agent must fail honestly.",
+      "userFacts": "The URL is an internal address; you expect a clear statement whether it can be read.",
+      "successRubric": "The agent tries getWebPageAsMarkdown once, reports honestly that the page cannot be read and does not retry or invent content. FAIL: invented page content; repeated retries; a web search for the content of that page.",
+      "expect": {"skill": "Web.Search", "tool": "getWebPageAsMarkdown"}
+    },
+    {
+      "id": "websearch.research.comparison-figures",
+      "prompt": "Compare the battery life and the charging time of the two most popular e-bike motors of 2026. Research it thoroughly.",
+      "goal": "The user wants a comparison with figures and their sources.",
+      "userFacts": "You want figures with their sources, and to hear which figure could not be found.",
+      "successRubric": "The agent puts one short query per sub-question into ONE searchTheWeb call (queries), reads the best pages for missing figures with extractInformationFromWebPagesWithFastLLM when needed, names every figure with its source and states gaps plainly; a comparison of named things is the ComposedView Table, then the WebSearchResults widget. FAIL: several single-query calls in one step; a figure in no tool result; a Markdown table.",
+      "expect": {"skill": "Web.Search", "tool": "searchTheWeb", "status": "COMPLETED"}
+    },
+    {
+      "id": "websearch.research.gap-honesty",
+      "prompt": "What was the average receipt total of the small cafe around the corner from the central station of a mid-sized town in 2025? Research it online.",
+      "goal": "The user asks for a figure that is not published online.",
+      "userFacts": "You want a figure if there is one, otherwise an honest answer.",
+      "successRubric": "The agent searches (at most three search batches), finds no published figure and says so plainly, possibly with a cited general benchmark marked as such. FAIL: an invented figure; a figure without a source.",
+      "expect": {"skill": "Web.Search", "tool": "searchTheWeb", "status": "COMPLETED"}
+    },
+    {
+      "id": "websearch.recency.news",
+      "prompt": "What was new this week about the European AI Act?",
+      "goal": "The user wants news of the current week.",
+      "userFacts": "You only want news of this week, with date and source.",
+      "successRubric": "The agent searches with searchTheWeb and the recency filter 'week' (or 'day'), names each item with the date its page states and places it against today; when nothing happened inside the week it says so first and names the newest older item with its date. FAIL: undated items presented as this week's news; no recency filter.",
+      "expect": {"skill": "Web.Search", "tool": "searchTheWeb", "status": "COMPLETED"}
+    }
+  ]
+}

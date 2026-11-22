@@ -16,16 +16,16 @@ use DDD\Infrastructure\Modules\DDDModule;
  * - `DDD\Domain\AI\Entities\AgentSpaces\`, `…\Entities\Conversations\`, `…\Entities\Discovery\`,
  *   `…\Entities\Environment\`,
  *   `…\Entities\Evals\`, `…\Entities\MCPPackages\`, `…\Entities\Mandates\`, `…\Entities\Models\CustomerSelection\`,
- *   `…\Entities\RecordedRuns\`, `…\Entities\Skills\`, `…\Entities\Texts\Embeddings\`;
+ *   `…\Entities\RecordedRuns\`, `…\Entities\Skills\`, `…\Entities\Texts\Embeddings\`, `…\Entities\WebSearch\`;
  * - `DDD\Domain\AI\Exceptions\Conversations\`, `…\Exceptions\Evals\`, `…\Exceptions\Texts\Embeddings\`;
  * - `DDD\Domain\AI\Interfaces\`, `DDD\Domain\AI\MessageHandlers\`;
  * - `DDD\Domain\AI\Libs\RecordedRuns\`, `DDD\Domain\AI\Listeners\Conversations\`,
  *   `DDD\Domain\AI\Messenger\Conversations\`, `DDD\Domain\AI\Traits\Conversations\`;
- * - `DDD\Domain\AI\Repo\Argus\Conversations\`, `…\Repo\Argus\Guard\`, `…\Repo\Argus\Mandates\`,
+ * - `DDD\Domain\AI\Repo\Argus\Conversations\`, `…\Repo\Argus\Guard\`, `…\Repo\Argus\Mandates\`, `…\Repo\Argus\WebSearch\`,
  *   `…\Repo\DB\AgentSpaces\`, `…\Repo\DB\Conversations\`, `…\Repo\DB\Evals\`, `…\Repo\DB\Mandates\`;
  * - `DDD\Domain\AI\Services\AgentSpaces\`, `…\Services\Conversations\`, `…\Services\Decisions\`,
  *   `…\Services\Eval\`, `…\Services\Mandates\`,
- *   `…\Services\Skills\`, `…\Services\SystemPrompts\`, `…\Services\Texts\Embeddings\`;
+ *   `…\Services\Skills\`, `…\Services\SystemPrompts\`, `…\Services\Texts\Embeddings\`, `…\Services\WebSearch\`;
  * - `DDD\Modules\Agents\`, `DDD\Presentation\Api\Agents\`, `DDD\Presentation\Mcp\` (the MCP / JSON-RPC wire DTOs,
  *   the tool executor, the console printer and the JSON-RPC base controller);
  * - `DDD\Symfony\Commands\Agents\` (the console commands of the module, their shared base, the option traits and the
@@ -56,6 +56,7 @@ class AgentsModule extends DDDModule
         'DDD\\Domain\\AI\\Entities\\RecordedRuns\\',
         'DDD\\Domain\\AI\\Entities\\Skills\\',
         'DDD\\Domain\\AI\\Entities\\Texts\\Embeddings\\',
+        'DDD\\Domain\\AI\\Entities\\WebSearch\\',
         'DDD\\Domain\\AI\\Exceptions\\Conversations\\',
         'DDD\\Domain\\AI\\Exceptions\\Evals\\',
         'DDD\\Domain\\AI\\Exceptions\\Texts\\Embeddings\\',
@@ -67,6 +68,7 @@ class AgentsModule extends DDDModule
         'DDD\\Domain\\AI\\Repo\\Argus\\Conversations\\',
         'DDD\\Domain\\AI\\Repo\\Argus\\Guard\\',
         'DDD\\Domain\\AI\\Repo\\Argus\\Mandates\\',
+        'DDD\\Domain\\AI\\Repo\\Argus\\WebSearch\\',
         'DDD\\Domain\\AI\\Repo\\DB\\AgentSpaces\\',
         'DDD\\Domain\\AI\\Repo\\DB\\Conversations\\',
         'DDD\\Domain\\AI\\Repo\\DB\\Evals\\',
@@ -79,6 +81,7 @@ class AgentsModule extends DDDModule
         'DDD\\Domain\\AI\\Services\\Skills\\',
         'DDD\\Domain\\AI\\Services\\SystemPrompts\\',
         'DDD\\Domain\\AI\\Services\\Texts\\Embeddings\\',
+        'DDD\\Domain\\AI\\Services\\WebSearch\\',
         'DDD\\Domain\\AI\\Traits\\Conversations\\',
         'DDD\\Modules\\Agents\\',
         'DDD\\Presentation\\Api\\Agents\\',
@@ -109,6 +112,8 @@ class AgentsModule extends DDDModule
             'DDD\\Domain\\AI\\Services\\Mandates\\',
             'DDD\\Domain\\AI\\Services\\Eval\\',
             'DDD\\Domain\\AI\\Services\\Texts\\Embeddings\\',
+            // the web research and its host hooks (the tools and the application fetch them with getService())
+            'DDD\\Domain\\AI\\Services\\WebSearch\\',
             'DDD\\Presentation\\Mcp\\Services\\',
         ];
     }
@@ -129,6 +134,7 @@ class AgentsModule extends DDDModule
             'DDD\\Domain\\AI\\Services\\Mandates\\',
             'DDD\\Domain\\AI\\Services\\Eval\\',
             'DDD\\Domain\\AI\\Services\\Texts\\Embeddings\\',
+            'DDD\\Domain\\AI\\Services\\WebSearch\\',
         ];
     }
 

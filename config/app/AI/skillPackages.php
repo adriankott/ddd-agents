@@ -19,4 +19,7 @@ return [
     AISkill::ASSISTANT_TASK_RUN_REPORTS => ['agent.taskRunReports'],
     // offered only while the memory store is switched on (AI.agentMemory.enabled): the package is unavailable otherwise
     AISkill::MEMORY_MANAGEMENT => ['agent.memories'],
+    // offered only while the web research is switched on (AI.webSearch) and its capability has an endpoint
+    AISkill::WEB_SEARCH => ['agent.webSearch'],
+    AISkill::WEB_PAGE_VIEW => ['agent.webPageScreenshot'],
 ];

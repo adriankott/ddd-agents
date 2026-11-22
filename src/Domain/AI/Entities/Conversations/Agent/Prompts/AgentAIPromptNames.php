@@ -106,6 +106,13 @@ class AgentAIPromptNames
      *      precision stage; routed via the FAST_CHEAP scope, a light classification, latency-first). */
     public const string APP_AI_SEARCH_RERANK = 'AI.Search.Rerank';
 
+    /**
+     * @var string The page reading of the web research: what ONE web source states for an extraction task, as one JSON
+     * object (status, sourceKind, asOf, facts with verbatim quotes, caveats, notAnswered). No placeholders: the task,
+     * the source and its text are the user content.
+     */
+    public const string APP_AI_WEB_SEARCH_PAGE_EXTRACT = 'AI.WebSearch.PageExtract';
+
     /** @var string Serves as system prompt for public-facing AI operations */
     public const string APP_AI_SYSTEM_PROMPT_PUBLIC_FACING = 'AI.SystemPrompts.PublicFacing';
 

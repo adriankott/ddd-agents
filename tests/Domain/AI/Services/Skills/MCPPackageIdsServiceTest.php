@@ -10,6 +10,8 @@ use DDD\Presentation\Mcp\Client\AI\AgentMandatesMCPPackage;
 use DDD\Presentation\Mcp\Client\AI\AgentMemoriesMCPPackage;
 use DDD\Presentation\Mcp\Client\AI\AgentTaskRunReportsMCPPackage;
 use DDD\Presentation\Mcp\Client\AI\AgentTaskSchedulesMCPPackage;
+use DDD\Presentation\Mcp\Client\AI\WebPageScreenshotMCPPackage;
+use DDD\Presentation\Mcp\Client\AI\WebSearchMCPPackage;
 use LogicException;
 use PHPUnit\Framework\TestCase;
 
@@ -61,6 +63,8 @@ class MCPPackageIdsServiceTest extends TestCase
                 AISkill::ASSISTANT_TASKS => [AgentTaskSchedulesMCPPackage::class],
                 AISkill::ASSISTANT_TASK_RUN_REPORTS => [AgentTaskRunReportsMCPPackage::class],
                 AISkill::MEMORY_MANAGEMENT => [AgentMemoriesMCPPackage::class],
+                AISkill::WEB_SEARCH => [WebSearchMCPPackage::class],
+                AISkill::WEB_PAGE_VIEW => [WebPageScreenshotMCPPackage::class],
             ],
             AISkill::resolvePackageIdsOfBinding($defaultBinding)
         );

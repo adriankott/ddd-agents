@@ -56,6 +56,9 @@ class AgentAIUsageScope
     /** Ranking assistant search results by relevance. */
     public const string AI_SEARCH_RERANK = 'AI.SEARCH.RERANK.RELEVANCE';
 
+    /** A fast model reading a web page for the facts an extraction task asks for. */
+    public const string AI_WEB_PAGE_EXTRACT = 'AI.WEB_PAGE.EXTRACT';
+
     /** Safety check on assistant input. */
     public const string AI_SECURITY_DETECT_INJECTION = 'AI.SECURITY.DETECT.INJECTION';
 

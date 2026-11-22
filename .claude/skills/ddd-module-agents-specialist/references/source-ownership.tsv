@@ -55,6 +55,18 @@ src/Domain/AI/Exceptions/Conversations/OwnerConsentMissingException.php	decision
 config/app/AI/decisionModel.php	decisions-and-guards
 config/app/AI/Prompts/AI/Agent/*Decision.md	decisions-and-guards
 config/app/AI/Prompts/AI/Agent/OwnerMessageInjectionGateRules.md	decisions-and-guards
+# web research (ddd-module-agents-tools-specialist): pierces the autonomy folders config/app/AI/Skills/** and src/Presentation/Mcp/Client/AI/**
+src/Domain/AI/**/WebSearch/**	tools
+src/Presentation/Mcp/Client/AI/WebSearchMCPPackage.php	tools
+src/Presentation/Mcp/Client/AI/WebPageScreenshotMCPPackage.php	tools
+src/Presentation/Mcp/Client/AI/ToolBatchAdoptionNote.php	tools
+src/Presentation/Mcp/Client/AI/Dtos/SearchTheWebRequestDto.php	tools
+src/Presentation/Mcp/Client/AI/Dtos/ExtractInformationFromWebPagesRequestDto.php	tools
+src/Presentation/Mcp/Client/AI/Dtos/WebPage*	tools
+src/Presentation/Mcp/Client/AI/Dtos/WebSearch*	tools
+config/app/AI/Skills/Web/**	tools
+config/app/AI/Prompts/AI/WebSearch/**	tools
+config/app/AI/webSearch.php	tools
 # autonomy (ddd-module-agents-autonomy-specialist): delegation, schedules, eligibility, mandates, supervisor, owner reports, background operations
 src/Domain/AI/**/*AIConversationDelegation*	autonomy
 src/Domain/AI/Entities/Conversations/Agent/AgentDelegation*	autonomy
