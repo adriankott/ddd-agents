@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.27
+
+- Added: `AgentDriveFileCardsTrait` (`POST …/driveFiles/cards {store, references, widgetSelfHydrationKey}`), the
+  hydration read of the `DriveFiles` widget: the facts of the block's files from their drive store under the viewer's
+  rights. A host mounts it on its chat controller; content URLs come from the store's own REST side.
+
 ## 0.1.26
 
 - Added: the drive mount contract. A file store module implements `AgentDriveStore` (tag `ai.agent_drive_store`,
