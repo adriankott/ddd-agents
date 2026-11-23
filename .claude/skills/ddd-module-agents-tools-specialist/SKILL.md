@@ -136,6 +136,14 @@ class DemoNotesMCPPackage extends MCPPackage
 Then bind the package to a skill in the host's `config/app/AI/skillPackages.php` (it replaces the package's file
 whole), e.g. `'Demo.Notes' => [DemoNotesMCPPackage::class]`, and write the skill file (skills-and-purposes skill).
 
+## Drive mounts
+
+A file store module (e.g. a cloud drive) implements `DDD\Domain\AI\Services\Drives\AgentDriveStore`; the package's
+`agent.drive` tools (`listDriveFiles`, `saveDriveFile`, `showDriveFiles`) and the file card `DriveFiles` reach it
+through `AgentDriveStoresService`, which also resolves file arguments (`reports/Plan.md`, `drivespaces/<name>/…`,
+`drive/<id>`). The store answers under the caller's rights, hands out facts only (no content, no URL) and copies on
+the server; the tool checks the mount's mode and asks the owner for a `WRITE_WITH_CONSENT` mount.
+
 ## The contract every meta tool shares
 
 A meta tool (`load_skills`, `askOwner`, `delegate` … — `AgentMetaTools::TOOL_CLASSES`) is answered by

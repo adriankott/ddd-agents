@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.1.26
+
+- Added: the drive mount contract. A file store module implements `AgentDriveStore` (tag `ai.agent_drive_store`,
+  autoconfigured): `findMountsOfCall()`, `listDriveFiles()`, `findDriveFiles()`, `saveDriveFiles()`,
+  `findFileCards()`. `AgentDriveStoresService` collects the stores and resolves a file argument against the mounts of
+  a call: `drivespaces/<name>/…` is that mount, `drive/<id>` a reference, any other path (also `/workspace/…`) the
+  agent space's own drive; `..` and unknown mounts are refused with the mounts named. `AgentDriveMount` carries the
+  mode (`READ_ONLY`, `READ_WRITE`, `WRITE_WITH_CONSENT`; an outward-visible space is never written without consent)
+  and its state-note line.
+- Added: the tool package `agent.drive` (`AgentDriveMCPPackage`, available while a store is installed):
+  `listDriveFiles` (READ, parallel-safe; `drivespaces` lists the mounts), `saveDriveFile` (WRITE, server-side copy;
+  a read-only mount refuses, a consent mount asks the owner through `OwnerConsentsService`) and `showDriveFiles`
+  (writes the file card). The store module's skill binds the package.
+- Added: the file card widget `DriveFiles` (`DriveFilesConversationWidget`): the block holds the store and the file
+  references only; a renderer hydrates them through `AgentDriveStoresService::findFileCards()` under the viewer's
+  rights. Hosts with a chat renderer add the component for `DriveFiles`.
+
 ## 0.1.25
 
 - Fixed: the eval workspace key of a repeated case names its real repetition: `app:ai-agent:eval-tools --repeat`

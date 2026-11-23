@@ -58,6 +58,9 @@ config/app/AI/Prompts/AI/Agent/OwnerMessageInjectionGateRules.md	decisions-and-g
 # web research (ddd-module-agents-tools-specialist): pierces the autonomy folders config/app/AI/Skills/** and src/Presentation/Mcp/Client/AI/**
 src/Domain/AI/**/WebSearch/**	tools
 src/Presentation/Mcp/Client/AI/WebSearchMCPPackage.php	tools
+src/Domain/AI/**/Drives/**	tools
+src/Presentation/Mcp/Client/AI/AgentDriveMCPPackage.php	tools
+src/Presentation/Mcp/Client/AI/Dtos/AgentDrive*	tools
 src/Presentation/Mcp/Client/AI/WebPageScreenshotMCPPackage.php	tools
 src/Presentation/Mcp/Client/AI/ToolBatchAdoptionNote.php	tools
 src/Presentation/Mcp/Client/AI/Dtos/SearchTheWebRequestDto.php	tools
