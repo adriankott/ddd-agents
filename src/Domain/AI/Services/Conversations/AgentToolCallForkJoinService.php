@@ -494,6 +494,7 @@ class AgentToolCallForkJoinService extends Service
             $toolCall->platformNoteForModel = $outcome->platformNoteForModel;
             $toolCall->bindableResult = $outcome->bindableResult;
             $toolCall->dictatedWidgetType = $outcome->dictatedWidgetType;
+            $toolCall->returnedUntrustedContent = $outcome->returnedUntrustedContent;
             $toolCall->status = $outcome->status;
             $toolCall->durationSeconds = $outcome->durationSeconds;
             $toolCall->executionStartedAt = $outcome->executionStartedAt;

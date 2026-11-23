@@ -15,6 +15,7 @@ use DDD\Domain\AI\Entities\Conversations\Agent\Decisions\OwnerConsent\OwnerConse
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolContentTrust;
 use DDD\Presentation\Mcp\Dtos\MCPToolResponse;
 use DDD\Presentation\Mcp\Services\MCPToolExecutorService;
+use DDD\Tests\Agents\Presentation\Services\Probes\ProbeContentTrustDeclaringResult;
 use DDD\Tests\Agents\Presentation\Services\Probes\ProbeUntrustedReadGateMCPPackage;
 use DDD\Tests\Agents\Presentation\Services\Probes\UntrustedReadGateToolExecutor;
 use DDD\Tests\Agents\Support\UnitTestCase;
@@ -87,6 +88,39 @@ class MCPToolExecutorWriteAfterUntrustedReadTest extends UnitTestCase
         self::assertNull($this->holdCall('probeFetchPage', ['url' => 'https://other.example.org/plain'], $provenance), 'no query string, no fragment');
     }
 
+    public function testTheCallsOwnVerdictWinsOverTheToolsRule(): void
+    {
+        self::assertNull(
+            $this->holdCall('probeWriteRecord', [], $this->provenanceAfterReading('probeReadForeignText', returnedUntrustedContent: false)),
+            'a foreign-text tool whose result declared only platform text is a trusted read'
+        );
+        $refusingExecutor = new UntrustedReadGateToolExecutor();
+        $refusingExecutor->writeAfterUntrustedReadMode = MCPToolContentTrust::WRITE_AFTER_UNTRUSTED_READ_REFUSE;
+        self::assertSame(
+            MCPToolResponse::REFUSAL_WRITE_AFTER_UNTRUSTED_READ,
+            $this->holdCall('probeWriteRecord', [], $this->provenanceAfterReading('probeReadPlatformRecord', returnedUntrustedContent: true), $refusingExecutor)?->refusalKind,
+            'a trusted tool whose result declared third-party text is an untrusted read'
+        );
+        self::assertNull(
+            $this->holdCall('probeWriteRecord', [], $this->provenanceAfterReading('probeReadForeignText', returnedUntrustedContent: false), $refusingExecutor),
+            'also under refuse'
+        );
+    }
+
+    public function testAResultDeclaresItsTrustAndOneThatCannotDecideIsUntrusted(): void
+    {
+        $executor = new UntrustedReadGateToolExecutor();
+        foreach ([[true, true], [false, false], [null, false]] as [$holdsOnlyPlatformText, $expectedTrust]) {
+            $response = self::invokeMethod($executor, 'applyResultNoteAndDictatedWidgetType', [
+                new ProbeContentTrustDeclaringResult($holdsOnlyPlatformText),
+                new MCPToolResponse('result'),
+            ]);
+            self::assertSame($expectedTrust, $response->getDeclaredTrustedContent());
+        }
+        $undeclaredResponse = self::invokeMethod($executor, 'applyResultNoteAndDictatedWidgetType', ['plain', new MCPToolResponse('result')]);
+        self::assertNull($undeclaredResponse->getDeclaredTrustedContent(), 'no declaration: the tool\'s static rule applies');
+    }
+
     /**
      * @param array<string, mixed> $arguments
      */
@@ -103,9 +137,10 @@ class MCPToolExecutorWriteAfterUntrustedReadTest extends UnitTestCase
         ]);
     }
 
-    protected function provenanceAfterReading(string $readToolName, bool $readBeforeTheTurn = false): AgentToolCallProvenance
+    protected function provenanceAfterReading(string $readToolName, bool $readBeforeTheTurn = false, ?bool $returnedUntrustedContent = null): AgentToolCallProvenance
     {
         $readRow = $this->toolCallRow($readBeforeTheTurn ? 0 : 2, $readToolName, 'see https://shown.example.org/page?id=7');
+        $readRow->toolCall->returnedUntrustedContent = $returnedUntrustedContent;
         $ownerRow = $this->row(AIConversationMessage::ROLE_USER, AIConversationMessage::AUTHOR_USER, 'look this up', 1);
         $messages = new AIConversationMessages();
         foreach ($readBeforeTheTurn ? [$readRow, $ownerRow] : [$ownerRow, $readRow] as $messageRow) {

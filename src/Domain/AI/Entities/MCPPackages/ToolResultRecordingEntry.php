@@ -40,6 +40,9 @@ class ToolResultRecordingEntry extends ValueObject
     /** @var string|null The widget type the tool's note dictates; null also for a recording written before the type existed */
     public ?string $dictatedWidgetType = null;
 
+    /** @var bool|null The call's untrusted-content verdict; null for an error result and a recording written before the verdict existed */
+    public ?bool $returnedUntrustedContent = null;
+
     /** @var array|null The result's bindable form as the tool returned it */
     public ?array $bindableResult = null;
 
@@ -67,6 +70,7 @@ class ToolResultRecordingEntry extends ValueObject
         $toolResultRecordingEntry->refusalIsFinal = $toolResult->refusalIsFinal;
         $toolResultRecordingEntry->platformNoteForModel = $toolResult->platformNoteForModel;
         $toolResultRecordingEntry->dictatedWidgetType = $toolResult->dictatedWidgetType;
+        $toolResultRecordingEntry->returnedUntrustedContent = $toolResult->returnedUntrustedContent;
         $toolResultRecordingEntry->bindableResult = $toolResult->bindableResult;
         $toolResultRecordingEntry->bookedCosts = $bookedCosts;
         return $toolResultRecordingEntry;
@@ -88,6 +92,7 @@ class ToolResultRecordingEntry extends ValueObject
         $toolResultRecordingEntry->refusalIsFinal = (bool)($storedEntry['refusalIsFinal'] ?? false);
         $toolResultRecordingEntry->platformNoteForModel = $storedEntry['platformNoteForModel'] ?? null;
         $toolResultRecordingEntry->dictatedWidgetType = $storedEntry['dictatedWidgetType'] ?? null;
+        $toolResultRecordingEntry->returnedUntrustedContent = is_bool($storedEntry['returnedUntrustedContent'] ?? null) ? $storedEntry['returnedUntrustedContent'] : null;
         $toolResultRecordingEntry->bindableResult = is_array($storedEntry['bindableResult'] ?? null) ? $storedEntry['bindableResult'] : null;
         $storedBookedCosts = $storedEntry['bookedCosts'] ?? null;
         $toolResultRecordingEntry->bookedCosts = is_array($storedBookedCosts) || is_object($storedBookedCosts) ? $storedBookedCosts : null;
@@ -98,7 +103,7 @@ class ToolResultRecordingEntry extends ValueObject
      * The stored form inside a recording file (key order fixed; an entry without booked costs stores none, an entry
      * whose refusal is not final stores no `refusalIsFinal`).
      *
-     * @return array{toolName: string, arguments: string, content: string, isError: bool, refusalKind: string|null, refusalIsFinal?: true, platformNoteForModel: string|null, dictatedWidgetType: string|null, bindableResult: array|null, bookedCosts?: array|object}
+     * @return array{toolName: string, arguments: string, content: string, isError: bool, refusalKind: string|null, refusalIsFinal?: true, platformNoteForModel: string|null, dictatedWidgetType: string|null, bindableResult: array|null, returnedUntrustedContent?: bool, bookedCosts?: array|object}
      */
     public function toStoredEntry(): array
     {
@@ -117,6 +122,9 @@ class ToolResultRecordingEntry extends ValueObject
             'dictatedWidgetType' => $this->dictatedWidgetType,
             'bindableResult' => $this->bindableResult,
         ];
+        if ($this->returnedUntrustedContent !== null) {
+            $storedEntry['returnedUntrustedContent'] = $this->returnedUntrustedContent;
+        }
         if ($this->bookedCosts !== null) {
             $storedEntry['bookedCosts'] = $this->bookedCosts;
         }
@@ -136,6 +144,7 @@ class ToolResultRecordingEntry extends ValueObject
         $toolResult->refusalIsFinal = $this->refusalIsFinal;
         $toolResult->platformNoteForModel = $this->platformNoteForModel;
         $toolResult->dictatedWidgetType = $this->dictatedWidgetType;
+        $toolResult->returnedUntrustedContent = $this->returnedUntrustedContent;
         $toolResult->bindableResult = $this->bindableResult;
         $toolResult->recordedBookedCosts = AIUsageBookedCostsStoredForm::buildBookedCostsFromStoredForm(
             is_array($this->bookedCosts) ? $this->bookedCosts : null

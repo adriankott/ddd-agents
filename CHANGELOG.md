@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.31
+
+- Security: per-call content trust. A tool's response DTO may implement `MCPToolResultDeclaresContentTrust`;
+  `isTrustedContent()` decides for that call and wins over the tool's static rule in both directions (a tool that serves
+  staff-only and partner texts needs no split). A throw counts as untrusted. The verdict is stored on the call
+  (`ToolCall::$returnedUntrustedContent`, hidden; also in fork outcomes and run recordings) and read by the write gate
+  after an untrusted read, the reading rule of the platform note and the tool-result screen. Calls stored before it
+  keep the static rule; no schema change (the call lives in the message's JSON).
+
 ## 0.1.30
 
 - Security: tools are untrusted by default. A READ or WORKSPACE tool returns untrusted content unless it (or its

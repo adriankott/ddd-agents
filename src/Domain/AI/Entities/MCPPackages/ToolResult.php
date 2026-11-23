@@ -49,6 +49,13 @@ class ToolResult extends ValueObject
     public ?string $dictatedWidgetType = null;
 
     /**
+     * Whether this call's result holds untrusted content: the result's own declaration
+     * ({@see MCPToolResultDeclaresContentTrust}), else the tool's rule ({@see MCPToolContentTrust}); null for an error
+     * result and for a result built before the verdict existed.
+     */
+    public ?bool $returnedUntrustedContent = null;
+
+    /**
      * The AI costs a recorded run stored for this result, set only on a PLAYED result
      * ({@see ToolResultRecording::playResult()}): the tool did not run, so nothing was booked; the executor books these
      * on the open recording instead, so the replayed tool call carries the costs the recorded one did.

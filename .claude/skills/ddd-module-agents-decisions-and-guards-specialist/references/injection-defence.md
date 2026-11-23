@@ -38,6 +38,13 @@ A tool returns untrusted content unless it says otherwise (`DDD\Domain\AI\Entiti
 | a WRITE or DELETE tool | trusted (its result reports the platform's own write) |
 | every other tool: READ, WORKSPACE, no effect declared | **untrusted** |
 
+**Per call:** a response DTO that implements `MCPToolResultDeclaresContentTrust` decides for its own call and wins over
+the table in both directions — `isTrustedContent()` true: a trusted read (no screen, no reading rule, no consent
+question for a later write); false: untrusted, also for a tool declared trusted; a throw counts as false. One tool can
+serve staff-only and partner texts: decide from the texts the result carries, never from an argument the model set.
+The verdict is stored on the call (`ToolCall::$returnedUntrustedContent`, a hidden platform fact); calls stored before
+it fall back to the table.
+
 An untrusted result without marks gets `ToolResultUntrustedSegments::UNMARKED_READING_RULE` on its platform note; a
 marked one gets `READING_RULE`. The tool-result screen (below) reads every untrusted result. The package's own
 packages for memories, schedules, run reports and mandates declare trust; web search, screenshots and the drive do

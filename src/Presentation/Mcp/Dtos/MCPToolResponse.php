@@ -110,6 +110,22 @@ class MCPToolResponse extends ValueObject
     }
 
     /**
+     * The trust the result declared for this call ({@see \DDD\Domain\AI\Entities\MCPPackages\MCPToolResultDeclaresContentTrust});
+     * null when it declared none (the tool's static rule applies). PROTECTED like the platform note.
+     */
+    protected ?bool $declaredTrustedContent = null;
+
+    public function setDeclaredTrustedContent(?bool $declaredTrustedContent): void
+    {
+        $this->declaredTrustedContent = $declaredTrustedContent;
+    }
+
+    public function getDeclaredTrustedContent(): ?bool
+    {
+        return $this->declaredTrustedContent;
+    }
+
+    /**
      * What a bindable result keeps for a `ComposedView`
      * ({@see \DDD\Domain\AI\Entities\Conversations\Widgets\Composed\Bindings\ComposedViewBindableResultRecord}).
      * PROTECTED like the platform note: the HTTP MCP response never carries it; the agent path folds it into the

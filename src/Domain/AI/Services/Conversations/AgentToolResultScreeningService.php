@@ -78,7 +78,10 @@ class AgentToolResultScreeningService extends Service
                     continue;
                 }
                 $toolDefinition = $toolDefinitions->getByName((string)($toolCall->name ?? ''));
-                if ($toolDefinition === null || !$toolDefinition->returnsUntrustedContent) {
+                // the call's own verdict first (a result that declared its trust), else the tool's static rule
+                $returnedUntrustedContent = $toolCall->returnedUntrustedContent
+                    ?? ($toolDefinition !== null && $toolDefinition->returnsUntrustedContent);
+                if (!$returnedUntrustedContent) {
                     continue;
                 }
                 // the screening start is a write of the turn this process drives — fenced on its claim; a

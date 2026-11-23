@@ -121,7 +121,8 @@ reason in `config/untrusted-sinks-allowlist.php`, enforced by `tests/Untrusted/U
 helpers and traps: Core skill **`ddd-untrusted-input-specialist`** — load it before touching such a call site.
 
 In the agent loop: a READ or WORKSPACE tool returns untrusted content unless it declares
-`MCPToolReturnsTrustedContent` (`MCPToolContentTrust`); after such a call a WRITE or DELETE of the same owner turn
+`MCPToolReturnsTrustedContent` (`MCPToolContentTrust`) — or its response DTO decides per call
+(`MCPToolResultDeclaresContentTrust::isTrustedContent()`, a throw = untrusted); after such a call a WRITE or DELETE of the same owner turn
 waits for the owner's consent (or is refused, `config/app/AI/untrustedContent.php`), and a fetch of an unseen
 model-built URL is refused (skill `ddd-module-agents-decisions-and-guards-specialist`, injection defence).
 

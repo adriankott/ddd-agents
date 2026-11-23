@@ -93,6 +93,14 @@ class ToolCall extends ValueObject
     public ?string $dictatedWidgetType = null;
 
     /**
+     * Whether this call's result held untrusted content ({@see \DDD\Domain\AI\Entities\MCPPackages\ToolResult::$returnedUntrustedContent}):
+     * read by the write gate after an untrusted read and by the tool-result screen. Null for a failed call and for a
+     * call stored before the verdict existed — the tool's static rule decides then. A platform fact, never shown.
+     */
+    #[HideProperty]
+    public ?bool $returnedUntrustedContent = null;
+
+    /**
      * @var array<string, mixed>|null What a bindable result keeps for a `ComposedView` (the stored form
      *      of {@see ComposedViewBindableResultRecord}: the structured shape a `$from` path addresses, the entity rows the
      *      references are minted over). Its OWN key of the `toolCall` column, never inside {@see $result}: the result
@@ -1236,6 +1244,7 @@ class ToolCall extends ValueObject
         $this->wasRefusedAsFinal = $toolResult->isError && $toolResult->refusalIsFinal ? true : null;
         $this->bindableResult = $toolResult->isError ? null : $toolResult->bindableResult;
         $this->dictatedWidgetType = $toolResult->isError ? null : $toolResult->dictatedWidgetType;
+        $this->returnedUntrustedContent = $toolResult->isError ? null : $toolResult->returnedUntrustedContent;
         $this->applyResultImages($toolResult);
     }
 

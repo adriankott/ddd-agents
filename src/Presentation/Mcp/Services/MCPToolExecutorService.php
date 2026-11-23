@@ -46,6 +46,7 @@ use DDD\Domain\AI\Entities\MCPPackages\ToolResult;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolResponsePlatformNoteProvider;
 use DDD\Domain\AI\Entities\MCPPackages\ToolResultUntrustedSegments;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolResponseDictatedWidgetTypeProvider;
+use DDD\Domain\AI\Entities\MCPPackages\MCPToolResultDeclaresContentTrust;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolImageBudget;
 use DDD\Domain\AI\Entities\MCPPackages\ToolCallImageReference;
 use DDD\Domain\AI\Entities\MCPPackages\ToolCallImageStore;
@@ -251,11 +252,16 @@ class MCPToolExecutorService extends Service
         $toolResult->images = $toolResultImages;
         $toolResult->refusalKind = $response->refusalKind;
         $toolResult->refusalIsFinal = $response->isFinalRefusal();
+        // the result's own per-call declaration wins over the tool's static rule (MCPToolResultDeclaresContentTrust)
+        $declaredTrustedContent = $response->getDeclaredTrustedContent();
+        $toolResult->returnedUntrustedContent = $response->isError
+            ? null
+            : ($declaredTrustedContent !== null ? !$declaredTrustedContent : MCPToolContentTrust::isUntrustedToolInPackages($toolName, $packageClasses));
         // a result that holds third-party passages in marks carries the reading rule of the marks in its platform note
         $toolResult->platformNoteForModel = ToolResultUntrustedSegments::buildPlatformNoteWithReadingRule(
             $response->getPlatformNoteForModel(),
             $this->joinTextContentParts($nonImageContentParts),
-            !$response->isError && MCPToolContentTrust::isUntrustedToolInPackages($toolName, $packageClasses)
+            $toolResult->returnedUntrustedContent === true
         );
         $toolResult->dictatedWidgetType = $response->isError ? null : $response->getDictatedWidgetType();
         if ($toolResult->isError) {
@@ -1172,7 +1178,22 @@ class MCPToolExecutorService extends Service
         if ($result instanceof MCPToolResponseDictatedWidgetTypeProvider) {
             $response->setDictatedWidgetType($result->getDictatedWidgetType());
         }
+        if ($result instanceof MCPToolResultDeclaresContentTrust) {
+            $response->setDeclaredTrustedContent($this->readDeclaredTrustedContent($result));
+        }
         return $response;
+    }
+
+    /**
+     * The per-call trust a result declares; a result that cannot decide (throws) is untrusted.
+     */
+    protected function readDeclaredTrustedContent(MCPToolResultDeclaresContentTrust $result): bool
+    {
+        try {
+            return $result->isTrustedContent() === true;
+        } catch (Throwable) {
+            return false;
+        }
     }
 
     /**
@@ -1757,7 +1778,8 @@ class MCPToolExecutorService extends Service
             ) {
                 continue;
             }
-            if ($this->isUntrustedReadToolName($calledToolName)) {
+            // the call's own verdict (a result that declared its trust); calls stored before it existed: the tool's rule
+            if ($toolCall->returnedUntrustedContent ?? $this->isUntrustedReadToolName($calledToolName)) {
                 $untrustedReadToolNames[] = $calledToolName;
             }
         }
