@@ -35,6 +35,12 @@ class AgentEvalCase extends ValueObject
     /** @var string The key that names the stored agent space the case runs in */
     public const string KEY_AGENT_SPACE_ID = 'agentSpaceId';
 
+    /**
+     * @var string The record kind of an agent space named by reference: `"agentSpaceId": "{{ref:agentSpace:<name>}}"`,
+     *      resolved by the application without a scope ({@see \DDD\Domain\AI\Services\Eval\AgentEvalRunHooksService::resolveAgentSpaceReference()})
+     */
+    public const string AGENT_SPACE_REFERENCE_KIND = 'agentSpace';
+
     /** @var string The key that declares how a case touches its agent space in a suite (`read`, `write`, `exclusive`) */
     public const string KEY_ACCESS = 'access';
 
@@ -192,11 +198,35 @@ class AgentEvalCase extends ValueObject
         return (bool)($this->caseFields['scheduledRun'] ?? false);
     }
 
-    /** `agentSpaceId`: the stored agent space the case runs in; null when the case names none. */
+    /**
+     * `agentSpaceId` as a number: the stored agent space the case runs in; null when the case names none or names it by
+     * reference ({@see getAgentSpaceReferenceName()}; the run hooks resolve it, never this accessor).
+     */
     public function getAgentSpaceId(): ?int
     {
-        $agentSpaceId = (int)($this->caseFields[static::KEY_AGENT_SPACE_ID] ?? 0);
+        $agentSpaceIdValue = $this->caseFields[static::KEY_AGENT_SPACE_ID] ?? null;
+        if (!is_int($agentSpaceIdValue) && !(is_string($agentSpaceIdValue) && ctype_digit($agentSpaceIdValue))) {
+            return null;
+        }
+        $agentSpaceId = (int)$agentSpaceIdValue;
         return $agentSpaceId > 0 ? $agentSpaceId : null;
+    }
+
+    /**
+     * The name of the agent space the case names by reference — `"agentSpaceId": "{{ref:agentSpace:<name>}}"` (the
+     * token is the whole value; the name is trimmed) — so a fixture survives the space being created again; null when
+     * `agentSpaceId` is a number, absent or no such token.
+     */
+    public function getAgentSpaceReferenceName(): ?string
+    {
+        $agentSpaceIdValue = $this->caseFields[static::KEY_AGENT_SPACE_ID] ?? null;
+        if (!is_string($agentSpaceIdValue)
+            || preg_match('/^\s*\{\{ref:' . preg_quote(static::AGENT_SPACE_REFERENCE_KIND, '/') . ':([^}]+)\}\}\s*$/', $agentSpaceIdValue, $referenceMatch) !== 1
+        ) {
+            return null;
+        }
+        $agentSpaceName = trim($referenceMatch[1]);
+        return $agentSpaceName !== '' ? $agentSpaceName : null;
     }
 
     /**

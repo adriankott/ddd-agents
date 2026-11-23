@@ -291,4 +291,18 @@ class AgentEvalCaseTest extends UnitTestCase
             RunSettings::describeEvalToolRefusal('replyToComment', ['replyToComment'], ['replyToComment' => 'Rate limit reached'], false)
         );
     }
+
+    public function testAnAgentSpaceIsNamedByNumberOrByReference(): void
+    {
+        self::assertSame(6, AgentEvalCase::fromArray(['agentSpaceId' => 6])->getAgentSpaceId());
+        self::assertSame(6, AgentEvalCase::fromArray(['agentSpaceId' => '6'])->getAgentSpaceId());
+        self::assertNull(AgentEvalCase::fromArray(['agentSpaceId' => 6])->getAgentSpaceReferenceName());
+
+        $referencingCase = AgentEvalCase::fromArray(['agentSpaceId' => '{{ref:agentSpace: admin }}']);
+        self::assertNull($referencingCase->getAgentSpaceId(), 'a reference is never read as a number');
+        self::assertSame('admin', $referencingCase->getAgentSpaceReferenceName());
+        self::assertNull(AgentEvalCase::fromArray(['agentSpaceId' => '{{ref:entry:admin}}'])->getAgentSpaceReferenceName());
+        self::assertNull(AgentEvalCase::fromArray([])->getAgentSpaceReferenceName());
+    }
+
 }

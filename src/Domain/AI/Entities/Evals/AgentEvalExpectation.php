@@ -154,6 +154,36 @@ class AgentEvalExpectation extends ValueObject
     }
 
     /**
+     * The deterministic gates of the block that hold for a judged run (several owner turns, then the judge): the
+     * assertions about what happened anywhere in the conversation tree — `skill` / `skills`, `forbiddenSkills` /
+     * `noSkill`, `tool` with `status`, `argsContain` / `argsAbsent`, `resultContains` / `resultNotContains`,
+     * `requiredTools`, `forbiddenTools`. The same checks as {@see evaluateConversation()}, so a judged run and the single
+     * shot fail a case for the same reason. Left out are the assertions about the shape of one turn, which more owner
+     * turns change by design: the final answer's widgets and phrases, the progress text, the task plan's end state,
+     * signal sources and tool call counts. A judge never overrules these gates
+     * ({@see \DDD\Domain\AI\Services\Eval\AgentEvalJudgedRunService::applyDeterministicGatesToRunResult()}).
+     *
+     * @param AIConversation $conversation the driven conversation
+     * @param array<string, int|string> $toolArgumentsFilledByThePlatform see {@see evaluateConversation()}
+     * @return string[] one sentence per unmet gate; empty when the run meets them
+     */
+    public function evaluateConversationForJudgedRun(AIConversation $conversation, array $toolArgumentsFilledByThePlatform = []): array
+    {
+        $messages = $conversation->getAllMessagesIncludingDelegations();
+        $expectedToolCallRow = $this->findExpectedToolCallRow($messages, $toolArgumentsFilledByThePlatform);
+        return array_merge(
+            $this->buildSkillFailures($messages),
+            $this->buildForbiddenSkillFailures($messages),
+            $this->buildExpectedToolFailures($conversation, $messages, $expectedToolCallRow),
+            $this->buildArgumentFailures($expectedToolCallRow, $toolArgumentsFilledByThePlatform),
+            $this->buildResultContainsFailures($messages, $expectedToolCallRow),
+            $this->buildRequiredToolFailures($messages),
+            $this->buildForbiddenToolFailures($messages),
+            $this->buildResultNotContainsFailures($messages, $expectedToolCallRow)
+        );
+    }
+
+    /**
      * The verdict of the driven conversation: passed when {@see evaluateConversation()} finds no failure, with the name
      * of the expected tool whose call was checked (null when the case expects no tool or none of them was called).
      *

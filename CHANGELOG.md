@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.1.37
+
+- Evaluation: a judged run applies the case's deterministic `expect` gates after the judge
+  (`AgentEvalJudgedRunService::applyDeterministicGatesToRunResult()`): skills, forbidden skills, `tool` with its
+  status, argument and result checks, `requiredTools`, `forbiddenTools` (`AgentEvalExpectation::evaluateConversationForJudgedRun()`,
+  the single shot's checks; not the last turn's widgets, phrases, task plan, signal sources or call counts), plus the
+  application's own gates (`buildHostGateFailures()`, default none). A judge's PASS with a missed gate becomes FAIL, the
+  missed gates lead the reasons and are listed under the verdict's `deterministicGateFailures`
+  (`AgentEvalJudgeVerdict::applyDeterministicGateFailures()` / `getDeterministicGateFailures()`,
+  `AgentEvalSimRunResult::getDeterministicGateFailures()`); an ERROR stays an ERROR. A host's bridge that did this
+  itself can go; keep only its own checks in `buildHostGateFailures()`.
+- Evaluation: a case names its agent space by reference, `"agentSpaceId": "{{ref:agentSpace:<name>}}"` (also inside any
+  other string of a case), resolved without a scope by the host's `AgentEvalRunHooksService::resolveAgentSpaceReference()`
+  (default null). An unresolved reference fails the case with its message and never falls back to the run's space;
+  numbers keep working. New `AgentEvalCase::getAgentSpaceReferenceName()`, `AgentEvalRunHooksService::resolveAgentSpaceIdOfCase()`.
+
 ## 0.1.36
 
 - Agent wire: `parallel_tool_calls` goes out with tools only when the model's catalog entry does not say

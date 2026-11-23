@@ -114,6 +114,27 @@ class AgentEvalRunHooksServiceTest extends IntegrationTestCase
         (new AgentEvalRunHooksService())->resolveEvalScope(AgentEvalCase::fromArray(['id' => 'c']));
     }
 
+    public function testACaseNamesItsAgentSpaceByReferenceAndTheReferenceWinsOverTheCaller(): void
+    {
+        $this->knowAgentSpaceWithOwner(17, 5);
+        $this->knowAgentSpaceWithOwner(18, 6);
+        $agentEvalRunHooksService = new AgentEvalRunHooksServiceWithNamedAgentSpacesDouble();
+        $agentEvalRunHooksService->agentSpaceIdsByName = ['evaluation admin' => 17];
+
+        $agentEvalScope = $agentEvalRunHooksService->resolveEvalScope(AgentEvalCase::fromArray(['id' => 'c', 'agentSpaceId' => '{{ref:agentSpace: evaluation admin }}']), 18);
+
+        self::assertSame(17, $agentEvalScope->getAgentSpaceId());
+        self::assertSame(5, $agentEvalScope->getOwnerAccountId());
+    }
+
+    public function testAReferenceThatDoesNotResolveFailsTheCaseAndNeverFallsBackToTheCallersSpace(): void
+    {
+        $this->knowAgentSpaceWithOwner(18, 6);
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage("The case 'c' names the agent space {{ref:agentSpace:missing}}, which does not resolve");
+        (new AgentEvalRunHooksService())->resolveEvalScope(AgentEvalCase::fromArray(['id' => 'c', 'agentSpaceId' => '{{ref:agentSpace:missing}}']), 18);
+    }
+
     public function testAnAgentSpaceThatIsNotStoredIsRefused(): void
     {
         $this->expectException(RuntimeException::class);

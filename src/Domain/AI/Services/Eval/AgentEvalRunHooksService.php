@@ -71,7 +71,7 @@ class AgentEvalRunHooksService extends Service
      */
     public function resolveEvalScope(AgentEvalCase $agentEvalCase, ?int $fallbackAgentSpaceId = null): AgentEvalScope
     {
-        $agentSpaceId = $agentEvalCase->getAgentSpaceId() ?? $fallbackAgentSpaceId;
+        $agentSpaceId = $this->resolveAgentSpaceIdOfCase($agentEvalCase, $fallbackAgentSpaceId);
         if ($agentSpaceId === null) {
             throw new RuntimeException("The case '{$agentEvalCase->getId()}' names no agent space and the caller gave none.");
         }
@@ -111,7 +111,7 @@ class AgentEvalRunHooksService extends Service
         if ($fallbackAccountId === null) {
             return $this->resolveEvalScope($agentEvalCase, $fallbackAgentSpaceId);
         }
-        $agentSpaceId = $agentEvalCase->getAgentSpaceId() ?? $fallbackAgentSpaceId;
+        $agentSpaceId = $this->resolveAgentSpaceIdOfCase($agentEvalCase, $fallbackAgentSpaceId);
         $agentSpacesService = $this->getAgentSpacesService();
         DDDService::instance()->deactivateEntityRightsRestrictions();
         try {
@@ -131,6 +131,49 @@ class AgentEvalRunHooksService extends Service
             throw new RuntimeException("Agent space {$agentSpaceId} not found");
         }
         return AgentEvalScope::forAgentSpace($agentSpace, $ownerAccount instanceof Account ? $ownerAccount : $fallbackAccount);
+    }
+
+    /**
+     * The agent space a case runs in: the space it names by reference (`"agentSpaceId": "{{ref:agentSpace:<name>}}"`,
+     * resolved by {@see resolveAgentSpaceReference()}), else the number it names, else `$fallbackAgentSpaceId`.
+     *
+     * @param AgentEvalCase $agentEvalCase
+     * @param int|null $fallbackAgentSpaceId the agent space the caller names for cases that name none
+     * @return int|null null when neither the case nor the caller names a space
+     * @throws RuntimeException when the case names a space by reference the application does not resolve (the case
+     *                          fails with that message, it never falls back to another space)
+     */
+    public function resolveAgentSpaceIdOfCase(AgentEvalCase $agentEvalCase, ?int $fallbackAgentSpaceId = null): ?int
+    {
+        $agentSpaceName = $agentEvalCase->getAgentSpaceReferenceName();
+        if ($agentSpaceName === null) {
+            return $agentEvalCase->getAgentSpaceId() ?? $fallbackAgentSpaceId;
+        }
+        $agentSpaceId = $this->resolveAgentSpaceReference($agentSpaceName);
+        if ($agentSpaceId === null || $agentSpaceId <= 0) {
+            throw new RuntimeException(sprintf(
+                "The case '%s' names the agent space {{ref:%s:%s}}, which does not resolve: no agent space of that name "
+                . '(the application resolves the name in AgentEvalRunHooksService::resolveAgentSpaceReference()).',
+                $agentEvalCase->getId(),
+                AgentEvalCase::AGENT_SPACE_REFERENCE_KIND,
+                $agentSpaceName
+            ));
+        }
+        return $agentSpaceId;
+    }
+
+    /**
+     * The id of the agent space a fixture names by reference (`{{ref:agentSpace:<name>}}`, in `agentSpaceId` or in any
+     * other string of a case): the application's word for its spaces, e.g. the admin space of its evaluation account.
+     * Resolved before the scope exists (the space IS the scope), so it gets no scope. The default: null — the module
+     * names no spaces, so such a case fails until the application resolves it.
+     *
+     * @param string $agentSpaceName the name the token names, trimmed
+     * @return int|null the agent space id; null = no space of that name
+     */
+    public function resolveAgentSpaceReference(string $agentSpaceName): ?int
+    {
+        return null;
     }
 
     /**

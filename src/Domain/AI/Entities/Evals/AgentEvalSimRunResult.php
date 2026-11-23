@@ -79,6 +79,17 @@ class AgentEvalSimRunResult
         return $this->agentEvalJudgeVerdict;
     }
 
+    /**
+     * The deterministic gates of the case the run missed, applied after the judge (a judge's PASS with a missed gate
+     * is a FAIL); empty when the run met them.
+     *
+     * @return string[]
+     */
+    public function getDeterministicGateFailures(): array
+    {
+        return $this->agentEvalJudgeVerdict->getDeterministicGateFailures();
+    }
+
     /** Why the owner turns stopped. */
     public function getStopReason(): string
     {

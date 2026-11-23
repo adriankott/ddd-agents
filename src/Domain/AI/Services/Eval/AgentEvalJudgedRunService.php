@@ -17,6 +17,7 @@ use DDD\Domain\AI\Entities\Conversations\Widgets\WidgetBlock;
 use DDD\Domain\AI\Entities\Conversations\Widgets\WidgetBlocks;
 use DDD\Domain\AI\Entities\Evals\AgentEvalCase;
 use DDD\Domain\AI\Entities\Evals\AgentEvalCompactionTreeRunResult;
+use DDD\Domain\AI\Entities\Evals\AgentEvalExpectation;
 use DDD\Domain\AI\Entities\Evals\AgentEvalHarnessCosts;
 use DDD\Domain\AI\Entities\Evals\AgentEvalJudgedRunOptions;
 use DDD\Domain\AI\Entities\Evals\AgentEvalJudgeTraceMessageLines;
@@ -358,7 +359,49 @@ class AgentEvalJudgedRunService extends AgentEvalRunnerService
             $agentEvalJudgedRunOptions->resolveJudgeModelName($this->getDefaultJudgeModelName()),
             $this->buildVerdictPrompt($conversation, $agentEvalSimCase, $this->getFullTraceText($conversation))
         );
-        return AgentEvalSimRunResult::forRun($agentEvalJudgeVerdict, $stopReason, min($turn, $maxTurns), $conversation);
+        $agentEvalSimRunResult = AgentEvalSimRunResult::forRun($agentEvalJudgeVerdict, $stopReason, min($turn, $maxTurns), $conversation);
+        return $this->applyDeterministicGatesToRunResult($agentEvalSimRunResult, $agentEvalScope, $agentEvalSimCase);
+    }
+
+    /**
+     * The deterministic gates of the case on the judged run, after the judge: a PASS the run's gates contradict becomes
+     * FAIL, the missed gates are listed on the verdict ({@see AgentEvalJudgeVerdict::applyDeterministicGateFailures()}).
+     * The gates are the case's `expect` assertions that hold across owner turns
+     * ({@see AgentEvalExpectation::evaluateConversationForJudgedRun()}, with the arguments the platform fills — the same
+     * reading as the single shot) and the application's own checks ({@see buildHostGateFailures()}). A judge never
+     * overrules them.
+     *
+     * @param AgentEvalSimRunResult $agentEvalSimRunResult the run with the judge's verdict
+     * @param AgentEvalScope $agentEvalScope
+     * @param AgentEvalSimCase $agentEvalSimCase
+     * @return AgentEvalSimRunResult the same result, its verdict with the gates applied
+     */
+    protected function applyDeterministicGatesToRunResult(
+        AgentEvalSimRunResult $agentEvalSimRunResult,
+        AgentEvalScope $agentEvalScope,
+        AgentEvalSimCase $agentEvalSimCase
+    ): AgentEvalSimRunResult {
+        $conversation = $agentEvalSimRunResult->getConversation();
+        $deterministicGateFailures = AgentEvalExpectation::fromExpectBlock($this->buildRunCaseOfSimCase($agentEvalSimCase)->getExpect())
+            ->evaluateConversationForJudgedRun($conversation, $this->getAgentEvalRunHooksService()->getHarnessToolCallArguments($agentEvalScope));
+        $deterministicGateFailures = array_merge($deterministicGateFailures, $this->buildHostGateFailures($conversation, $agentEvalScope, $agentEvalSimCase));
+        $agentEvalSimRunResult->getAgentEvalJudgeVerdict()->applyDeterministicGateFailures($deterministicGateFailures);
+        return $agentEvalSimRunResult;
+    }
+
+    /**
+     * The application's own deterministic gates of a judged run (e.g. a check of a document the run produced), one
+     * sentence per missed gate; they count like the case's `expect` gates ({@see applyDeterministicGatesToRunResult()}).
+     * Called once per judged run, after the judge. The default: none.
+     *
+     * @param AIConversation $conversation the driven conversation (as read back for a stored run)
+     * @param AgentEvalScope $agentEvalScope
+     * @param AgentEvalSimCase $agentEvalSimCase the case, its application keys readable with getApplicationValue()
+     * @return string[]
+     */
+    protected function buildHostGateFailures(AIConversation $conversation, AgentEvalScope $agentEvalScope, AgentEvalSimCase $agentEvalSimCase): array
+    {
+        return [];
     }
 
     /**

@@ -63,6 +63,9 @@ class AgentEvalJudgeVerdict extends ValueObject
     /** @var string The key of the head of the raw answer kept beside a salvaged or unparseable verdict */
     public const string KEY_RAW = 'raw';
 
+    /** @var string The deterministic gates of the case the run missed (a list of sentences), set after the judge */
+    public const string KEY_DETERMINISTIC_GATE_FAILURES = 'deterministicGateFailures';
+
     /** @var string[] The boolean verdict fields salvaged from the head of a cut-off answer, in this order */
     public const array SALVAGED_BOOLEAN_FIELD_NAMES = ['goalMet', 'grounded', 'toolAppropriate', 'clarificationOk'];
 
@@ -300,6 +303,41 @@ class AgentEvalJudgeVerdict extends ValueObject
             return null;
         }
         return 'judge evaluation error: ' . $this->getReasons();
+    }
+
+    /**
+     * The deterministic gates of the case the run missed ({@see applyDeterministicGateFailures()}); empty when it met
+     * them or none were checked.
+     *
+     * @return string[]
+     */
+    public function getDeterministicGateFailures(): array
+    {
+        $deterministicGateFailures = $this->verdictFields[static::KEY_DETERMINISTIC_GATE_FAILURES] ?? [];
+        return is_array($deterministicGateFailures) ? array_values(array_map('strval', $deterministicGateFailures)) : [];
+    }
+
+    /**
+     * Applies the deterministic gates of the case the run missed: they are listed under
+     * {@see KEY_DETERMINISTIC_GATE_FAILURES}; a PASS becomes FAIL with the failures before the judge's reasons — the
+     * judge never overrules a gate. A FAIL stays a FAIL and lists them too; an ERROR (no verdict) stays as it is. No
+     * failures: nothing changes.
+     *
+     * @param string[] $deterministicGateFailures one sentence per missed gate
+     * @return void
+     */
+    public function applyDeterministicGateFailures(array $deterministicGateFailures): void
+    {
+        if ($deterministicGateFailures === [] || $this->getVerdict() === static::VERDICT_ERROR) {
+            return;
+        }
+        $this->verdictFields[static::KEY_DETERMINISTIC_GATE_FAILURES] = array_values($deterministicGateFailures);
+        if (!$this->isPass()) {
+            return;
+        }
+        $this->verdictFields[static::KEY_VERDICT] = static::VERDICT_FAIL;
+        $this->verdictFields[static::KEY_REASONS] = 'Deterministic gate failed (the judge said PASS): '
+            . implode(' | ', $deterministicGateFailures) . '. Judge: ' . $this->getReasons();
     }
 
     /**

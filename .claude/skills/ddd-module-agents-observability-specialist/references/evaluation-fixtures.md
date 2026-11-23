@@ -65,7 +65,7 @@ children of kind `toolsCase`; "runner" = `AgentEvalRunnerService`.
 | `prompt` | string | `''` | every command; the first owner message |
 | `followUpPrompts` | list of strings | `[]` | runner and judged run: owner messages sent one per turn after the previous turn settled; blank entries skipped |
 | `followUpIdleMinutes` | list of ints | `[]` | aligned with `followUpPrompts`: the owner's idle time before each; a missing entry = none |
-| `agentSpaceId` | int | none | every command; the stored agent space the case runs in; else the scope options' space (the planning, eval-tools, eval-selection, eval-tiers; a recall case must name its own). An application that names the scope by its own key declares it as `AgentEvalCaseRowHeader::SCOPE_FIELD_NAME` |
+| `agentSpaceId` | int, or `"{{ref:agentSpace:<name>}}"` | none | every command; the stored agent space the case runs in; else the scope options' space (the planning, eval-tools, eval-selection, eval-tiers; a recall case must name its own). By reference the fixture survives the space being created again: the application resolves the name without a scope (`AgentEvalRunHooksService::resolveAgentSpaceReference($name)`, default null); an unresolved reference fails the case with its message, never falls back to the options' space. An application that names the scope by its own key declares it as `AgentEvalCaseRowHeader::SCOPE_FIELD_NAME` |
 | `purposeName` | string | the fixture's | runner: the case's conversation runs in this purpose |
 | `reportChannel` | string | none | runner: simulates an unattended run reporting on this channel (initiator type admin task); without `purposeName` the schedule-run purpose |
 | `scheduledRun` | bool (truthy) | false | runner: replays one firing of a task schedule on a conversation that is never stored; without `purposeName` the schedule-run purpose |
@@ -193,6 +193,12 @@ the keys below ride along; every other key of the case stays.
 | `contextRetentionSettings` | `{storeRequestSnapshot?, hintRecentToolCallsToDiscourageRepeats?, maxToolCallImagesOnWire?}` | merged onto the conversation's |
 | `compactionSettings` | `{enabled?, triggerTokens?, keepRecentTurns?, resummarizeFromSourceEvery?, aiModelName?, keepRecentMessages?, segmentMessages?, tierFanIn?, levelRetention?}` | fresh compaction settings of these keys |
 | `followUpPrompts`, `followUpIdleMinutes`, `purposeName`, `reportChannel`, `scheduledRun` | as above | scripted owner turns come before the driver takes over |
+
+The case's `expect` gates hold for the judged flavor too: after the judge, `skill(s)`, `forbiddenSkills`/`noSkill`,
+`tool` with `status`/`argsContain`/`argsAbsent`/`resultContains`/`resultNotContains`, `requiredTools` and
+`forbiddenTools` are checked on the whole tree; a missed gate turns the judge's PASS into FAIL and is listed under the
+verdict's `deterministicGateFailures`. The assertions about one turn's shape (`emitsWidget`, `finalAnswerNotContains`,
+`emitsProgressText`, `taskPlan`, `signalSources`, `toolCallCountMax`/`Min`) are not gates of a judged run.
 
 The driver ends a run with `[DONE]` or `[GIVE-UP]`. A judged case that writes needs `access: write` in a suite, or every
 write tool is refused. The judge and the driver run `AI.evalSuite.judgeModelName` / `driverModelName` unless the run

@@ -391,11 +391,29 @@ class AgentEvalSuitePlanService extends Service
         AgentEvalSuitePlanOptions $agentEvalSuitePlanOptions,
         bool $withFallback
     ): bool {
-        $agentSpaceId = $agentEvalCase->getAgentSpaceId() ?? ($withFallback ? $agentEvalSuitePlanOptions->fallbackAgentSpaceId : null);
+        $agentSpaceId = $this->resolveAgentSpaceIdOfCaseForPlanning($agentEvalCase) ?? ($withFallback ? $agentEvalSuitePlanOptions->fallbackAgentSpaceId : null);
         $agentEvalSuiteTask->agentSpaceId = $agentSpaceId;
         // no space at all: a run that names an account plans the case at account level for it
         $agentEvalSuiteTask->accountId = $agentSpaceId === null && $withFallback ? $agentEvalSuitePlanOptions->fallbackAccountId : null;
         return $agentSpaceId !== null || $agentEvalSuiteTask->accountId !== null;
+    }
+
+    /**
+     * The agent space a case names for planning: its number, or the space its reference resolves to
+     * ({@see AgentEvalRunHooksService::resolveAgentSpaceReference()}). A reference that does not resolve plans like a
+     * case without a space; its run then fails with the reference's message
+     * ({@see AgentEvalRunHooksService::resolveAgentSpaceIdOfCase()}), never on another space.
+     */
+    protected function resolveAgentSpaceIdOfCaseForPlanning(AgentEvalCase $agentEvalCase): ?int
+    {
+        $agentSpaceName = $agentEvalCase->getAgentSpaceReferenceName();
+        if ($agentSpaceName === null) {
+            return $agentEvalCase->getAgentSpaceId();
+        }
+        /** @var AgentEvalRunHooksService $agentEvalRunHooksService */
+        $agentEvalRunHooksService = DDDService::instance()->getService(AgentEvalRunHooksService::class);
+        $agentSpaceId = $agentEvalRunHooksService->resolveAgentSpaceReference($agentSpaceName);
+        return $agentSpaceId !== null && $agentSpaceId > 0 ? $agentSpaceId : null;
     }
 
     /**

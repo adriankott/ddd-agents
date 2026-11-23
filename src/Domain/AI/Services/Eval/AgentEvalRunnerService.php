@@ -232,7 +232,10 @@ class AgentEvalRunnerService extends Service
             $agentEvalRecordReference->resolvedValue = $heldRecordReference->resolvedValue;
             return $agentEvalRecordReference;
         }
-        $resolvedValue = $this->getAgentEvalRunHooksService()->resolveRecordReference($agentEvalScope, $agentEvalRecordReference->recordKind, $agentEvalRecordReference->recordName);
+        // an agent space reference resolves without the scope, the same way as in `agentSpaceId`
+        $resolvedValue = $agentEvalRecordReference->recordKind === AgentEvalCase::AGENT_SPACE_REFERENCE_KIND
+            ? $this->getAgentEvalRunHooksService()->resolveAgentSpaceReference($agentEvalRecordReference->recordName)
+            : $this->getAgentEvalRunHooksService()->resolveRecordReference($agentEvalScope, $agentEvalRecordReference->recordKind, $agentEvalRecordReference->recordName);
         if ($resolvedValue === null) {
             throw new AgentEvalPreconditionNotEstablishedException(sprintf(
                 "record reference %s: no %s named '%s' in this scope",

@@ -1021,4 +1021,21 @@ class AgentEvalExpectationTest extends UnitTestCase
         self::assertSame(['skill loaded although none was expected: [Example.Figures]'], $this->evaluate($conversationWithSkill, ['noSkill' => true])->failures);
         self::assertTrue($this->evaluate($conversationWithoutSkill, ['noSkill' => true])->passed);
     }
+
+    public function testAJudgedRunIsGatedOnWhatHappenedInTheTreeNotOnTheShapeOfItsLastTurn(): void
+    {
+        $conversation = $this->conversation([['getFigures', '{}', AIConversationMessage::STATUS_FAILED]], ['Example.Figures'], 'plain prose, no widget');
+        $expectation = AgentEvalExpectation::fromExpectBlock([
+            'skill' => 'Example.Figures',
+            'requiredTools' => ['getFigures'],
+            'forbiddenTools' => ['deleteFigures'],
+            'emitsWidget' => 'figureTable',
+            'toolCallCountMax' => ['getFigures' => 0],
+        ]);
+        $judgedFailures = $expectation->evaluateConversationForJudgedRun($conversation);
+        self::assertSame(["required tool not completed: 'getFigures' must have a COMPLETED call, completed were [load_skills]"], $judgedFailures);
+        self::assertGreaterThan(count($judgedFailures), count($expectation->evaluateConversation($conversation)), 'the single shot also checks the last turn\'s widget and the call count');
+        self::assertSame([], AgentEvalExpectation::fromExpectBlock(['emitsWidget' => 'figureTable'])->evaluateConversationForJudgedRun($conversation));
+    }
+
 }
