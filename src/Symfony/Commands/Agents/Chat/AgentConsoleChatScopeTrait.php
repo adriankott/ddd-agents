@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DDD\Symfony\Commands\Agents\Chat;
 
+use DDD\Domain\AI\Services\Conversations\Agent\AIConversationTurnEndFollowUpsService;
 use DDD\Domain\AI\Entities\AgentSpaces\AgentSpace;
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Entities\Conversations\Compaction\AIConversationCompactionNodes;
@@ -280,6 +281,10 @@ trait AgentConsoleChatScopeTrait
         } finally {
             $this->closeUsageEnvelope($usageEnvelopeContext);
         }
+        // the turn end a worker's release runs: the host's settled-turn listeners (e.g. a workspace commit)
+        /** @var AIConversationTurnEndFollowUpsService $aIConversationTurnEndFollowUpsService */
+        $aIConversationTurnEndFollowUpsService = DDDService::instance()->getService(AIConversationTurnEndFollowUpsService::class);
+        $aIConversationTurnEndFollowUpsService->runSettledTurnListenersAfterInlineTurn($conversation);
     }
 
     /**

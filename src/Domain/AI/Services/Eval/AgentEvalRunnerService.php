@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DDD\Domain\AI\Services\Eval;
 
+use DDD\Domain\AI\Services\Conversations\Agent\AIConversationTurnEndFollowUpsService;
 use DDD\Domain\AI\Entities\AgentSpaces\AgentSpace;
 use DDD\Domain\AI\Entities\Conversations\Agent\AgentToolCallProvenance;
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
@@ -1737,6 +1738,10 @@ class AgentEvalRunnerService extends Service
         } finally {
             $aIUsageEnvelopesService->closeEnvelope($turnEnvelopeContext);
         }
+        // the turn end a worker's release runs: the host's settled-turn listeners (e.g. a workspace commit)
+        /** @var AIConversationTurnEndFollowUpsService $aIConversationTurnEndFollowUpsService */
+        $aIConversationTurnEndFollowUpsService = DDDService::instance()->getService(AIConversationTurnEndFollowUpsService::class);
+        $aIConversationTurnEndFollowUpsService->runSettledTurnListenersAfterInlineTurn($conversation);
         if (isset($conversation->id) && ($conversation->purposeName ?? null)) {
             /** @var SupervisorCheckpointRunsService $supervisorCheckpointRunsService */
             $supervisorCheckpointRunsService = DDDService::instance()->getService(SupervisorCheckpointRunsService::class);

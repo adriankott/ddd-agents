@@ -46,8 +46,9 @@ class AIConversationTurnEndFollowUpsService extends Service
             /** @var AgentMemoriesService $agentMemoriesService */
             $agentMemoriesService = DDDService::instance()->getService(AgentMemoriesService::class);
             $agentMemoriesService->curateConversationAfterTurn($conversation, true);
-        } catch (\Throwable) {
-            // swallow — the turn already produced + persisted its answer; curation is best-effort background work
+        } catch (\Throwable $curationError) {
+            // the turn already produced + persisted its answer; curation is best-effort background work — logged
+            $this->aiTrace('memory.curation.failed', ['conversationId' => $conversation->id ?? null, 'message' => $curationError->getMessage()]);
         }
         // Supervisor: a fully settled owner turn is the cadence beat — decide whether a
         // checkpoint is owed and, if so, dispatch the tandem supervisor async (never inline — the owner's
@@ -82,19 +83,44 @@ class AIConversationTurnEndFollowUpsService extends Service
             /** @var AIConversationPurposeRunsService $aIConversationPurposeRunsService */
             $aIConversationPurposeRunsService = DDDService::instance()->getService(AIConversationPurposeRunsService::class);
             $aIConversationPurposeRunsService->closeConversationIfPurposeGoalReached($agentRun, $conversation, !$checkpointDispatched);
-        } catch (\Throwable) {
-            // swallow — re-evaluated on the next settled turn / the supervisor completion path / the reaper
+        } catch (\Throwable $purposeCloseError) {
+            // re-evaluated on the next settled turn / the supervisor completion path / the reaper — logged
+            $this->aiTrace('purpose.close.failed', ['conversationId' => $conversation->id ?? null, 'message' => $purposeCloseError->getMessage()]);
         }
         // Other domains react to the finished owner turn — for example a long
         // run of THIS chat's space that sits idle while the owner just wrote here: it takes in the
         // owner's lines now and is resumed. Best-effort per listener; the listener's own recovery cron
         // pass retries. Resolving the service and building a listener stay inside the same catch.
+        $this->notifySettledOwnerTurnListeners($conversation);
+    }
+
+    /**
+     * The settled-turn listeners after an INLINE turn (the console chat, the eval runner): the turn drove
+     * {@see \DDD\Domain\AI\Services\Conversations\AIConversationAgentService::generateAgentReply()} without a worker
+     * release, so the listeners a host hangs on the turn end (e.g. a workspace commit) run here. Root conversations only;
+     * the worker-only follow-ups (schedule streak, memory curation, supervisor beat, purpose close) keep their own
+     * inline calls.
+     */
+    public function runSettledTurnListenersAfterInlineTurn(AIConversation $conversation): void
+    {
+        if (!isset($conversation->id) || $conversation->isDelegationChild()) {
+            return;
+        }
+        $this->notifySettledOwnerTurnListeners($conversation);
+    }
+
+    protected function notifySettledOwnerTurnListeners(AIConversation $conversation): void
+    {
         try {
             /** @var AIConversationSettledOwnerTurnListenersService $aIConversationSettledOwnerTurnListenersService */
             $aIConversationSettledOwnerTurnListenersService = DDDService::instance()->getService(AIConversationSettledOwnerTurnListenersService::class);
             $aIConversationSettledOwnerTurnListenersService->notifyListenersOfSettledOwnerTurn($conversation);
-        } catch (\Throwable) {
-            // swallow — the chat's answer is persisted; the listener's own recovery delivers later
+        } catch (\Throwable $listenersError) {
+            // the chat's answer is persisted; each listener's own recovery delivers later — logged
+            DDDService::instance()->getLogger()->warning('[SettledOwnerTurn] listeners could not run', [
+                'conversationId' => $conversation->id ?? null,
+                'reason' => $listenersError::class . ': ' . mb_substr($listenersError->getMessage(), 0, 500),
+            ]);
         }
     }
 }

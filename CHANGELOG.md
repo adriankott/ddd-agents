@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.28
+
+- Fixed: the console chat and the eval runner run the host's settled-turn listeners after their inline turn
+  (`AIConversationTurnEndFollowUpsService::runSettledTurnListenersAfterInlineTurn()`, root conversations only), as a
+  worker's release does; before, a turn-end hook (e.g. a workspace commit) never ran there.
+- Fixed: a settled-turn listener that throws is logged as a warning with its class (before: swallowed silently); a
+  failed memory curation and a failed purpose close are traced.
+- Fixed: `AgentToolCallProvenance::$agentSpaceId` falls back to the conversation's stored `agentSpaceId` when the
+  space object did not load (before: null although the conversation has a space).
+
 ## 0.1.27
 
 - Added: `AgentDriveFileCardsTrait` (`POST …/driveFiles/cards {store, references, widgetSelfHydrationKey}`), the

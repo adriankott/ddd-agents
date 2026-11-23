@@ -148,7 +148,10 @@ class AgentToolCallProvenance extends ValueObject implements MCPServerProvidedIn
         $this->toolCallOriginMessage = $toolCallOriginMessage;
         $this->conversationId = $conversationId;
         $this->agentSpace = $agentSpace;
-        $this->agentSpaceId = $agentSpace !== null && isset($agentSpace->id) ? (int)$agentSpace->id : null;
+        // the conversation's stored space id when its space object did not load (rights of the reader, a lazy relation)
+        $this->agentSpaceId = $agentSpace !== null && isset($agentSpace->id)
+            ? (int)$agentSpace->id
+            : ($conversation !== null && isset($conversation->agentSpaceId) ? (int)$conversation->agentSpaceId : null);
         $this->rootConversationId = $rootConversationId;
         $this->conversationMessages = $conversationMessages;
         $this->scheduleId = $scheduleId;
