@@ -615,6 +615,7 @@ class ArgusAIAgentConversation extends ArgusAIConversation
         $agentWireRequestParameters->reasoningContext = $this->resolveReasoningContextForRequest($aiModel);
         $agentWireRequestParameters->chatCompletionsTools = $this->getChatCompletionTools();
         $agentWireRequestParameters->chatCompletionsToolChoice = $this->getChatCompletionToolChoice();
+        $agentWireRequestParameters->sendsParallelToolCalls = $aiModel->sendsParallelToolCalls();
         $agentWireRequestParameters->usesExplicitPromptCacheBreakpoints = $this->usesExplicitPromptCacheBreakpoints();
         $agentWireRequestParameters->promptCacheKey = $this->resolvePromptCacheKey();
         // a Responses call asks for its encrypted reasoning items back when the carry-over is on

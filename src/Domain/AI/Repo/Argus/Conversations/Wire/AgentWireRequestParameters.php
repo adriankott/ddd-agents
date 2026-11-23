@@ -66,6 +66,12 @@ class AgentWireRequestParameters
      */
     public ?string $promptCacheKey = null;
 
+    /**
+     * @var bool Whether a request with tools carries `parallel_tool_calls: true`: false for a model the catalog marks as
+     *      not accepting it ({@see \DDD\Domain\AI\Entities\Models\AIModel::sendsParallelToolCalls()})
+     */
+    public bool $sendsParallelToolCalls = true;
+
     /** @var bool True when the request carries explicit prompt-cache breakpoints (the catalog mode over the direct egress). */
     public bool $usesExplicitPromptCacheBreakpoints = false;
 

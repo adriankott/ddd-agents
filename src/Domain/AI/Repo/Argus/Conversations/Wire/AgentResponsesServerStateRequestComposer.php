@@ -38,7 +38,9 @@ class AgentResponsesServerStateRequestComposer
             if ($responsesToolChoice !== null) {
                 $body['tool_choice'] = $responsesToolChoice;
             }
-            $body['parallel_tool_calls'] = true;
+            if ($agentWireRequestParameters->sendsParallelToolCalls) {
+                $body['parallel_tool_calls'] = true;
+            }
         }
         if ($agentWireRequestParameters->maxOutputTokens !== null) {
             $body['max_output_tokens'] = $agentWireRequestParameters->maxOutputTokens;

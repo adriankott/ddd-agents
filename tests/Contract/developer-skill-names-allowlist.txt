@@ -12,3 +12,5 @@ setup[].undo	a key path inside a fixture file
 <recording>.definitions.json	a file name pattern the tool-call comparison writes next to its recording
 <recording>.replay-definitions.json	a file name pattern the tool-call comparison writes next to its recording
 var/eval-seed-account-leases/<prefix><accountId>.lock	a lock file pattern in the application's var folder
+prompt_tokens_details.cached_tokens	OpenRouter usage field of a Chat Completions answer (wire name, read by ddd-ai)
+cache_write_tokens	OpenRouter usage field of a Chat Completions answer (wire name, read by ddd-ai)

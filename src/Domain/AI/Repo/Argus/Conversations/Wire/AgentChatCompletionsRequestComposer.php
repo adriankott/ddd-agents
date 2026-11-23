@@ -47,7 +47,9 @@ class AgentChatCompletionsRequestComposer
             if ($agentWireRequestParameters->chatCompletionsToolChoice !== null) {
                 $body['tool_choice'] = $agentWireRequestParameters->chatCompletionsToolChoice;
             }
-            $body['parallel_tool_calls'] = true;
+            if ($agentWireRequestParameters->sendsParallelToolCalls) {
+                $body['parallel_tool_calls'] = true;
+            }
         }
         if ($agentWireRequestParameters->promptCacheKey !== null) {
             $body['prompt_cache_key'] = $agentWireRequestParameters->promptCacheKey;

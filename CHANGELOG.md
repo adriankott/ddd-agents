@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.36
+
+- Agent wire: `parallel_tool_calls` goes out with tools only when the model's catalog entry does not say
+  `supportsParallelToolCalls: false` (`AgentWireRequestParameters::$sendsParallelToolCalls`, all three composers: Chat
+  Completions, Responses, Responses server state). Fixes Kimi K3.1 Pro over OpenRouter: with its `requireParameters` no
+  endpoint accepted the parameter (404 "No endpoints found that can handle the requested parameters").
+- Requires mgamadeus/ddd-ai ^3.4.5.
+
 ## 0.1.35
 
 - Prompt cache: Claude models (catalog mode `anthropicCacheControl`, ddd-ai 3.4.4) get Anthropic `cache_control:
