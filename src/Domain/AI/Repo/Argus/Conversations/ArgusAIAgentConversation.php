@@ -1011,9 +1011,64 @@ class ArgusAIAgentConversation extends ArgusAIConversation
             )]);
             return $messages;
         }
+        if ($this->usesAnthropicCacheControl()) {
+            // the same boundaries as the explicit breakpoints — after the base prompt, before the loaded skills, at the
+            // end of the system content (at most three) — plus one on the newest stable wire message: four markers,
+            // Anthropic's limit. The tools precede the system content in Anthropic's cache, so a marker covers them too.
+            $this->addPromptCacheBreakpointToLastStableWireMessage($messages);
+            array_unshift($messages, ['role' => 'system', 'content' => $this->buildSystemContentPartsWithPromptCacheBreakpoints($this->lastSystemSegments)]);
+            return $this->convertPromptCacheBreakpointsToAnthropicCacheControl($messages);
+        }
         $systemContent = implode('', array_map(static fn (AgentContextSegment $systemSegment): string => $systemSegment->text, $this->lastSystemSegments));
         array_unshift($messages, ['role' => 'system', 'content' => $systemContent]);
         return $messages;
+    }
+
+    /** @var array<string, string> Anthropic's cache marker with the default lifetime (5 min), as OpenRouter passes it through */
+    public const array ANTHROPIC_CACHE_CONTROL = ['type' => 'ephemeral'];
+
+    /** @var int Anthropic accepts at most four cache markers per request */
+    public const int ANTHROPIC_MAX_CACHE_MARKERS = 4;
+
+    /**
+     * Whether this request carries Anthropic `cache_control` markers: the model's catalog entry names the mode
+     * ({@see AIModel::PROMPT_CACHE_MODE_ANTHROPIC_CACHE_CONTROL}) and the request goes over the direct OpenRouter egress.
+     * Without markers an Anthropic model caches nothing (measured: 0 cached and 0 written tokens over a 30k shared prefix).
+     */
+    public function usesAnthropicCacheControl(): bool
+    {
+        $aiModel = $this->getAIModel();
+        return $this->loadEndpointTargetsOpenRouterDirect()
+            && $aiModel !== null
+            && $aiModel->getPromptCacheMode() === AIModel::PROMPT_CACHE_MODE_ANTHROPIC_CACHE_CONTROL;
+    }
+
+    /**
+     * The wire messages with every `prompt_cache_breakpoint` marker turned into Anthropic's `cache_control`, the first
+     * {@see ANTHROPIC_MAX_CACHE_MARKERS} kept in message order (a marker past them is dropped).
+     *
+     * @param array<int, array<string, mixed>> $wireMessages
+     * @return array<int, array<string, mixed>>
+     */
+    public function convertPromptCacheBreakpointsToAnthropicCacheControl(array $wireMessages): array
+    {
+        $cacheMarkerCount = 0;
+        foreach ($wireMessages as $messagePosition => $wireMessage) {
+            if (!is_array($wireMessage['content'] ?? null)) {
+                continue;
+            }
+            foreach ($wireMessage['content'] as $partPosition => $contentPart) {
+                if (!is_array($contentPart) || !array_key_exists('prompt_cache_breakpoint', $contentPart)) {
+                    continue;
+                }
+                unset($wireMessages[$messagePosition]['content'][$partPosition]['prompt_cache_breakpoint']);
+                if ($cacheMarkerCount < self::ANTHROPIC_MAX_CACHE_MARKERS) {
+                    $wireMessages[$messagePosition]['content'][$partPosition]['cache_control'] = self::ANTHROPIC_CACHE_CONTROL;
+                    $cacheMarkerCount++;
+                }
+            }
+        }
+        return $wireMessages;
     }
 
     /**
@@ -1131,7 +1186,8 @@ class ArgusAIAgentConversation extends ArgusAIConversation
     {
         // the server-state arm caches implicitly, and OpenAI prices those writes at the write multiple too (GPT-5.6+;
         // the probe's usage reports `cache_write_tokens`)
-        return $this->usesExplicitPromptCacheBreakpoints() || $this->agentWireConfiguration?->usesResponsesServerState() === true
+        return $this->usesExplicitPromptCacheBreakpoints() || $this->usesAnthropicCacheControl()
+            || $this->agentWireConfiguration?->usesResponsesServerState() === true
             ? AIModel::PROMPT_CACHE_WRITE_TTL_DEFAULT
             : null;
     }

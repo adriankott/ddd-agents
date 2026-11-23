@@ -231,6 +231,7 @@ class AgentChatCommand extends AgentConsoleCommand
         $contextRetentionSettingsOverride = $this->buildContextRetentionSettingsOverrideFromInput($input);
         $wireRunSettingsOverride = $this->buildWireRunSettingsOverrideFromInput($input);
 
+        $this->modelNameOfNewConversation = $modelName;
         $conversation = $this->findOrCreateConversation(
             $this->readIdOption($input, self::OPTION_CONVERSATION_ID),
             $chatScope,

@@ -193,9 +193,15 @@ trait AgentConsoleChatScopeTrait
     }
 
     /**
-     * The wire API of the agentic default model, which a new console conversation runs on unless a model is pinned
-     * later: a Chat Completions model is stamped with the system-prompt swap, never the append-only default it cannot
-     * run. Null when the model catalog cannot answer (the run then stamps the strategy before its first call).
+     * The model a new conversation of this command runs on (`--model`, `--tier`, `--vendor`; null = the agentic
+     * default), set by the command before it creates the conversation; its wire API decides the stamp.
+     */
+    protected ?string $modelNameOfNewConversation = null;
+
+    /**
+     * The wire API of the model a new console conversation runs on ({@see $modelNameOfNewConversation}, else the
+     * agentic default): a Chat Completions model is stamped with the system-prompt swap, never the append-only default
+     * it cannot run. Null when the model catalog cannot answer (the run then stamps the strategy before its first call).
      *
      * @return string|null
      */
@@ -204,7 +210,7 @@ trait AgentConsoleChatScopeTrait
         try {
             /** @var AIConversationModelCallsService $aIConversationModelCallsService */
             $aIConversationModelCallsService = DDDService::instance()->getService(AIConversationModelCallsService::class);
-            return $aIConversationModelCallsService->resolveAgentWireApi(null, null);
+            return $aIConversationModelCallsService->resolveAgentWireApi($this->modelNameOfNewConversation, null);
         } catch (Throwable) {
             return null;
         }

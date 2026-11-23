@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.35
+
+- Prompt cache: Claude models (catalog mode `anthropicCacheControl`, ddd-ai 3.4.4) get Anthropic `cache_control:
+  {type: ephemeral}` markers on the agent's Chat Completions call over the direct OpenRouter egress — after the base
+  prompt, before the loaded skills, at the end of the system content and on the newest stable message (at most four).
+  Writes are booked at 1.25x the input rate. Before, nothing marked them and a Claude model cached nothing.
+- Model switch: an append-only conversation whose owner picks a Chat Completions model (Opus, Kimi) after its first
+  model call moves to `systemPromptSwap` at the next run start instead of failing every call with "Agent wire
+  configuration rejected (chatCompletions + conversationAppend)". One-way; a strategy named at the creation of a Chat
+  Completions conversation is still refused.
+- Console chat: a new conversation is stamped from the model of `--model` / `--tier`, not from the agentic default, so
+  a Chat Completions `--model` no longer needs `--skill-loading-strategy=systemPromptSwap`.
+- Requires `mgamadeus/ddd-ai` ^3.4.4.
+
 ## 0.1.34
 
 - Sandbox: `AgentSandboxCommand::$status` (`RUNNING`, `EXITED`, `KILLED`, `TIMED_OUT`; null = unknown). The host fills

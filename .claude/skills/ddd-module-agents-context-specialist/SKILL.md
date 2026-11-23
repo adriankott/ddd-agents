@@ -53,7 +53,8 @@ the tools and their results to the tools skill.
    are stamped at creation (request, then the purpose's `contextRetention:` map, then
    `config/app/AI/contextRetention.php`); the first four never change after the first model call. A conversation stored
    without the `toolDelivery` / drop stamp keeps `native` and unloads nothing — the getters read the stamp, never the
-   default.
+   default. One change is made by the package itself: an append-only
+   conversation whose owner switches to a Chat Completions model after its first call moves to `systemPromptSwap`.
 6. **Nothing is unloaded inside an append-only epoch.** Under `conversationAppend` the cold-capability unloading is
    skipped inside an epoch; the set is rebuilt only when a new epoch starts (compaction, state epoch start). With
    `dropColdSkillsAtCompactionRebase` the first call after a compaction unloads cold skills once per epoch (recorded in

@@ -32,6 +32,16 @@ With explicit markers (`ArgusAIAgentConversation::buildModelContext()`):
 history markers. A Responses request reads the cache only at markers it carries, hence the re-marked item of the
 previous call; the slot before the loaded skills goes to it under the provider's cap of four.
 
+**Anthropic `cache_control`.** A model whose catalog mode is `AIModel::PROMPT_CACHE_MODE_ANTHROPIC_CACHE_CONTROL` (the
+Claude models) over the direct OpenRouter egress (`ArgusAIAgentConversation::usesAnthropicCacheControl()`; Chat
+Completions, so `systemPromptSwap`) gets the same boundaries as the Chat Completions row above — three in the system
+content, one on the newest stable message — as `cache_control: {type: "ephemeral"}` on those text parts
+(`convertPromptCacheBreakpointsToAnthropicCacheControl()`, at most four, Anthropic's limit). Without markers a Claude
+model caches nothing. The writes are booked at the default lifetime (5 min, 1.25x the input rate); the usage maps
+OpenRouter's `prompt_tokens_details.cached_tokens` / `cache_write_tokens`. Anthropic caches tools before the system
+content, so under the swap a skill load (new top-level tools) writes the whole prefix again; reordering the system
+segments cannot keep the cache across a load. A model with `automaticPrefix` (Kimi K3.1 Pro) gets no markers.
+
 The routing key (`AgentWireRequestParameters::$promptCacheKey`, sent as `prompt_cache_key`) is sent only together
 with explicit markers (`ArgusAIAgentConversation::resolvePromptCacheKey()`). Its value comes from
 `AgentSpacesService::findPromptCacheRoutingKeyOfConversation()`: one per agent space, the account's for a
@@ -70,6 +80,13 @@ The strategy is stamped at creation (`ContextRetentionSettings::buildForNewConve
   (`AIConversationsService::stampCreationSettingsOfUnstampedConversation()`): one that already made a model call gets
   `systemPromptSwap` and `everyCall` (the shape its history already has), one without a model call its stored value or
   the current default for its wire API. A later change of the default never moves a running conversation.
+- A model picked mid-conversation that speaks only Chat Completions moves a `conversationAppend` conversation that
+  already made a model call to `systemPromptSwap` at the next run start
+  (`AIConversationsService::switchToSystemPromptSwapForChatCompletionsModel()`, trace
+  `conversation.skillLoadingStrategy.switchedForChatCompletionsModel`) — the one change of the stamp, and one-way: the
+  swap runs on both wire APIs. A strategy named at the creation of a Chat Completions conversation is still refused.
+- The console chat stamps a new conversation from the model it runs on (`--model`, `--tier`;
+  `AgentConsoleChatScopeTrait::$modelNameOfNewConversation`), not from the agentic default.
 
 **Where the combination is checked.** At creation (a bad request, nothing stored); at every run start
 (`AIConversationAgentService` fails the run with an error row and the owner report of a service error); when an

@@ -37,6 +37,7 @@ use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessages;
 use DDD\Domain\AI\Entities\Conversations\Messages\CompactionSettings;
 use DDD\Domain\AI\Exceptions\Conversations\AgentRunClaimLostException;
 use DDD\Domain\AI\Entities\Conversations\Messages\ContextRetentionSettings;
+use DDD\Domain\AI\Entities\Models\AIModel;
 use DDD\Domain\AI\MessageHandlers\AIConversationSummarizeMessage;
 use DDD\Domain\AI\Repo\DB\Conversations\Agent\DBAIConversationDelegationBatchModel;
 use DDD\Domain\AI\Repo\DB\Conversations\Compaction\DBAIConversationCompactionNodeModel;
@@ -2101,6 +2102,38 @@ class AIConversationsService extends EntitiesService
             'skillLoadingStrategy' => $stampedContextRetentionSettings->skillLoadingStrategy,
             'stateChangeDelivery' => $stampedContextRetentionSettings->stateChangeDelivery,
         ]);
+    }
+
+    /**
+     * A conversation stamped `conversationAppend` that already made a model call and whose run now uses a model that
+     * speaks only Chat Completions (the owner picked another model mid-conversation) switches to `systemPromptSwap` for good: Chat Completions cannot run the
+     * append-only loading, so every call would be refused. The switch is the one change the stamp allows: append-only
+     * loading needs the Responses API, the swap runs on both, so a later switch back to a Responses model keeps the swap.
+     * The stored history renders under the swap as it is: the loaded set comes from the same capability rows, the
+     * instructions earlier `load_skills` results carried stay where they are. Each request snapshot records the strategy
+     * of its own call, so a reconstruction of an earlier call still renders it append-only.
+     *
+     * @return bool true when the strategy was switched
+     */
+    public function switchToSystemPromptSwapForChatCompletionsModel(AIConversation $conversation, ?string $modelNameOverride): bool
+    {
+        // only a conversation that already ran: a strategy named at the creation of a Chat Completions conversation (an
+        // evaluation arm, a start request) stays a refusal, never a silent change of what was asked for
+        if (!$conversation->usesConversationAppend()
+            || $this->resolveAgentWireApiOfConversation($conversation, $modelNameOverride) !== AIModel::AGENT_WIRE_API_CHAT_COMPLETIONS
+            || !$this->conversationHasModelCall($conversation)
+        ) {
+            return false;
+        }
+        $switchedContextRetentionSettings = clone $conversation->contextRetentionSettings;
+        $switchedContextRetentionSettings->skillLoadingStrategy = ContextRetentionSettings::SKILL_LOADING_STRATEGY_SYSTEM_PROMPT_SWAP;
+        $conversation->contextRetentionSettings = $switchedContextRetentionSettings;
+        $this->persistContextRetentionSettings($conversation);
+        $this->aiTrace('conversation.skillLoadingStrategy.switchedForChatCompletionsModel', [
+            'conversationId' => $conversation->id ?? null,
+            'model' => $modelNameOverride ?? ($conversation->aiModelNameOverride ?? null),
+        ]);
+        return true;
     }
 
     /**

@@ -125,6 +125,7 @@ class AgentChatTuiCommand extends AgentConsoleCommand
         $this->htmlTranscriptPath = is_string($htmlPathOption) && $htmlPathOption !== '' ? $htmlPathOption : null;
 
         // a new conversation is stamped with the default skill-loading strategy
+        $this->modelNameOfNewConversation = $modelName;
         $conversation = $this->findOrCreateConversation($this->readIdOption($input, self::OPTION_CONVERSATION_ID), $chatScope, (bool)$input->getOption('ephemeral'), null);
 
         // the optional opening message (-m) is sent as the first turn before the screen loop takes over

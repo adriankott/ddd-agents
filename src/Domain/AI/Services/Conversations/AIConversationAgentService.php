@@ -1869,6 +1869,8 @@ class AIConversationAgentService extends Service implements AgentModelCallRunner
         /** @var AIConversationsService $aIConversationsServiceForStrategyStamp */
         $aIConversationsServiceForStrategyStamp = AIConversation::getService();
         $aIConversationsServiceForStrategyStamp->stampCreationSettingsOfUnstampedConversation($conversation, $modelNameOverride);
+        // a model picked mid-conversation that speaks only Chat Completions moves an append-only conversation to the swap
+        $aIConversationsServiceForStrategyStamp->switchToSystemPromptSwapForChatCompletionsModel($conversation, $modelNameOverride);
         $agentRun->agentWireConfiguration = $aIConversationModelCallsService->resolveAgentWireConfiguration($conversation, $modelNameOverride);
         if ($agentRun->agentWireConfiguration->isRejected()) {
             $aIConversationOwnerReportDeliveryService->failRunOnRejectedAgentWireConfiguration($agentRun, $conversation, $transientMessageIds, $agentRun->agentWireConfiguration, $consoleStream, $emitRealtimeSignal);
