@@ -61,6 +61,9 @@ class AgentEvalRunOptions implements AIConversationProgressReporterInterface
      */
     public ?string $workspaceKey = null;
 
+    /** @var bool Keep the case's workspace after the run (`--keepWorkspace`, for debugging): no clean-up, the key is reported */
+    public bool $keepsWorkspace = false;
+
     /** @var string[] The tools the runner blocked for the agent's run of the case (set when the block is applied) */
     public array $blockedToolNames = [];
 

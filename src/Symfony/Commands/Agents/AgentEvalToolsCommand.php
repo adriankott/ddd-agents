@@ -127,6 +127,7 @@ class AgentEvalToolsCommand extends AgentEvalConsoleCommand
             ->addOption('json', null, InputOption::VALUE_NONE, 'Emit machine-readable JSON results instead of the report')
             ->addOption('model', null, InputOption::VALUE_OPTIONAL, 'Override the agent model by catalog name; default = the conversation default')
             ->addOption('repeat', null, InputOption::VALUE_OPTIONAL, 'Run every selected case N times (each repetition = its own child process, file <caseId>.rep<k>.json) and report per case how many of the N runs passed (metrics.repetitions). Works with --case too. Default 1.', '1')
+            ->addOption('keepWorkspace', null, InputOption::VALUE_NONE, 'Keep each case\'s eval workspace (and a module\'s scratch state, e.g. its drive) after the run, for debugging; the report names the key.')
             ->addOption('repetition', null, InputOption::VALUE_REQUIRED, 'Internal: the repetition a child process runs (set by its parent for --repeat); it names the case\'s eval workspace.')
             ->addOption('parallel', null, InputOption::VALUE_OPTIONAL, 'Run cases in child processes, N at a time: reads beside reads, a case that writes in the write lane of its resource. Default 10; pass --parallel=1 to run the cases one after the other in this process.', '10')
             ->addOption('no-save', null, InputOption::VALUE_NONE, 'Do not write the run into the results folder and store no record (a child process: its parent writes the case files).')
@@ -220,6 +221,7 @@ class AgentEvalToolsCommand extends AgentEvalConsoleCommand
         $runSettings->parallel = max(1, (int)$input->getOption('parallel'));
         $repetitionOption = $input->getOption('repetition');
         $runSettings->repetition = is_numeric($repetitionOption) && (int)$repetitionOption >= 1 ? (int)$repetitionOption : null;
+        $runSettings->keepsWorkspace = (bool)$input->getOption('keepWorkspace');
         $runSettings->includeAsyncOnlyCases = (bool)$input->getOption('include-async');
         $runSettings->evalArms = $this->resolveEvalArmOptions($input);
         $runSettings->agentEvalArms = $this->buildEvalArms($runSettings->evalArms);
@@ -382,6 +384,7 @@ class AgentEvalToolsCommand extends AgentEvalConsoleCommand
         $agentEvalJudgedRunOptions->simulatedOwnerDevice = $runSettings->simulatedOwnerDevice;
         $agentEvalJudgedRunOptions->aiModelName = $runSettings->modelName;
         $agentEvalJudgedRunOptions->repetition = $runSettings->repetition;
+        $agentEvalJudgedRunOptions->keepsWorkspace = $runSettings->keepsWorkspace;
         $agentEvalJudgedRunOptions->everyWriteToolBlocked = $everyWriteToolBlocked;
         $agentEvalJudgedRunOptions->progressReporter = $this->getProgressReporter();
         return $agentEvalJudgedRunOptions;
@@ -966,6 +969,9 @@ class AgentEvalToolsCommand extends AgentEvalConsoleCommand
         array_push($childArguments, '--case=' . $agentEvalSuiteTask->caseId, '--json', '--no-save', '--fixture=' . $agentEvalSuiteTask->fixturePath);
         if ($runSettings->repeat > 1) {
             $childArguments[] = '--repetition=' . max(1, (int)$agentEvalSuiteTask->repetition);
+        }
+        if ($runSettings->keepsWorkspace) {
+            $childArguments[] = '--keepWorkspace';
         }
         array_push($childArguments, ...$this->buildScopeArgumentsForChild($input));
         if ($runSettings->modelName !== null && $runSettings->modelName !== '') {

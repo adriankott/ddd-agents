@@ -68,6 +68,9 @@ class AgentEvalToolsRunSettings extends ValueObject
     /** @var int|null The repetition a child process runs (`--repetition`, passed by its parent); null when not counted */
     public ?int $repetition = null;
 
+    /** @var bool Keep every case's eval workspace after its run (`--keepWorkspace`) */
+    public bool $keepsWorkspace = false;
+
     /** @var string|null The file the whole result is also written to (the file a parent reads); null = none */
     public ?string $resultFile = null;
 

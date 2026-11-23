@@ -336,6 +336,10 @@ as `AgentToolCallProvenance::$workspaceKey` and never touches the space's own wo
 assembled the runner calls `AgentEvalRunHooksService::prepareWorkspaceOfCase(scope, key, scratchFiles, reporter)`
 (create it empty, write `scratchFiles`); at the end of the case — after the teardown, also when the run threw and for a
 transient conversation — `cleanUpWorkspaceOfCase(key, reporter)`. Both default to nothing; the application that has
-workspaces implements them. Report lines start with `workspace: `. A case whose expected tools are only READ and
+workspaces implements them. A module that keeps state per workspace (e.g. a drive whose own space is the workspace)
+implements `AgentEvalWorkspaceParticipant` (tag `ai.agent_eval_workspace_participant`): the runner calls every
+participant beside the two hooks (`AgentEvalWorkspaceParticipantsService`), so no application repeats that code.
+`app:ai-agent:eval-tools --keepWorkspace` keeps every case's workspace and the participants' state after the run (the
+report names the key), for debugging. Report lines start with `workspace: `. A case whose expected tools are only READ and
 WORKSPACE tools is a read case: it runs in parallel lanes and passes the read-only gate.
 

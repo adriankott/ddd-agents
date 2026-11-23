@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.29
+
+- Added: `AgentEvalWorkspaceParticipant` (tag `ai.agent_eval_workspace_participant`): a module that keeps state per
+  eval workspace prepares and removes it beside the application's workspace hooks; the runner calls every participant
+  through `AgentEvalWorkspaceParticipantsService` (a throw is one `[ERROR]` line, the others still run).
+- Added: `app:ai-agent:eval-tools --keepWorkspace` (forwarded to child processes, `AgentEvalRunOptions::$keepsWorkspace`):
+  no workspace clean-up after a case, the report names the kept key.
+
 ## 0.1.28
 
 - Fixed: the console chat and the eval runner run the host's settled-turn listeners after their inline turn

@@ -849,6 +849,12 @@ class AgentEvalRunnerService extends Service
         } catch (Throwable $throwable) {
             $agentEvalRunOptions->reportProgress(static::WORKSPACE_REPORT_LINE_PREFIX . '[ERROR] ' . $throwable->getMessage());
         }
+        // the modules that keep state per workspace (e.g. a drive): their own isolation of the case
+        /** @var AgentEvalWorkspaceParticipantsService $agentEvalWorkspaceParticipantsService */
+        $agentEvalWorkspaceParticipantsService = DDDService::instance()->getService(AgentEvalWorkspaceParticipantsService::class);
+        foreach ($agentEvalWorkspaceParticipantsService->prepareWorkspaceOfCase($agentEvalScope, $agentEvalRunOptions->workspaceKey, $agentEvalCase->getScratchFiles(), $agentEvalRunOptions) as $preparedLine) {
+            $agentEvalRunOptions->reportProgress(static::WORKSPACE_REPORT_LINE_PREFIX . $preparedLine);
+        }
     }
 
     /**
@@ -871,11 +877,19 @@ class AgentEvalRunnerService extends Service
             return [];
         }
         $agentEvalRunOptions->workspaceKey = null;
+        if ($agentEvalRunOptions->keepsWorkspace) {
+            $keptLine = 'kept ' . $workspaceKey . ' (--keepWorkspace)';
+            $agentEvalRunOptions->reportProgress(static::WORKSPACE_REPORT_LINE_PREFIX . $keptLine);
+            return [$keptLine];
+        }
+        /** @var AgentEvalWorkspaceParticipantsService $agentEvalWorkspaceParticipantsService */
+        $agentEvalWorkspaceParticipantsService = DDDService::instance()->getService(AgentEvalWorkspaceParticipantsService::class);
+        $participantLines = $agentEvalWorkspaceParticipantsService->cleanUpWorkspaceOfCase($workspaceKey, $agentEvalRunOptions);
         try {
-            $removedLines = $this->getAgentEvalRunHooksService()->cleanUpWorkspaceOfCase($workspaceKey, $agentEvalRunOptions);
+            $removedLines = [...$this->getAgentEvalRunHooksService()->cleanUpWorkspaceOfCase($workspaceKey, $agentEvalRunOptions), ...$participantLines];
         } catch (Throwable $throwable) {
             $agentEvalRunOptions->reportProgress(static::WORKSPACE_REPORT_LINE_PREFIX . '[ERROR] ' . $throwable->getMessage());
-            return [];
+            $removedLines = $participantLines;
         }
         foreach ($removedLines as $removedLine) {
             $agentEvalRunOptions->reportProgress(static::WORKSPACE_REPORT_LINE_PREFIX . $removedLine);
