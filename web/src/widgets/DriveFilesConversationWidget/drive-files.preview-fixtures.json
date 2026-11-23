@@ -1,0 +1,39 @@
+{
+  "wireName": "DriveFiles",
+  "fixtures": [
+    {
+      "name": "default",
+      "description": "A deck handed over as pptx and pdf, a spreadsheet and a folder: the pptx opens its PDF twin, the xlsx only downloads, the folder shows its entries.",
+      "payload": { "store": "drive", "references": ["drive/812", "drive/813", "drive/814", "drive/40"], "title": "Kampagnen-Performance 2026" },
+      "hydration": {
+        "DriveFiles": [
+          { "reference": "drive/812", "name": "kampagnen-performance-2026.pptx", "path": "out/kampagnen-performance-2026.pptx", "isFolder": false, "sizeBytes": 2483011, "contentType": "application/vnd.openxmlformats-officedocument.presentationml.presentation", "modifiedAt": "2026-11-23 18:04:00", "urlsExpireAt": "2099-01-01 00:00:00", "openLink": "/drive?space=1&path=%2Fout%2Fkampagnen-performance-2026.pptx" },
+          { "reference": "drive/813", "name": "kampagnen-performance-2026.pdf", "path": "out/kampagnen-performance-2026.pdf", "isFolder": false, "sizeBytes": 812004, "contentType": "application/pdf", "modifiedAt": "2026-11-23 18:04:12", "urlsExpireAt": "2099-01-01 00:00:00" },
+          { "reference": "drive/814", "name": "codes.xlsx", "path": "out/codes.xlsx", "isFolder": false, "sizeBytes": 18304, "contentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "modifiedAt": "2026-11-22 09:30:00", "urlsExpireAt": "2099-01-01 00:00:00", "state": "Being checked" },
+          { "reference": "drive/40", "name": "web", "path": "web", "isFolder": true, "childCount": 12, "modifiedAt": "2026-11-23 17:55:00", "urlsExpireAt": "2099-01-01 00:00:00" }
+        ]
+      },
+      "locale": "de",
+      "expectedState": "data",
+      "width": 528
+    },
+    {
+      "name": "empty",
+      "description": "None of the references is readable for the viewer: the card says so (render report empty).",
+      "payload": { "store": "drive", "references": ["drive/9"] },
+      "hydration": { "DriveFiles": [] },
+      "locale": "en",
+      "expectedState": "empty",
+      "width": 528
+    },
+    {
+      "name": "failed",
+      "description": "The store's read failed: the card offers a retry (render report failed).",
+      "payload": { "store": "drive", "references": ["drive/812"] },
+      "hydration": { "DriveFiles": { "__status": 500 } },
+      "locale": "en",
+      "expectedState": "error",
+      "width": 528
+    }
+  ]
+}

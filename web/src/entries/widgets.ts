@@ -13,6 +13,30 @@ export { ClockConversationWidget } from "../widgets/ClockConversationWidget/Cloc
 export { ConceptExplainerConversationWidget } from "../widgets/ConceptExplainerConversationWidget/ConceptExplainerConversationWidget";
 export { ConversationSearchResultsConversationWidget } from "../widgets/ConversationSearchResultsConversationWidget/ConversationSearchResultsConversationWidget";
 export { CurrencyConverterConversationWidget } from "../widgets/CurrencyConverterConversationWidget/CurrencyConverterConversationWidget";
+export { DriveFilesConversationWidget } from "../widgets/DriveFilesConversationWidget/DriveFilesConversationWidget";
+// The DriveFiles card's seam: the cards a host's store reads (`registerDriveFileCardsSource` sits in the root entry).
+export {
+  DRIVE_FILE_CARDS_SOURCE_MISSING,
+  type DriveFileCardsSource,
+  readDriveFileCardsSource,
+  unregisterDriveFileCardsSource,
+} from "../widgets/DriveFilesConversationWidget/shared/drive-file-cards-source";
+export {
+  DRIVE_FILES_MAX_FILES,
+  DRIVE_FILES_WIDGET_TYPE,
+  type DriveFileCard,
+  type DriveFileContent,
+  type DriveFileFamily,
+  type DriveFilesRequest,
+  driveFileCardToOpen,
+  driveFileFamilyOf,
+  driveFileTypeLabelOf,
+  formatDriveFileSize,
+  isDriveFileCardExpired,
+  nodeIdOfReference,
+  parseDriveFilesPayload,
+  safeDriveFileOpenLink,
+} from "../widgets/DriveFilesConversationWidget/shared/drive-files";
 export { CustomVisualizationConversationWidget } from "../widgets/CustomVisualizationConversationWidget/CustomVisualizationConversationWidget";
 // Where the custom visualization's sandbox frame loads from: a host sets `frameUrl` (e.g. to a host of another
 // registrable domain, so the frame runs out of process) before the first widget renders.

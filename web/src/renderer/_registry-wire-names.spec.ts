@@ -34,6 +34,7 @@ const PACKAGE_CANONICAL_WIRE_NAMES = [
   "ConversationSearchResults",
   "CurrencyConverter",
   "CustomVisualization",
+  "DriveFiles",
   "EntityMention",
   "MultiChoice",
   "QuickReplies",

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.38
+
+- Web: the package renders the `DriveFiles` widget (the cards `showDriveFiles` writes): one row per file or folder with
+  thumbnail or type tile, type · size · date (a folder: its entries), the store's state, open (browser-viewable files;
+  an office file opens its PDF twin of the same name, else download only), download, and a link to the drive screen
+  (the card's `openLink` when it is an app path or same-origin URL, else the source's `buildDriveScreenHref`). Expired
+  card URLs are read again; loading, failed (retry), empty and not-connected states. Built on the agents kit (no
+  admin-ui dependency).
+- Web: the seam `DriveFileCardsSource` (`readFileCards`, `readFileContent`, optional `buildDriveScreenHref`) with
+  `registerDriveFileCardsSource()` (root entry), the types `DriveFileCard`, `DriveFileContent`, `DriveFilesRequest` and
+  the pure helpers (`./widgets`); widget doc and preview fixtures. A host that registered its own `DriveFiles` widget
+  removes it (the wire name is now the package's).
+
 ## 0.1.37
 
 - Evaluation: a judged run applies the case's deterministic `expect` gates after the judge

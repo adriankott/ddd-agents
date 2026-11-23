@@ -1,0 +1,91 @@
+@import "../../styles/spacings";
+
+// The DriveFiles card: a headline, then one row per file or folder (tile | name over facts | actions).
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: $x1;
+  min-width: 0;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--agents-bg-var);
+  color: var(--agents-fg-light);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.tileThumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.tileFolder {
+  color: var(--agents-accent1-500);
+}
+
+.tilePdf {
+  color: var(--agents-danger-500);
+}
+
+.tileSpreadsheet {
+  color: var(--agents-success-500);
+}
+
+.tileDocument {
+  color: var(--agents-info-500);
+}
+
+.tilePresentation {
+  color: var(--agents-warning-500);
+}
+
+.tileImage,
+.tileVideo {
+  color: var(--agents-accent1-500);
+}
+
+.tileText,
+.tileArchive {
+  color: var(--agents-neutral-700);
+}
+
+.meta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: $x0_5 $x1;
+  min-width: 0;
+}
+
+.facts {
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.failure {
+  color: var(--agents-danger-900);
+}
+
+.actions {
+  display: inline-flex;
+  align-items: center;
+  gap: $x0_5;
+}

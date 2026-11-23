@@ -123,6 +123,26 @@ key the generator cannot see as a literal is wrapped in `textKey("…")`.
 - `DEFAULT_AGENTS_COMPONENTS` (root, `/provider`) holds the package's default components, so a replacement can wrap one;
   `MarkdownLink` (`/renderer`) is the chat's link component, which a `Markdown` replacement receives as `components.a`.
 
+## Drive file cards (`DriveFiles`)
+
+The widget `DriveFiles` (written by the tool `showDriveFiles`) shows files of a drive store as cards: name, type, size,
+date, a thumbnail, open (an office file opens its PDF twin of the same name, else it only downloads), download and a
+link to the file's place in the host's drive screen. The block names a store and references only; the cards are read
+through the source the host registers once, before the first chat:
+
+```ts
+import { registerDriveFileCardsSource } from "@mgamadeus/ddd-agents";
+
+registerDriveFileCardsSource({
+  readFileCards: (request, signal) => …,     // DriveFileCard[] of the block, under the viewer's rights
+  readFileContent: (card, disposition) => …, // { url, fileName? }: "inline" opens, "attachment" downloads
+  buildDriveScreenHref: (card) => …,         // optional: the screen link when a card carries no openLink
+});
+```
+
+Without a source the card says the drive is not connected. A card's `openLink` is followed only as a path of this app
+or a same-origin URL, through `onNavigate`. A cloud drive host uses the source of `@mgamadeus/ddd-clouddrive/agents`.
+
 ## AgentChat in a host window
 
 | Prop | Default | |

@@ -11,6 +11,12 @@ export {
 export { registerCanvasBodies } from "../renderer/canvas/canvasBodies";
 export { registerCanvasFeatureFlags } from "../renderer/canvas/canvas-feature-flags";
 export { registerWidgetHydrator } from "../renderer/widget-hydration/widget-hydration.registry";
+// The store behind the DriveFiles cards (a cloud drive, a workspace): one source per host, before the first chat.
+export {
+  registerDriveFileCardsSource,
+  type DriveFileCardsSource,
+} from "../widgets/DriveFilesConversationWidget/shared/drive-file-cards-source";
+export type { DriveFileCard, DriveFileContent, DriveFilesRequest } from "../widgets/DriveFilesConversationWidget/shared/drive-files";
 export {
   registerComposedViewDataSourceFetcher,
   type ComposedViewDataSourceFetcher,

@@ -57,6 +57,28 @@
       ]
     },
     {
+      "key": "%count% entries",
+      "defaultText": "%count% entries",
+      "placeholders": [
+        "count"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/DriveFilesConversationWidget/DriveFilesConversationWidget.tsx"
+      ]
+    },
+    {
+      "key": "%count% files from the drive",
+      "defaultText": "%count% files from the drive",
+      "placeholders": [
+        "count"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/DriveFilesConversationWidget/DriveFilesConversationWidget.tsx"
+      ]
+    },
+    {
       "key": "%count% place",
       "defaultText": "%count% place",
       "placeholders": [
@@ -85,6 +107,28 @@
       ]
     },
     {
+      "key": "%name% could not be downloaded.",
+      "defaultText": "%name% could not be downloaded.",
+      "placeholders": [
+        "name"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/DriveFilesConversationWidget/DriveFilesConversationWidget.tsx"
+      ]
+    },
+    {
+      "key": "%name% could not be opened.",
+      "defaultText": "%name% could not be opened.",
+      "placeholders": [
+        "name"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/DriveFilesConversationWidget/DriveFilesConversationWidget.tsx"
+      ]
+    },
+    {
       "key": "%position% of %count%",
       "defaultText": "%position% of %count%",
       "placeholders": [
@@ -105,6 +149,24 @@
       "contexts": [],
       "usedIn": [
         "src/chat/ConversationMessage/ConversationMessageWidgets/ConversationMessageHeader/ConversationMessageHeader.tsx"
+      ]
+    },
+    {
+      "key": "1 entry",
+      "defaultText": "1 entry",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/DriveFilesConversationWidget/DriveFilesConversationWidget.tsx"
+      ]
+    },
+    {
+      "key": "1 file from the drive",
+      "defaultText": "1 file from the drive",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/DriveFilesConversationWidget/DriveFilesConversationWidget.tsx"
       ]
     },
     {
@@ -365,6 +427,17 @@
       ]
     },
     {
+      "key": "Download %name%",
+      "defaultText": "Download %name%",
+      "placeholders": [
+        "name"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/DriveFilesConversationWidget/DriveFilesConversationWidget.tsx"
+      ]
+    },
+    {
       "key": "E-mail draft",
       "defaultText": "E-mail draft",
       "placeholders": [],
@@ -398,6 +471,15 @@
       "contexts": [],
       "usedIn": [
         "src/widgets/CurrencyConverterConversationWidget/CurrencyConverterWidget/CurrencyConverterWidget.tsx"
+      ]
+    },
+    {
+      "key": "Folder",
+      "defaultText": "Folder",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/DriveFilesConversationWidget/DriveFilesConversationWidget.tsx"
       ]
     },
     {
@@ -529,6 +611,15 @@
       ]
     },
     {
+      "key": "No file to show",
+      "defaultText": "No file to show",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/DriveFilesConversationWidget/DriveFilesConversationWidget.tsx"
+      ]
+    },
+    {
       "key": "No map available.",
       "defaultText": "No map available.",
       "placeholders": [],
@@ -580,6 +671,17 @@
       "contexts": [],
       "usedIn": [
         "src/renderer/WindowedWidget/WindowedWidget.tsx"
+      ]
+    },
+    {
+      "key": "Open %name%",
+      "defaultText": "Open %name%",
+      "placeholders": [
+        "name"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/DriveFilesConversationWidget/DriveFilesConversationWidget.tsx"
       ]
     },
     {
@@ -927,6 +1029,17 @@
       ]
     },
     {
+      "key": "Show %name% in the drive",
+      "defaultText": "Show %name% in the drive",
+      "placeholders": [
+        "name"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/DriveFilesConversationWidget/DriveFilesConversationWidget.tsx"
+      ]
+    },
+    {
       "key": "Show all %lineCount% lines",
       "defaultText": "Show all %lineCount% lines",
       "placeholders": [
@@ -1108,6 +1221,24 @@
       ]
     },
     {
+      "key": "The drive is not connected yet",
+      "defaultText": "The drive is not connected yet",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/DriveFilesConversationWidget/DriveFilesConversationWidget.tsx"
+      ]
+    },
+    {
+      "key": "The files could not be loaded.",
+      "defaultText": "The files could not be loaded.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/DriveFilesConversationWidget/DriveFilesConversationWidget.tsx"
+      ]
+    },
+    {
       "key": "The map could not be loaded.",
       "defaultText": "The map could not be loaded.",
       "placeholders": [],
@@ -1150,6 +1281,24 @@
       "contexts": [],
       "usedIn": [
         "src/widgets/CustomVisualizationConversationWidget/CustomVisualizationWidget/CustomVisualizationFrame.tsx"
+      ]
+    },
+    {
+      "key": "These files show here once the drive is part of this app.",
+      "defaultText": "These files show here once the drive is part of this app.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/DriveFilesConversationWidget/DriveFilesConversationWidget.tsx"
+      ]
+    },
+    {
+      "key": "These files were removed, or you may not open them.",
+      "defaultText": "These files were removed, or you may not open them.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/DriveFilesConversationWidget/DriveFilesConversationWidget.tsx"
       ]
     },
     {
@@ -1372,6 +1521,15 @@
       "contexts": [],
       "usedIn": [
         "src/widgets/ClockConversationWidget/ClockWidget/ClockRow.tsx"
+      ]
+    },
+    {
+      "key": "Try again",
+      "defaultText": "Try again",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/DriveFilesConversationWidget/DriveFilesConversationWidget.tsx"
       ]
     },
     {
