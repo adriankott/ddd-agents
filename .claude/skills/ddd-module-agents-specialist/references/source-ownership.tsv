@@ -208,6 +208,7 @@ config/app/AI/agentToolCallChildProcess.php	tools
 src/Modules/**	entry
 src/Domain/AI/**/AgentSpaces/**	entry
 src/Domain/AI/**/Discovery/**	entry
+src/Domain/AI/**/Sandboxes/**	entry
 src/Domain/AI/**/Entitlements/**	entry
 src/Domain/AI/**/Channels/**	entry
 src/Domain/AI/Entities/Environment/**	entry

@@ -68,6 +68,8 @@ use DDD\Domain\Base\Repo\DatabaseRepoEntity;
 use DDD\Domain\Base\Services\EntitiesService;
 use DDD\Domain\Common\Entities\Charts\DateValueSequence;
 use DDD\Infrastructure\Base\DateTime\Date;
+use DDD\Domain\AI\Entities\Sandboxes\AgentSandboxConversation;
+use DDD\Domain\AI\Entities\Sandboxes\AgentSandboxConversations;
 use DDD\Infrastructure\Base\DateTime\DateTime;
 use DDD\Infrastructure\Exceptions\BadRequestException;
 use DDD\Infrastructure\Exceptions\ForbiddenException;
@@ -702,6 +704,90 @@ class AIConversationsService extends EntitiesService
         DBAIConversations::restrictToConversationsOfAgentSpace($queryBuilder, $agentSpace);
         DBAIConversations::restrictToCustomerVisibleConversations($queryBuilder);
         return $repoClass->find($queryBuilder, false);
+    }
+
+    /**
+     * The number of root conversations per agent space (the sandbox screen's workspace list), in this environment. A
+     * space without conversations is missing from the answer.
+     *
+     * @param int[] $agentSpaceIds
+     * @return int[] agent space id => root conversation count
+     */
+    public function countRootConversationsPerAgentSpaceId(array $agentSpaceIds): array
+    {
+        $agentSpaceIds = array_values(array_unique(array_filter(array_map('intval', $agentSpaceIds))));
+        if ($agentSpaceIds === []) {
+            return [];
+        }
+        $tableName = DBAIConversationModel::getTableName();
+        $rows = EntityManagerFactory::getInstance()->getConnection()->fetchAllAssociative(
+            'SELECT `agentSpaceId`, COUNT(*) AS `conversationCount` FROM `' . $tableName . '`'
+            . ' WHERE `agentSpaceId` IN (:agentSpaceIds) AND `rootConversationId` IS NULL'
+            . ' AND ' . DBAIConversations::buildEnvironmentPredicate($tableName, self::currentEnvironment())
+            . ' GROUP BY `agentSpaceId`',
+            ['agentSpaceIds' => $agentSpaceIds, 'environment' => self::currentEnvironment()],
+            ['agentSpaceIds' => \Doctrine\DBAL\ArrayParameterType::INTEGER]
+        );
+        $conversationCountsByAgentSpaceId = [];
+        foreach ($rows as $row) {
+            $conversationCountsByAgentSpaceId[(int)$row['agentSpaceId']] = (int)$row['conversationCount'];
+        }
+        return $conversationCountsByAgentSpaceId;
+    }
+
+    /**
+     * The agent spaces among `$agentSpaceIds` on which a conversation holds a live turn right now (RUNNING or waiting
+     * for its delegation children, {@see AIConversationRunState::LIVE_TURN}), in this environment.
+     *
+     * @param int[] $agentSpaceIds
+     * @return int[]
+     */
+    public function findAgentSpaceIdsWithALiveTurn(array $agentSpaceIds): array
+    {
+        $agentSpaceIds = array_values(array_unique(array_filter(array_map('intval', $agentSpaceIds))));
+        if ($agentSpaceIds === []) {
+            return [];
+        }
+        $tableName = DBAIConversationModel::getTableName();
+        return array_map('intval', EntityManagerFactory::getInstance()->getConnection()->fetchFirstColumn(
+            'SELECT DISTINCT `agentSpaceId` FROM `' . $tableName . '`'
+            . ' WHERE `agentSpaceId` IN (:agentSpaceIds) AND `runState` IN (:liveTurnRunStates)'
+            . ' AND ' . DBAIConversations::buildEnvironmentPredicate($tableName, self::currentEnvironment()),
+            ['agentSpaceIds' => $agentSpaceIds, 'liveTurnRunStates' => AIConversationRunState::LIVE_TURN, 'environment' => self::currentEnvironment()],
+            ['agentSpaceIds' => \Doctrine\DBAL\ArrayParameterType::INTEGER, 'liveTurnRunStates' => \Doctrine\DBAL\ArrayParameterType::STRING]
+        ));
+    }
+
+    /**
+     * The newest root conversations of one agent space (the sandbox screen's links), newest change first, in this
+     * environment. Read for an admin: no rights condition.
+     *
+     * @param int $agentSpaceId
+     * @param int $limit
+     * @return AgentSandboxConversations
+     */
+    public function findNewestRootConversationsOfAgentSpaceIdForSandbox(int $agentSpaceId, int $limit): AgentSandboxConversations
+    {
+        $tableName = DBAIConversationModel::getTableName();
+        $rows = EntityManagerFactory::getInstance()->getConnection()->fetchAllAssociative(
+            'SELECT `id`, `accountId`, `runState`, `purposeName`, `created`, `updated` FROM `' . $tableName . '`'
+            . ' WHERE `agentSpaceId` = :agentSpaceId AND `rootConversationId` IS NULL'
+            . ' AND ' . DBAIConversations::buildEnvironmentPredicate($tableName, self::currentEnvironment())
+            . ' ORDER BY `updated` DESC, `id` DESC LIMIT ' . max(1, min($limit, 200)),
+            ['agentSpaceId' => $agentSpaceId, 'environment' => self::currentEnvironment()]
+        );
+        $agentSandboxConversations = new AgentSandboxConversations();
+        foreach ($rows as $row) {
+            $agentSandboxConversation = new AgentSandboxConversation();
+            $agentSandboxConversation->conversationId = (int)$row['id'];
+            $agentSandboxConversation->accountId = $row['accountId'] !== null ? (int)$row['accountId'] : null;
+            $agentSandboxConversation->runState = $row['runState'] !== null ? (string)$row['runState'] : null;
+            $agentSandboxConversation->purposeName = $row['purposeName'] !== null ? (string)$row['purposeName'] : null;
+            $agentSandboxConversation->createdAt = $row['created'] !== null ? DateTime::fromString((string)$row['created']) : null;
+            $agentSandboxConversation->updatedAt = $row['updated'] !== null ? DateTime::fromString((string)$row['updated']) : null;
+            $agentSandboxConversations->add($agentSandboxConversation);
+        }
+        return $agentSandboxConversations;
     }
 
     /**

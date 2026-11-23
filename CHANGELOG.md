@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.1.32
+
+- Added: sandbox administration for an admin screen of the agent workspaces. Host contract
+  `AgentSandboxAdministration` (tag `ai.agent_sandbox_administration`): workspaces with session state, disk and
+  memory, mount mode, runner instance and owner; read-only file tree and file bytes; unsaved drive changes; processes;
+  recent commands; session log; start, offload, kill a job, end, reset. The runner and the workspaces stay the host's.
+- Added: `AgentSandboxesAdminService` (conversation count and live-turn flag per workspace from the conversation
+  table, the space's root conversations, a 409 guard while a turn runs unless forced with a reason, the reset
+  confirmation with the workspace's name, file delivery under the untrusted-content rules: raster images and PDF
+  inline, UTF-8 text as text/plain with a 256 KB preview cut, anything else an opaque attachment, 25 MB at most) and
+  `AgentSandboxesControllerTrait` (`GET /list`, `/{workspaceKey}`, `/files`, `/files/content`, `/driveStatus`,
+  `/processes`, `/commands`, `/events`, `/conversations`, `/actions`; `POST /start`, `/offload`, `/jobs/{jobId}/kill`,
+  `/end`, `/reset`; access hook `throwForbiddenUnlessSandboxesAccessAllowed()`).
+- Added: the audit `AgentSandboxActionLogEntry` (new table `AgentSandboxActionLogEntries`; every action, refusals and
+  failures included; readable by a reader of every agent row). Without the table the actions run and the audit goes
+  to the error log.
+- Migration: optional. A host that wants the screen implements `AgentSandboxAdministration`, mounts the trait on an
+  operator-only controller and creates the table through the schema diff.
+
 ## 0.1.31
 
 - Security: per-call content trust. A tool's response DTO may implement `MCPToolResultDeclaresContentTrust`;

@@ -126,6 +126,15 @@ In the agent loop: a READ or WORKSPACE tool returns untrusted content unless it 
 waits for the owner's consent (or is refused, `config/app/AI/untrustedContent.php`), and a fetch of an unseen
 model-built URL is refused (skill `ddd-module-agents-decisions-and-guards-specialist`, injection defence).
 
+## Sandbox administration
+
+The admin screen for agent workspaces: the host implements `AgentSandboxAdministration` (tag
+`ai.agent_sandbox_administration`; the runner and the workspaces stay the host's), mounts
+`AgentSandboxesControllerTrait` on an operator-only controller (`throwForbiddenUnlessSandboxesAccessAllowed()`) and
+creates the table `AgentSandboxActionLogEntries` (schema diff). The package adds the conversations of a workspace's
+space, the 409 guard while a turn runs (force with a reason), the reset confirmation, the audit of every action and
+the file delivery under the untrusted-content rules (skill `ddd-module-agents-specialist`, sandbox administration).
+
 ## Messenger
 
 `AgentMessengerTransports` lists six transports and the routing. The framework registers neither; the host copies them

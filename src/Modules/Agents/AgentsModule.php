@@ -16,15 +16,16 @@ use DDD\Infrastructure\Modules\DDDModule;
  * - `DDD\Domain\AI\Entities\AgentSpaces\`, `…\Entities\Conversations\`, `…\Entities\Discovery\`, `…\Entities\Drives\`,
  *   `…\Entities\Environment\`,
  *   `…\Entities\Evals\`, `…\Entities\MCPPackages\`, `…\Entities\Mandates\`, `…\Entities\Models\CustomerSelection\`,
- *   `…\Entities\RecordedRuns\`, `…\Entities\Skills\`, `…\Entities\Texts\Embeddings\`, `…\Entities\WebSearch\`;
+ *   `…\Entities\RecordedRuns\`, `…\Entities\Sandboxes\`, `…\Entities\Skills\`, `…\Entities\Texts\Embeddings\`, `…\Entities\WebSearch\`;
  * - `DDD\Domain\AI\Exceptions\Conversations\`, `…\Exceptions\Evals\`, `…\Exceptions\Texts\Embeddings\`;
  * - `DDD\Domain\AI\Interfaces\`, `DDD\Domain\AI\MessageHandlers\`;
  * - `DDD\Domain\AI\Libs\RecordedRuns\`, `DDD\Domain\AI\Listeners\Conversations\`,
  *   `DDD\Domain\AI\Messenger\Conversations\`, `DDD\Domain\AI\Traits\Conversations\`;
  * - `DDD\Domain\AI\Repo\Argus\Conversations\`, `…\Repo\Argus\Guard\`, `…\Repo\Argus\Mandates\`, `…\Repo\Argus\WebSearch\`,
- *   `…\Repo\DB\AgentSpaces\`, `…\Repo\DB\Conversations\`, `…\Repo\DB\Evals\`, `…\Repo\DB\Mandates\`;
+ *   `…\Repo\DB\AgentSpaces\`, `…\Repo\DB\Conversations\`, `…\Repo\DB\Evals\`, `…\Repo\DB\Mandates\`,
+ *   `…\Repo\DB\Sandboxes\`;
  * - `DDD\Domain\AI\Services\AgentSpaces\`, `…\Services\Conversations\`, `…\Services\Decisions\`, `…\Services\Drives\`,
- *   `…\Services\Eval\`, `…\Services\Mandates\`,
+ *   `…\Services\Eval\`, `…\Services\Mandates\`, `…\Services\Sandboxes\`,
  *   `…\Services\Skills\`, `…\Services\SystemPrompts\`, `…\Services\Texts\Embeddings\`, `…\Services\WebSearch\`;
  * - `DDD\Modules\Agents\`, `DDD\Presentation\Api\Agents\`, `DDD\Presentation\Mcp\` (the MCP / JSON-RPC wire DTOs,
  *   the tool executor, the console printer and the JSON-RPC base controller);
@@ -55,6 +56,7 @@ class AgentsModule extends DDDModule
         'DDD\\Domain\\AI\\Entities\\Mandates\\',
         'DDD\\Domain\\AI\\Entities\\Models\\CustomerSelection\\',
         'DDD\\Domain\\AI\\Entities\\RecordedRuns\\',
+        'DDD\\Domain\\AI\\Entities\\Sandboxes\\',
         'DDD\\Domain\\AI\\Entities\\Skills\\',
         'DDD\\Domain\\AI\\Entities\\Texts\\Embeddings\\',
         'DDD\\Domain\\AI\\Entities\\WebSearch\\',
@@ -74,12 +76,14 @@ class AgentsModule extends DDDModule
         'DDD\\Domain\\AI\\Repo\\DB\\Conversations\\',
         'DDD\\Domain\\AI\\Repo\\DB\\Evals\\',
         'DDD\\Domain\\AI\\Repo\\DB\\Mandates\\',
+        'DDD\\Domain\\AI\\Repo\\DB\\Sandboxes\\',
         'DDD\\Domain\\AI\\Services\\AgentSpaces\\',
         'DDD\\Domain\\AI\\Services\\Conversations\\',
         'DDD\\Domain\\AI\\Services\\Decisions\\',
         'DDD\\Domain\\AI\\Services\\Drives\\',
         'DDD\\Domain\\AI\\Services\\Eval\\',
         'DDD\\Domain\\AI\\Services\\Mandates\\',
+        'DDD\\Domain\\AI\\Services\\Sandboxes\\',
         'DDD\\Domain\\AI\\Services\\Skills\\',
         'DDD\\Domain\\AI\\Services\\SystemPrompts\\',
         'DDD\\Domain\\AI\\Services\\Texts\\Embeddings\\',
@@ -118,6 +122,8 @@ class AgentsModule extends DDDModule
             'DDD\\Domain\\AI\\Services\\WebSearch\\',
             // the drive stores' registry (the drive tools and the file card fetch it)
             'DDD\\Domain\\AI\\Services\\Drives\\',
+            // the sandbox administration and its audit (the admin controller trait fetches them)
+            'DDD\\Domain\\AI\\Services\\Sandboxes\\',
             'DDD\\Presentation\\Mcp\\Services\\',
         ];
     }

@@ -1,6 +1,6 @@
 ---
 name: ddd-module-agents-specialist
-description: "Installs, wires and runs the agent of mgamadeus/ddd-agents in a DDD host and routes to the eight agent topic skills. Covers the installation checklist, the chat controller traits and start route, the agent space (agentSpaceId, account level, its host entity), override points by same-path subclass, entitlement interfaces, listeners, the 19 config files, host wording, persona and egress, the six Messenger transports, the usage envelope middleware, workers and stop grace, the package's console commands (schedules, finalize, purges, maintenance, diagnosis, chat with record and replay, evaluation, decision, tool-call comparison), the host duties with command templates, the cron list, table names, persisted class names, the package suite, source ownership. Use when adding the agent to an application, wiring agent transports or workers, schedules never fire, a crashed turn never answers, agent event tables grow, overriding an agent service, naming agent tables, or asking which agent skill explains a file."
+description: "Installs, wires and runs the agent of mgamadeus/ddd-agents in a DDD host and routes to the eight agent topic skills. Covers the installation checklist, chat controller traits, the agent space (agentSpaceId, account level, its host entity), same-path overrides, entitlements, listeners, the 19 config files, host wording, persona and egress, the six Messenger transports, the usage envelope middleware, workers and stop grace, the package's console commands (schedules, purges, diagnosis, chat replay, evaluation), the sandbox admin screen (AgentSandboxAdministration, workspaces, offload, reset, audit), host duties, the cron list, table names, persisted class names, the package suite, source ownership. Use when adding the agent to an application, wiring agent transports or workers, schedules never fire, a crashed turn never answers, agent event tables grow, overriding an agent service, building a sandbox or workspace admin screen, naming agent tables, or asking which agent skill explains a file."
 metadata:
   author: mgamadeus
   version: "0.2.0"
@@ -165,6 +165,7 @@ the recovery commands).
 | Adapt a package command by its override points; register the cron list | [host-duties.md](references/host-duties.md), `templates/crons.sh` |
 | Model "what the agent works for": spaces, account level, starting a conversation for a space, tools that name a space | [agent-space.md](references/agent-space.md) |
 | Missing agent tables, wrong table names, a table prefix, a renamed persisted class | [tables-and-persisted-names.md](references/tables-and-persisted-names.md) |
+| Mount the sandbox admin screen: agent workspaces, sessions, files, commands, offload / kill / reset with audit; implement `AgentSandboxAdministration` | [sandbox-administration.md](references/sandbox-administration.md) |
 | Build the first tool, skill, purpose and widget | [first-capability-end-to-end.md](references/first-capability-end-to-end.md) |
 | Start a purposed conversation, with or without an agent space | [first-capability-end-to-end.md](references/first-capability-end-to-end.md) |
 
