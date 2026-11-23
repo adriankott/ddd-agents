@@ -56,7 +56,7 @@ class ToolDefinition extends ValueObject
     #[HideProperty]
     public ?MCPToolEffect $effect = null;
 
-    /** True if the tool carries #[MCPToolReturnsUntrustedContent] — the loop screens its results for injections. */
+    /** True if the tool returns untrusted content ({@see MCPToolContentTrust}) — the loop screens its results for injections. */
     public bool $returnsUntrustedContent = false;
 
     /** How many image parts the tool's result may carry (#[MCPToolImageBudget]); null = the executor's default. */

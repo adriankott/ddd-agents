@@ -20,6 +20,7 @@ use DDD\Domain\AI\Services\Conversations\AIConversationSchedulesService;
 use DDD\Domain\AI\Services\Conversations\AIConversationsService;
 use DDD\Presentation\Mcp\Client\AI\Dtos\PreviousTaskRunReportsGetRequestDto;
 use DDD\Presentation\Mcp\Client\AI\Dtos\PreviousTaskRunReportsMcpResponseDto;
+use DDD\Domain\AI\Entities\MCPPackages\MCPToolReturnsTrustedContent;
 
 /**
  * The reports the earlier runs of a scheduled run's OWN schedule wrote for the owner:
@@ -27,6 +28,7 @@ use DDD\Presentation\Mcp\Client\AI\Dtos\PreviousTaskRunReportsMcpResponseDto;
  * `Schedule.Run` conversation (the purpose preloads its skill); the schedule comes from the run itself, never from an
  * argument.
  */
+#[MCPToolReturnsTrustedContent('run reports the platform composed')]
 class AgentTaskRunReportsMCPPackage extends MCPPackage
 {
     public static ?string $name = 'agent.taskRunReports';

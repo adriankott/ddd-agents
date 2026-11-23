@@ -1,4 +1,4 @@
-# Config map: the eighteen config files and who explains them
+# Config map: the nineteen config files and who explains them
 
 **Reader:** host developer
 
@@ -14,7 +14,7 @@ Readers that fall back per key to their class default: `AgentApplicationWording:
 file does not list is off, except `AgentDecisionModelSettings::DEFAULT_ON_SITES`). The other readers take the file as
 it is.
 
-Besides the eighteen PHP files the package ships prompts (`config/app/AI/Prompts/`), purposes
+Besides the nineteen PHP files the package ships prompts (`config/app/AI/Prompts/`), purposes
 (`config/app/AI/Purposes/`) and its agent skill files (`config/app/AI/Skills/`); a host's file at the same path
 replaces each of them the same way. Prompts: `ddd-module-agents-context-specialist` and
 `ddd-module-agents-decisions-and-guards-specialist`; purposes and skills: `ddd-module-agents-skills-and-purposes-specialist`
@@ -40,6 +40,7 @@ and `ddd-module-agents-autonomy-specialist`.
 | `skillPackages.php` | `AI.skillPackages` | `AISkillsService`, `AISkill::getPackageClassesBySkillName()` | which MCP packages each skill brings | the package's own skills | `ddd-module-agents-skills-and-purposes-specialist` |
 | `skillRequirements.php` | `AI.skillRequirements` | `AISkillsService::applySkillRequirementOverlay()` | flags, rights and billing access a skill requires | none | `ddd-module-agents-skills-and-purposes-specialist` |
 | `supervisor.php` | `AI.supervisor` | `SupervisorCheckpointService` | the supervisor switch, model and efforts | off | `ddd-module-agents-autonomy-specialist` |
+| `untrustedContent.php` | `AI.untrustedContent` | `MCPToolContentTrust` (the tool documentation, the tool-result screen, the reading rule of a result), `MCPToolExecutorService::holdCallAfterUntrustedRead()` | which packages and tools return trusted content beside `MCPToolReturnsTrustedContent` (`trustedPackages`, `trustedTools`), what a write after an untrusted read of the turn gets (`writeAfterUntrustedRead`: `ownerConsent` or `refuse`; no value switches it off) | no trusted extras, `ownerConsent` | `ddd-module-agents-decisions-and-guards-specialist` |
 | `usageScopesCountedElsewhere.php` | `AI.usageScopesCountedElsewhere` | `DDD\Domain\AI\Services\AIUsageEnvelopesService` (ddd-ai) | usage scopes left out of booked-cost recordings | the chat model's turn call | `ddd-module-agents-loop-specialist` |
 | `webSearch.php` | `AI.webSearch` | `WebSearchConfiguration::findValue()` (`AIWebSearchService`, the web Argus repositories, `WebSearchMCPPackage`) | the web research on or off (`enabled`), a switch and an endpoint per capability (search, url-to-markdown, screenshot), cache lifetimes, timeouts, the tools' limits, the search fee per request, the reading model | off, no endpoints | `ddd-module-agents-tools-specialist` |
 

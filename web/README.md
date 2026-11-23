@@ -117,6 +117,9 @@ key the generator cannot see as a literal is wrapped in `textKey("…")`.
   `useAgentsLinkNavigation()` give a host's own widget the same behaviour.
 - `AgentsEnvironment.onOpenEntity(target)` opens the entity of an `openEntity` action on a host route; return `false` to
   open the `entityDetail` canvas as before.
+- `AgentsEnvironment.markdownImageHosts` lists the hosts an image in model Markdown may load from (`cdn.example.com`,
+  `*.example.com`, https only), beside the page's own origin and inline raster `data:` images. Any other image renders
+  as a link: model text is foreign, and an image URL would carry what the model knows to that host.
 - `DEFAULT_AGENTS_COMPONENTS` (root, `/provider`) holds the package's default components, so a replacement can wrap one;
   `MarkdownLink` (`/renderer`) is the chat's link component, which a `Markdown` replacement receives as `components.a`.
 

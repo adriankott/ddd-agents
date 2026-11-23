@@ -2,7 +2,7 @@
 
 **Reader:** host developer
 
-Contents: two classes of input · the layers · the owner-message screen · the tool-result screen · the gate rules · the sentinel-canary probe · what a host must do · honest limits
+Contents: two classes of input · the layers · untrusted by default · the write after an untrusted read · the owner-message screen · the tool-result screen · the gate rules · the sentinel-canary probe · what a host must do · honest limits
 
 ## Two classes of input
 
@@ -26,6 +26,49 @@ self-service request is doing the authorization layer's job, badly.
 3. **Detection** — the two screens below. They are the lowest tier: a cheap, best-effort filter. A classifier on a
    finite battery is never a proof, and an adaptive attacker can find a text it passes.
 
+## Untrusted by default
+
+A tool returns untrusted content unless it says otherwise (`DDD\Domain\AI\Entities\MCPPackages\MCPToolContentTrust`):
+
+| Declaration | Content |
+|---|---|
+| `MCPToolReturnsUntrustedContent` on the method or its package (or a parent package) | untrusted |
+| `MCPToolReturnsTrustedContent` on the method or its package (or a parent package) | trusted |
+| listed in `config/app/AI/untrustedContent.php` (`trustedTools`, `trustedPackages`; a subclass matches its parent) | trusted |
+| a WRITE or DELETE tool | trusted (its result reports the platform's own write) |
+| every other tool: READ, WORKSPACE, no effect declared | **untrusted** |
+
+An untrusted result without marks gets `ToolResultUntrustedSegments::UNMARKED_READING_RULE` on its platform note; a
+marked one gets `READING_RULE`. The tool-result screen (below) reads every untrusted result. The package's own
+packages for memories, schedules, run reports and mandates declare trust; web search, screenshots and the drive do
+not. A host declares trust only for content the platform vouches for — its own records, text it composed, the owner's
+own data — never for text a third party wrote, also when the platform stored it (a customer's message, a mail, a
+file, a shell's output).
+
+## The write after an untrusted read
+
+The executor (`MCPToolExecutorService::holdCallAfterUntrustedRead()`, after the mandate gate) holds a call of an agent
+turn once a call of an untrusted tool completed in the same owner turn (after the owner message the call traces back
+to):
+
+| Call | Result |
+|---|---|
+| READ, WORKSPACE | runs |
+| a tool declaring `MCPToolRequiresOwnerConfirmation` | runs into its own consent step |
+| WRITE, DELETE or no declared effect, `writeAfterUntrustedRead: ownerConsent` (default) | runs only after the owner-consent check finds the owner's explicit yes to this step (`OwnerConsentRequest` kind `WRITE_AFTER_UNTRUSTED_READ`, the tool and its arguments as the target); otherwise a gate refusal (`OWNER_CONFIRMATION_REQUIRED`) naming the untrusted tools |
+| the same under `refuse` | final refusal `WRITE_AFTER_UNTRUSTED_READ`; the owner starts the step with a new message |
+| a tool declaring `MCPToolFetchesModelChosenUrl` with a URL whose query string or fragment appears in no owner message and no tool result | final refusal `UNSEEN_URL_AFTER_UNTRUSTED_READ` (a link exactly as a result showed it runs) |
+| no untrusted call in the turn, an MCP client of the owner, an evaluation harness's own call | runs |
+
+- The consent step fails closed: with the site `ownerConsent` not `on`, in a scheduled run without the owner, in a
+  delegated sub-task the write is refused with a tool result — never a hang. A host that wants such writes declares
+  the tools it reads as trusted where that is true, or lets the owner confirm.
+- No value of `writeAfterUntrustedRead` switches the gate off; an unknown value is `ownerConsent`.
+- The consent is used when the write may have happened (also a failure with an unknown outcome) and released when the
+  tool refused with a caller-facing 4xx.
+- Limits: taint is per owner turn (a new owner message starts clean), per conversation (a delegation result composed
+  from untrusted text is not tainted in the parent; the child itself cannot get consent), and by tool, not by passage.
+
 ## The owner-message screen (`ownerMessageInjection`)
 
 - **When:** at the turn start, as a parallel child of the turn-start batch (`ArgusAgentOwnerMessageInjectionDecision`),
@@ -45,9 +88,9 @@ self-service request is doing the authorization layer's job, badly.
 
 ## The tool-result screen (`toolResultInjection`)
 
-- **Which results:** every COMPLETED result of a tool marked `DDD\Domain\AI\Entities\MCPPackages\MCPToolReturnsUntrustedContent` (the tool definition's
-  `returnsUntrustedContent`) — text written by third parties and fetched from outside. Mark only that: not what the owner
-  wrote, not what the platform composed. Marking the tool is `ddd-module-agents-tools-specialist`'s topic.
+- **Which results:** every COMPLETED result of a tool that returns untrusted content (the tool definition's
+  `returnsUntrustedContent`, [untrusted by default](#untrusted-by-default)). Declaring trust is
+  `ddd-module-agents-tools-specialist`'s topic.
 - **Start:** after each step `AgentToolResultScreeningService::startScreeningOfUntrustedToolResultsOfStep()` sets the
   call's `injectionScreening` to `pending` in a claim-fenced write and dispatches one `AgentToolResultScreeningMessage`
   per result to the transport `ai_tool_result_screening` (`AgentMessengerTransports::TOOL_RESULT_SCREENING`). Never for
@@ -98,7 +141,9 @@ cannot stop content that genuinely looks clean. A host uses it to measure guard 
 
 ## What a host must do
 
-- Mark its fetching tools with `MCPToolReturnsUntrustedContent`.
+- Declare `MCPToolReturnsTrustedContent` on the packages that read only its own records (or list them in
+  `config/app/AI/untrustedContent.php`), and keep every tool that reads third-party text untrusted.
+- Switch `ownerConsent` `on` if its agent writes after reading untrusted content, or choose `writeAfterUntrustedRead: refuse`.
 - Run a worker on the transport `ai_tool_result_screening` (`ddd-module-agents-specialist`, transports).
 - When it replaces the gate rules: keep the four numbered rules, the output word BLOCKED and the final SUCCESS LINE
   ([the gate rules](#the-gate-rules)), and re-measure.

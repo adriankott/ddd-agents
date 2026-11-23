@@ -22,6 +22,13 @@ use DDD\Domain\AI\Entities\MCPPackages\MCPTool;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolSummary;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolEntitlement;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolRequiresMandate;
+use DDD\Domain\AI\Entities\MCPPackages\MCPToolContentTrust;
+use DDD\Domain\AI\Entities\MCPPackages\MCPToolFetchesModelChosenUrl;
+use DDD\Domain\AI\Entities\MCPPackages\MCPToolRequiresOwnerConfirmation;
+use DDD\Domain\AI\Entities\Conversations\Agent\Decisions\OwnerConsent\OwnerConsentRequest;
+use DDD\Domain\AI\Entities\Conversations\Agent\Decisions\OwnerConsent\OwnerConsentReservation;
+use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
+use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessages;
 use DDD\Domain\AI\Entities\MCPPackages\MCPExposedFilterProperties;
 use DDD\Domain\AI\Exceptions\Conversations\AgentRunClaimLostException;
 use DDD\Domain\AI\Exceptions\Conversations\AgentToolExecutionTimeoutException;
@@ -247,7 +254,8 @@ class MCPToolExecutorService extends Service
         // a result that holds third-party passages in marks carries the reading rule of the marks in its platform note
         $toolResult->platformNoteForModel = ToolResultUntrustedSegments::buildPlatformNoteWithReadingRule(
             $response->getPlatformNoteForModel(),
-            $this->joinTextContentParts($nonImageContentParts)
+            $this->joinTextContentParts($nonImageContentParts),
+            !$response->isError && MCPToolContentTrust::isUntrustedToolInPackages($toolName, $packageClasses)
         );
         $toolResult->dictatedWidgetType = $response->isError ? null : $response->getDictatedWidgetType();
         if ($toolResult->isError) {
@@ -871,6 +879,15 @@ class MCPToolExecutorService extends Service
                     return $mandateRefusal;
                 }
 
+                // THE WRITE AFTER AN UNTRUSTED READ: once the current turn read content the platform does not vouch for
+                // ({@see MCPToolContentTrust}), a WRITE or DELETE waits for the owner's consent (or is refused, per
+                // `AI.untrustedContent.writeAfterUntrustedRead`), and a fetch of a model-built URL is refused.
+                $untrustedReadRefusal = $this->holdCallAfterUntrustedRead($toolName, $reflection, $method, $arguments, $serverProvidedInput);
+                if ($untrustedReadRefusal !== null) {
+                    $this->releaseFirstUseMandateBindingOfFailedCall();
+                    return $untrustedReadRefusal;
+                }
+
                 // THE OWNER'S CONSENT for a #[MCPToolRequiresOwnerConfirmation] tool: checked inside the tool
                 // body, after its own refusals and before its write ({@see OwnerConsentsService::requireOwnerConsentForStep()});
                 // a missing consent comes back as OwnerConsentMissingException → the gate refusal in the catch below.
@@ -911,8 +928,10 @@ class MCPToolExecutorService extends Service
                         if ($result->isError) {
                             $this->releaseFirstUseMandateBindingOfFailedCall();
                         }
+                        $this->concludeUntrustedReadConsent(!$result->isError);
                         return $result;
                     }
+                    $this->concludeUntrustedReadConsent(true);
                     // LLM-optimized output is the MCP DEFAULT (generalized across ALL packages): unless the caller
                     // EXPLICITLY asked for the structured shape (`outputFormat=structured`), any response that can
                     // render itself compactly (implements LlmMarkdownRenderable) returns that Markdown — the model
@@ -940,9 +959,12 @@ class MCPToolExecutorService extends Service
             } catch (OwnerConsentMissingException $ownerConsentMissing) {
                 // the tool wrote nothing — a gate refusal the loop recognizes, never a failed execution
                 $this->releaseFirstUseMandateBindingOfFailedCall();
+                $this->concludeUntrustedReadConsent(false);
                 return MCPToolResponse::gateRefusal($ownerConsentMissing->getMessage(), MCPToolResponse::REFUSAL_OWNER_CONFIRMATION_REQUIRED);
             } catch (Throwable $e) {
                 $this->releaseFirstUseMandateBindingOfFailedCall();
+                // a refusal written for the caller changed nothing; any other failure leaves the outcome unknown
+                $this->concludeUntrustedReadConsent(!($e instanceof FrameworkException && $this->isToolFailureMessageWrittenForTheCaller($e)));
                 // errors_as_json: let the real exception (+ stack) propagate to JsonErrorExceptionSubscriber
                 // instead of swallowing it — same debug mechanism as the regular endpoints.
                 if ($errorsAsJson) {
@@ -1582,6 +1604,238 @@ class MCPToolExecutorService extends Service
      * @var AgentMandateFirstUseBinding|null
      */
     protected ?AgentMandateFirstUseBinding $firstUseMandateBinding = null;
+
+    /** The owner's consent reserved by {@see holdCallAfterUntrustedRead()} for the call that runs now; null otherwise. */
+    protected ?OwnerConsentReservation $untrustedReadConsentReservation = null;
+
+    /** The provenance of the call {@see $untrustedReadConsentReservation} was reserved for. */
+    protected ?AgentToolCallProvenance $untrustedReadConsentCallProvenance = null;
+
+    /** @var int Characters of the arguments the consent request names */
+    public const int UNTRUSTED_READ_CONSENT_ARGUMENTS_CHARS = 400;
+
+    /**
+     * The gate after an untrusted read of the current owner turn (agent calls only: an MCP client of the owner, an
+     * evaluation harness's own calls and a call outside a conversation pass):
+     * - a tool declaring {@see MCPToolFetchesModelChosenUrl} is refused for a URL whose query string or fragment appears
+     *   in no owner message and no tool result of the conversation;
+     * - a WRITE or DELETE (or a tool without a declared effect) is refused under `refuse`, else runs only with the
+     *   owner's consent to this step ({@see OwnerConsentsService}); a tool that asks for consent itself
+     *   ({@see MCPToolRequiresOwnerConfirmation}) is left to its own step. WORKSPACE and READ pass.
+     *
+     * @param array<array-key, mixed> $arguments
+     * @return MCPToolResponse|null the refusal, null when the call may run
+     * @throws AgentRunClaimLostException
+     */
+    protected function holdCallAfterUntrustedRead(
+        string $toolName,
+        ReflectionClass $packageReflectionClass,
+        ReflectionMethod $method,
+        array $arguments,
+        ?MCPServerProvidedInput $serverProvidedInput
+    ): ?MCPToolResponse {
+        $this->untrustedReadConsentReservation = null;
+        $this->untrustedReadConsentCallProvenance = null;
+        if (!$serverProvidedInput instanceof AgentToolCallProvenance || $serverProvidedInput->isEvalHarnessCall
+            || !$serverProvidedInput->conversation instanceof AIConversation
+        ) {
+            return null;
+        }
+        $untrustedReadToolNames = $this->findUntrustedReadToolNamesOfCurrentTurn($serverProvidedInput);
+        if ($untrustedReadToolNames === []) {
+            return null;
+        }
+        $fetchAttributes = $method->getAttributes(MCPToolFetchesModelChosenUrl::class);
+        if ($fetchAttributes !== []) {
+            /** @var MCPToolFetchesModelChosenUrl $fetchAttribute */
+            $fetchAttribute = $fetchAttributes[0]->newInstance();
+            $unseenUrl = null;
+            foreach ($fetchAttribute->argumentNames as $urlArgumentName) {
+                $unseenUrl ??= $this->findUnseenModelBuiltUrl($arguments[$urlArgumentName] ?? null, $serverProvidedInput);
+            }
+            if ($unseenUrl !== null) {
+                return MCPToolResponse::finalRefusal(
+                    "Tool '{$toolName}' was NOT executed: this turn read content written by third parties (" . implode(', ', $untrustedReadToolNames)
+                    . "), and the URL {$unseenUrl} carries a query string or fragment that appears in no owner message and no result. "
+                    . 'Open links exactly as a result showed them, or ask the owner.',
+                    MCPToolResponse::REFUSAL_UNSEEN_URL_AFTER_UNTRUSTED_READ
+                );
+            }
+        }
+        $effectAttributes = $method->getAttributes(MCPToolEffect::class);
+        $toolEffect = $effectAttributes !== [] ? $effectAttributes[0]->newInstance() : null;
+        if ($toolEffect instanceof MCPToolEffect && !in_array($toolEffect->effect, [MCPToolEffect::WRITE, MCPToolEffect::DELETE], true)) {
+            return null;
+        }
+        if ($method->getAttributes(MCPToolRequiresOwnerConfirmation::class) !== []) {
+            return null;
+        }
+        if ($this->getWriteAfterUntrustedReadMode() === MCPToolContentTrust::WRITE_AFTER_UNTRUSTED_READ_REFUSE) {
+            return MCPToolResponse::finalRefusal(
+                "Tool '{$toolName}' was NOT executed: this turn read content written by third parties (" . implode(', ', $untrustedReadToolNames)
+                . '), and this application takes no write in such a turn. Tell the owner exactly what you would change; the owner starts it with a new message.',
+                MCPToolResponse::REFUSAL_WRITE_AFTER_UNTRUSTED_READ
+            );
+        }
+        $argumentsJson = (string)json_encode($arguments, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $ownerConsentRequest = OwnerConsentRequest::forAction(
+            $toolName,
+            'WRITE_AFTER_UNTRUSTED_READ',
+            'run ' . $toolName . ' with ' . mb_substr($argumentsJson, 0, static::UNTRUSTED_READ_CONSENT_ARGUMENTS_CHARS),
+            'the agent read text written by third parties in this turn (' . implode(', ', $untrustedReadToolNames)
+                . '); the step runs only because the owner asked for it',
+            $toolName . ':' . md5($argumentsJson)
+        );
+        $ownerConsentReservation = $this->getOwnerConsentsService()->reserveOwnerConsentForStep($serverProvidedInput, $ownerConsentRequest);
+        if (!$ownerConsentReservation->isWriteAllowed()) {
+            return MCPToolResponse::gateRefusal(
+                "Tool '{$toolName}' was NOT executed: this turn read content written by third parties (" . implode(', ', $untrustedReadToolNames)
+                . '), so a write needs the owner\'s explicit yes to this step. ' . $ownerConsentReservation->buildModelFacingText(),
+                MCPToolResponse::REFUSAL_OWNER_CONFIRMATION_REQUIRED
+            );
+        }
+        $this->untrustedReadConsentReservation = $ownerConsentReservation;
+        $this->untrustedReadConsentCallProvenance = $serverProvidedInput;
+        return null;
+    }
+
+    /** The owner-consent service of the gate after an untrusted read. */
+    protected function getOwnerConsentsService(): OwnerConsentsService
+    {
+        /** @var OwnerConsentsService $ownerConsentsService */
+        $ownerConsentsService = DDDService::instance()->getService(OwnerConsentsService::class);
+        return $ownerConsentsService;
+    }
+
+    /**
+     * The messages of the call's conversation as the loop holds them (never a lazy load: the loop hands the live set).
+     */
+    protected function findLoadedMessagesOfCall(AgentToolCallProvenance $agentToolCallProvenance): ?AIConversationMessages
+    {
+        if ($agentToolCallProvenance->conversationMessages !== null) {
+            return $agentToolCallProvenance->conversationMessages;
+        }
+        $conversation = $agentToolCallProvenance->conversation;
+        return $conversation instanceof AIConversation && isset($conversation->messages) ? $conversation->messages : null;
+    }
+
+    /** Whether a called tool returned untrusted content ({@see MCPToolContentTrust::isUntrustedToolName()}). */
+    protected function isUntrustedReadToolName(string $toolName): bool
+    {
+        return MCPToolContentTrust::isUntrustedToolName($toolName);
+    }
+
+    /** `AI.untrustedContent.writeAfterUntrustedRead` ({@see MCPToolContentTrust::getWriteAfterUntrustedReadMode()}). */
+    protected function getWriteAfterUntrustedReadMode(): string
+    {
+        return MCPToolContentTrust::getWriteAfterUntrustedReadMode();
+    }
+
+    /**
+     * The untrusted tools whose calls completed in the current owner turn (after the owner message the call traces
+     * back to), in order, each once.
+     *
+     * @return string[]
+     */
+    protected function findUntrustedReadToolNamesOfCurrentTurn(AgentToolCallProvenance $agentToolCallProvenance): array
+    {
+        $conversationMessages = $this->findLoadedMessagesOfCall($agentToolCallProvenance);
+        if ($conversationMessages === null) {
+            return [];
+        }
+        $sourceUserMessage = $agentToolCallProvenance->sourceUserMessage;
+        $turnStartIndex = $sourceUserMessage !== null && isset($sourceUserMessage->indexInConversation) ? (int)$sourceUserMessage->indexInConversation : -1;
+        $untrustedReadToolNames = [];
+        foreach ($conversationMessages->getElements() as $conversationMessage) {
+            if (($conversationMessage->indexInConversation ?? -1) <= $turnStartIndex || !isset($conversationMessage->toolCall)) {
+                continue;
+            }
+            $toolCall = $conversationMessage->toolCall;
+            $calledToolName = (string)($toolCall->name ?? '');
+            if ($calledToolName === '' || ($toolCall->status ?? null) !== AIConversationMessage::STATUS_COMPLETED
+                || in_array($calledToolName, $untrustedReadToolNames, true)
+            ) {
+                continue;
+            }
+            if ($this->isUntrustedReadToolName($calledToolName)) {
+                $untrustedReadToolNames[] = $calledToolName;
+            }
+        }
+        return $untrustedReadToolNames;
+    }
+
+    /**
+     * The first URL of the argument (a string or a list of strings) with a query string or a fragment that appears
+     * in no owner message and no tool result of the conversation; null when every URL was seen or carries none.
+     *
+     * @param mixed $urlArgument
+     * @return string|null
+     */
+    protected function findUnseenModelBuiltUrl(mixed $urlArgument, AgentToolCallProvenance $agentToolCallProvenance): ?string
+    {
+        $urls = is_array($urlArgument) ? array_values(array_filter($urlArgument, 'is_string')) : (is_string($urlArgument) ? [$urlArgument] : []);
+        $conversationTexts = null;
+        foreach ($urls as $url) {
+            if (parse_url($url, PHP_URL_QUERY) === null && parse_url($url, PHP_URL_FRAGMENT) === null) {
+                continue;
+            }
+            $conversationTexts ??= $this->collectOwnerAndResultTexts($agentToolCallProvenance);
+            $isSeen = false;
+            foreach ([$url, htmlspecialchars($url, ENT_QUOTES), str_replace('/', '\\/', $url)] as $urlForm) {
+                if (str_contains($conversationTexts, $urlForm)) {
+                    $isSeen = true;
+                    break;
+                }
+            }
+            if (!$isSeen) {
+                return $url;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The owner messages and the stored tool results of the conversation, joined (the texts a URL may come from).
+     */
+    protected function collectOwnerAndResultTexts(AgentToolCallProvenance $agentToolCallProvenance): string
+    {
+        $conversationMessages = $this->findLoadedMessagesOfCall($agentToolCallProvenance);
+        if ($conversationMessages === null) {
+            return '';
+        }
+        $texts = [];
+        foreach ($conversationMessages->getElements() as $conversationMessage) {
+            if ($conversationMessage->isOwnerText()) {
+                $texts[] = (string)($conversationMessage->message ?? '');
+            }
+            if (isset($conversationMessage->toolCall)) {
+                $texts[] = (string)($conversationMessage->toolCall->result ?? '');
+            }
+        }
+        return implode("\n", $texts);
+    }
+
+    /**
+     * Concludes the consent {@see holdCallAfterUntrustedRead()} reserved for the call that ran: used when the write may
+     * have happened (also an unknown outcome), released when the tool reported it changed nothing.
+     *
+     * @throws AgentRunClaimLostException
+     */
+    protected function concludeUntrustedReadConsent(bool $writeMayHaveHappened): void
+    {
+        $ownerConsentReservation = $this->untrustedReadConsentReservation;
+        $this->untrustedReadConsentReservation = null;
+        if ($ownerConsentReservation === null) {
+            return;
+        }
+        $ownerConsentsService = $this->getOwnerConsentsService();
+        $callProvenance = $this->untrustedReadConsentCallProvenance;
+        if ($writeMayHaveHappened) {
+            $ownerConsentsService->markConsentUsed($callProvenance, $ownerConsentReservation);
+        } else {
+            $ownerConsentsService->releaseConsent($callProvenance, $ownerConsentReservation);
+        }
+    }
 
     /**
      * A gated call that threw or answered with an error did no outward work: the first-use binding it stamped on

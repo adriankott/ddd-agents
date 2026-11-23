@@ -111,6 +111,20 @@ examples/workers.yaml                   [consumer list for the six transports]
   class (`AgentMessengerTransports`), is a stored name. Moving one needs a migration entry (`Common.objectTypeMigrations`) or, for a
   message class, a drained queue or an alias in the host.
 
+## Untrusted Input (mandatory)
+
+No byte or string from outside — web pages, mail, files of a drive or a workspace, shell output, third-party API
+bodies, model output, a client's claims about type, name or size — is ever executed or interpreted as code. Use the
+Core helpers of `DDD\Infrastructure\Untrusted` (fixed-format image decode, guarded URL fetch, safe XML, contained
+paths, isolated processes, archive caps, untrusted-content responses); any other raw sink call needs an entry with its
+reason in `config/untrusted-sinks-allowlist.php`, enforced by `tests/Untrusted/UntrustedSinkScanTest.php`. Rule,
+helpers and traps: Core skill **`ddd-untrusted-input-specialist`** — load it before touching such a call site.
+
+In the agent loop: a READ or WORKSPACE tool returns untrusted content unless it declares
+`MCPToolReturnsTrustedContent` (`MCPToolContentTrust`); after such a call a WRITE or DELETE of the same owner turn
+waits for the owner's consent (or is refused, `config/app/AI/untrustedContent.php`), and a fetch of an unseen
+model-built URL is refused (skill `ddd-module-agents-decisions-and-guards-specialist`, injection defence).
+
 ## Messenger
 
 `AgentMessengerTransports` lists six transports and the routing. The framework registers neither; the host copies them

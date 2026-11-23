@@ -10,11 +10,10 @@ use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
 /**
  * Renders an agent conversation to a self-contained HTML transcript file — the pragmatic stand-in for a terminal
  * TUI (the console is line-oriented and cannot do collapse/scroll/mouse). The browser gives, for free, exactly the
- * three things the terminal can't: native collapsible tool results (`<details>`), real Markdown (bold, tables,
- * lists via marked.js from a CDN) and mouse/scroll/search.
+ * things the terminal can't: native collapsible tool results (`<details>`) and mouse/scroll/search.
  *
- * Pure trace → HTML string; no I/O (the caller writes the file). Tool args/results are HTML-escaped; assistant
- * Markdown is carried as the element's textContent and rendered client-side, so model `<…>`/`&` cannot inject.
+ * Pure trace → HTML string; no I/O (the caller writes the file). Everything is HTML-escaped and the page carries no
+ * script and a CSP without scripts or requests: model and tool text is foreign and must never run in a browser.
  * Delegation children render as nested, indented blocks under their delegate call.
  */
 class ConversationHtmlTranscript
@@ -75,7 +74,7 @@ class ConversationHtmlTranscript
                 $this->escape((string)$message->message)
             );
         }
-        // Assistant: carry raw Markdown as textContent (escaped here, decoded back by the browser, rendered by marked).
+        // Assistant: the raw Markdown as escaped text (shown pre-wrapped, never rendered as HTML).
         return sprintf(
             '<div class="msg assistant%s"><span class="id">%s</span><span class="role">agent&gt;</span><div class="md">%s</div></div>',
             $delegationClass,
@@ -126,15 +125,16 @@ class ConversationHtmlTranscript
 
     protected function shell(string $body): string
     {
-        // marked.js (CDN) renders the assistant Markdown client-side; <details> handle collapse natively.
+        // No script at all: model and tool text is foreign, so the Markdown stays escaped text (pre-wrap) and the CSP
+        // forbids scripts and requests even when someone opens the file from a server; <details> collapse natively.
         return <<<HTML
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">
 <title>Agent transcript</title>
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <style>
   :root { color-scheme: light dark; }
   body { font: 14px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; max-width: 64rem; margin: 0 auto; padding: 1.5rem; }
@@ -150,7 +150,7 @@ class ConversationHtmlTranscript
   .skills { color: #38a; }
   .err { color: #c33; }
   .delegation { margin-left: 1.5rem; border-left: 2px solid #b6b; padding-left: .75rem; }
-  .md { display: inline-block; vertical-align: top; }
+  .md { display: inline-block; vertical-align: top; white-space: pre-wrap; word-break: break-word; }
   .md table { border-collapse: collapse; margin: .5rem 0; }
   .md th, .md td { border: 1px solid #8884; padding: .2rem .5rem; }
   .md code { background: #8882; padding: 0 .25rem; border-radius: 3px; }
@@ -161,11 +161,6 @@ class ConversationHtmlTranscript
 </head>
 <body>
 $body
-<script>
-  document.querySelectorAll('.md').forEach(function (el) {
-    el.innerHTML = marked.parse(el.textContent);
-  });
-</script>
 </body>
 </html>
 HTML;

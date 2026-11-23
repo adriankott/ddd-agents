@@ -53,6 +53,8 @@ src/Domain/AI/Repo/Argus/Conversations/Decisions/**	decisions-and-guards
 src/Domain/AI/Repo/Argus/Guard/**	decisions-and-guards
 src/Domain/AI/Exceptions/Conversations/OwnerConsentMissingException.php	decisions-and-guards
 config/app/AI/decisionModel.php	decisions-and-guards
+config/app/AI/untrustedContent.php	decisions-and-guards
+config/untrusted-sinks-allowlist.php	decisions-and-guards
 config/app/AI/Prompts/AI/Agent/*Decision.md	decisions-and-guards
 config/app/AI/Prompts/AI/Agent/OwnerMessageInjectionGateRules.md	decisions-and-guards
 # web research (ddd-module-agents-tools-specialist): pierces the autonomy folders config/app/AI/Skills/** and src/Presentation/Mcp/Client/AI/**

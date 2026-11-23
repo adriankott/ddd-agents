@@ -11,6 +11,7 @@ use DDD\Domain\AI\Entities\MCPPackages\MCPToolEffect;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolExecutionTimeout;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolRefreshesState;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolReturnsUntrustedContent;
+use DDD\Domain\AI\Entities\MCPPackages\MCPToolFetchesModelChosenUrl;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolSummary;
 use DDD\Domain\AI\Entities\Conversations\Messages\ContextRetentionSettings;
 use DDD\Domain\AI\Entities\WebSearch\PageScreenshots\PageScreenshotPart;
@@ -65,6 +66,7 @@ class WebPageScreenshotMCPPackage extends MCPPackage
     #[MCPToolEffect(MCPToolEffect::READ)]
     #[MCPToolRefreshesState('a screenshot reports the CURRENT rendered page — identical args legitimately return a changed image after the page changes')]
     #[MCPToolReturnsUntrustedContent('the rendered pixels and text of any web page, made by whoever runs the site')]
+    #[MCPToolFetchesModelChosenUrl('url')]
     #[MCPToolExecutionTimeout(45, 'one render (≤ 30 s), and a second one in a tall window for a page that blocks scrolling')]
     #[MCPToolSummary('Render a URL and SEE one part of it as screenshots (layout/colours/images/design; part 1 = top 4,000 px, the answer names the other parts; device desktop|mobile; noCache for a fresh render). For a page\'s TEXT use getWebPageAsMarkdown. Needs a vision-capable model.')]
     public function getWebPageAsScreenshot(

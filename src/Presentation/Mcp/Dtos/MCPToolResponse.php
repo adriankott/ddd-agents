@@ -38,6 +38,12 @@ class MCPToolResponse extends ValueObject
     /** The environment-wide write lock refused a tool that is no declared read (the process must not change data). */
     public const string REFUSAL_ENVIRONMENT_WRITE_LOCKED = 'ENVIRONMENT_WRITE_LOCKED';
 
+    /** A write after an untrusted read of the same turn, refused for the turn (`writeAfterUntrustedRead: refuse`). */
+    public const string REFUSAL_WRITE_AFTER_UNTRUSTED_READ = 'WRITE_AFTER_UNTRUSTED_READ';
+
+    /** A fetch of a model-built URL (an unseen query string or fragment) after an untrusted read of the same turn. */
+    public const string REFUSAL_UNSEEN_URL_AFTER_UNTRUSTED_READ = 'UNSEEN_URL_AFTER_UNTRUSTED_READ';
+
     /**
      * @var string|null Set when the executor's GATE refused the call BEFORE it ran (one of the REFUSAL_* consts).
      *      A gate refusal is a sanctioned "call again once the gate opens" — the loop's repeat guards must not count

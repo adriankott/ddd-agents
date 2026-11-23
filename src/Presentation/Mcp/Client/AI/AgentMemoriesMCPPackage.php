@@ -29,6 +29,7 @@ use DDD\Presentation\Mcp\Client\AI\Dtos\AgentMemoryListRequestDto;
 use DDD\Presentation\Mcp\Client\AI\Dtos\AgentMemoryRememberRequestDto;
 use DDD\Presentation\Mcp\Client\AI\Dtos\AgentMemorySearchRequestDto;
 use DDD\Presentation\Mcp\Client\AI\Dtos\AgentMemoryUpdateRequestDto;
+use DDD\Domain\AI\Entities\MCPPackages\MCPToolReturnsTrustedContent;
 
 /**
  * The tools of the package's memory store: recall (list everything, or search a topic), store, correct and forget a
@@ -40,6 +41,7 @@ use DDD\Presentation\Mcp\Client\AI\Dtos\AgentMemoryUpdateRequestDto;
  * argument. The space defaults to the conversation's space. A memory about the owner as a person belongs to the
  * account, a memory about the business to the space.
  */
+#[MCPToolReturnsTrustedContent('the agent\'s own memory rows as the platform stores them')]
 class AgentMemoriesMCPPackage extends MCPPackage
 {
     public static ?string $name = 'agent.memories';

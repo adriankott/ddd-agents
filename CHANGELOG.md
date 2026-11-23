@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.1.30
+
+- Security: tools are untrusted by default. A READ or WORKSPACE tool returns untrusted content unless it (or its
+  package) declares `MCPToolReturnsTrustedContent` or is listed in the new `config/app/AI/untrustedContent.php`
+  (`trustedPackages`, `trustedTools`); `MCPToolReturnsUntrustedContent` still forces untrusted, WRITE / DELETE tools
+  are trusted (`MCPToolContentTrust`). An untrusted result without marks carries
+  `ToolResultUntrustedSegments::UNMARKED_READING_RULE` on its platform note and is read by the tool-result screen.
+  The package's memories, schedules, run reports and mandates packages declare trust.
+- Security: the executor holds a WRITE or DELETE (or a tool without a declared effect) once an untrusted tool completed
+  in the same owner turn: it runs only after the owner-consent check finds the owner's yes to this step
+  (`writeAfterUntrustedRead: ownerConsent`, the default; refusal kind `OWNER_CONFIRMATION_REQUIRED`), or is refused for
+  the turn (`refuse`, kind `WRITE_AFTER_UNTRUSTED_READ`). No value switches it off. Tools with their own consent step
+  (`MCPToolRequiresOwnerConfirmation`), READ and WORKSPACE calls, the owner's MCP client and the eval harness are not
+  held. Without the site `ownerConsent` on, in a scheduled run and in a delegated sub-task the held write is refused.
+- Security: `MCPToolFetchesModelChosenUrl` (on `getWebPageAsMarkdown`, `extractInformationFromWebPagesWithFastLLM`,
+  `getWebPageAsScreenshot`): after an untrusted read of the turn a URL whose query string or fragment appears in no
+  owner message and no tool result is refused (`UNSEEN_URL_AFTER_UNTRUSTED_READ`).
+- Security: `PageScreenshot` decodes only PNG through Core's `RasterImageDecoder` (coder pinned, limits).
+- Security: the HTML transcript renders no script (no CDN marked.js, escaped Markdown, a CSP without scripts).
+- Security: `WidgetBlock::getFields()` deep-copies with `allowed_classes: [stdClass]`.
+- Web: images in model Markdown load only from the page's origin, inline raster data and
+  `AgentsEnvironment.markdownImageHosts`; any other source renders as a link.
+- Added: the sink scan (`tests/Untrusted/UntrustedSinkScanTest.php`, `config/untrusted-sinks-allowlist.php`).
+- Requires `mgamadeus/ddd` ^3.40.0.
+- Migration: declare `MCPToolReturnsTrustedContent` on the host packages that read only the platform's own records
+  (or list them in `untrustedContent.php`); keep tools that read third-party text (customer messages, mail, files,
+  pages) untrusted; switch the decision site `ownerConsent` on if the agent writes after such reads, or choose
+  `refuse`. Hosts with a markdown image CDN set `markdownImageHosts`.
+
 ## 0.1.29
 
 - Added: `AgentEvalWorkspaceParticipant` (tag `ai.agent_eval_workspace_participant`): a module that keeps state per

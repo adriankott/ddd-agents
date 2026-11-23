@@ -7,6 +7,8 @@ namespace DDD\Domain\AI\Entities\WebSearch\PageScreenshots;
 use DDD\Domain\AI\Repo\Argus\WebSearch\PageScreenshots\ArgusPageScreenshot;
 use DDD\Domain\Base\Entities\LazyLoad\LazyLoadRepo;
 use DDD\Domain\Base\Entities\ValueObject;
+use DDD\Infrastructure\Untrusted\RasterImageDecoder;
+use DDD\Infrastructure\Untrusted\UnsupportedImageFormatException;
 
 /**
  * A rendered-page SCREENSHOT of a URL, captured through the host's screenshot endpoint
@@ -55,8 +57,29 @@ class PageScreenshot extends ValueObject
         if ($imageBlob === null) {
             return 0;
         }
-        $imageSize = getimagesizefromstring($imageBlob);
-        return $imageSize !== false ? (int)$imageSize[$dimensionIndex] : 0;
+        if (RasterImageDecoder::detectFormat($imageBlob) !== RasterImageDecoder::FORMAT_PNG) {
+            return 0;
+        }
+        try {
+            $rasterImageInfo = RasterImageDecoder::probe($imageBlob);
+        } catch (\ImagickException) {
+            return 0;
+        }
+        return $dimensionIndex === 0 ? $rasterImageInfo->width : $rasterImageInfo->height;
+    }
+
+    /**
+     * The capture decoded as what the renderer sends: a PNG, the coder pinned ({@see RasterImageDecoder}). Any other
+     * bytes are refused before Imagick sees them.
+     *
+     * @throws \ImagickException
+     */
+    protected static function readCapturedPng(string $imageBlob): \Imagick
+    {
+        if (RasterImageDecoder::detectFormat($imageBlob) !== RasterImageDecoder::FORMAT_PNG) {
+            throw UnsupportedImageFormatException::forDetectedType(RasterImageDecoder::describeContentType($imageBlob));
+        }
+        return RasterImageDecoder::readBlob($imageBlob);
     }
 
     /**
@@ -73,8 +96,7 @@ class PageScreenshot extends ValueObject
             return $this;
         }
         try {
-            $imagick = new \Imagick();
-            $imagick->readImageBlob($imageBlob);
+            $imagick = static::readCapturedPng($imageBlob);
             $width = $imagick->getImageWidth();
             $height = $imagick->getImageHeight();
             $contentBottom = $height;
@@ -146,8 +168,7 @@ class PageScreenshot extends ValueObject
             return $firstSegmentIndex === 0 ? [(string)$this->content] : [];
         }
         try {
-            $imagick = new \Imagick();
-            $imagick->readImageBlob($imageBlob);
+            $imagick = static::readCapturedPng($imageBlob);
             $width = $imagick->getImageWidth();
             $height = $imagick->getImageHeight();
             $format = $imagick->getImageFormat();

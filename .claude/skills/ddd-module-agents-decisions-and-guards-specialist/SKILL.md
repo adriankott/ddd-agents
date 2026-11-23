@@ -1,6 +1,6 @@
 ---
 name: ddd-module-agents-decisions-and-guards-specialist
-description: "Explains where a typed decision model judges a step of the mgamadeus/ddd-agents loop and what guards the owner against a wrong or hostile step. Covers every decision site (reply language, skill and plan-item preload, reasoning effort, plan dynamics, direct widget, turn-start line, turn closing, stall recovery, injection screening, owner consent), modes off/shadow/on/cohort, decisionModel.php, run settings and the kill switch, fallbacks, adding a site (ArgusAgentDecisionTrait, AgentDecisionCallsService, question rules, probes), injection defence (MCPToolReturnsUntrustedContent, gate rules, sentinel-canary probe), owner consent before an irreversible step (OwnerConsentsService), the circuit breaker and decision statistics. Use when switching off or tuning a decision site, a reply comes in the wrong language, a final text is bounced, a tool answers NOT DONE or OWNER_CONFIRMATION_REQUIRED, a tool result was removed for security, decisions show fallback:breaker, or a decision site is added."
+description: "Explains where a typed decision model judges a step of the mgamadeus/ddd-agents loop and what guards the owner against a wrong or hostile step. Covers every decision site (reply language, skill and plan-item preload, reasoning effort, plan dynamics, direct widget, turn-start line, turn closing, stall recovery, injection screening, owner consent), modes, decisionModel.php, the kill switch, fallbacks, adding a site (ArgusAgentDecisionTrait, AgentDecisionCallsService, probes), injection defence (untrusted-by-default tools, MCPToolReturnsTrustedContent, untrustedContent.php, the write gate after an untrusted read, gate rules), owner consent (OwnerConsentsService), the circuit breaker and decision statistics. Use when switching off or tuning a decision site, a reply comes in the wrong language, a final text is bounced, a write answers NOT DONE, OWNER_CONFIRMATION_REQUIRED or WRITE_AFTER_UNTRUSTED_READ, a tool result was removed for security, decisions show fallback:breaker, or a decision site is added."
 metadata:
   author: mgamadeus
   version: "0.1.0"
@@ -79,6 +79,9 @@ breaker, and the statistics that show whether a decision earns its place.
   under a purpose that works on without the owner, and there the counter always judges first; the model is asked only
   where the counter does not bounce. What decides is the `turnClosing` site mode alone. Every other conversation runs
   the counter alone (the sequence itself: `ddd-module-agents-loop-specialist`).
+- **A READ tool is untrusted unless it declares `MCPToolReturnsTrustedContent`** (or is listed in
+  `untrustedContent.php`): after its call a write of the same turn needs the owner's consent, and with `ownerConsent`
+  not `on` that write is refused. Declare trust on the packages that read only the platform's own records.
 - **A transient conversation is never screened** for injections: its message ids are not real rows.
 - **The breaker is shared by every runner site.** One transport failure of a runner site benches every runner site in
   every worker for `breakerSeconds`. The owner-message injection check neither trips nor closes it; the tool-result
@@ -152,7 +155,7 @@ return [
 | Switch the layer or one site for a single conversation (kill switch, row, admin override) | [decision sites](references/decision-sites.md) |
 | Add a decision of the host's own (a tool-side check, a host service) | [adding a decision site](references/adding-a-decision-site.md) |
 | Write or tune a question; probe it on recorded cases before wiring | [adding a decision site](references/adding-a-decision-site.md) |
-| Mark a tool whose result carries third-party text; replace the gate rules; a result reads "removed for security" | [injection defence](references/injection-defence.md) |
+| Mark a tool whose result carries third-party text or declare one trusted; a write answers OWNER_CONFIRMATION_REQUIRED or WRITE_AFTER_UNTRUSTED_READ after a web read; a URL fetch is refused as unseen; replace the gate rules; a result reads "removed for security" | [injection defence](references/injection-defence.md) |
 | An owner message shows the filter notice to the model | [injection defence](references/injection-defence.md) |
 | A tool must not act without the owner's explicit yes; the tool answers NOT DONE | [owner consent](references/owner-consent.md) |
 | Decisions show `fallback:breaker` or `fallback:transport`; the decision model seems down | [circuit breaker and statistics](references/circuit-breaker-and-statistics.md) |

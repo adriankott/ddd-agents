@@ -166,6 +166,12 @@ export interface AgentsEnvironment {
    * first surface mounts and the last unmounts). Default: nothing is dispatched.
    */
   buildChatSurfaceOpenChangedAction?: (isOpen: boolean) => AgentsStateAction;
+  /**
+   * Hosts an image in model text may load from, besides the page's own origin and inline raster data: `cdn.example.com`
+   * or `*.example.com` (https only). Model text is foreign; an image of any other host renders as a link, so a page the
+   * agent read cannot make the browser send data to its host. Default: none.
+   */
+  markdownImageHosts?: readonly string[];
   components?: Partial<AgentsComponents>;
   texts?: AgentsTexts;
   /**

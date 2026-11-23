@@ -57,6 +57,7 @@ use DDD\Presentation\Mcp\Client\AI\Dtos\TaskScheduleUpdateRequestDto;
 use Psr\Cache\InvalidArgumentException;
 use ReflectionException;
 use Throwable;
+use DDD\Domain\AI\Entities\MCPPackages\MCPToolReturnsTrustedContent;
 
 /**
  * Scheduled tasks the agent sets up for the owner: a one-off task that runs in the background now, a one-time task at
@@ -75,6 +76,7 @@ use Throwable;
  * ({@see TASK_LIST_WIDGET_TYPE}, {@see composeTaskListWidgetNote()}), and the account rights: the package gates no
  * tool by a right; an application that has one declares `MCPRequiresAccountRights` on its subclass.
  */
+#[MCPToolReturnsTrustedContent('the account\'s task schedules as the platform stores them')]
 class AgentTaskSchedulesMCPPackage extends MCPPackage
 {
     public static ?string $name = 'agent.taskSchedules';

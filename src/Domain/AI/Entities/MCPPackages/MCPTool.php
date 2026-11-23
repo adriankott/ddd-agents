@@ -51,10 +51,10 @@ class MCPTool extends ValueObject
     #[HideProperty]
     public ?MCPToolEffect $effect = null;
 
-    /** True if this tool carries #[MCPToolReturnsUntrustedContent] (on the method OR its package class) — its results are screened for injections. */
+    /** True if this tool returns untrusted content ({@see MCPToolContentTrust}: declared untrusted, or a READ / WORKSPACE tool not declared trusted) — its results are screened for injections and hold the turn's writes for the owner's consent. */
     public bool $returnsUntrustedContent = false;
 
-    /** The MCP tool annotations derived from {@see $effect} and {@see $returnsUntrustedContent} — on the `tools/list` wire for external clients. */
+    /** The MCP tool annotations derived from {@see $effect} and an explicit #[MCPToolReturnsUntrustedContent] — on the `tools/list` wire for external clients. */
     public ?MCPToolAnnotations $annotations = null;
 
     /** @var int|null How many image parts the tool's result may carry (#[MCPToolImageBudget], method before package class); null = the executor's default. */
@@ -105,10 +105,11 @@ class MCPTool extends ValueObject
         // #[MCPToolEffect] — the METHOD's own declaration only (the same read as MCPToolEffectCatalog)
         $effectAttributes = $reflectionMethod->getAttributes(MCPToolEffect::class);
         $mcpFunction->effect = $effectAttributes !== [] ? $effectAttributes[0]->newInstance() : null;
-        // #[MCPToolReturnsUntrustedContent] — same method-OR-class read; the loop screens its results.
-        $mcpFunction->returnsUntrustedContent = $reflectionMethod->getAttributes(MCPToolReturnsUntrustedContent::class) !== []
+        // untrusted unless declared trusted ({@see MCPToolContentTrust}); the MCP annotations keep the explicit declaration
+        $mcpFunction->returnsUntrustedContent = MCPToolContentTrust::isUntrustedToolMethod($mcpPackageReflectionClass, $reflectionMethod);
+        $declaresUntrustedContent = $reflectionMethod->getAttributes(MCPToolReturnsUntrustedContent::class) !== []
             || $mcpPackageReflectionClass->getAttributes(MCPToolReturnsUntrustedContent::class) !== [];
-        $mcpFunction->annotations = MCPToolAnnotations::fromToolDeclarations($mcpFunction->effect, $mcpFunction->returnsUntrustedContent);
+        $mcpFunction->annotations = MCPToolAnnotations::fromToolDeclarations($mcpFunction->effect, $declaresUntrustedContent);
         // #[MCPToolExecutionTimeout] — the method's own ceiling wins over the package class's; null = loop default.
         $executionTimeoutAttributes = $reflectionMethod->getAttributes(MCPToolExecutionTimeout::class);
         if ($executionTimeoutAttributes === []) {

@@ -93,7 +93,7 @@ class WidgetBlock extends ValueObject
             return null;
         }
         /** @var stdClass $fields */
-        $fields = unserialize(serialize($this->fields));
+        $fields = unserialize(serialize($this->fields), ['allowed_classes' => [stdClass::class]]);
         return $fields;
     }
 

@@ -40,7 +40,8 @@ import type {
   AgentsTooltipProps,
   AgentsTrendDeltaProps,
 } from "./types";
-import { useAgentsTexts } from "../AgentsProvider";
+import { useAgentsEnvironment, useAgentsTexts } from "../AgentsProvider";
+import { isAllowedMarkdownImageSource } from "./markdown-image-source";
 import { classNames } from "../class-names";
 
 const TEXT_ELEMENT_BY_ROLE = {
@@ -678,10 +679,26 @@ const DefaultSegmentBar = (props: AgentsSegmentBarProps) => {
 
 const NO_MARKDOWN_PLUGINS: PluggableList = [];
 
-/** Drops an image without a source: streamed Markdown emits a partial `![alt](` that would fetch the page itself. */
+/**
+ * An image of model text loads only from an allowed source (`isAllowedMarkdownImageSource`: the page's origin, inline
+ * raster data, `AgentsEnvironment.markdownImageHosts`); any other becomes a link the owner may open. Drops an image
+ * without a source: streamed Markdown emits a partial `![alt](` that would fetch the page itself.
+ */
 const MarkdownImage: Components["img"] = (imageProps) => {
   const { src, node, ...otherProps } = imageProps;
-  return src ? <img src={src} {...otherProps} /> : null;
+  const { markdownImageHosts } = useAgentsEnvironment();
+  if (!src) {
+    return null;
+  }
+  const pageOrigin = typeof window !== "undefined" ? window.location.origin : undefined;
+  if (isAllowedMarkdownImageSource(src, pageOrigin, markdownImageHosts)) {
+    return <img src={src} {...otherProps} />;
+  }
+  return (
+    <a href={src} target="_blank" rel="noopener noreferrer nofollow" referrerPolicy="no-referrer">
+      {otherProps.alt || src}
+    </a>
+  );
 };
 
 const DefaultMarkdown = (props: AgentsMarkdownProps) => {

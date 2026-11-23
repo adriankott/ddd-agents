@@ -21,6 +21,7 @@ use DDD\Presentation\Mcp\Client\AI\Dtos\AgentMandateMcpResponseDto;
 use DDD\Presentation\Mcp\Client\AI\Dtos\AgentMandatesMcpResponseDto;
 use Psr\Cache\InvalidArgumentException;
 use ReflectionException;
+use DDD\Domain\AI\Entities\MCPPackages\MCPToolReturnsTrustedContent;
 
 /**
  * What the three mandate tools DO — grant from the customer's own verified statement, list, revoke — without
@@ -50,6 +51,7 @@ use ReflectionException;
  * works for no space. Revocation is deliberately un-checked (safety-directed — any customer utterance suffices to
  * revoke).
  */
+#[MCPToolReturnsTrustedContent('mandates and their state as the platform stores them')]
 abstract class AgentMandateToolCallsMCPPackage extends MCPPackage
 {
     /**
