@@ -141,8 +141,8 @@ whole), e.g. `'Demo.Notes' => [DemoNotesMCPPackage::class]`, and write the skill
 A file store module (e.g. a cloud drive) implements `DDD\Domain\AI\Services\Drives\AgentDriveStore`; the package's
 `agent.drive` tools (`listDriveFiles`, `saveDriveFile`, `showDriveFiles`) and the file card `DriveFiles` reach it
 through `AgentDriveStoresService`, which also resolves file arguments (a path of the own drive, `drivespaces/<name>/…`,
-`drive/<id>`). The store answers under the caller's rights, hands out facts only (no content, no URL) and copies on
-the server; the tool checks the mount's mode and asks the owner for a `WRITE_WITH_CONSENT` mount.
+`drive/<id>`). The store answers under the caller's rights, hands out facts only (no content, no content URL; at most `AgentDriveFile::$openLink`, the host screen showing the
+file, set through `setOpenLinkIfSafe()`) and copies on the server; the tool checks the mount's mode and asks the owner for a `WRITE_WITH_CONSENT` mount.
 
 ## The contract every meta tool shares
 

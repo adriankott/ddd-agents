@@ -8,7 +8,8 @@ use DDD\Domain\Base\Entities\ValueObject;
 use DDD\Infrastructure\Base\DateTime\DateTime;
 
 /**
- * One file or folder of a drive as the agent and a file card see it: facts only, never content and never a URL.
+ * One file or folder of a drive as the agent and a file card see it: facts only, never content and never a content URL.
+ * The one link it may carry is {@see $openLink}: where the host's own screen shows the file.
  */
 class AgentDriveFile extends ValueObject
 {
@@ -46,6 +47,39 @@ class AgentDriveFile extends ValueObject
 
     /** @var string|null A state the agent must know, e.g. `pending scan`, `blocked`, `uncommitted` */
     public ?string $state = null;
+
+    /**
+     * @var string|null Where the host's admin screen shows this file or folder (a path of the host, e.g.
+     *      `/admin/drive?space=12&path=%2FTemplates%2Fletter.typ&file=812`), set by the store when the host configured
+     *      a link; null otherwise. Never a content URL and never another origin: {@see isSafeOpenLink()}
+     */
+    public ?string $openLink = null;
+
+    /**
+     * Sets the open link when it is a path of the host (`/…`, not `//…`) or an absolute http(s) URL; anything else
+     * (`javascript:`, `data:`, a protocol-relative URL) leaves it null.
+     * @param string|null $openLink
+     * @return void
+     */
+    public function setOpenLinkIfSafe(?string $openLink): void
+    {
+        $this->openLink = $openLink !== null && static::isSafeOpenLink($openLink) ? $openLink : null;
+    }
+
+    /**
+     * @param string $openLink
+     * @return bool true for a host path (`/…`) or an absolute http(s) URL without control characters
+     */
+    public static function isSafeOpenLink(string $openLink): bool
+    {
+        if ($openLink === '' || preg_match('/[\x00-\x20\x7f\\\\]/', $openLink) === 1) {
+            return false;
+        }
+        if (str_starts_with($openLink, '/')) {
+            return !str_starts_with($openLink, '//');
+        }
+        return preg_match('#^https?://[^/?\#]+#i', $openLink) === 1;
+    }
 
     public function uniqueKey(): string
     {

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.33
+
+- Drive file cards: `AgentDriveFile::$openLink` (nullable) — where the host's admin screen shows the file or folder.
+  A drive store sets it through `setOpenLinkIfSafe()` (a host path `/…` or an absolute http(s) URL; `javascript:`,
+  `data:` and protocol-relative links are dropped). It reaches the card component through the `DriveFiles` hydration
+  read (`POST …/driveFiles/cards` → `files.elements[].openLink`); the model's file lines do not carry it. A renderer
+  uses it as the card's "open" link and falls back to its own behaviour when it is null.
+
 ## 0.1.32
 
 - Added: sandbox administration for an admin screen of the agent workspaces. Host contract
