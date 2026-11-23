@@ -74,6 +74,7 @@ class AgentSandboxActionLogEntry extends Entity
 
     /** @var string|null The reason given for a forced action */
     #[Length(max: 1000)]
+    #[DatabaseIndex(indexType: DatabaseIndex::TYPE_NONE)]
     public ?string $reason = null;
 
     /** @var string|null SUCCEEDED, REFUSED or FAILED */
@@ -84,5 +85,6 @@ class AgentSandboxActionLogEntry extends Entity
 
     /** @var string|null Why it was refused or failed, or what it did */
     #[Length(max: 1000)]
+    #[DatabaseIndex(indexType: DatabaseIndex::TYPE_NONE)]
     public ?string $outcomeDetail = null;
 }

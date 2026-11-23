@@ -23,7 +23,7 @@ One service implementing `DDD\Domain\AI\Services\Sandboxes\AgentSandboxAdministr
 | `readFileBytes(string $workspaceKey, string $relativePath, int $maxBytes): ?string` | at most `$maxBytes + 1` bytes; null = no file |
 | `findDriveStatus(string $workspaceKey): AgentSandboxDriveStatus` | unsaved changes against the drive |
 | `findProcesses(string $workspaceKey): AgentSandboxProcesses` | processes and background jobs of the session |
-| `findRecentCommands(string $workspaceKey, int $limit): AgentSandboxCommands` | the last commands, newest first |
+| `findRecentCommands(string $workspaceKey, int $limit): AgentSandboxCommands` | the last commands, newest first; fill `status` (`RUNNING`/`EXITED`/`KILLED`/`TIMED_OUT`: exit code → EXITED, killed job → KILLED, runner timeout → TIMED_OUT, else RUNNING; null = unknown) |
 | `findSessionEvents(string $workspaceKey, int $limit): AgentSandboxSessionEvents` | the session log, newest first |
 | `startSession(string $workspaceKey): void` | warm a session |
 | `offloadSession(string $workspaceKey): AgentSandboxOffloadResult` | commit the drive changes, then release the session |

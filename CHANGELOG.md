@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.34
+
+- Sandbox: `AgentSandboxCommand::$status` (`RUNNING`, `EXITED`, `KILLED`, `TIMED_OUT`; null = unknown). The host fills
+  it from the runner: an exit code → EXITED, a killed job → KILLED, the runner's timeout → TIMED_OUT, else RUNNING. A
+  screen never reads null as running.
+- Sandbox audit: `reason` and `outcomeDetail` of `AgentSandboxActionLogEntries` (VARCHAR(1000)) get no index any more
+  (the generator indexes every scalar column by default). A host that already created the table drops the two indexes
+  through the schema diff.
+
 ## 0.1.33
 
 - Drive file cards: `AgentDriveFile::$openLink` (nullable) — where the host's admin screen shows the file or folder.
