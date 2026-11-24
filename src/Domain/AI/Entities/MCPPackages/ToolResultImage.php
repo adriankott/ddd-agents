@@ -43,8 +43,9 @@ class ToolResultImage extends ValueObject
     public string $sha256 = '';
 
     /**
-     * @var string Where the bytes can be RE-RESOLVED after this process forgets them: `inline` (single-turn spool,
-     * the default — a browser viewport exists only in the moment it was captured) or the name a
+     * @var string Where the bytes can be RE-RESOLVED after this process forgets them: `inline` (the default — set to
+     * `spool` when the call completes and the package's spool took the bytes, {@see ToolCallImageReference::SOURCE_STORE_SPOOL})
+     * or the name a
      * {@see ToolCallImageStore} package declares (a durable catalog picture the loop re-reads on every model call
      * inside the wire window, so the picture survives the 12-step worker chunks and turn boundaries).
      */

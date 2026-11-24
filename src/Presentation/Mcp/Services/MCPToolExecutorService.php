@@ -17,6 +17,7 @@ use DDD\Domain\Common\Entities\Accounts\Account;
 use DDD\Infrastructure\Exceptions\ForbiddenException;
 use DDD\Domain\AI\Entities\Conversations\Messages\RunSettings;
 use DDD\Domain\AI\Services\Conversations\Agent\OwnerConsentsService;
+use DDD\Domain\AI\Services\Conversations\Agent\AgentToolCallImageSpoolService;
 use DDD\Domain\AI\Entities\MCPPackages\MCPServerProvidedInput;
 use DDD\Domain\AI\Entities\MCPPackages\MCPTool;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolSummary;
@@ -333,6 +334,16 @@ class MCPToolExecutorService extends Service
     {
         if (!$toolCallImageReference->isReResolvable()) {
             return null;
+        }
+        if ($toolCallImageReference->sourceStore === ToolCallImageReference::SOURCE_STORE_SPOOL) {
+            // the package's own durable spool of pictures without a store (AgentToolCallImageSpoolService)
+            try {
+                /** @var AgentToolCallImageSpoolService $agentToolCallImageSpoolService */
+                $agentToolCallImageSpoolService = DDDService::instance()->getService(AgentToolCallImageSpoolService::class);
+                return $agentToolCallImageSpoolService->resolveSpooledToolCallImage($toolCallImageReference);
+            } catch (\Throwable) {
+                return null;
+            }
         }
         foreach ($packageClasses as $packageClass) {
             if (!is_a($packageClass, ToolCallImageStore::class, true)

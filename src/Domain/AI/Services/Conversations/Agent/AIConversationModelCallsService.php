@@ -660,7 +660,8 @@ class AIConversationModelCallsService extends Service
      * come from the transient carry this invocation captured ({@see AIConversation::$transientToolCallImages}) or —
      * for a DURABLE picture — are re-resolved through the loaded {@see \DDD\Domain\AI\Entities\MCPPackages\ToolCallImageStore}
      * package on every call, so a catalog sheet survives the 12-step worker chunk, the turn boundary and a resumed
-     * worker. An inline image (a browser viewport) outside the carry is gone.
+     * worker; a picture without a store of its own was spooled when its call completed and is re-read the same way
+     * ({@see AgentToolCallImageSpoolService}). An inline image the spool could not take is gone outside the carry.
      *
      * The wire cap counts PICTURES (`maxToolCallImagesOnWire`): newest results first, whole, until the cap is reached;
      * the newest result always rides (truncated to the cap). Every candidate that does NOT ride gets the dropped marker

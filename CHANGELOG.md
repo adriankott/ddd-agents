@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.3.7
+
+**Added:**
+
+- **Durable tool pictures.** A picture a tool returns without a store of its own (a browser viewport, a workspace
+  image) is written to the package's spool when the call completes (`AgentToolCallImageSpoolService`), and its
+  reference names it (`ToolCallImageReference::SOURCE_STORE_SPOOL`, id `<conversation id>/<sha256>`). Every later model
+  call re-reads the same base64 text (`MCPToolExecutorService::resolveToolCallImage()`), so the frozen tool result is
+  byte-identical across worker invocations and turns. Before, such a picture left at the end of its worker invocation:
+  the next invocation sent the "no longer on the wire" marker in its place, the prompt cache was written again from that
+  result on, and on the Messages API the thinking after it was dropped (one drop per picture that left). A picture now
+  leaves only on purpose: its result is stubbed or cleared, the picture cap pushes it off, or a compaction removes it.
+- Where the bytes go: `config/app/AI/toolCallImageSpool.php` (`AI.toolCallImageSpool`). The Core object store
+  `agentToolImages` when it is configured (`OBJECT_STORAGE_AGENTTOOLIMAGES_*`, key prefix `agent-tool-images/`), else
+  the application cache for 24 h (at most 2 MB per picture). Every read checks the bytes again: the hash against the
+  reference, the type from the magic bytes against the allow-list.
+- It degrades without errors: a failed or impossible write leaves the picture inline (the behaviour before), a failed
+  read is a dropped picture, `enabled => false` switches the spool off. A per-process cache (APCu under the CLI) is not
+  shared by the workers, so there the picture leaves as before.
+- Cost: pictures ride on more calls (while their result is in full and the cap allows them); on a cached prefix they
+  are read from the cache.
+
+**Host steps:**
+
+- None required. For the effect, the workers need a shared cache (Redis) or the object store: configure
+  `OBJECT_STORAGE_AGENTTOOLIMAGES_*` (or name another store in an own `toolCallImageSpool.php`) and give the key prefix a
+  lifecycle rule (e.g. 30 days). No table, no DDL.
+
 ## 0.3.6
 
 **Fixed:**

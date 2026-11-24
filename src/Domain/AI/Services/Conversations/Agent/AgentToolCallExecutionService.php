@@ -95,6 +95,9 @@ class AgentToolCallExecutionService extends Service
                 ArgusApiOperations::clearCallJournal();
             }
         }
+        // a picture without a store of its own goes to the durable spool first, so the reference built next names it
+        // and the next worker invocation re-reads the same bytes (the frozen result stays byte-identical)
+        $this->findToolCallImageSpoolService()->spoolInlineToolResultImages($toolResult, $conversation);
         $toolCall->applyExecutionOutcome($toolResult);
         $toolCall->wasHeldForOwnerConsent = $provenance->isWriteHeldForOwnerConsent;
         return $toolResult;
@@ -105,6 +108,13 @@ class AgentToolCallExecutionService extends Service
         /** @var EvalOutboundRecipientsService $evalOutboundRecipientsService */
         $evalOutboundRecipientsService = DDDService::instance()->getService(EvalOutboundRecipientsService::class);
         return $evalOutboundRecipientsService;
+    }
+
+    protected function findToolCallImageSpoolService(): AgentToolCallImageSpoolService
+    {
+        /** @var AgentToolCallImageSpoolService $agentToolCallImageSpoolService */
+        $agentToolCallImageSpoolService = DDDService::instance()->getService(AgentToolCallImageSpoolService::class);
+        return $agentToolCallImageSpoolService;
     }
 
     protected function findToolExecutor(): MCPToolExecutorService

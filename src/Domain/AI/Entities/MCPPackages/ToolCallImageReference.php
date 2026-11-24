@@ -14,8 +14,15 @@ use DDD\Domain\Base\Entities\ValueObject;
  */
 class ToolCallImageReference extends ValueObject
 {
-    /** The single-turn spool: the bytes exist only in the process that captured them (a browser viewport) — never re-resolvable. */
+    /** The bytes exist only in the process that captured them — never re-resolvable (a picture the spool could not take, or the spool is off). */
     public const string SOURCE_STORE_INLINE = 'inline';
+
+    /**
+     * The package's durable spool of a picture that has no store of its own: the bytes were written when the call
+     * completed ({@see \DDD\Domain\AI\Services\Conversations\Agent\AgentToolCallImageSpoolService}), the id is
+     * `<conversation id>/<sha256>`, and every later model call re-reads the same bytes.
+     */
+    public const string SOURCE_STORE_SPOOL = 'spool';
 
     /** @var string Where the bytes can be re-resolved: {@see SOURCE_STORE_INLINE}, or the name a {@see ToolCallImageStore} package declares. */
     public string $sourceStore = self::SOURCE_STORE_INLINE;

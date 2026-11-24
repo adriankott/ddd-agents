@@ -324,8 +324,13 @@ newer picture pushes an older one off the wire, that result changes, the provide
 that is not durable leaves at the end of its worker invocation (a turn end, a worker chunk): the first call of the
 next invocation sends the "no longer on the wire" marker in its place. Seen live: a page picture viewed in turn 1,
 turn 2's first call lost the cache from that result on and three thinking blocks after it. One drop per picture that
-leaves; the cache before the picture and the thinking before it stay. A tool whose pictures should survive a turn end
-returns durable references (`ToolCallImageStore`). `app:agent:cache-diff` shows each drop.
+leaves; the cache before the picture and the thinking before it stay. Since 0.3.7 a picture without a store of its
+own is written to the package's spool when its call completes (`AgentToolCallImageSpoolService`,
+`ToolCallImageReference::SOURCE_STORE_SPOOL`, settings `AI.toolCallImageSpool`): every later call re-reads the same
+base64 text, so the result stays byte-identical across the worker boundary and the drop above is gone. It still
+happens where the spool cannot help: the spool is off, its store is a per-process cache (APCu under the CLI), the
+cache TTL ran out, or the picture cap pushes the picture off. A tool may also return its own durable references
+(`ToolCallImageStore`). `app:agent:cache-diff` shows each drop.
 
 **Notes of a call.** The volatile tail (signals, the plan, the time) goes out as ONE `role: "system"` message with
 `clear_at: next_user_message` after the whole history: the model sees it on this call, later calls send it again at the

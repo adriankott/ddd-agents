@@ -9,8 +9,9 @@ namespace DDD\Domain\AI\Entities\MCPPackages;
  * from the bytes-free {@see ToolCallImageReference} the tool call persisted. The loop composes the wire on every model
  * call and re-resolves the images of the tool results inside the wire window through the loaded packages implementing
  * this — so a picture the model is meant to decide with is still there after the 12-step worker chunk yielded, after
- * a turn boundary and after a resumed worker reloaded the conversation. Inline images (a browser viewport) stay
- * single-turn: they name no store.
+ * a turn boundary and after a resumed worker reloaded the conversation. Images that name no store (a browser viewport)
+ * go to the package's own spool when the call completes ({@see ToolCallImageReference::SOURCE_STORE_SPOOL}); a store of
+ * its own is for a package whose pictures already live somewhere.
  *
  * A tool declares the store on the image part it attaches ({@see \DDD\Presentation\Mcp\Dtos\MCPToolResponse::addImageContent()}
  * with `sourceStore` + `sourceImageId`); the executor carries both onto {@see ToolResultImage} and the persisted

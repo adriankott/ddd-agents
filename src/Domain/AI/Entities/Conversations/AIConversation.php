@@ -4437,7 +4437,7 @@ class AIConversation extends Entity
      * {@see \DDD\Domain\AI\Services\Conversations\AIConversationAgentService::dispatchToolCall()} right after a
      * non-error tool result carried images; read by that service's `resolveToolCallImages()` when the wire is composed
      * for the next model call. A resumed worker loads a fresh conversation → empty map → the downgrade line,
-     * because inline tool images are single-turn only until a persisted artifact resolver exists.
+     * because a picture without a durable reference (spool or store) cannot be re-read after this process.
      * PROTECTED — the schema generator iterates only PUBLIC properties, and a
      * bare `array` public would crash it ("no SQL TYPE allocation"); access goes through the two methods below.
      */
