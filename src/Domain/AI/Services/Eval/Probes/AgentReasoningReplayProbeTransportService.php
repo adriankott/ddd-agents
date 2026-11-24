@@ -25,24 +25,28 @@ class AgentReasoningReplayProbeTransportService extends Service
 
     public const string RESPONSES_URL = 'https://openrouter.ai/api/v1/responses';
 
-    public const array ENDPOINT_URLS = [self::CHAT_COMPLETIONS_URL, self::RESPONSES_URL];
+    /** The Anthropic Messages API on OpenRouter */
+    public const string MESSAGES_URL = 'https://openrouter.ai/api/v1/messages';
+
+    public const array ENDPOINT_URLS = [self::CHAT_COMPLETIONS_URL, self::RESPONSES_URL, self::MESSAGES_URL];
 
     /**
      * POST one JSON body.
      *
      * @param array<string, mixed> $body
+     * @param array<string, string> $additionalHeaders the headers of the wire API next to the authentication (the Messages API: version and betas)
      * @throws InternalErrorException The endpoint is not one of ENDPOINT_URLS, or the key is missing
      */
-    public function postJson(string $url, array $body, int $timeoutSeconds): ReasoningReplayProbeHttpAnswer
+    public function postJson(string $url, array $body, int $timeoutSeconds, array $additionalHeaders = []): ReasoningReplayProbeHttpAnswer
     {
         if (!in_array($url, self::ENDPOINT_URLS, true)) {
-            throw new InternalErrorException('The probe calls only the OpenRouter chat completions and responses endpoints, not ' . $url);
+            throw new InternalErrorException('The probe calls only the OpenRouter chat completions, responses and messages endpoints, not ' . $url);
         }
         $reasoningReplayProbeHttpAnswer = new ReasoningReplayProbeHttpAnswer();
         $startedAt = hrtime(true);
         try {
             $response = $this->createHttpClient()->request('POST', $url, [
-                'headers' => ['Authorization' => 'Bearer ' . $this->findOpenRouterKey(), 'Content-Type' => 'application/json'],
+                'headers' => $additionalHeaders + ['Authorization' => 'Bearer ' . $this->findOpenRouterKey(), 'Content-Type' => 'application/json'],
                 'body' => (string)json_encode($body, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
                 'timeout' => $timeoutSeconds,
                 'max_duration' => $timeoutSeconds,

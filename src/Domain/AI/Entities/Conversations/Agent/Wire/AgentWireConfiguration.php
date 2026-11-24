@@ -9,6 +9,7 @@ use DDD\Domain\AI\Entities\Conversations\Messages\RunSettings;
 use DDD\Domain\AI\Entities\Models\AIModel;
 use DDD\Domain\AI\Entities\Models\AIModel as BaseAIModel;
 use DDD\Infrastructure\Libs\Config;
+use DDD\Infrastructure\Services\DDDService;
 use Throwable;
 
 /**
@@ -23,7 +24,7 @@ use Throwable;
 class AgentWireConfiguration
 {
     /** The Chat-Completions + append-only rejection. */
-    public const string REJECTION_CONVERSATION_APPEND_NEEDS_RESPONSES = 'skillLoadingStrategy conversationAppend needs the Responses API: Chat Completions has no mid-conversation tool addition (allowed_tools is ignored, a changed tools array loses the cached prefix)';
+    public const string REJECTION_CONVERSATION_APPEND_NEEDS_RESPONSES = 'skillLoadingStrategy conversationAppend needs the Responses or the Messages API: Chat Completions has no mid-conversation tool addition (allowed_tools is ignored, a changed tools array loses the cached prefix)';
 
     /** The Responses + non-OpenAI-model rejection. */
     public const string REJECTION_RESPONSES_NEEDS_OPENAI_MODEL = 'agentWireApi responses is probed for OpenAI models only (GPT-6 Luna, GPT-6 Sol, GPT-5.6 Luna)';
@@ -45,7 +46,13 @@ class AgentWireConfiguration
      */
     public const string REJECTION_SERVER_STATE_WITH_STATE_NOTES = 'agentWireApi responsesServerState with stateChangeDelivery onceWhenChanged is not built: the state notes under a server-side chain are unmeasured';
 
-    /** @var string {@see AIModel::AGENT_WIRE_API_CHAT_COMPLETIONS}, {@see AIModel::AGENT_WIRE_API_RESPONSES} or {@see RunSettings::AGENT_WIRE_API_RESPONSES_SERVER_STATE}. */
+    /** The Messages API is Anthropic's own wire: no other vendor's model is served on it. */
+    public const string REJECTION_MESSAGES_NEEDS_ANTHROPIC_MODEL = 'agentWireApi messages is the Anthropic Messages API: only an Anthropic model runs on it';
+
+    /** The Messages request (thinking binding, mid-conversation system messages and tool additions, provider pin) is probed on OpenRouter's `/messages` endpoint only. */
+    public const string REJECTION_MESSAGES_NEEDS_DIRECT_OPENROUTER = 'agentWireApi messages needs the direct OpenRouter egress: no other egress is probed for the Messages API';
+
+    /** @var string {@see AIModel::AGENT_WIRE_API_CHAT_COMPLETIONS}, {@see AIModel::AGENT_WIRE_API_RESPONSES}, {@see AIModel::AGENT_WIRE_API_MESSAGES} or {@see RunSettings::AGENT_WIRE_API_RESPONSES_SERVER_STATE}. */
     public string $wireApi = AIModel::AGENT_WIRE_API_CHAT_COMPLETIONS;
 
     /** @var string {@see ContextRetentionSettings::SKILL_LOADING_STRATEGIES}. */
@@ -84,7 +91,9 @@ class AgentWireConfiguration
      * egress or not. The matrix:
      * Chat Completions + system-prompt swap → allowed (every model, both egresses); Chat Completions + append-only →
      * rejected; Responses + either strategy → allowed for an OpenAI model over the direct OpenRouter egress, rejected
-     * otherwise.
+     * otherwise; Messages + either strategy → allowed for an Anthropic model over the direct OpenRouter egress,
+     * rejected otherwise. A wire API that only the model's catalog entry names falls back to Chat Completions when the
+     * egress cannot serve it ({@see resolveWireApiFor()}): a catalog default never makes a model unusable.
      */
     public static function resolveFor(
         ?BaseAIModel $aiModel,
@@ -93,7 +102,7 @@ class AgentWireConfiguration
         bool $directOpenRouterEgress
     ): static {
         $agentWireConfiguration = new static();
-        $agentWireConfiguration->wireApi = self::resolveWireApiFor($aiModel, $runSettings);
+        $agentWireConfiguration->wireApi = self::resolveWireApiFor($aiModel, $runSettings, $directOpenRouterEgress);
         // an unstamped conversation takes the global default for its wire API: append-only on Chat Completions would be
         // refused, and a default must never make a model unusable
         $agentWireConfiguration->skillLoadingStrategy = ($contextRetentionSettings ?? new ContextRetentionSettings())
@@ -106,7 +115,7 @@ class AgentWireConfiguration
         $agentWireConfiguration->previousReasoningCarryOver = self::resolvePreviousReasoningCarryOver(
             $runSettings->previousReasoningCarryOver ?? null,
             $agentWireConfiguration->wireApi,
-            $directOpenRouterEgress || $agentWireConfiguration->wireApi === AIModel::AGENT_WIRE_API_RESPONSES
+            $directOpenRouterEgress || $agentWireConfiguration->wireApi !== AIModel::AGENT_WIRE_API_CHAT_COMPLETIONS
                 ? $aiModel?->getPreviousReasoningCarryOver()
                 : null
         );
@@ -128,12 +137,69 @@ class AgentWireConfiguration
 
     /**
      * The wire API a run with `$aiModel` (null = unresolved) speaks under the conversation's run settings: the run
-     * settings' row ({@see RunSettings::$agentWireApi}), else the model's catalog value, else Chat Completions.
+     * settings' row ({@see RunSettings::$agentWireApi}), else the model's catalog value as far as this agent speaks it
+     * ({@see resolveWireApiOfCatalogValue()}), else Chat Completions. A
+     * catalog value the egress cannot serve — the Responses or the Messages API without the direct OpenRouter egress
+     * (`$directOpenRouterEgress` false; null = not known, no fallback) — becomes Chat Completions: the catalog names
+     * a model's best wire, never a requirement. A row is kept as it is and refused by {@see findRejectionReason()}.
      */
-    public static function resolveWireApiFor(?BaseAIModel $aiModel, ?RunSettings $runSettings): string
+    public static function resolveWireApiFor(?BaseAIModel $aiModel, ?RunSettings $runSettings, ?bool $directOpenRouterEgress = null): string
     {
-        return RunSettings::canonicalAgentWireApi($runSettings?->agentWireApi)
-            ?? ($aiModel instanceof AIModel ? $aiModel->getAgentWireApi() : AIModel::AGENT_WIRE_API_CHAT_COMPLETIONS);
+        $wireApiOfRow = RunSettings::canonicalAgentWireApi($runSettings?->agentWireApi);
+        if ($wireApiOfRow !== null) {
+            return $wireApiOfRow;
+        }
+        $wireApiOfCatalog = $aiModel instanceof AIModel ? static::resolveWireApiOfCatalogValue($aiModel) : AIModel::AGENT_WIRE_API_CHAT_COMPLETIONS;
+        if ($directOpenRouterEgress === false && $wireApiOfCatalog !== AIModel::AGENT_WIRE_API_CHAT_COMPLETIONS) {
+            return AIModel::AGENT_WIRE_API_CHAT_COMPLETIONS;
+        }
+        return $wireApiOfCatalog;
+    }
+
+    /**
+     * The wire APIs a model's catalog entry may name for this agent. The server-state arm is no catalog value: it comes
+     * from a conversation's run settings only ({@see RunSettings::AGENT_WIRE_APIS}).
+     */
+    public const array CATALOG_WIRE_APIS = [
+        AIModel::AGENT_WIRE_API_CHAT_COMPLETIONS,
+        AIModel::AGENT_WIRE_API_RESPONSES,
+        AIModel::AGENT_WIRE_API_MESSAGES,
+    ];
+
+    /** @var array<string, true> The catalog values already logged as not spoken, by model name and value (one line per process). */
+    protected static array $loggedCatalogWireApisNotSpoken = [];
+
+    /**
+     * The wire API the catalog entry of `$aiModel` names, as this agent speaks it. The model catalog returns the
+     * value as written ({@see AIModel::getAgentWireApi()}); it is matched here against {@see CATALOG_WIRE_APIS},
+     * whatever its case and surrounding blanks. A value this agent does not speak (a wire API of a newer agent
+     * version, a typing error) is Chat Completions, with one warning per model and process: a catalog default never
+     * makes a model unusable.
+     */
+    public static function resolveWireApiOfCatalogValue(AIModel $aiModel): string
+    {
+        $catalogValue = $aiModel->getAgentWireApi();
+        $normalizedCatalogValue = strtolower(trim($catalogValue));
+        foreach (static::CATALOG_WIRE_APIS as $catalogWireApi) {
+            if ($normalizedCatalogValue === strtolower($catalogWireApi)) {
+                return $catalogWireApi;
+            }
+        }
+        $logKey = ($aiModel->name ?? '') . '|' . $catalogValue;
+        if (!isset(static::$loggedCatalogWireApisNotSpoken[$logKey])) {
+            static::$loggedCatalogWireApisNotSpoken[$logKey] = true;
+            static::logCatalogWireApiNotSpoken($aiModel->name ?? null, $catalogValue);
+        }
+        return AIModel::AGENT_WIRE_API_CHAT_COMPLETIONS;
+    }
+
+    /** Logs a catalog `settings.agentWireApi` this agent does not speak; the agent speaks Chat Completions to that model. */
+    protected static function logCatalogWireApiNotSpoken(?string $modelName, string $catalogValue): void
+    {
+        DDDService::instance()->getLogger()->warning(
+            '[AgentWireConfiguration] The model catalog names a wire API this agent does not speak (settings.agentWireApi) — the agent speaks Chat Completions',
+            ['model' => $modelName, 'agentWireApi' => $catalogValue, 'spoken' => static::CATALOG_WIRE_APIS]
+        );
     }
 
     /** The reason line of a combination the matrix rejects, null for an allowed one. */
@@ -143,6 +209,12 @@ class AgentWireConfiguration
             return $skillLoadingStrategy === ContextRetentionSettings::SKILL_LOADING_STRATEGY_CONVERSATION_APPEND
                 ? self::REJECTION_CONVERSATION_APPEND_NEEDS_RESPONSES
                 : null;
+        }
+        if ($wireApi === AIModel::AGENT_WIRE_API_MESSAGES) {
+            if ($modelVendor !== AIModel::VENDOR_ANTHROPIC) {
+                return self::REJECTION_MESSAGES_NEEDS_ANTHROPIC_MODEL;
+            }
+            return $directOpenRouterEgress ? null : self::REJECTION_MESSAGES_NEEDS_DIRECT_OPENROUTER;
         }
         if ($modelVendor !== AIModel::VENDOR_OPENAI) {
             return self::REJECTION_RESPONSES_NEEDS_OPENAI_MODEL;
@@ -171,9 +243,12 @@ class AgentWireConfiguration
     /**
      * The error texts with which a provider refuses carried reasoning items: the error code
      * `invalid_encrypted_content` (a blob that cannot be verified — another model, a tampered item) and the organisation
-     * mismatch of an item minted under another OpenAI organisation (a shared-capacity or second-key route).
+     * mismatch of an item minted under another OpenAI organisation (a shared-capacity or second-key route); on the
+     * Messages API Anthropic's ``Invalid `signature` in `thinking` block`` — a block bound to another conversation
+     * prefix or model on a request that did not ask to drop it, or a signature that cannot be read at all (which the
+     * drop setting does not cover).
      */
-    public const array CARRIED_REASONING_REJECTION_ERROR_TEXTS = ['invalid_encrypted_content', 'organization_id did not match'];
+    public const array CARRIED_REASONING_REJECTION_ERROR_TEXTS = ['invalid_encrypted_content', 'organization_id did not match', 'in `thinking` block'];
 
     /**
      * Whether the provider error of a call (the JSON of the response's `error` object, {@see \DDD\Domain\AI\Entities\Conversations\Agent\ModelResponse::$providerError})
@@ -200,8 +275,8 @@ class AgentWireConfiguration
      * (the legacy `on` reads as `all`), else the model's catalog value (`$modelCarryOver`,
      * {@see \DDD\Domain\AI\Entities\Models\AIModel::getPreviousReasoningCarryOver()} — e.g. `currentTurn` for a
      * reasoning model that keeps its verdicts only in its reasoning), else the per-API default — `capped` on the
-     * Responses API (cap {@see resolveDefaultPreviousReasoningCapTokens()}), `off` on Chat Completions; always `off` on
-     * the server-state arm.
+     * Responses and the Messages API (cap {@see resolveDefaultPreviousReasoningCapTokens()}), `off` on Chat
+     * Completions; always `off` on the server-state arm.
      */
     public static function resolvePreviousReasoningCarryOver(?string $previousReasoningCarryOverRow, string $wireApi, ?string $modelCarryOver = null): string
     {
@@ -216,7 +291,7 @@ class AgentWireConfiguration
         if ($canonicalModelCarryOver !== null && $canonicalModelCarryOver !== RunSettings::PREVIOUS_REASONING_CARRY_OVER_INHERIT) {
             return $canonicalModelCarryOver;
         }
-        return $wireApi === AIModel::AGENT_WIRE_API_RESPONSES
+        return $wireApi === AIModel::AGENT_WIRE_API_RESPONSES || $wireApi === AIModel::AGENT_WIRE_API_MESSAGES
             ? RunSettings::PREVIOUS_REASONING_CARRY_OVER_CAPPED
             : RunSettings::PREVIOUS_REASONING_CARRY_OVER_OFF;
     }
@@ -280,6 +355,12 @@ class AgentWireConfiguration
     public function usesResponsesApi(): bool
     {
         return RunSettings::isResponsesAgentWireApi($this->wireApi);
+    }
+
+    /** Whether the calls speak the Anthropic Messages API (through OpenRouter's `/messages` endpoint). */
+    public function usesMessagesApi(): bool
+    {
+        return $this->wireApi === AIModel::AGENT_WIRE_API_MESSAGES;
     }
 
     /** Whether the calls go directly to OpenAI with `store: true` + `previous_response_id` (the test-only server-state arm). */

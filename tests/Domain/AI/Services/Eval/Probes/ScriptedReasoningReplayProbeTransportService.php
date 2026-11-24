@@ -16,12 +16,16 @@ class ScriptedReasoningReplayProbeTransportService extends AgentReasoningReplayP
     /** @var array<int, array<string, mixed>> The bodies sent, in order */
     public array $sentBodies = [];
 
+    /** @var array<int, array<string, string>> The additional headers sent, in order */
+    public array $sentHeaders = [];
+
     /** @var string[] The URLs called, in order */
     public array $calledUrls = [];
 
-    public function postJson(string $url, array $body, int $timeoutSeconds): ReasoningReplayProbeHttpAnswer
+    public function postJson(string $url, array $body, int $timeoutSeconds, array $additionalHeaders = []): ReasoningReplayProbeHttpAnswer
     {
         $this->calledUrls[] = $url;
+        $this->sentHeaders[] = $additionalHeaders;
         $this->sentBodies[] = $body;
         return array_shift($this->scriptedAnswers) ?? self::answer(500, '{"error":{"message":"no scripted answer"}}');
     }

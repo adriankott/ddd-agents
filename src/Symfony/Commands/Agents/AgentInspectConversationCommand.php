@@ -8,6 +8,8 @@ use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Entities\Conversations\Diagnostics\AIConversationDelegationTreeReport;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessages;
+use DDD\Domain\AI\Entities\Conversations\Messages\RequestSnapshot;
+use DDD\Domain\AI\Entities\Conversations\Messages\RunSettings;
 use DDD\Domain\AI\Entities\Conversations\Widgets\ConversationWidgetOrigin;
 use DDD\Domain\AI\Repo\DB\Conversations\Messages\DBAIConversationMessage;
 use DDD\Domain\AI\Services\Conversations\AgentMessagePrinterInterface;
@@ -469,6 +471,9 @@ class AgentInspectConversationCommand extends AgentConsoleCommand
                 ? ' · appended skills [' . implode(', ', $requestSnapshot->appendedSkillNames ?? []) . '] tools [' . implode(', ', $requestSnapshot->appendedToolNames ?? []) . ']'
                 : ''
         ));
+        foreach ($this->describeMessagesWireReplay($requestSnapshot) as $messagesWireLine) {
+            $output->writeln('  ' . $messagesWireLine);
+        }
         if ($full) {
             $output->writeln('<fg=gray>  ── sent payload ──</>');
             $output->writeln((string)json_encode($sentPayload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
@@ -497,6 +502,9 @@ class AgentInspectConversationCommand extends AgentConsoleCommand
             $responseError = $rawResponse['error'];
             return '⛔ ERROR RESPONSE (model call FAILED — NOT a stall): '
                 . (is_array($responseError) ? (string)json_encode($responseError, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : (string)$responseError);
+        }
+        if (($rawResponse['type'] ?? null) === 'message' && is_array($rawResponse['content'] ?? null)) {
+            return $this->summariseMessagesRawResponse($rawResponse);
         }
         $firstChoice = $rawResponse['choices'][0] ?? null;
         if (!is_array($firstChoice)) {
@@ -527,6 +535,79 @@ class AgentInspectConversationCommand extends AgentConsoleCommand
             $summaryLines[] = sprintf('⚠ TOKEN MISMATCH — billed %d completion tokens but visible content ≈ %d tok → the provider stripped generated output', $completionTokens, $visibleTokenEstimate);
         }
         return implode("\n  ", $summaryLines);
+    }
+
+    /**
+     * The summary of an answer of the Anthropic Messages API: the stop reason, the output and thinking tokens, the
+     * thinking blocks it carries, its text, each call, and the blocks the provider dropped from the REQUEST.
+     *
+     * @param array<string, mixed> $rawResponse the decoded raw response (`type: "message"`)
+     * @return string the summary lines, joined for printing under the `response:` label
+     */
+    protected function summariseMessagesRawResponse(array $rawResponse): string
+    {
+        $answerTexts = [];
+        $toolCalls = [];
+        $thinkingBlockCount = 0;
+        foreach ($rawResponse['content'] as $contentBlock) {
+            $blockType = is_array($contentBlock) ? ($contentBlock['type'] ?? null) : null;
+            if ($blockType === 'text') {
+                $answerTexts[] = (string)($contentBlock['text'] ?? '');
+            } elseif ($blockType === 'tool_use') {
+                $toolCalls[] = ['function' => ['name' => (string)($contentBlock['name'] ?? '?'), 'arguments' => (string)json_encode($contentBlock['input'] ?? [], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)]];
+            } elseif ($blockType === 'thinking' || $blockType === 'redacted_thinking') {
+                $thinkingBlockCount++;
+            }
+        }
+        $summaryLines = [sprintf(
+            'stop_reason=%s · output_tokens=%d · thinking_tokens=%d · %d thinking block(s)',
+            (string)($rawResponse['stop_reason'] ?? '?'),
+            (int)($rawResponse['usage']['output_tokens'] ?? 0),
+            (int)($rawResponse['usage']['output_tokens_details']['thinking_tokens'] ?? 0),
+            $thinkingBlockCount
+        )];
+        $summaryLines[] = $this->describeAnswerText(trim(implode("\n", $answerTexts)));
+        foreach ($this->describeToolCalls($toolCalls) as $toolCallLine) {
+            $summaryLines[] = $toolCallLine;
+        }
+        foreach (is_array($rawResponse['input_transformations'] ?? null) ? $rawResponse['input_transformations'] : [] as $inputTransformation) {
+            $summaryLines[] = sprintf(
+                '⚠ request changed by the provider: %s at %s (%s)',
+                (string)($inputTransformation['type'] ?? '?'),
+                (string)($inputTransformation['path'] ?? '?'),
+                (string)($inputTransformation['reason'] ?? '?')
+            );
+        }
+        return implode("\n  ", $summaryLines);
+    }
+
+    /**
+     * The lines of a call on the Messages API: the frozen part and the thinking floor it rendered with, the thinking
+     * tokens of its answer and every thinking block the provider dropped from its request. Empty on another wire API.
+     *
+     * @return string[]
+     */
+    protected function describeMessagesWireReplay(RequestSnapshot $requestSnapshot): array
+    {
+        if (($requestSnapshot->wireApi ?? null) !== RunSettings::AGENT_WIRE_API_MESSAGES) {
+            return [];
+        }
+        $messagesWireLines = [sprintf(
+            'messages wire: frozen from msg %s · thinking from msg %s · answer stored %s · thinking tokens %s',
+            $requestSnapshot->messagesWireFrozenFromMessageIndex !== null ? '#' . $requestSnapshot->messagesWireFrozenFromMessageIndex : '— (carry-over off)',
+            $requestSnapshot->messagesWireThinkingFromMessageIndex !== null ? '#' . $requestSnapshot->messagesWireThinkingFromMessageIndex : '—',
+            $requestSnapshot->wireReasoningItemsJson !== null ? 'yes' : 'no',
+            $requestSnapshot->wireReasoningTokens !== null ? (string)$requestSnapshot->wireReasoningTokens : '?'
+        )];
+        foreach ($requestSnapshot->inputTransformations ?? [] as $inputTransformation) {
+            $messagesWireLines[] = sprintf(
+                '<fg=red>dropped by the provider:</> %s at %s (%s)',
+                (string)($inputTransformation['type'] ?? '?'),
+                (string)($inputTransformation['path'] ?? '?'),
+                (string)($inputTransformation['reason'] ?? '?')
+            );
+        }
+        return $messagesWireLines;
     }
 
     /**

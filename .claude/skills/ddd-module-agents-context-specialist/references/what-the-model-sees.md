@@ -70,7 +70,11 @@ starting after the compaction cover's edge. How a row renders:
 - pictures ride inside their tool result (see "Tool pictures" below);
 - an owner row the injection check blocked renders as `AIConversationMessage::SECURITY_FILTER_NOTICE`;
 - under append-only loading or `onceWhenChanged`, recorded appended items and state notes are placed at the
-  positions the calls that sent them recorded; they are wire items, never rows.
+  positions the calls that sent them recorded; they are wire items, never rows;
+- on the Anthropic Messages API the newer part of the history is FROZEN: a step there goes out as the content the
+  provider returned (thinking blocks included, from the thinking floor on), its tool results in full and its calls
+  with their full arguments, and the stubs, the shortened arguments and the picture cap above apply only below that
+  part ([prompt-cache-and-stable-prefix.md](prompt-cache-and-stable-prefix.md), section 5a).
 
 **Tool pictures.** `AIConversationModelCallsService::resolveToolCallImages()` runs where the wire is composed, the one
 point where both the resolved model and the pictures are known. Candidates are the completed tool results in the
@@ -93,7 +97,10 @@ read reuse counts the pictures that still ride ([tool-call-efficiency.md](tool-c
 ## 4. The volatile tail
 
 `AgentModelInput::buildTailEntries()` is the one list the egress and the admin composition read. Every entry is a
-user-role wire entry after the whole history, never stored. Order:
+user-role wire entry after the whole history, never stored as a row. On the Messages API the text entries are joined
+into ONE `role: "system"` message with `clear_at: next_user_message`; its text is kept on the call's snapshot
+(`RequestSnapshot::$messagesWireTailJson`) and later calls send it again at the same place, where the provider hides
+it from the model. Order:
 
 1. recent reads hint (`ALREADY_FETCHED_READS`), only with `ContextRetentionSettings::$hintRecentToolCallsToDiscourageRepeats`;
 2. the compact task plan with the "Owner turns so far" counter;

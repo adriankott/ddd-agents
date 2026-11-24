@@ -7,6 +7,7 @@ namespace DDD\Domain\AI\Entities\Conversations\Diagnostics;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessages;
 use DDD\Domain\AI\Entities\Conversations\Messages\RequestSnapshot;
+use DDD\Domain\AI\Entities\Conversations\Messages\RunSettings;
 use DDD\Domain\Base\Entities\ValueObject;
 
 /**
@@ -61,6 +62,9 @@ class PromptCacheDiffReport extends ValueObject
     /** The characters of every state note the calls delivered (each note is sent once, then cached). */
     public int $stateNoteChars = 0;
 
+    /** The thinking blocks the provider dropped from the requests of the calls on the Messages API. */
+    public int $droppedThinkingBlocks = 0;
+
     /** Cache hit share over every call, 0–100. */
     public function hitPercent(): int
     {
@@ -103,7 +107,12 @@ class PromptCacheDiffReport extends ValueObject
                 'stateEpochStartIndex' => $snapshot->stateEpochStartIndex,
                 'stateEpochCause' => $snapshot->stateEpochCause,
                 'stateNoteKinds' => array_values(array_map(static fn (array $stateDelta): string => (string)($stateDelta['kind'] ?? '?'), $snapshot->stateDeltas ?? [])),
+                // the Messages API: the thinking tokens of the answer and the thinking blocks the provider dropped from
+                // the request (null on another wire API)
+                'thinkingTokens' => $snapshot->wireApi === RunSettings::AGENT_WIRE_API_MESSAGES ? $snapshot->wireReasoningTokens : null,
+                'droppedThinkingBlocks' => $snapshot->wireApi === RunSettings::AGENT_WIRE_API_MESSAGES ? $snapshot->countDroppedThinkingBlocks() : null,
             ];
+            $report->droppedThinkingBlocks += (int)$row['droppedThinkingBlocks'];
             if ($previousSnapshot !== null) {
                 $row['firstChangedSystemSegment'] = self::firstChangedSystemSegment($previousSnapshot->systemSegmentHashes, $snapshot->systemSegmentHashes);
                 $row['toolsChanged'] = $previousSnapshot->toolsHash !== null && $snapshot->toolsHash !== null
@@ -210,7 +219,14 @@ class PromptCacheDiffReport extends ValueObject
         // a Responses body carries `input` items — the first `developer` message is the system content
         $wireMessages = is_array($body['messages'] ?? null) ? array_values($body['messages']) : (is_array($body['input'] ?? null) ? array_values($body['input']) : []);
         $system = '';
-        if ($wireMessages !== [] && in_array($wireMessages[0]['role'] ?? null, ['system', 'developer'], true)) {
+        $tools = $body['tools'] ?? [];
+        if (array_key_exists('system', $body)) {
+            // a Messages body: the system content is a top-level key, a `role: "system"` message is part of the history,
+            // and a tool declared with `defer_loading` was appended by a skill load (no change of the tool set)
+            $systemContent = self::normaliseContent($body['system']);
+            $system = is_string($systemContent) ? $systemContent : (string)json_encode($systemContent);
+            $tools = is_array($tools) ? RequestSnapshot::withoutDeferredTools($tools) : $tools;
+        } elseif ($wireMessages !== [] && in_array($wireMessages[0]['role'] ?? null, ['system', 'developer'], true)) {
             $systemContent = self::normaliseContent($wireMessages[0]['content'] ?? '');
             $system = is_string($systemContent) ? $systemContent : (string)json_encode($systemContent);
             array_shift($wireMessages);
@@ -224,7 +240,7 @@ class PromptCacheDiffReport extends ValueObject
             }
         }
         return PromptCacheRequestRegions::forToolsSystemAndMessages(
-            (string)json_encode($body['tools'] ?? [], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+            (string)json_encode($tools, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
             $system,
             $wireMessages
         );
@@ -243,7 +259,7 @@ class PromptCacheDiffReport extends ValueObject
                 $isTextOnly = false;
                 continue;
             }
-            unset($content[$partPosition]['prompt_cache_breakpoint']);
+            unset($content[$partPosition]['prompt_cache_breakpoint'], $content[$partPosition]['cache_control']);
             if (in_array($contentPart['type'] ?? null, ['text', 'input_text', 'output_text'], true)) {
                 $contentText .= (string)($contentPart['text'] ?? '');
             } else {

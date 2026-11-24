@@ -521,7 +521,7 @@ class ContextRetentionSettings extends ValueObject
      * API its model resolves to, {@see \DDD\Domain\AI\Entities\Conversations\Agent\Wire\AgentWireConfiguration::resolveWireApiFor()};
      * null = not known, the plain global default): {@see resolveDefaultSkillLoadingStrategy()}, except that a global
      * {@see SKILL_LOADING_STRATEGY_CONVERSATION_APPEND} on the Chat Completions wire becomes
-     * {@see SKILL_LOADING_STRATEGY_SYSTEM_PROMPT_SWAP} — append-only loading needs the Responses API, and a default must
+     * {@see SKILL_LOADING_STRATEGY_SYSTEM_PROMPT_SWAP} — append-only loading needs the Responses or the Messages API, and a default must
      * never make a model unusable. Only the default is adapted: a strategy a purpose, an admin start, a CLI option or a
      * stored stamp names is kept, and the creation refuses an append-only request on Chat Completions as before.
      * {@see $rebuildEpochOnSituationChange} and {@see $stateChangeDelivery} keep their defaults on this path: the epoch
@@ -533,7 +533,7 @@ class ContextRetentionSettings extends ValueObject
         $defaultSkillLoadingStrategy = self::resolveDefaultSkillLoadingStrategy();
         if ($defaultSkillLoadingStrategy === self::SKILL_LOADING_STRATEGY_CONVERSATION_APPEND
             && $agentWireApi !== null
-            && !RunSettings::isResponsesAgentWireApi($agentWireApi)
+            && !RunSettings::isAppendOnlyCapableAgentWireApi($agentWireApi)
         ) {
             return self::SKILL_LOADING_STRATEGY_SYSTEM_PROMPT_SWAP;
         }

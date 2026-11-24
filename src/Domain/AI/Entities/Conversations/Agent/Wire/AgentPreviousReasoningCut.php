@@ -72,15 +72,18 @@ class AgentPreviousReasoningCut
 
     /**
      * The cut of a call on `$wireApi` over the rows of its context (oldest first), with the cap `$capTokens`.
+     * `$lowestCutFromMessageIndex`: no step below it sends items whatever the anchor says — the Messages API passes
+     * the start of its frozen part and the step of a reported drop ({@see AgentMessagesWireReplay}), so the sum counts
+     * only what the call can send.
      *
      * @param AIConversationMessage[] $messages
      */
-    public static function decideFor(array $messages, string $wireApi, int $capTokens, ?string $modelNameOfCall = null): static
+    public static function decideFor(array $messages, string $wireApi, int $capTokens, ?string $modelNameOfCall = null, int $lowestCutFromMessageIndex = 0): static
     {
         $agentPreviousReasoningCut = new static();
         $agentPreviousReasoningCut->capTokens = $capTokens;
         $agentPreviousReasoningCut->anchorCutFromMessageIndex = self::findRecordedCutOfTheNewestEarlierCall($messages);
-        $anchorCutFromMessageIndex = $agentPreviousReasoningCut->anchorCutFromMessageIndex ?? 0;
+        $anchorCutFromMessageIndex = max($agentPreviousReasoningCut->anchorCutFromMessageIndex ?? 0, $lowestCutFromMessageIndex);
         /** @var int[] $reasoningTokensByStepMarkerIndex the steps at or above the anchor, oldest first */
         $reasoningTokensByStepMarkerIndex = [];
         foreach ($messages as $message) {

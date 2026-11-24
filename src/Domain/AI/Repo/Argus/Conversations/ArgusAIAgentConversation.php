@@ -13,6 +13,7 @@ use DDD\Domain\AI\Entities\MCPPackages\MCPToolAttributeCatalog;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolNewestResultIsNeverStubbed;
 use DDD\Domain\AI\Entities\Conversations\Agent\Decisions\AgentDecisionModelSettings;
 use DDD\Domain\AI\Entities\Conversations\Agent\TaskPlan;
+use DDD\Domain\AI\Entities\Conversations\Agent\Wire\AgentMessagesWireReplay;
 use DDD\Domain\AI\Entities\Conversations\Agent\Wire\AgentPreviousReasoningCut;
 use DDD\Domain\AI\Entities\Conversations\Agent\Wire\AgentWireConfiguration;
 use DDD\Domain\AI\Entities\Conversations\Agent\Wire\AgentResponsesServerStateChain;
@@ -23,6 +24,7 @@ use DDD\Domain\AI\Entities\Conversations\Messages\RunSettings;
 use DDD\Domain\AI\Entities\Conversations\Agent\Tools\UpdateTaskPlanTool;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessages;
+use DDD\Domain\AI\Entities\ModelCalls\AIModelCallUsage;
 use DDD\Domain\AI\Entities\Models\AIModel;
 use DDD\Domain\AI\Entities\Models\Selection\ModelScope;
 use DDD\Domain\AI\Entities\Prompts\AIPrompt;
@@ -31,6 +33,9 @@ use DDD\Domain\AI\Entities\Conversations\Usage\AgentAIUsageScope;
 use DDD\Domain\AI\Repo\Argus\Attributes\ArgusLanguageModel;
 use DDD\Domain\AI\Repo\Argus\Conversations\Wire\AgentChatCompletionsRequestComposer;
 use DDD\Domain\AI\Repo\Argus\Conversations\Wire\AgentResponsesRequestComposer;
+use DDD\Domain\AI\Repo\Argus\Conversations\Wire\AgentMessagesInputTransformation;
+use DDD\Domain\AI\Repo\Argus\Conversations\Wire\AgentMessagesRequestComposer;
+use DDD\Domain\AI\Repo\Argus\Conversations\Wire\AgentMessagesResponse;
 use DDD\Domain\AI\Repo\Argus\Conversations\Wire\AgentResponsesResponse;
 use DDD\Domain\AI\Repo\Argus\Conversations\Wire\AgentResponsesServerStateRequestComposer;
 use DDD\Infrastructure\Exceptions\InternalErrorException;
@@ -96,6 +101,12 @@ class ArgusAIAgentConversation extends ArgusAIConversation
 
     /** The direct OpenRouter Responses API — the endpoint of a call whose wire API is `responses`. */
     public const string EGRESS_OPENROUTER_RESPONSES = 'POST:https://openrouter.ai/api/v1/responses';
+
+    /** The Anthropic Messages API on OpenRouter — the endpoint of a call whose wire API is `messages`. */
+    public const string EGRESS_OPENROUTER_MESSAGES = 'POST:https://openrouter.ai/api/v1/messages';
+
+    /** @var string[] The endpoints {@see applyAgentWireConfiguration()} switches an instance to; a Chat call goes back to the declared one. */
+    public const array WIRE_SPECIFIC_EGRESS_ENDPOINTS = [self::EGRESS_OPENROUTER_RESPONSES, self::EGRESS_OPENAI_RESPONSES, self::EGRESS_OPENROUTER_MESSAGES];
 
     /**
      * TEST-ONLY: the Responses API directly at OpenAI — the endpoint of the server-state arm
@@ -169,11 +180,19 @@ class ArgusAIAgentConversation extends ArgusAIConversation
 
     /**
      * Sets how this call talks to the model. A `responses` configuration points the per-instance load endpoint at the
-     * Responses API (the same per-instance mutation as the LiteLLM flip in {@see __construct()}); it must be applied
+     * Responses API, a `messages` configuration at the Messages API (the same per-instance mutation as the LiteLLM flip in {@see __construct()}); it must be applied
      * before {@see argusLoad()}, which reads the endpoint before the payload.
      */
     public function applyAgentWireConfiguration(AgentWireConfiguration $agentWireConfiguration): void
     {
+        // a console provider order replaces this egress's provider pin for the process
+        // ({@see resolveOpenRouterProviderPreference()}): reasoning minted on the pinned provider would reach another
+        // host, so a call on a pinned wire API carries none while the order is in force
+        if (static::hasConsoleProviderOrder() && $agentWireConfiguration->carriesPreviousReasoning()
+            && ($agentWireConfiguration->usesMessagesApi() || $agentWireConfiguration->usesResponsesApi())
+        ) {
+            $agentWireConfiguration = $agentWireConfiguration->withoutPreviousReasoningCarryOver();
+        }
         $this->agentWireConfiguration = $agentWireConfiguration;
         $argusLoad = $this->getArgusSettings()->argusLoad;
         if ($agentWireConfiguration->usesResponsesServerState()) {
@@ -184,12 +203,27 @@ class ArgusAIAgentConversation extends ArgusAIConversation
             $argusLoad->loadEndpoint = self::EGRESS_OPENROUTER_RESPONSES;
             return;
         }
-        // a Chat call on an instance a Responses call used before goes back to the declared endpoint
-        if ($argusLoad->loadEndpoint === self::EGRESS_OPENROUTER_RESPONSES || $argusLoad->loadEndpoint === self::EGRESS_OPENAI_RESPONSES) {
+        if ($agentWireConfiguration->usesMessagesApi()) {
+            $argusLoad->loadEndpoint = self::EGRESS_OPENROUTER_MESSAGES;
+            return;
+        }
+        // a Chat call on an instance a Responses or a Messages call used before goes back to the declared endpoint
+        if (in_array($argusLoad->loadEndpoint, self::WIRE_SPECIFIC_EGRESS_ENDPOINTS, true)) {
             /** @var ArgusLoad $declaredArgusLoad */
             $declaredArgusLoad = self::getAttributeInstance(ArgusLoad::class);
             $argusLoad->loadEndpoint = self::findRequestedLiteLlmEgressEndpoint() ?? $declaredArgusLoad->loadEndpoint;
         }
+    }
+
+    /**
+     * Whether an operator's console provider order ({@see forceProviderOrder()}) is in force for this process. It is
+     * itself a pin for the process and replaces the provider pin of this egress; the egress then sends no carried
+     * reasoning on a wire API it would have pinned ({@see applyAgentWireConfiguration()},
+     * {@see withReasoningItemsOfStep()}). Nothing automatic leaves a pin: a retry's rotation keeps `only`.
+     */
+    public static function hasConsoleProviderOrder(): bool
+    {
+        return static::$providerOrderOverrideStatic !== null;
     }
 
     /** Whether this egress talks to openrouter.ai directly (not the LiteLLM proxy) — the Responses API needs it. */
@@ -525,6 +559,14 @@ class ArgusAIAgentConversation extends ArgusAIConversation
         if ($this->agentWireConfiguration?->usesResponsesServerState() === true) {
             return $this->composeResponsesServerStatePayload($aiModel, $agentWireRequestParameters);
         }
+        if ($this->agentWireConfiguration?->usesMessagesApi() === true) {
+            $payload = $this->applyEgressAuthentication(['body' => AgentMessagesRequestComposer::composeBody($agentWireRequestParameters)]);
+            foreach (AgentMessagesRequestComposer::buildHeaders() as $headerName => $headerValue) {
+                $payload['headers'][$headerName] = $headerValue;
+            }
+            $this->lastRequestPayload = $payload;
+            return $payload;
+        }
         $body = $this->agentWireConfiguration?->usesResponsesApi() === true
             ? AgentResponsesRequestComposer::composeBody($agentWireRequestParameters)
             : AgentChatCompletionsRequestComposer::composeBody($agentWireRequestParameters);
@@ -620,7 +662,9 @@ class ArgusAIAgentConversation extends ArgusAIConversation
         $agentWireRequestParameters->chatCompletionsMessages = ($userContentHasCompleteFormat && is_array($this->userContent))
             ? $this->userContent
             : $this->buildOpenAIChatCompletionSystemAndUserMessages();
-        $serviceTier = $this->resolveServiceTierForRequest($aiModel);
+        // a Messages body carries no service tier, so none is noted for this call: the cost booking multiplies the
+        // price of a call whose tier was noted ({@see ArgusAILanguageModelTrait::updateCostsForUsage()})
+        $serviceTier = $this->agentWireConfiguration?->usesMessagesApi() === true ? null : $this->resolveServiceTierForRequest($aiModel);
         $this->lastRequestServiceTier = $serviceTier;
         $agentWireRequestParameters->serviceTier = $serviceTier;
 
@@ -684,16 +728,28 @@ class ArgusAIAgentConversation extends ArgusAIConversation
     public const array OPENAI_PROVIDER_PIN = ['only' => ['openai'], 'allow_fallbacks' => false];
 
     /**
+     * The provider pin of a call on the Messages API: only the `anthropic` provider, no fallback. Without it OpenRouter
+     * alternates between the hosts of a Claude model call by call (measured: Google and Anthropic in turn); the
+     * thinking blocks survive that, the prompt cache does not — each host holds its own.
+     */
+    public const array ANTHROPIC_PROVIDER_PIN = ['only' => ['anthropic'], 'allow_fallbacks' => false];
+
+    /**
      * The routing block of the trait ({@see ArgusAILanguageModelTrait::resolveOpenRouterProviderPreference()}: the sort of
      * the prioritization strategy, the catalog filters) with {@see OPENAI_PROVIDER_PIN} merged in for an OpenAI model over
-     * the direct OpenRouter egress — on both wire APIs. A console provider-order pin (an explicit debug override) is kept
-     * as it is; every other model and the LiteLLM egress get the trait's block unchanged.
+     * the direct OpenRouter egress — on both wire APIs — and with {@see ANTHROPIC_PROVIDER_PIN} for a call on the Messages
+     * API. A console provider order (an operator's explicit pin for one process, {@see hasConsoleProviderOrder()})
+     * REPLACES both pins and is kept as it is — the egress then sends no carried reasoning on those calls; every other
+     * model and the LiteLLM egress get the trait's block unchanged.
      *
      * @return array<string, mixed>|null
      */
     protected function resolveOpenRouterProviderPreference(?ArgusLanguageModel $argusLanguageModel, ?\DDD\Domain\AI\Entities\Models\AIModel $aiModel = null): ?array
     {
         $providerPreference = parent::resolveOpenRouterProviderPreference($argusLanguageModel, $aiModel);
+        if ($this->agentWireConfiguration?->usesMessagesApi() === true && static::$providerOrderOverrideStatic === null) {
+            return array_merge($providerPreference ?? [], self::ANTHROPIC_PROVIDER_PIN);
+        }
         if ($aiModel?->vendor !== AIModel::VENDOR_OPENAI || !$this->loadEndpointTargetsOpenRouterDirect()
             || static::$providerOrderOverrideStatic !== null
         ) {
@@ -737,7 +793,7 @@ class ArgusAIAgentConversation extends ArgusAIConversation
      */
     public ?array $capturedReasoningItems = null;
 
-    /** @var string|null The wire API {@see $capturedReasoningItems} came from (`chatCompletions` / `responses`). */
+    /** @var string|null The wire API {@see $capturedReasoningItems} came from (`chatCompletions` / `responses` / `messages`). */
     public ?string $capturedReasoningItemsWireApi = null;
 
     /**
@@ -745,6 +801,39 @@ class ArgusAIAgentConversation extends ArgusAIConversation
      *      (the size the carry-over `capped` sums later); null when no items were captured or the usage names none.
      */
     public ?int $capturedReasoningTokens = null;
+
+    /**
+     * @var string|null The content blocks of the LAST answer on the Messages API as a JSON list, as the provider
+     *      returned them (thinking blocks with their signature, text, `tool_use`); null on every other wire API and for
+     *      an answer without a block. The loop stores it on the step's marker row.
+     */
+    public ?string $capturedMessagesContentJson = null;
+
+    /**
+     * @var AgentMessagesInputTransformation[] What the provider changed in the LAST request on the Messages API
+     *      before the model read it (dropped thinking blocks); empty when nothing was changed.
+     */
+    public array $capturedInputTransformations = [];
+
+    /**
+     * @var AgentMessagesWireReplay|null The frozen part and the thinking floor of the LAST fold on the Messages API;
+     *      null on every other wire API. The loop records it on the call's request snapshot.
+     */
+    public ?AgentMessagesWireReplay $lastMessagesWireReplay = null;
+
+    /**
+     * @var AgentMessagesWireReplay|null The floors a recorded call rendered with, set by the forensic reconstruction
+     *      of that call ({@see AgentMessagesWireReplay::fromRecordedFloors()}): the fold renders with them instead of
+     *      deciding anew. Null on a live call.
+     */
+    public ?AgentMessagesWireReplay $messagesWireReplayOfRecordedCall = null;
+
+    /**
+     * @var string[] The texts of the notes the LAST request on the Messages API carried after its history (one
+     *      `role: "system"` message with `clear_at`). The loop stores them on the step's marker row; a later call sends
+     *      them again while the step is frozen.
+     */
+    public array $lastMessagesWireTailTexts = [];
 
     /**
      * @var AgentPreviousReasoningCut|null The cut of the LAST fold under the carry-over `capped` (which steps went with
@@ -770,7 +859,34 @@ class ArgusAIAgentConversation extends ArgusAIConversation
         if (AgentResponsesResponse::isResponsesObject($responseObject)) {
             return AgentResponsesResponse::fromResponseObject($responseObject)->getToolCallsInChatCompletionsShape();
         }
+        if (AgentMessagesResponse::isMessagesObject($responseObject)) {
+            return AgentMessagesResponse::fromResponseObject($responseObject)->getToolCallsInChatCompletionsShape();
+        }
         return parent::extractToolCallsFromResponse($responseObject);
+    }
+
+    /** A Messages-API answer (`type: "message"`) arrives without the status/data envelope, like a Chat-Completions answer. */
+    protected function isAnswerObjectWithoutEnvelope(object $callResponseData): bool
+    {
+        return AgentMessagesResponse::isMessagesObject($callResponseData) || parent::isAnswerObjectWithoutEnvelope($callResponseData);
+    }
+
+    /** The text of a Messages-API answer is its `text` blocks ({@see AgentMessagesResponse::getText()}). */
+    protected function extractAnswerText(object $responseObject): ?string
+    {
+        if (AgentMessagesResponse::isMessagesObject($responseObject)) {
+            return AgentMessagesResponse::fromResponseObject($responseObject)->getText();
+        }
+        return parent::extractAnswerText($responseObject);
+    }
+
+    /** The usage of a Messages-API answer sums its three disjoint input counts ({@see AgentMessagesResponse::getUsage()}). */
+    protected function extractAnswerUsage(object $responseObject): ?AIModelCallUsage
+    {
+        if (AgentMessagesResponse::isMessagesObject($responseObject)) {
+            return AgentMessagesResponse::fromResponseObject($responseObject)->getUsage();
+        }
+        return parent::extractAnswerUsage($responseObject);
     }
 
     /**
@@ -790,6 +906,21 @@ class ArgusAIAgentConversation extends ArgusAIConversation
         $this->unusableResponsesAnswerReason = AgentResponsesResponse::isResponsesObject($responseObject)
             ? AgentResponsesResponse::fromResponseObject($responseObject)->findUnusableAnswerReason()
             : null;
+        $this->capturedMessagesContentJson = null;
+        $this->capturedInputTransformations = [];
+        if (AgentMessagesResponse::isMessagesObject($responseObject)) {
+            // the Messages API: the answer's content blocks are stored whatever the carry-over is — a frozen step sends
+            // them back verbatim, and a conversation whose carry-over is switched on later needs them from then on
+            $agentMessagesResponse = AgentMessagesResponse::fromResponseObject($responseObject);
+            $this->unusableResponsesAnswerReason = $agentMessagesResponse->findUnusableAnswerReason();
+            $this->capturedInputTransformations = $agentMessagesResponse->getInputTransformations();
+            $this->capturedMessagesContentJson = $agentMessagesResponse->getContentBlocksJson();
+            if ($this->capturedMessagesContentJson !== null) {
+                $this->capturedReasoningItemsWireApi = AIModel::AGENT_WIRE_API_MESSAGES;
+                $this->capturedReasoningTokens = $agentMessagesResponse->getThinkingTokens() ?? ($agentMessagesResponse->countThinkingBlocks() === 0 ? 0 : null);
+            }
+            return;
+        }
         if ($this->agentWireConfiguration?->carriesPreviousReasoning() !== true) {
             return;
         }
@@ -1045,8 +1176,16 @@ class ArgusAIAgentConversation extends ArgusAIConversation
             // the same boundaries as the explicit breakpoints — after the base prompt, before the loaded skills, at the
             // end of the system content (at most three) — plus one on the newest stable wire message: four markers,
             // Anthropic's limit. The tools precede the system content in Anthropic's cache, so a marker covers them too.
+            // On the Messages API under append-only loading the loaded-skills segment is fixed, so the marker before it is
+            // not needed: its slot goes to the item the PREVIOUS call marked. Anthropic looks an entry up only about 20
+            // blocks back from a marker, and one step with many parallel calls adds more blocks than that.
+            $marksPreviousCallsWireMessage = $this->agentWireConfiguration?->usesMessagesApi() === true
+                && $this->agentWireConfiguration->usesConversationAppend();
             $this->addPromptCacheBreakpointToLastStableWireMessage($messages);
-            array_unshift($messages, ['role' => 'system', 'content' => $this->buildSystemContentPartsWithPromptCacheBreakpoints($this->lastSystemSegments)]);
+            if ($marksPreviousCallsWireMessage) {
+                $this->addPromptCacheBreakpointToPreviousCallsMessagesWireMessage($messages);
+            }
+            array_unshift($messages, ['role' => 'system', 'content' => $this->buildSystemContentPartsWithPromptCacheBreakpoints($this->lastSystemSegments, !$marksPreviousCallsWireMessage)]);
             return $this->convertPromptCacheBreakpointsToAnthropicCacheControl($messages);
         }
         $systemContent = implode('', array_map(static fn (AgentContextSegment $systemSegment): string => $systemSegment->text, $this->lastSystemSegments));
@@ -1183,6 +1322,30 @@ class ArgusAIAgentConversation extends ArgusAIConversation
     }
 
     /**
+     * The second wire breakpoint on the Messages API: the item the PREVIOUS model call marked. That call's stable
+     * messages ended before its own notes and its answer — the newest assistant entry of this call's stable messages
+     * and the stored notes right before it ({@see buildStoredMessagesWireTailEntriesOfStep()}) — so the rule of
+     * {@see addPromptCacheBreakpointToLastStableWireMessage()} applied to the messages before them finds the item it
+     * marked. No assistant entry yet = no previous call.
+     *
+     * @param array<int, array<string, mixed>> $wireMessages
+     */
+    public function addPromptCacheBreakpointToPreviousCallsMessagesWireMessage(array &$wireMessages): void
+    {
+        $stableWireMessageCount = min($this->stableWireMessageCount ?? count($wireMessages), count($wireMessages));
+        for ($position = $stableWireMessageCount - 1; $position >= 0; $position--) {
+            if (($wireMessages[$position]['role'] ?? null) !== 'assistant') {
+                continue;
+            }
+            while ($position > 0 && isset($wireMessages[$position - 1][AgentMessagesRequestComposer::KEY_CLEAR_AT])) {
+                $position--;
+            }
+            $this->addPromptCacheBreakpointToLastTextMessageBefore($wireMessages, $position, false);
+            return;
+        }
+    }
+
+    /**
      * The breakpoint on the newest text-bearing message before `$endPosition` (exclusive); a message already marked
      * keeps its one marker.
      *
@@ -1275,8 +1438,28 @@ class ArgusAIAgentConversation extends ArgusAIConversation
         // whether the context THIS repository holds ends on the budget-closing signal (its own `modelInput`, the
         // object {@see buildModelContext()} passes in on the live wire).
         $toolLessStepIsTheBudgetClosingStep = $this->modelInput !== null && $this->modelInput->isNewestMessageABudgetClosingSignal();
+        // on the Messages API a text note goes out as a `role: "system"` message with `clear_at`; its text is kept for
+        // the step's marker row, so a later call can send it again at the same place
+        $usesMessagesApi = $this->agentWireConfiguration?->usesMessagesApi() === true;
+        $this->lastMessagesWireTailTexts = [];
+        $tailWireMessagesWithParts = [];
         foreach ($agentContext->buildTailEntries($this->forceToolChoice, $toolLessStepIsTheBudgetClosingStep, $this->sendsForcedToolChoiceAsNote())->toWireMessages() as $tailWireMessage) {
-            $messages[] = $tailWireMessage;
+            if (!$usesMessagesApi) {
+                $messages[] = $tailWireMessage;
+            } elseif (is_string($tailWireMessage['content'] ?? null)) {
+                if ($tailWireMessage['content'] !== '') {
+                    $this->lastMessagesWireTailTexts[] = $tailWireMessage['content'];
+                }
+            } else {
+                // a tail entry with a picture stays a user message of this call
+                $tailWireMessagesWithParts[] = $tailWireMessage;
+            }
+        }
+        if ($this->lastMessagesWireTailTexts !== []) {
+            $messages[] = self::buildMessagesWireNoteEntry($this->lastMessagesWireTailTexts);
+        }
+        foreach ($tailWireMessagesWithParts as $tailWireMessageWithParts) {
+            $messages[] = $tailWireMessageWithParts;
         }
         return $messages;
     }
@@ -1369,7 +1552,26 @@ class ArgusAIAgentConversation extends ArgusAIConversation
         // a step that only repeated load_skills for skills already loaded is not replayed: the model repeated its own
         // freshest pattern (call + "already loaded") instead of calling the loaded tool. Kept under server state:
         // there the provider holds the call and the next request must answer it.
-        if ($this->agentWireConfiguration?->wireApi !== RunSettings::AGENT_WIRE_API_RESPONSES_SERVER_STATE) {
+        // the Messages API: which rows go out exactly as earlier calls sent and received them, and which steps with
+        // their thinking blocks (the cut of `capped` is part of that decision) — decided over all rows of the context
+        $messagesWireReplay = $this->agentWireConfiguration?->usesMessagesApi() === true
+            ? ($this->messagesWireReplayOfRecordedCall ?? AgentMessagesWireReplay::decideFor(array_values($messages), $this->agentWireConfiguration, $this->getAIModel()?->name))
+            : null;
+        $this->lastMessagesWireReplay = $messagesWireReplay;
+        if ($messagesWireReplay?->frozenFromMessageIndex !== null) {
+            // a step of the frozen part stays: taking it off the wire would change the prefix of every later thinking block
+            $frozenFromPosition = count($messages);
+            foreach (array_values($messages) as $position => $candidate) {
+                if ($messagesWireReplay->rendersFrozen($candidate->indexInConversation ?? null)) {
+                    $frozenFromPosition = $position;
+                    break;
+                }
+            }
+            $messages = [
+                ...self::withoutStepsThatOnlyRepeatedSkillLoads(array_slice(array_values($messages), 0, $frozenFromPosition)),
+                ...array_slice(array_values($messages), $frozenFromPosition),
+            ];
+        } elseif ($this->agentWireConfiguration?->wireApi !== RunSettings::AGENT_WIRE_API_RESPONSES_SERVER_STATE) {
             $messages = self::withoutStepsThatOnlyRepeatedSkillLoads(array_values($messages));
         }
         $count = count($messages);
@@ -1411,9 +1613,14 @@ class ArgusAIAgentConversation extends ArgusAIConversation
         }
         // carry-over `capped`: the steps below the cut go without their reasoning items — the cut is
         // decided once per fold over these rows, starting from the cut the previous call recorded
-        $this->lastPreviousReasoningCut = $this->agentWireConfiguration?->carriesCappedPreviousReasoning() === true
-            ? AgentPreviousReasoningCut::decideFor(array_values($messages), $this->agentWireConfiguration->wireApi, $this->agentWireConfiguration->previousReasoningCapTokens, $this->getAIModel()?->name)
-            : null;
+        // (on the Messages API the cut is part of the replay decision made above)
+        if ($messagesWireReplay !== null) {
+            $this->lastPreviousReasoningCut = $messagesWireReplay->previousReasoningCut;
+        } else {
+            $this->lastPreviousReasoningCut = $this->agentWireConfiguration?->carriesCappedPreviousReasoning() === true
+                ? AgentPreviousReasoningCut::decideFor(array_values($messages), $this->agentWireConfiguration->wireApi, $this->agentWireConfiguration->previousReasoningCapTokens, $this->getAIModel()?->name)
+                : null;
+        }
         $isSupersededTaskPlanCall = static fn (AIConversationMessage $callMessage): bool =>
             isset($taskPlanCallPositions[spl_object_id($callMessage)])
             && $taskPlanCallPositions[spl_object_id($callMessage)] < $newestTaskPlanCallPosition
@@ -1444,7 +1651,10 @@ class ArgusAIAgentConversation extends ArgusAIConversation
             }
         }
         $newestNeverStubbedCallIndexes = array_values(array_filter($newestNeverStubbedCallIndexesByToolName, 'is_int'));
+        // a result of the frozen part of a Messages-API history is never cleared: clearing it would change the prefix
+        // every later thinking block is bound to
         $keepsFullToolResult = static fn (AIConversationMessage $callMessage): bool =>
+            ($messagesWireReplay !== null && $messagesWireReplay->rendersFrozen($callMessage->indexInConversation ?? null)) ||
             (($callMessage->indexInConversation ?? null) !== null && in_array($callMessage->indexInConversation, $newestNeverStubbedCallIndexes, true)) ||
             (($callMessage->indexInConversation ?? PHP_INT_MAX) >= $keepToolResultsFromIndex
                 && !isset($toolResultIndexesStubbedByBudget[$callMessage->indexInConversation ?? PHP_INT_MAX]))
@@ -1548,6 +1758,9 @@ class ArgusAIAgentConversation extends ArgusAIConversation
                         break;
                     }
                 }
+                foreach ($this->buildStoredMessagesWireTailEntriesOfStep($message) as $storedTailEntry) {
+                    $entries[] = $storedTailEntry;
+                }
                 $entries[] = $this->withReasoningItemsOfStep([
                     'role' => 'assistant',
                     'content' => '',
@@ -1592,6 +1805,9 @@ class ArgusAIAgentConversation extends ArgusAIConversation
                     }
                 }
                 if ($calls !== []) {
+                    foreach ($this->buildStoredMessagesWireTailEntriesOfStep($message) as $storedTailEntry) {
+                        $entries[] = $storedTailEntry;
+                    }
                     $entries[] = $this->withReasoningItemsOfStep([
                         'role' => 'assistant',
                         'content' => $message->getOpenAiMessageContent(timezone: $agentContext?->resolveTimezoneForMessageIndex($messageIndex)),
@@ -1613,8 +1829,18 @@ class ArgusAIAgentConversation extends ArgusAIConversation
                 continue;
             }
             // each bracket in the zone in effect at its position (the call's zone without a state delivery)
-            $chatMessageEntry = $message->toOpenAiChatMessageArray($i === $newestUserTurnIndex, $agentContext?->resolveTimezoneForMessageIndex($messageIndex));
-            $entries[] = $role === 'assistant' ? $this->withReasoningItemsOfStep($chatMessageEntry, $message, $i > $currentTurnInitiatorPosition) : $chatMessageEntry;
+            // an owner message of the frozen part of a Messages-API history keeps the reply-language cue it was sent with
+            $carriesReplyLanguageCue = $i === $newestUserTurnIndex
+                || ($messagesWireReplay !== null && $messagesWireReplay->rendersFrozen($messageIndex) && $message->isOwnerText());
+            $chatMessageEntry = $message->toOpenAiChatMessageArray($carriesReplyLanguageCue, $agentContext?->resolveTimezoneForMessageIndex($messageIndex));
+            if ($role === 'assistant') {
+                foreach ($this->buildStoredMessagesWireTailEntriesOfStep($message) as $storedTailEntry) {
+                    $entries[] = $storedTailEntry;
+                }
+                $entries[] = $this->withReasoningItemsOfStep($chatMessageEntry, $message, $i > $currentTurnInitiatorPosition);
+            } else {
+                $entries[] = $chatMessageEntry;
+            }
         }
         // what THIS call appends, after the last history row (it is stable history from the next call on) —
         // after any recorded item whose place no visited row reached
@@ -1647,7 +1873,12 @@ class ArgusAIAgentConversation extends ArgusAIConversation
      */
     protected function withReasoningItemsOfStep(array $assistantEntry, AIConversationMessage $stepMarkerRow, bool $stepIsInTheCurrentTurn = true): array
     {
+        if ($this->agentWireConfiguration?->usesMessagesApi() === true) {
+            return $this->withStoredMessagesWireAnswerOfStep($assistantEntry, $stepMarkerRow);
+        }
         if ($this->agentWireConfiguration === null || !$this->agentWireConfiguration->carriesPreviousReasoning()
+            // a console provider order replaced the OpenAI pin of this call: its reasoning items stay off the wire
+            || (static::hasConsoleProviderOrder() && $this->getAIModel()?->vendor === AIModel::VENDOR_OPENAI && $this->loadEndpointTargetsOpenRouterDirect())
             || ($this->agentWireConfiguration->carriesOnlyTheCurrentTurnsReasoning() && !$stepIsInTheCurrentTurn)
             || ($this->lastPreviousReasoningCut !== null && !$this->lastPreviousReasoningCut->sendsTheItemsOfTheStepAt($stepMarkerRow->indexInConversation ?? null))
             || ($stepMarkerRow->inputTokens ?? 0) <= 0 || !isset($stepMarkerRow->requestSnapshot)
@@ -1660,6 +1891,79 @@ class ArgusAIAgentConversation extends ArgusAIConversation
             $assistantEntry['reasoning_details'] = $wireReasoningItems;
         }
         return $assistantEntry;
+    }
+
+    /**
+     * An assistant entry of a call on the Messages API with the stored answer of its step: for a frozen step
+     * ({@see AgentMessagesWireReplay::rendersFrozen()}) whose marker row stored the answer's content blocks, the entry
+     * carries them verbatim ({@see AgentMessagesRequestComposer::KEY_ASSISTANT_CONTENT_JSON}) — with the thinking
+     * blocks from the thinking floor on, without them below it. Every other entry is unchanged: the composer builds the
+     * message from its text and its calls. So is a step whose stored calls differ from the calls its rows hold.
+     *
+     * @param array<string, mixed> $assistantEntry
+     * @return array<string, mixed>
+     */
+    protected function withStoredMessagesWireAnswerOfStep(array $assistantEntry, AIConversationMessage $stepMarkerRow): array
+    {
+        $stepMarkerMessageIndex = $stepMarkerRow->indexInConversation ?? null;
+        $requestSnapshot = isset($stepMarkerRow->requestSnapshot) ? $stepMarkerRow->requestSnapshot : null;
+        if ($this->lastMessagesWireReplay === null || !$this->lastMessagesWireReplay->rendersFrozen($stepMarkerMessageIndex)
+            || ($stepMarkerRow->inputTokens ?? 0) <= 0 || !AgentMessagesWireReplay::holdsStoredAnswerOfTheMessagesApi($requestSnapshot)
+        ) {
+            return $assistantEntry;
+        }
+        // the stored answer goes back only when its calls are exactly the calls the rows hold: a call the loop did not
+        // keep has no result on the wire, and the provider refuses a call without its result
+        $toolCallIdsOfRows = array_map(
+            static fn (mixed $chatToolCall): string => is_array($chatToolCall) ? (string)($chatToolCall['id'] ?? '') : '',
+            array_values((array)($assistantEntry['tool_calls'] ?? []))
+        );
+        if (AgentMessagesRequestComposer::readToolUseIdsOfStoredContent($requestSnapshot->wireReasoningItemsJson) !== $toolCallIdsOfRows) {
+            return $assistantEntry;
+        }
+        $assistantEntry[AgentMessagesRequestComposer::KEY_ASSISTANT_CONTENT_JSON] = $requestSnapshot->wireReasoningItemsJson;
+        if (!$this->lastMessagesWireReplay->sendsTheThinkingOfTheStepAt($stepMarkerMessageIndex)) {
+            $assistantEntry[AgentMessagesRequestComposer::KEY_ASSISTANT_CONTENT_WITHOUT_THINKING] = true;
+        }
+        return $assistantEntry;
+    }
+
+    /**
+     * The notes the call of a frozen step sent after its history, as the entry that goes right before the step's
+     * assistant entry: one `role: "system"` message with `clear_at` (hidden from the model from the next user message
+     * on, present for the binding of the step's thinking block). Empty on every other wire API, for a step outside the
+     * frozen part and for a call that stored none.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    protected function buildStoredMessagesWireTailEntriesOfStep(AIConversationMessage $stepMarkerRow): array
+    {
+        $requestSnapshot = isset($stepMarkerRow->requestSnapshot) ? $stepMarkerRow->requestSnapshot : null;
+        if ($this->lastMessagesWireReplay === null || $requestSnapshot === null || ($stepMarkerRow->inputTokens ?? 0) <= 0
+            || !$this->lastMessagesWireReplay->rendersFrozen($stepMarkerRow->indexInConversation ?? null)
+        ) {
+            return [];
+        }
+        $tailTexts = $requestSnapshot->getMessagesWireTailTexts();
+        return $tailTexts !== [] ? [self::buildMessagesWireNoteEntry($tailTexts)] : [];
+    }
+
+    /**
+     * The notes of one call in the form the Messages composer turns into a `role: "system"` message with `clear_at`:
+     * ONE text block (the notes joined by a blank line), so a step adds one block to the history whatever the number
+     * of its notes (the provider looks a cache entry up only a limited number of blocks back).
+     *
+     * @param string[] $noteTexts
+     * @return array<string, mixed>
+     */
+    public static function buildMessagesWireNoteEntry(array $noteTexts): array
+    {
+        return [
+            'role' => 'user',
+            'content' => implode("\n\n", $noteTexts),
+            AgentMessagesRequestComposer::KEY_AS_SYSTEM_MESSAGE => true,
+            AgentMessagesRequestComposer::KEY_CLEAR_AT => AgentMessagesRequestComposer::CLEAR_AT_NEXT_USER_MESSAGE,
+        ];
     }
 
     /**

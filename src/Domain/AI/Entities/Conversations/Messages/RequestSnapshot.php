@@ -121,7 +121,7 @@ class RequestSnapshot extends ValueObject
     public ?string $toolsHash = null;
 
     /**
-     * @var string|null The wire API this call spoke: `chatCompletions` / `responses`; null on rows stored before
+     * @var string|null The wire API this call spoke: `chatCompletions` / `responses` / `messages`; null on rows stored before
      *      the field existed (= Chat Completions). A reconstruction composes the body in this API's shape.
      */
     public ?string $wireApi = null;
@@ -234,14 +234,17 @@ class RequestSnapshot extends ValueObject
 
     /**
      * @var string|null The wire API the call's {@see $wireReasoningItemsJson} came from
-     *      (`chatCompletions` / `responses`) — a later call sends them back only on the same API.
+     *      (`chatCompletions` / `responses` / `messages`) — a later call sends them back only on the same API.
      */
     public ?string $wireReasoningApi = null;
 
     /**
      * @var string|null The provider's opaque reasoning items this call returned, as JSON (Responses
      *      `reasoning` items with their encrypted content, or Chat-Completions `reasoning_details`) — sent back in place
-     *      on every later call of the conversation while the carry-over is on; ≈ 2–3 KB. Stored on the step's marker
+     *      on every later call of the conversation while the carry-over is on; ≈ 2–3 KB. On the Messages API it is the
+     *      answer's whole content block list as the provider returned it (thinking blocks with their signature, text,
+     *      `tool_use`): a frozen step sends exactly these blocks back
+     *      ({@see \DDD\Domain\AI\Entities\Conversations\Agent\Wire\AgentMessagesWireReplay}). Stored on the step's marker
      *      row (this snapshot) instead of a new column (an existing JSON column), hidden from
      *      the API output (size); compaction drops them with the covered rows.
      */
@@ -267,6 +270,36 @@ class RequestSnapshot extends ValueObject
 
     /** @var int|null Carry-over `capped`: the reasoning tokens of the items this call sent back (diagnostics). */
     public ?int $previousReasoningSentTokens = null;
+
+    /**
+     * @var int|null Messages API: the frozen floor this call rendered with — the rows whose index is at or above it
+     *      went out exactly as earlier calls sent and received them
+     *      ({@see \DDD\Domain\AI\Entities\Conversations\Agent\Wire\AgentMessagesWireReplay::$frozenFromMessageIndex}).
+     *      Under the carry-over `all` / `capped` the next call starts from it. Null on every other wire API and with
+     *      the carry-over off.
+     */
+    public ?int $messagesWireFrozenFromMessageIndex = null;
+
+    /** @var int|null Messages API: the thinking floor this call rendered with (the frozen steps at or above it went with their thinking blocks); diagnostics. */
+    public ?int $messagesWireThinkingFromMessageIndex = null;
+
+    /**
+     * @var string|null Messages API: the notes this call sent after its history (the plan, the clock, the
+     *      reply-language cue, …) as a JSON list of texts. While the call's step is frozen every later call sends them
+     *      again at the same place, as a `role: "system"` message with `clear_at` — the provider hides it from the
+     *      model, and the thinking block of this call stays bound to an unchanged prefix. Null on every other wire API
+     *      and with the carry-over off.
+     */
+    #[HideProperty]
+    public ?string $messagesWireTailJson = null;
+
+    /**
+     * @var array<int, array<string, string>>|null Messages API: what the provider changed in this call's REQUEST
+     *      before the model read it, as the answer reported it (`input_transformations`): one `{type, path, reason}`
+     *      entry per block — `thinking_dropped` with `prefix_binding_mismatch` (something before the block changed)
+     *      or `model_binding_mismatch` (another model produced it). Null when nothing was changed.
+     */
+    public ?array $inputTransformations = null;
 
     /**
      * @var string|null TEST-ONLY server-state arm: the id of the response OpenAI stored for this
@@ -327,6 +360,43 @@ class RequestSnapshot extends ValueObject
         parent::setPropertiesFromObject($object, $throwErrors, $rootCall, $sanitizeInput);
         $this->stateAtEpochStart = self::buildArrayFormOfStateValue($this->stateAtEpochStart);
         $this->stateDeltas = self::buildArrayFormOfStateValue($this->stateDeltas);
+        $this->inputTransformations = self::buildArrayFormOfStateValue($this->inputTransformations);
+    }
+
+    /**
+     * How many thinking blocks the provider dropped from this call's request ({@see $inputTransformations} entries of
+     * the type `thinking_dropped`).
+     */
+    public function countDroppedThinkingBlocks(): int
+    {
+        $droppedThinkingBlockCount = 0;
+        foreach ($this->inputTransformations ?? [] as $inputTransformation) {
+            if (($inputTransformation['type'] ?? null) === 'thinking_dropped') {
+                $droppedThinkingBlockCount++;
+            }
+        }
+        return $droppedThinkingBlockCount;
+    }
+
+    /** Whether the provider dropped a thinking block from this call's request. */
+    public function reportsDroppedThinkingBlocks(): bool
+    {
+        return $this->countDroppedThinkingBlocks() > 0;
+    }
+
+    /**
+     * The notes this call sent after its history on the Messages API ({@see $messagesWireTailJson}); empty when none
+     * are stored.
+     *
+     * @return string[]
+     */
+    public function getMessagesWireTailTexts(): array
+    {
+        if ($this->messagesWireTailJson === null || $this->messagesWireTailJson === '') {
+            return [];
+        }
+        $tailTexts = json_decode($this->messagesWireTailJson, true);
+        return is_array($tailTexts) ? array_values(array_filter($tailTexts, static fn (mixed $tailText): bool => is_string($tailText) && $tailText !== '')) : [];
     }
 
     /**
@@ -347,14 +417,17 @@ class RequestSnapshot extends ValueObject
      * were produced by that model. A conversation can switch models mid-way (`aiModelNameOverride`): a model never
      * receives another model's reasoning. Items stored without a model name (rows written before the name was stamped)
      * go back only on the Responses API, whose encrypted items are bound to their model by the provider anyway (a
-     * mismatch is refused and the call is repeated without carried items); on Chat Completions they are dropped.
+     * mismatch is refused and the call is repeated without carried items); on Chat Completions they are dropped. On the
+     * Messages API the model is not compared: some models read another model's thinking blocks, and the provider drops
+     * and reports the ones the call's model cannot read ({@see $inputTransformations}).
      */
     public function holdsWireReasoningItemsFor(string $wireApi, ?string $modelNameOfCall = null): bool
     {
         if ($this->wireReasoningApi !== $wireApi || $this->wireReasoningItemsJson === null || $this->wireReasoningItemsJson === '') {
             return false;
         }
-        if ($modelNameOfCall === null) {
+        // the Messages API: the provider reads the binding of every block itself and reports the ones it dropped
+        if ($modelNameOfCall === null || $wireApi === AIModel::AGENT_WIRE_API_MESSAGES) {
             return true;
         }
         if ($this->modelName === null || $this->modelName === '') {
@@ -409,6 +482,8 @@ class RequestSnapshot extends ValueObject
         $appendOnlyRecord->wireReasoningApi = null;
         $appendOnlyRecord->wireReasoningItemsJson = null;
         $appendOnlyRecord->wireReasoningTokens = null;
+        // the notes ride before the step's assistant entry only: a discarded response has none
+        $appendOnlyRecord->messagesWireTailJson = null;
         return $appendOnlyRecord;
     }
 
@@ -488,6 +563,37 @@ class RequestSnapshot extends ValueObject
     }
 
     /**
+     * Record the hash of the tools a Messages body declares with `defer_loading` ({@see $appendedToolsHash}) — the
+     * tools the conversation's skill loads appended; null when the body declares none.
+     *
+     * @param array<int, mixed>|null $toolsOfSentBody the `tools` array of the sent body
+     */
+    public function recordAppendedToolsHashOfDeferredTools(?array $toolsOfSentBody): void
+    {
+        $deferredTools = array_values(array_filter(
+            $toolsOfSentBody ?? [],
+            static fn (mixed $tool): bool => is_array($tool) && ($tool['defer_loading'] ?? false) === true
+        ));
+        $this->appendedToolsHash = $deferredTools !== []
+            ? hash(self::WIRE_HASH_ALGORITHM, (string)json_encode($deferredTools, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE))
+            : null;
+    }
+
+    /**
+     * The tools of a Messages body that are offered from the first call on (declared without `defer_loading`).
+     *
+     * @param array<int, mixed> $toolsOfSentBody
+     * @return array<int, mixed>
+     */
+    public static function withoutDeferredTools(array $toolsOfSentBody): array
+    {
+        return array_values(array_filter(
+            $toolsOfSentBody,
+            static fn (mixed $tool): bool => !is_array($tool) || ($tool['defer_loading'] ?? false) !== true
+        ));
+    }
+
+    /**
      * Record the tool choice the egress sent ({@see $forceToolChoice}): a string choice as it is, a named-function
      * choice as its JSON.
      *
@@ -536,6 +642,19 @@ class RequestSnapshot extends ValueObject
                 continue;
             }
             foreach ($message['content'] as $partIndex => $part) {
+                // the Messages API: an `image` block of a user message, or inside a `tool_result` block
+                if (is_array($part) && ($part['type'] ?? null) === 'image') {
+                    $requestPayload['messages'][$messageIndex]['content'][$partIndex] = self::redactMessagesImageBlock($part);
+                    continue;
+                }
+                if (is_array($part) && ($part['type'] ?? null) === 'tool_result' && is_array($part['content'] ?? null)) {
+                    foreach ($part['content'] as $resultBlockIndex => $resultBlock) {
+                        if (is_array($resultBlock) && ($resultBlock['type'] ?? null) === 'image') {
+                            $requestPayload['messages'][$messageIndex]['content'][$partIndex]['content'][$resultBlockIndex] = self::redactMessagesImageBlock($resultBlock);
+                        }
+                    }
+                    continue;
+                }
                 if (is_array($part)
                     && ($part['type'] ?? null) === 'image_url'
                     && isset($part['image_url']['url'])
@@ -549,6 +668,21 @@ class RequestSnapshot extends ValueObject
             }
         }
         return $requestPayload;
+    }
+
+    /**
+     * A Messages `image` block with its base64 bytes replaced by the byte-count marker of {@see redactImagePayload()};
+     * a block that names a URL is unchanged.
+     *
+     * @param array<string, mixed> $imageBlock
+     * @return array<string, mixed>
+     */
+    public static function redactMessagesImageBlock(array $imageBlock): array
+    {
+        if (($imageBlock['source']['type'] ?? null) === 'base64' && is_string($imageBlock['source']['data'] ?? null)) {
+            $imageBlock['source']['data'] = '[image data redacted — ' . strlen($imageBlock['source']['data']) . ' bytes, not persisted]';
+        }
+        return $imageBlock;
     }
 
     /**

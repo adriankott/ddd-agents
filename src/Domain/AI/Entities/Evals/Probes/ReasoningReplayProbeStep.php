@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace DDD\Domain\AI\Entities\Evals\Probes;
 
 use DDD\Domain\AI\Entities\Conversations\Messages\RunSettings;
+use DDD\Domain\AI\Repo\Argus\Conversations\ArgusAIAgentConversation;
+use DDD\Domain\AI\Repo\Argus\Conversations\Wire\AgentMessagesRequestComposer;
+use DDD\Domain\AI\Repo\Argus\Conversations\Wire\AgentMessagesResponse;
 
 /**
  * One answered probe call read back: its call record, and the assistant entry the next call sends (text, tool calls
@@ -26,10 +29,23 @@ class ReasoningReplayProbeStep
     /** @var array<int, array<string, mixed>> The reasoning items as the API returned them (replayed verbatim) */
     protected array $reasoningItems = [];
 
+    /** @var string|null The Messages API: the answer's content blocks as the provider returned them (a JSON list, sent back verbatim) */
+    protected ?string $messagesContentJson = null;
+
+    /** @var string|null The Messages API: the note the call ended on; the next calls keep it at its place, before this step's assistant entry */
+    public ?string $noteText = null;
+
+    /** The results of the order task's tools by tool name and the id the call names ({@see buildToolResultOfCall()}) */
+    public const array ORDER_TASK_TOOL_RESULTS = [
+        'getOrder' => ['4712' => '{"orderId":"4712","customerId":"C-88","items":["saddle"]}', '4713' => '{"orderId":"4713","customerId":"C-17","items":["bell"]}', '*' => '{"orderId":"4711","customerId":"C-17","items":["brake pads","chain"]}'],
+        'getCustomer' => ['C-88' => '{"customerId":"C-88","name":"Jonas Weber","city":"50667 Köln"}', '*' => '{"customerId":"C-17","name":"Mara Lindt","city":"80331 München"}'],
+        'getInvoice' => ['*' => '{"orderId":"4711","total":"84.90"}'],
+    ];
+
     /**
-     * Reads one answer: Chat Completions `choices[0].message` (`content`, `tool_calls`, `reasoning_details`) or the
-     * Responses `output` items (`reasoning`, `function_call`, `message`), plus usage, provider and
-     * `input_transformations`.
+     * Reads one answer: Chat Completions `choices[0].message` (`content`, `tool_calls`, `reasoning_details`), the
+     * Responses `output` items (`reasoning`, `function_call`, `message`) or the Messages `content` blocks (`thinking`,
+     * `text`, `tool_use`), plus usage, provider and `input_transformations`.
      */
     public static function fromAnswer(string $wireApi, string $label, string $modelName, ReasoningReplayProbeHttpAnswer $reasoningReplayProbeHttpAnswer): static
     {
@@ -59,12 +75,20 @@ class ReasoningReplayProbeStep
         if (array_key_exists('input_transformations', $answerBody)) {
             $reasoningReplayProbeCall->inputTransformationsJson = (string)json_encode($answerBody['input_transformations'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         }
-        if ($wireApi === RunSettings::AGENT_WIRE_API_RESPONSES) {
+        foreach (is_array($answerBody['input_transformations'] ?? null) ? $answerBody['input_transformations'] : [] as $inputTransformation) {
+            if (is_array($inputTransformation) && ($inputTransformation['type'] ?? null) === AgentMessagesResponse::TRANSFORMATION_THINKING_DROPPED) {
+                $reasoningReplayProbeCall->droppedThinkingBlockCount++;
+            }
+        }
+        if ($wireApi === RunSettings::AGENT_WIRE_API_MESSAGES) {
+            $reasoningReplayProbeStep->readMessagesAnswer($reasoningReplayProbeHttpAnswer->rawBody, $answerBody);
+        } elseif ($wireApi === RunSettings::AGENT_WIRE_API_RESPONSES) {
             $reasoningReplayProbeStep->readResponsesOutput((array)($answerBody['output'] ?? []));
+            $reasoningReplayProbeStep->readUsage((array)($answerBody['usage'] ?? []));
         } else {
             $reasoningReplayProbeStep->readChatCompletionsMessage((array)($answerBody['choices'][0]['message'] ?? []));
+            $reasoningReplayProbeStep->readUsage((array)($answerBody['usage'] ?? []));
         }
-        $reasoningReplayProbeStep->readUsage((array)($answerBody['usage'] ?? []));
         $reasoningReplayProbeCall->reasoningItemCount = count($reasoningReplayProbeStep->reasoningItems);
         foreach ($reasoningReplayProbeStep->reasoningItems as $reasoningItem) {
             $reasoningReplayProbeCall->reasoningItemTypes[] = (string)($reasoningItem['type'] ?? '?');
@@ -94,10 +118,40 @@ class ReasoningReplayProbeStep
         if ($this->toolCalls !== []) {
             $assistantEntry['tool_calls'] = $this->toolCalls;
         }
+        if ($this->messagesContentJson !== null) {
+            // the Messages API: the content blocks go back exactly as they came
+            $assistantEntry[AgentMessagesRequestComposer::KEY_ASSISTANT_CONTENT_JSON] = $this->messagesContentJson;
+            return $assistantEntry;
+        }
         if ($this->reasoningItems !== []) {
             $assistantEntry['reasoning_details'] = $this->reasoningItems;
         }
         return $assistantEntry;
+    }
+
+    /**
+     * The entries this step adds to the next call's history: on the Messages API the note its call ended on (a
+     * `role: "system"` message with `clear_at`, kept at its place), then the assistant entry and the tool results.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function buildHistoryEntries(): array
+    {
+        $historyEntries = [];
+        if ($this->noteText !== null) {
+            $historyEntries[] = ArgusAIAgentConversation::buildMessagesWireNoteEntry([$this->noteText]);
+        }
+        $historyEntries[] = $this->buildAssistantEntry();
+        foreach ($this->buildToolResultEntries() as $toolResultEntry) {
+            $historyEntries[] = $toolResultEntry;
+        }
+        return $historyEntries;
+    }
+
+    /** Whether the answer carries a tool call (the step continues the loop). */
+    public function hasToolCalls(): bool
+    {
+        return $this->toolCalls !== [];
     }
 
     /**
@@ -109,9 +163,31 @@ class ReasoningReplayProbeStep
     {
         $toolResultEntries = [];
         foreach ($this->toolCalls as $toolCall) {
-            $toolResultEntries[] = ['role' => 'tool', 'tool_call_id' => (string)($toolCall['id'] ?? ''), 'content' => self::TOOL_RESULT];
+            $toolResultEntries[] = [
+                'role' => 'tool',
+                'tool_call_id' => (string)($toolCall['id'] ?? ''),
+                'content' => self::buildToolResultOfCall((string)($toolCall['function']['name'] ?? ''), (string)($toolCall['function']['arguments'] ?? '')),
+            ];
         }
         return $toolResultEntries;
+    }
+
+    /**
+     * The result of one probe tool call: a tool of the order task answers by the id its arguments name
+     * ({@see ORDER_TASK_TOOL_RESULTS}), every other tool with {@see TOOL_RESULT}.
+     */
+    public static function buildToolResultOfCall(string $toolName, string $argumentsJson): string
+    {
+        $resultsOfTool = self::ORDER_TASK_TOOL_RESULTS[$toolName] ?? null;
+        if ($resultsOfTool === null) {
+            return self::TOOL_RESULT;
+        }
+        foreach ($resultsOfTool as $namedId => $result) {
+            if ($namedId !== '*' && str_contains($argumentsJson, '"' . $namedId . '"')) {
+                return $result;
+            }
+        }
+        return $resultsOfTool['*'];
     }
 
     /**
@@ -165,6 +241,48 @@ class ReasoningReplayProbeStep
                 $this->reasoningItems[] = $reasoningItem;
             }
         }
+    }
+
+    /**
+     * An answer of the Messages API: the content blocks kept verbatim for the replay, the thinking blocks as the
+     * reasoning items, the `tool_use` blocks as calls, and Anthropic's three disjoint input counts.
+     *
+     * @param array<string, mixed> $answerBody
+     */
+    protected function readMessagesAnswer(string $rawBody, array $answerBody): void
+    {
+        $answerObject = json_decode($rawBody);
+        if (AgentMessagesResponse::isMessagesObject($answerObject)) {
+            $this->messagesContentJson = AgentMessagesResponse::fromResponseObject($answerObject)->getContentBlocksJson();
+        }
+        $texts = [];
+        foreach ((array)($answerBody['content'] ?? []) as $contentBlock) {
+            if (!is_array($contentBlock)) {
+                continue;
+            }
+            $blockType = $contentBlock['type'] ?? null;
+            if (in_array($blockType, AgentMessagesRequestComposer::THINKING_BLOCK_TYPES, true)) {
+                $this->reasoningItems[] = $contentBlock;
+            } elseif ($blockType === 'tool_use') {
+                $this->toolCalls[] = [
+                    'id' => (string)($contentBlock['id'] ?? ''),
+                    'type' => 'function',
+                    'function' => ['name' => (string)($contentBlock['name'] ?? ''), 'arguments' => (string)json_encode($contentBlock['input'] ?? new \stdClass(), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)],
+                ];
+            } elseif ($blockType === 'text' && is_string($contentBlock['text'] ?? null)) {
+                $texts[] = $contentBlock['text'];
+            }
+        }
+        $this->assistantText = $texts !== [] ? implode("\n", $texts) : null;
+        $usage = (array)($answerBody['usage'] ?? []);
+        $cacheReadTokens = is_numeric($usage['cache_read_input_tokens'] ?? null) ? (int)$usage['cache_read_input_tokens'] : 0;
+        $cacheWriteTokens = is_numeric($usage['cache_creation_input_tokens'] ?? null) ? (int)$usage['cache_creation_input_tokens'] : 0;
+        $this->call->inputTokens = is_numeric($usage['input_tokens'] ?? null) ? (int)$usage['input_tokens'] + $cacheReadTokens + $cacheWriteTokens : null;
+        $this->call->cachedInputTokens = $cacheReadTokens;
+        $this->call->cacheWriteTokens = $cacheWriteTokens;
+        $this->call->outputTokens = is_numeric($usage['output_tokens'] ?? null) ? (int)$usage['output_tokens'] : null;
+        $this->call->reasoningTokens = is_numeric($usage['output_tokens_details']['thinking_tokens'] ?? null) ? (int)$usage['output_tokens_details']['thinking_tokens'] : null;
+        $this->call->costInUsd = is_numeric($usage['cost'] ?? null) ? (float)$usage['cost'] : null;
     }
 
     /**

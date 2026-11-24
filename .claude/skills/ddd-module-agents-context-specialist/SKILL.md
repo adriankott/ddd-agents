@@ -21,7 +21,7 @@ the tools and their results to the tools skill.
 | The per-call model input: system segments, history, volatile tail | `AgentModelInput`, `AgentContextSegmentType`, `AgentModelInputTailEntries` |
 | The client context of the owner's newest input (`[SIGNAL:client-context]`) | `AgentClientContext`, `AgentClientContextService` |
 | The core prompts and the cached base prompt | `AgentAIPromptNames`, `AgentBaseSystemPromptCacheService` |
-| Wire APIs, append-only skill loading, prefix epochs, reasoning carry-over | `AgentWireConfiguration`, `AgentPrefixEpoch`, `AgentAppendOnlyCall`, `AgentPreviousReasoningCut` |
+| Wire APIs (Chat Completions, Responses, Anthropic Messages), append-only skill loading, prefix epochs, reasoning carry-over, the frozen part of a Messages call | `AgentWireConfiguration`, `AgentPrefixEpoch`, `AgentAppendOnlyCall`, `AgentPreviousReasoningCut`, `AgentMessagesWireReplay`, `AgentMessagesRequestComposer` |
 | Context reduction (compaction tree, tool-result stubbing) | `AIConversationCompactionService`, `CompactionBudgets`, `CompactionModelLimits`, `ToolResultRetention` |
 | Skill and tool eviction | `LoadedCapabilities`, `LoadedCapability`, `AgentColdCapabilityUnloading` |
 | Volatile context delivered once per change | `AgentStateEpoch`, `AgentStateDelivery`, `AgentStateDelta`, `AgentSpaceContextFields` |
@@ -81,7 +81,8 @@ the tools and their results to the tools skill.
   catalog answer, an evaluation run) leaves the strategy unstamped and the run stamps it before its first call (also in
   memory for an ephemeral conversation), and a run over an unstamped conversation resolves it for its wire API
   (`ContextRetentionSettings::getSkillLoadingStrategyForAgentWireApi()`). A catalog entry without
-  `settings.agentWireApi` speaks Chat Completions. An append the start request names is refused
+  `settings.agentWireApi`, or with a value this agent does not speak, speaks Chat Completions (the second with a
+  warning in the log). An append the start request names is refused
   (`AgentWireConfiguration::REJECTION_CONVERSATION_APPEND_NEEDS_RESPONSES`), while a purpose's wire profile the model
   cannot run is dropped at the purposed start with the trace line `purpose.agentWireProfile.fellBack`.
 - **Every skill load under the swap costs the whole prefix.** It changes the top-level tools and the LOADED_SKILLS

@@ -66,6 +66,12 @@ class ReasoningReplayProbeCall extends ValueObject
     /** @var string|null The answer's `input_transformations` (dropped thinking blocks) as JSON; null when absent */
     public ?string $inputTransformationsJson = null;
 
+    /** @var int How many thinking blocks the provider dropped from this call's request (`thinking_dropped` entries of `input_transformations`) */
+    public int $droppedThinkingBlockCount = 0;
+
+    /** @var int|null The reasoning (thinking) tokens the provider reports for the answer; null when it names none */
+    public ?int $reasoningTokens = null;
+
     /** @var int Wall time of the call in milliseconds */
     public int $durationMs = 0;
 

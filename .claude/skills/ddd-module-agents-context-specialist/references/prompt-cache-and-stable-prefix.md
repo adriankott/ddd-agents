@@ -3,7 +3,7 @@
 **Reader:** host developer and package maintainer
 
 Contents: 1. The rule · 2. Breakpoints and the routing key · 3. Wire API and strategy · 4. Append-only loading and
-prefix epochs · 5. Reasoning carry-over · 6. The cached base prompt · 7. What breaks the cache · 8. Host checklist
+prefix epochs · 5. Reasoning carry-over · 5a. The Messages API: thinking blocks and the frozen part · 6. The cached base prompt · 7. What breaks the cache · 8. Host checklist
 
 ## 1. The rule
 
@@ -33,10 +33,15 @@ history markers. A Responses request reads the cache only at markers it carries,
 previous call; the slot before the loaded skills goes to it under the provider's cap of four.
 
 **Anthropic `cache_control`.** A model whose catalog mode is `AIModel::PROMPT_CACHE_MODE_ANTHROPIC_CACHE_CONTROL` (the
-Claude models) over the direct OpenRouter egress (`ArgusAIAgentConversation::usesAnthropicCacheControl()`; Chat
-Completions, so `systemPromptSwap`) gets the same boundaries as the Chat Completions row above — three in the system
-content, one on the newest stable message — as `cache_control: {type: "ephemeral"}` on those text parts
-(`convertPromptCacheBreakpointsToAnthropicCacheControl()`, at most four, Anthropic's limit). Without markers a Claude
+Claude models) over the direct OpenRouter egress (`ArgusAIAgentConversation::usesAnthropicCacheControl()`) gets its
+markers as `cache_control: {type: "ephemeral"}` on those text parts
+(`convertPromptCacheBreakpointsToAnthropicCacheControl()`, at most four, Anthropic's limit). On Chat Completions (so
+`systemPromptSwap`) they sit as in the Chat Completions row above: three in the system content, one on the newest
+stable message. On the Messages API under `conversationAppend` the loaded-skills segment is fixed, so the marker
+before it is not needed: two in the system content (after the base prompt, at the end) and two in the history — the
+newest stable message and the one the previous call marked
+(`addPromptCacheBreakpointToPreviousCallsMessagesWireMessage()`; Anthropic looks an entry up only about 20 blocks back
+from a marker, and one step with many parallel calls adds more blocks than that). Without markers a Claude
 model caches nothing. The writes are booked at the default lifetime (5 min, 1.25x the input rate); the usage maps
 OpenRouter's `prompt_tokens_details.cached_tokens` / `cache_write_tokens`. Anthropic caches tools before the system
 content, so under the swap a skill load (new top-level tools) writes the whole prefix again; reordering the system
@@ -52,19 +57,28 @@ conversation without a space.
 `AgentWireConfiguration::resolveFor()` decides, once per run, from the model, the run settings and the stamped retention
 settings:
 
-- **Wire API.** `RunSettings::$agentWireApi` if set, else the catalog's `AIModel::getAgentWireApi()`
-  (`chatCompletions` without a value). `responses` is allowed for an OpenAI model over the direct OpenRouter egress
-  only. `RunSettings::AGENT_WIRE_API_RESPONSES_SERVER_STATE` is a test arm (OpenAI keeps the state,
-  `AgentResponsesServerStateChain`).
+- **Wire API.** `RunSettings::$agentWireApi` if set, else the catalog's value, else `chatCompletions`. The catalog
+  (`AIModel::getAgentWireApi()` in mgamadeus/ddd-ai) returns the value as written and checks nothing; the agent matches
+  it against the forms it speaks (`AgentWireConfiguration::CATALOG_WIRE_APIS`: `chatCompletions`, `responses`,
+  `messages`; `resolveWireApiOfCatalogValue()`), and a value it does not speak is Chat Completions with one warning
+  per model and process — a catalog default never makes a model unusable. `responses` is allowed for an OpenAI model
+  and `messages` (the Anthropic Messages API) for an Anthropic model, both over the direct OpenRouter egress only; a
+  catalog value the egress cannot serve (the LiteLLM proxy) is Chat Completions as well.
+  `RunSettings::AGENT_WIRE_API_RESPONSES_SERVER_STATE` is a test arm (OpenAI keeps the state,
+  `AgentResponsesServerStateChain`) and never a catalog value.
 - **Skill-loading strategy.** `systemPromptSwap` (a load changes the catalog lines of the loaded skills in the
-  SKILL_CATALOG segment, the LOADED_SKILLS segment and the top-level tools) or `conversationAppend` (Responses only).
+  SKILL_CATALOG segment, the LOADED_SKILLS segment and the top-level tools) or `conversationAppend` (Responses and
+  Messages, `RunSettings::isAppendOnlyCapableAgentWireApi()`).
 - **Rejections** carry a reason instead of a silent switch: `REJECTION_CONVERSATION_APPEND_NEEDS_RESPONSES`,
   `REJECTION_RESPONSES_NEEDS_OPENAI_MODEL`, `REJECTION_RESPONSES_NEEDS_DIRECT_OPENROUTER`,
-  `REJECTION_SERVER_STATE_NEEDS_CONVERSATION_APPEND`, `REJECTION_SERVER_STATE_WITH_STATE_NOTES`.
+  `REJECTION_MESSAGES_NEEDS_ANTHROPIC_MODEL`, `REJECTION_MESSAGES_NEEDS_DIRECT_OPENROUTER`,
+  `REJECTION_SERVER_STATE_NEEDS_CONVERSATION_APPEND`, `REJECTION_SERVER_STATE_WITH_STATE_NOTES`. They apply to a
+  value the conversation's row names; a catalog value falls back as described above.
 
-Both API bodies are composed from one API-neutral `AgentWireRequestParameters`: `AgentChatCompletionsRequestComposer`
-or `AgentResponsesRequestComposer` (`AgentResponsesInputItems` maps the same messages: system → one `developer`
-message, `function_call` / `function_call_output`, `input_image`, the appended `additional_tools` items).
+All API bodies are composed from one API-neutral `AgentWireRequestParameters`: `AgentChatCompletionsRequestComposer`,
+`AgentResponsesRequestComposer` (`AgentResponsesInputItems` maps the same messages: system → one `developer`
+message, `function_call` / `function_call_output`, `input_image`, the appended `additional_tools` items) or
+`AgentMessagesRequestComposer` (section 5a).
 
 The strategy is stamped at creation (`ContextRetentionSettings::buildForNewConversation()`): the global default
 `conversationAppend` becomes `systemPromptSwap` when the new conversation's model speaks Chat Completions.
@@ -93,6 +107,16 @@ The strategy is stamped at creation (`ContextRetentionSettings::buildForNewConve
 override of the run settings is applied (`AIConversationsService::applyAdminRunSettingsOverride()`, a bad request); and
 in a model call made outside a run (`AIConversationModelCallsService::performModelCall()` throws
 `AIModelCallFailedException`).
+
+**The Messages answer.** `AgentMessagesResponse` reads it (`type: "message"`): the text, the `tool_use` blocks in the
+Chat Completions shape, the content blocks verbatim (stored for the replay), the usage (the booked input is the
+uncached remainder plus the tokens read from and written to the cache; `output_tokens_details.thinking_tokens`) and
+`input_transformations` — the thinking blocks the provider dropped from the REQUEST. An answer without text and
+without a call (a `refusal` stop, a cut at `max_tokens` inside the thinking) fails the call with the outcome
+`messagesAnswerUnusable`. The readers live in this package: ddd-ai's language-model trait asks three hooks
+(`isAnswerObjectWithoutEnvelope()`, `extractAnswerText()`, `extractAnswerUsage()`) which
+`ArgusAIAgentConversation` overrides for this answer shape. A Messages body carries no service tier, so none is noted
+for the call and no tier multiplier enters its booking.
 
 **The Responses answer.** `AgentResponsesResponse` reads the answer: the calls in the Chat Completions shape, the
 reasoning items and the usage including the tokens written to the cache (`AgentResponsesUsage`). An answer the provider refused or cut off (status
@@ -151,7 +175,7 @@ compaction summarizer never see them.
 `off`. Order: the conversation's row, else the model's catalog value (`AIModel::$previousReasoningCarryOver` in
 mgamadeus/ddd-ai, host-overridable in `config/app/AI/models.php`; applied on the Responses API and on Chat Completions
 over the direct OpenRouter egress only, where `reasoning_details` reach the provider), else the per-API default:
-`capped` on Responses, `off` on Chat Completions; always `off` on the server-state arm. Kimi K3.1 Pro sets
+`capped` on Responses and on Messages, `off` on Chat Completions; always `off` on the server-state arm. Kimi K3.1 Pro sets
 `currentTurn`: it keeps its verdicts (what it saw on pictures) in its reasoning, so without its own items it re-read the
 same pictures until the repeat guard stopped it.
 
@@ -191,6 +215,63 @@ noise: a call's duration follows its output tokens (about 1.35 s plus 0.49 s per
 input, so the cap is a cache and cost lever, not a latency one. A host that wants `all` sets it per conversation
 (`RunSettings::$previousReasoningCarryOver`, a purpose's `runSettings`); a host that wants another cap sets
 `previousReasoningCapTokens`.
+
+## 5a. The Messages API: thinking blocks and the frozen part
+
+On the Anthropic Messages API a thinking block is signed and bound to the prefix that produced it: the system prompt,
+the tool set and every message before the block. A request that changed anything before a block loses that block and
+every later one. The request always asks for `thinking.block_binding.prefix_mismatch_behavior: drop_block`
+(`AgentMessagesRequestComposer::THINKING`), so the provider drops instead of refusing, and names each drop in the
+answer's `input_transformations` (reasons `prefix_binding_mismatch`, `model_binding_mismatch`). Valid changes: appended
+messages, appended `role: "system"` messages, a `clear_at` note left in place, tools declared `defer_loading`, moved
+cache markers, and removing the thinking of a LEADING run of steps (each block is chained to the one before it; only a
+removal from the middle breaks).
+
+The harness edits history on purpose (the notes at the end of each call, cleared tool results, shortened arguments,
+the picture cap), so the history of a call has two parts, decided by `AgentMessagesWireReplay::decideFor()`:
+
+| Part | Rendering |
+|---|---|
+| Below `frozenFromMessageIndex` | as on every other wire API: every edit applies, no thinking block rides |
+| At or above it (frozen) | the assistant message is the content the provider returned (`RequestSnapshot::$wireReasoningItemsJson` with `wireReasoningApi = messages`), tool results in full, call arguments unshortened, an owner message with the cue it was sent with, and the notes of each call re-sent where they were sent (`RequestSnapshot::$messagesWireTailJson`) |
+
+Thinking rides from `thinkingFromMessageIndex` on, never below the frozen part:
+
+| Carry-over | Frozen floor | Thinking floor |
+|---|---|---|
+| `off` | none | none |
+| `currentTurn` | the newest turn initiator | the same |
+| `all` | the floor the newest earlier call recorded (`RequestSnapshot::$messagesWireFrozenFromMessageIndex`), else the newest turn initiator | the same |
+| `capped` (the default) | as `all` | the cut of `AgentPreviousReasoningCut`: the newest steps whose thinking fits the cap, never below the frozen floor |
+
+A call whose answer reported dropped thinking lifts the thinking floor to its own step
+(`RequestSnapshot::reportsDroppedThinkingBlocks()`): the earlier blocks are invalid for good. A stored answer is sent
+verbatim only when its `tool_use` ids equal the call ids of the step's rows; otherwise the step is rendered from the
+rows, without thinking. Stored content of any Anthropic model is sent to the model of the call: the provider drops the
+blocks that model cannot read and reports it (`model_binding_mismatch`).
+
+**Notes of a call.** The volatile tail (signals, the plan, the time) goes out as ONE `role: "system"` message with
+`clear_at: next_user_message` after the whole history: the model sees it on this call, later calls send it again at the
+same place and the provider hides it. A tool result's user message counts as the next user message.
+
+**Skill loads.** The instructions a load appends go out as a `role: "system"` message at that place, its tools as
+`tool_addition` blocks; the tools are declared top-level with `defer_loading: true`, which changes neither the tool
+set a block is bound to nor the tools hash of the snapshot (`RequestSnapshot::withoutDeferredTools()`,
+`recordAppendedToolsHashOfDeferredTools()`).
+
+**Request shape.** Headers `anthropic-version` and the betas of `AgentMessagesRequestComposer::BETAS`; `thinking:
+adaptive`; `output_config.effort` from the step's effort; `max_tokens` from the catalog's maximum output; no
+temperature; a forced tool choice goes out as `auto` plus the `[SIGNAL:tool-expected]` line where the catalog says so.
+
+**Provider pin.** A Messages call is pinned to Anthropic (`ArgusAIAgentConversation::ANTHROPIC_PROVIDER_PIN`: `only`,
+no fallback): the signatures are valid on the host that minted them and the cache is per provider. Nothing automatic
+leaves the pin. An operator's console provider order (`forceProviderOrder()`, `hasConsoleProviderOrder()`) is itself a
+pin for one process and replaces it; the egress then sends no carried reasoning on that call (the same holds for the
+OpenAI pin of a call that carries reasoning items).
+
+**Refusals.** A provider error naming one of `CARRIED_REASONING_REJECTION_ERROR_TEXTS` (a thinking block refused in
+spite of `drop_block`) repeats the call once without carried thinking. Dropped blocks are recorded on the snapshot
+(`RequestSnapshot::$inputTransformations`) and as the trace event `turn.modelCall.inputTransformations`.
 
 ## 6. The cached base prompt
 
@@ -250,6 +331,8 @@ On both paths:
 | A tiny result stubbed to a longer stub | that row | `ToolCall::MIN_RESULT_CHARS_TO_STUB` |
 | An older `update_task_plan` call's arguments stubbed (`{"superseded":true}`) | the history from that call | only calls of earlier turns, once at the turn boundary; the running turn's plan calls keep their arguments |
 | Carried reasoning items dropped by the `capped` cut | the history from the first dropped item | the cap (4000) well above the two kept steps; `all` drops none |
+| Messages API: the frozen floor moves up at a turn start (`currentTurn`) or the thinking floor moves (`capped`) | the history from the first step that returns to the plain rendering or loses its thinking | `all` and `capped` keep the recorded frozen floor across turns |
+| Messages API: an edit inside the frozen part (should not happen) | the provider drops the thinking after it and reports it | the frozen rendering; `app:ai-agent:cache-diff` and `inspect --snapshots` name the drop |
 | A picture leaving the image cap | that result | the cap keeps the newest pictures |
 
 ## 8. Host checklist

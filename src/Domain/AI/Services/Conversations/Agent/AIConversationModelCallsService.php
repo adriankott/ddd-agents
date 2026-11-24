@@ -18,11 +18,14 @@ use DDD\Domain\AI\Entities\Conversations\Messages\ToolCall;
 use DDD\Domain\AI\Entities\Conversations\Messages\ToolCalls;
 use DDD\Domain\AI\Exceptions\AIModelCallTransportFailedException;
 use DDD\Domain\AI\Exceptions\AIModelCallFailedException;
+use DDD\Domain\AI\Entities\Conversations\Agent\Wire\AgentMessagesWireReplay;
 use DDD\Domain\AI\Entities\Conversations\Agent\Wire\AgentWireConfiguration;
 use DDD\Domain\AI\Entities\Conversations\Agent\Wire\AgentAppendOnlyCall;
 use DDD\Domain\AI\Entities\Conversations\Agent\Wire\AgentCallToolDelivery;
 use DDD\Domain\AI\Entities\Skills\AISkills;
 use DDD\Domain\AI\Services\Skills\AISkillsService;
+use DDD\Domain\AI\Repo\Argus\Conversations\Wire\AgentMessagesInputTransformation;
+use DDD\Domain\AI\Repo\Argus\Conversations\Wire\AgentMessagesRequestComposer;
 use DDD\Domain\AI\Repo\Argus\Conversations\Wire\AgentResponsesInputItems;
 use DDD\Domain\AI\Repo\Argus\Conversations\Wire\AgentResponsesRequestComposer;
 use DDD\Domain\AI\Entities\Conversations\Messages\RunSettings;
@@ -143,7 +146,7 @@ class AIConversationModelCallsService extends Service
     {
         $argusAIAgentConversation = ArgusAIAgentConversation::newInstance();
         $argusAIAgentConversation->aiModelNameOverride = $aiModelName;
-        return AgentWireConfiguration::resolveWireApiFor($this->findAgentModelOfEgress($argusAIAgentConversation), $runSettings);
+        return AgentWireConfiguration::resolveWireApiFor($this->findAgentModelOfEgress($argusAIAgentConversation), $runSettings, $argusAIAgentConversation->targetsDirectOpenRouterEgress());
     }
 
     /**
@@ -476,15 +479,22 @@ class AIConversationModelCallsService extends Service
                 $requestSnapshot->rawResponseJson = json_encode($argusAIAgentConversation->lastRawResponse, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?: null;
             }
             // A hash per system segment and one of the tools: the cache diff names what changed on every call.
+            // (a Messages body declares the tools a skill load appended next to the top-level ones, with
+            // `defer_loading`: they are the appended tools, not a change of the tool set)
+            $toolsOfSentBody = is_array($requestPayload['body']['tools'] ?? null) ? $requestPayload['body']['tools'] : null;
             $requestSnapshot->recordSystemSegmentAndToolsHashes(
                 $argusAIAgentConversation->lastSystemSegments,
-                is_array($requestPayload['body']['tools'] ?? null) ? $requestPayload['body']['tools'] : null
+                $toolsOfSentBody !== null && $agentWireConfiguration->usesMessagesApi() ? RequestSnapshot::withoutDeferredTools($toolsOfSentBody) : $toolsOfSentBody
             );
             // the wire API and the skill-loading strategy of this call, and the hash of its appended tools
             $requestSnapshot->wireApi = $agentWireConfiguration->wireApi;
             $requestSnapshot->skillLoadingStrategy = $agentWireConfiguration->skillLoadingStrategy;
             $requestSnapshot->toolDelivery = $agentAppendOnlyCall !== null ? $argusAIAgentConversation->modelInput->prefixEpoch?->toolDelivery : null;
-            $requestSnapshot->recordAppendedToolsHash(is_array($requestPayload['body']['input'] ?? null) ? $requestPayload['body']['input'] : null);
+            if ($agentWireConfiguration->usesMessagesApi()) {
+                $requestSnapshot->recordAppendedToolsHashOfDeferredTools($toolsOfSentBody);
+            } else {
+                $requestSnapshot->recordAppendedToolsHash(is_array($requestPayload['body']['input'] ?? null) ? $requestPayload['body']['input'] : null);
+            }
             // TEST-ONLY server-state arm: the stored response this call produced and the chain link it made
             if ($agentWireConfiguration->usesResponsesServerState() && $argusAIAgentConversation->lastResponsesServerStateChain !== null) {
                 $requestSnapshot->recordResponsesServerStateChain(
@@ -500,6 +510,38 @@ class AIConversationModelCallsService extends Service
                 $requestSnapshot->wireReasoningApi = $argusAIAgentConversation->capturedReasoningItemsWireApi;
                 $requestSnapshot->wireReasoningItemsJson = json_encode($argusAIAgentConversation->capturedReasoningItems, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?: null;
                 $requestSnapshot->wireReasoningTokens = $argusAIAgentConversation->capturedReasoningTokens;
+            }
+            // the Messages API: the answer's content blocks ride the step's marker row whatever the carry-over is, with
+            // the notes the request ended on, the frozen part it rendered and what the provider dropped from it
+            if ($argusAIAgentConversation->capturedMessagesContentJson !== null) {
+                $requestSnapshot->wireReasoningApi = $argusAIAgentConversation->capturedReasoningItemsWireApi;
+                $requestSnapshot->wireReasoningItemsJson = $argusAIAgentConversation->capturedMessagesContentJson;
+                $requestSnapshot->wireReasoningTokens = $argusAIAgentConversation->capturedReasoningTokens;
+            }
+            if ($agentWireConfiguration->usesMessagesApi()) {
+                $messagesWireReplayOfCall = $argusAIAgentConversation->lastMessagesWireReplay;
+                if ($messagesWireReplayOfCall?->frozenFromMessageIndex !== null) {
+                    $requestSnapshot->messagesWireFrozenFromMessageIndex = $messagesWireReplayOfCall->frozenFromMessageIndex;
+                    $requestSnapshot->messagesWireThinkingFromMessageIndex = $messagesWireReplayOfCall->thinkingFromMessageIndex;
+                    $requestSnapshot->messagesWireTailJson = $argusAIAgentConversation->lastMessagesWireTailTexts !== []
+                        ? (json_encode($argusAIAgentConversation->lastMessagesWireTailTexts, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?: null)
+                        : null;
+                }
+                $requestSnapshot->inputTransformations = $argusAIAgentConversation->capturedInputTransformations !== []
+                    ? array_map(static fn (AgentMessagesInputTransformation $inputTransformation): array => $inputTransformation->toArray(), $argusAIAgentConversation->capturedInputTransformations)
+                    : null;
+                if ($requestSnapshot->inputTransformations !== null) {
+                    // the provider changed the request before the model read it (dropped thinking blocks): traced with
+                    // the place and the reason of every block, so a cause in the history building is found
+                    $this->aiTrace('turn.modelCall.inputTransformations', [
+                        'conversationId' => $conversation->id ?? null,
+                        'model' => $requestSnapshot->modelName,
+                        'droppedThinkingBlocks' => $requestSnapshot->countDroppedThinkingBlocks(),
+                        'frozenFromMessageIndex' => $requestSnapshot->messagesWireFrozenFromMessageIndex,
+                        'thinkingFromMessageIndex' => $requestSnapshot->messagesWireThinkingFromMessageIndex,
+                        'inputTransformations' => $requestSnapshot->inputTransformations,
+                    ]);
+                }
             }
             // carry-over `capped`: the cut this call sent — the next call starts from it
             if ($argusAIAgentConversation->lastPreviousReasoningCut !== null) {
@@ -573,11 +615,11 @@ class AIConversationModelCallsService extends Service
         // an empty answer the loop would nudge as a stall (Chat Completions is unchanged)
         if ($providerError === null && $argusAIAgentConversation->unusableResponsesAnswerReason !== null) {
             $providerError = (string)json_encode(
-                ['outcome' => 'responsesAnswerUnusable', 'reason' => $argusAIAgentConversation->unusableResponsesAnswerReason],
+                ['outcome' => $agentWireConfiguration->usesMessagesApi() ? 'messagesAnswerUnusable' : 'responsesAnswerUnusable', 'reason' => $argusAIAgentConversation->unusableResponsesAnswerReason],
                 JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
             );
             \DDD\Infrastructure\Services\DDDService::instance()->getLogger()->warning(
-                'AIConversationModelCallsService: unusable Responses answer for conversation ' . ($conversation->id ?? 'transient')
+                'AIConversationModelCallsService: unusable ' . ($agentWireConfiguration->usesMessagesApi() ? 'Messages' : 'Responses') . ' answer for conversation ' . ($conversation->id ?? 'transient')
                 . ' — ' . $argusAIAgentConversation->unusableResponsesAnswerReason
             );
         }
@@ -927,6 +969,18 @@ class AIConversationModelCallsService extends Service
         // as a visible placeholder at its wire position instead.
         $producingContext->renderImageReferencePlaceholders = true;
         $argusAIAgentConversation = ArgusAIAgentConversation::newInstance();
+        // a call on the Messages API is rebuilt with the frozen part and the thinking floor it recorded
+        $wasSentOnTheMessagesApi = ($message->requestSnapshot->wireApi ?? null) === RunSettings::AGENT_WIRE_API_MESSAGES;
+        if ($wasSentOnTheMessagesApi) {
+            $agentWireConfigurationOfRecordedCall = new AgentWireConfiguration();
+            $agentWireConfigurationOfRecordedCall->wireApi = RunSettings::AGENT_WIRE_API_MESSAGES;
+            $agentWireConfigurationOfRecordedCall->skillLoadingStrategy = $message->requestSnapshot->skillLoadingStrategy ?? $agentWireConfigurationOfRecordedCall->skillLoadingStrategy;
+            $argusAIAgentConversation->agentWireConfiguration = $agentWireConfigurationOfRecordedCall;
+            $argusAIAgentConversation->messagesWireReplayOfRecordedCall = AgentMessagesWireReplay::fromRecordedFloors(
+                $message->requestSnapshot->messagesWireFrozenFromMessageIndex,
+                $message->requestSnapshot->messagesWireThinkingFromMessageIndex
+            );
+        }
         // an append-only call's history carries the items the epoch's calls appended
         $reconstructedToolSchemas = $this->buildToolSchemasForMessage($conversation, $message);
         if ($producingContext->prefixEpoch !== null) {
@@ -957,6 +1011,18 @@ class AIConversationModelCallsService extends Service
             $reconstructedBody['wireApi'] = $message->requestSnapshot->wireApi;
             $reconstructedBody['input'] = AgentResponsesInputItems::fromChatCompletionsMessages($requestBodyMessages);
             $reconstructedBody['responsesTools'] = AgentResponsesRequestComposer::convertToolSchemas($reconstructedBody['tools']);
+        }
+        // a Messages call too: the system blocks, the messages and the tools in the form of that API
+        if ($wasSentOnTheMessagesApi) {
+            $agentMessagesConversation = AgentMessagesRequestComposer::convertChatCompletionsMessages($requestBodyMessages);
+            $reconstructedBody['wireApi'] = $message->requestSnapshot->wireApi;
+            $reconstructedBody['messagesApiSystem'] = $agentMessagesConversation->systemBlocks;
+            $reconstructedBody['messagesApiMessages'] = $agentMessagesConversation->messages;
+            $reconstructedBody['messagesApiTools'] = [
+                ...AgentMessagesRequestComposer::convertToolSchemas($reconstructedBody['tools']),
+                ...AgentMessagesRequestComposer::convertToolSchemas($agentMessagesConversation->appendedChatCompletionsTools, true),
+            ];
+            $reconstructedBody['messages'] = AgentMessagesRequestComposer::withoutEntryKeysOfThisWire($requestBodyMessages);
         }
         return [
             'reconstructed' => true,

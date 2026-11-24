@@ -89,7 +89,9 @@ class AgentCacheDiffCommand extends AgentConsoleCommand
     protected function renderCallTable(PromptCacheDiffReport $promptCacheDiffReport, OutputInterface $output): void
     {
         $callTable = new Table($output);
-        $callTable->setHeaders(['idx', 'input', 'cached', 'write', 'gap s', 'provider', 'tools', 'system', 'segment', 'first diff', 'cause', 'state']);
+        // `thinking`: the thinking tokens of the answer and, after a slash, the thinking blocks the provider dropped
+        // from the request — a call on the Messages API only
+        $callTable->setHeaders(['idx', 'input', 'cached', 'write', 'gap s', 'provider', 'tools', 'system', 'segment', 'first diff', 'cause', 'state', 'thinking']);
         foreach ($promptCacheDiffReport->rows as $callRow) {
             $firstDifference = $callRow['firstDiff'];
             $callTable->addRow([
@@ -108,6 +110,9 @@ class AgentCacheDiffCommand extends AgentConsoleCommand
                 $callRow['stateEpochStartIndex'] === null ? '—' : '@' . $callRow['stateEpochStartIndex']
                     . ($callRow['stateEpochCause'] !== null ? ' !' . $callRow['stateEpochCause'] : '')
                     . ($callRow['stateNoteKinds'] !== [] ? ' ' . implode(',', $callRow['stateNoteKinds']) : ''),
+                ($callRow['thinkingTokens'] ?? null) === null && ($callRow['droppedThinkingBlocks'] ?? null) === null
+                    ? '—'
+                    : (string)($callRow['thinkingTokens'] ?? '?') . (($callRow['droppedThinkingBlocks'] ?? 0) > 0 ? ' / <fg=red>' . $callRow['droppedThinkingBlocks'] . ' dropped</>' : ''),
             ]);
         }
         $callTable->render();
@@ -130,6 +135,12 @@ class AgentCacheDiffCommand extends AgentConsoleCommand
             $promptCacheDiffReport->hitPercent(),
             $promptCacheDiffReport->zeroCreditCalls
         ));
+        if ($promptCacheDiffReport->droppedThinkingBlocks > 0) {
+            $output->writeln(sprintf(
+                '<fg=red>thinking blocks dropped by the provider: %d</> (a change before the block; `app:ai-agent:inspect --snapshots` names the place and the reason)',
+                $promptCacheDiffReport->droppedThinkingBlocks
+            ));
+        }
         foreach ($promptCacheDiffReport->callsByCause as $cause => $callCount) {
             $inputTokensOfCause = $promptCacheDiffReport->inputByCause[$cause] ?? 0;
             $output->writeln(sprintf(

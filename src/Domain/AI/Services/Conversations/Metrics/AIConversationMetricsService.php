@@ -41,7 +41,8 @@ class AIConversationMetricsService extends Service
 
     /**
      * The message rows in index order, with every key {@see AIConversationMetrics::buildFromRows()} reads plus the
-     * run report's own (`u`, `cost`, `args`, `refusedFlag`, `resultHead`, `variants`, `skillSections`).
+     * run report's own (`u`, `cost`, `args`, `refusedFlag`, `resultHead`, `variants`, `skillSections`, the usage keys
+     * `inTok` / `cachedTok` / `writeTok` / `outTok` / `reasoningTok` and `inputTransformations`).
      *
      * @return array<int, array<string, mixed>>
      * @throws DBALException
@@ -68,7 +69,12 @@ class AIConversationMetricsService extends Service
             // 300: the failure kind reads past the executor's prefix ("Execution failed for Tool 'x': …")
             . ' LEFT(' . $sqlDialect->jsonText('`toolCall`', JsonPath::fromKeys('result')) . ', 300) AS `resultHead`,'
             . ' ' . $sqlDialect->jsonText('`requestSnapshot`', JsonPath::fromKeys('variants')) . ' AS `variants`,'
-            . ' ' . $sqlDialect->jsonText('`requestSnapshot`', JsonPath::fromKeys('skillSections')) . ' AS `skillSections`'
+            . ' ' . $sqlDialect->jsonText('`requestSnapshot`', JsonPath::fromKeys('skillSections')) . ' AS `skillSections`,'
+            // the usage of the row's model call, and — a call on the Messages API — the thinking tokens of its answer
+            // and what the provider changed in its request (dropped thinking blocks)
+            . ' `inputTokens` AS `inTok`, `cachedInputTokens` AS `cachedTok`, `cacheWriteTokens` AS `writeTok`, `outputTokens` AS `outTok`,'
+            . ' ' . $sqlDialect->jsonText('`requestSnapshot`', JsonPath::fromKeys('wireReasoningTokens')) . ' AS `reasoningTok`,'
+            . ' ' . $sqlDialect->jsonText('`requestSnapshot`', JsonPath::fromKeys('inputTransformations')) . ' AS `inputTransformations`'
             // a truncated branch (soft-deleted by an edit or a rewind) is no longer part of the conversation
             . " FROM `{$messagesTable}` WHERE `aiConversationId` = :id AND `truncatedAt` IS NULL ORDER BY `indexInConversation` LIMIT " . self::MAX_ROWS,
             ['id' => (int)$conversation->id]

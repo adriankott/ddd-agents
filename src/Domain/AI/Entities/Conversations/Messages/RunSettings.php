@@ -275,17 +275,20 @@ class RunSettings extends ValueObject
     public const string AGENT_WIRE_API_INHERIT = 'inherit';
     public const string AGENT_WIRE_API_CHAT_COMPLETIONS = 'chatCompletions';
     public const string AGENT_WIRE_API_RESPONSES = 'responses';
+    /** The Anthropic Messages API ({@see AIModel::AGENT_WIRE_API_MESSAGES}): the native wire of the Claude models. */
+    public const string AGENT_WIRE_API_MESSAGES = 'messages';
     /**
      * TEST-ONLY: the Responses API called directly at OpenAI with `store: true` and `previous_response_id` — OpenAI keeps
      * the conversation state, each call sends only the items after the previous response. Selectable per conversation
-     * (run settings, eval arm), never from the model catalog ({@see AIModel::CATALOG_AGENT_WIRE_APIS}).
+     * (run settings, eval arm), never from the model catalog ({@see \DDD\Domain\AI\Entities\Conversations\Agent\Wire\AgentWireConfiguration::CATALOG_WIRE_APIS}).
      */
     public const string AGENT_WIRE_API_RESPONSES_SERVER_STATE = 'responsesServerState';
 
-    /** @var string[] The wire APIs a conversation's run settings may name: the catalog's two plus the server-state arm. */
+    /** @var string[] The wire APIs a conversation's run settings may name: the catalog's three plus the server-state arm. */
     public const array AGENT_WIRE_APIS = [
         self::AGENT_WIRE_API_CHAT_COMPLETIONS,
         self::AGENT_WIRE_API_RESPONSES,
+        self::AGENT_WIRE_API_MESSAGES,
         self::AGENT_WIRE_API_RESPONSES_SERVER_STATE,
     ];
 
@@ -556,7 +559,7 @@ class RunSettings extends ValueObject
                 ? RunSettings::AGENT_WIRE_API_INHERIT
                 : self::canonicalAgentWireApi($override->agentWireApi);
             if ($canonicalValue === null) {
-                throw new BadRequestException('agentWireApi must be one of inherit, chatCompletions, responses, responsesServerState');
+                throw new BadRequestException('agentWireApi must be one of inherit, ' . implode(', ', self::AGENT_WIRE_APIS));
             }
             $this->agentWireApi = $canonicalValue === RunSettings::AGENT_WIRE_API_INHERIT ? null : $canonicalValue;
             $this->agentWireApiSetByAccountId = $setByAccountId;
@@ -593,7 +596,7 @@ class RunSettings extends ValueObject
     /**
      * The canonical spelling of a wire API a run setting may name.
      *
-     * @param string|null $value `chatCompletions` / `responses` / `responsesServerState` in any case, with surrounding blanks
+     * @param string|null $value `chatCompletions` / `responses` / `messages` / `responsesServerState` in any case, with surrounding blanks
      * @return string|null The constant of {@see self::AGENT_WIRE_APIS}; null for anything else
      */
     public static function canonicalAgentWireApi(?string $value): ?string
@@ -616,6 +619,19 @@ class RunSettings extends ValueObject
     public static function isResponsesAgentWireApi(?string $agentWireApi): bool
     {
         return $agentWireApi === self::AGENT_WIRE_API_RESPONSES || $agentWireApi === self::AGENT_WIRE_API_RESPONSES_SERVER_STATE;
+    }
+
+    /**
+     * Whether a wire API can add tools and instructions in the middle of a conversation, which append-only skill
+     * loading needs: the Responses API (an `additional_tools` item, a `developer` message) and the Anthropic Messages
+     * API (a `tool_addition` block, a `role: "system"` message). Chat Completions cannot.
+     *
+     * @param string|null $agentWireApi
+     * @return bool
+     */
+    public static function isAppendOnlyCapableAgentWireApi(?string $agentWireApi): bool
+    {
+        return self::isResponsesAgentWireApi($agentWireApi) || $agentWireApi === self::AGENT_WIRE_API_MESSAGES;
     }
 
     /**

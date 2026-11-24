@@ -8,6 +8,7 @@ use DDD\Domain\AI\Entities\Conversations\Agent\AgentRun;
 use DDD\Domain\AI\Entities\Conversations\Messages\ContextRetentionSettings;
 use DDD\Domain\AI\Entities\Conversations\Messages\RunSettings;
 use DDD\Domain\AI\Entities\Conversations\Purposes\AIConversationPurpose;
+use DDD\Domain\AI\Entities\Conversations\Agent\Wire\AgentWireConfiguration;
 use DDD\Domain\AI\Entities\Models\AIModel;
 use DDD\Domain\AI\Services\Skills\AISkillsService;
 use DDD\Infrastructure\Exceptions\InternalErrorException;
@@ -305,7 +306,7 @@ class AIConversationPurposesService extends Service
 
     /**
      * The run settings of a purpose's `runSettings:` frontmatter map: `agentWireApi`
-     * (`chatCompletions` | `responses`), `previousReasoningCarryOver` (`all` | `currentTurn` | `capped` | `off`),
+     * (`chatCompletions` | `responses` | `messages`), `previousReasoningCarryOver` (`all` | `currentTurn` | `capped` | `off`),
      * `previousReasoningCapTokens` (a positive count) and `fixedReasoningEffort` (`low` | `medium` | `high`). An unknown
      * key or value is ignored (= inherit); a map that names no valid value — `runSettings: {}`, the way an inheriting
      * purpose drops its parent's map — answers null.
@@ -317,7 +318,7 @@ class AIConversationPurposesService extends Service
         $purposeRunSettings = RunSettings::newInstance();
         $agentWireApi = is_string($runSettingsMap['agentWireApi'] ?? null) ? RunSettings::canonicalAgentWireApi($runSettingsMap['agentWireApi']) : null;
         // the server-state arm is a test arm, never a purpose default
-        $purposeRunSettings->agentWireApi = in_array($agentWireApi, [AIModel::AGENT_WIRE_API_CHAT_COMPLETIONS, AIModel::AGENT_WIRE_API_RESPONSES], true) ? $agentWireApi : null;
+        $purposeRunSettings->agentWireApi = in_array($agentWireApi, AgentWireConfiguration::CATALOG_WIRE_APIS, true) ? $agentWireApi : null;
         $previousReasoningCarryOver = is_string($runSettingsMap['previousReasoningCarryOver'] ?? null)
             ? RunSettings::canonicalPreviousReasoningCarryOver($runSettingsMap['previousReasoningCarryOver'])
             : null;

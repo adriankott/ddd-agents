@@ -44,7 +44,7 @@ class RunSettingsOverride extends ValueObject
     /** @var string|null Switch 2 of the plan-dynamics site: `inherit` / `yes` / `no` — does the chat model receive the verdict here? */
     public ?string $planDynamicsModelReceivesVerdict = null;
 
-    /** @var string|null `inherit` / `chatCompletions` / `responses` — the conversation's agent wire API. */
+    /** @var string|null `inherit` / `chatCompletions` / `responses` / `messages` — the conversation's agent wire API. */
     public ?string $agentWireApi = null;
 
     /** @var string|null `inherit` / `all` / `currentTurn` / `capped` / `off` — which reasoning items of the previous calls go back. */

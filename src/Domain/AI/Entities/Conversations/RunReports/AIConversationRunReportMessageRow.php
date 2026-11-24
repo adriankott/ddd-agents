@@ -90,6 +90,43 @@ class AIConversationRunReportMessageRow extends ValueObject
         return (float)($this->rowFields['cost'] ?? 0);
     }
 
+    /** `inTok`: the input tokens of the row's model call (cached and written ones included); 0 when none. */
+    public function getInputTokens(): int
+    {
+        return (int)($this->rowFields['inTok'] ?? 0);
+    }
+
+    /** `cachedTok`: the input tokens the row's model call read from the prompt cache; 0 when none. */
+    public function getCachedInputTokens(): int
+    {
+        return (int)($this->rowFields['cachedTok'] ?? 0);
+    }
+
+    /** `writeTok`: the input tokens the row's model call wrote to the prompt cache; 0 when none. */
+    public function getCacheWriteTokens(): int
+    {
+        return (int)($this->rowFields['writeTok'] ?? 0);
+    }
+
+    /** `outTok`: the output tokens of the row's model call (reasoning included); 0 when none. */
+    public function getOutputTokens(): int
+    {
+        return (int)($this->rowFields['outTok'] ?? 0);
+    }
+
+    /** `reasoningTok`: the reasoning (thinking) tokens the provider reported for the row's model call; 0 when it stored none. */
+    public function getReasoningTokens(): int
+    {
+        return is_numeric($this->rowFields['reasoningTok'] ?? null) ? (int)$this->rowFields['reasoningTok'] : 0;
+    }
+
+    /** `inputTransformations`: how many thinking blocks the provider dropped from the request of the row's model call. */
+    public function countDroppedThinkingBlocks(): int
+    {
+        $inputTransformationsJson = $this->rowFields['inputTransformations'] ?? null;
+        return is_string($inputTransformationsJson) ? substr_count($inputTransformationsJson, '"thinking_dropped"') : 0;
+    }
+
     /** `variants`: the variants vector the row's model call ran with, as JSON text; null when the row carries none. */
     public function findVariantsJson(): ?string
     {

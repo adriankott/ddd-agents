@@ -35,12 +35,16 @@ step's usage on the signal it writes, so budgets and the cost sum stay complete.
 
 ## 2. Provider errors come first
 
-`ModelResponse::$providerError` (an error body instead of a completion, or an unusable answer of the Responses API) is
+`ModelResponse::$providerError` (an error body instead of a completion, or an unusable answer of the Responses or the
+Messages API — outcomes `responsesAnswerUnusable`, `messagesAnswerUnusable`: no text and no call, e.g. a `refusal`
+stop) is
 checked before the stall: an empty response caused by a provider error must never be nudged as a stall.
 `AIConversationOwnerReportDeliveryService::failFastOnProviderError()` writes the ERROR row and throws
 `AIModelCallFailedException`; the release is `afterProviderError()` (FAILED, no retry). One exception: when the provider
-refuses the carried reasoning items, `AIConversationModelCallsService::performModelCall()` switches the carry-over off for
-the conversation and sends the same call once more.
+refuses the carried reasoning items (or, on the Messages API, a thinking block), `AIConversationModelCallsService::performModelCall()` switches the carry-over off for
+the conversation and sends the same call once more. Thinking blocks the provider only DROPPED from a Messages request
+are no error: the answer is used, the drop is recorded on the snapshot and as `turn.modelCall.inputTransformations`,
+and later calls send thinking from that step on.
 
 ## 3. Stall shapes
 

@@ -6,7 +6,7 @@ delegation, the supervisor, run claims, the decision layer, the loop's message h
 
 **Package:** `mgamadeus/ddd-agents` (v0.1.x, not released)
 **Namespace:** `DDD\`
-**Depends on:** `mgamadeus/ddd` (^3.27.0), `mgamadeus/ddd-ai` (^3.2.1), `mgamadeus/ddd-argus` (^1.3.2),
+**Depends on:** `mgamadeus/ddd` (^3.27.0), `mgamadeus/ddd-ai` (^3.5.0), `mgamadeus/ddd-argus` (^1.3.2),
 `mgamadeus/ddd-common-money` (^1.1.1)
 
 > **This module follows all DDD Core conventions.** For base patterns, see `vendor/mgamadeus/ddd/AGENTS.md` and skills in `vendor/mgamadeus/ddd`. For models, prompts and usage envelopes, see `vendor/mgamadeus/ddd-ai`. For Argus patterns, see `vendor/mgamadeus/ddd-argus`.

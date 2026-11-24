@@ -102,6 +102,24 @@ class AIConversationRunReport extends ValueObject
     /** @var float Seconds of the non-blocking tool calls summed */
     public float $nonBlockingToolSeconds = 0.0;
 
+    /** @var int Input tokens of the model calls summed (cached and written ones included) */
+    public int $inputTokens = 0;
+
+    /** @var int Input tokens the model calls read from the prompt cache */
+    public int $cachedInputTokens = 0;
+
+    /** @var int Input tokens the model calls wrote to the prompt cache */
+    public int $cacheWriteTokens = 0;
+
+    /** @var int Output tokens of the model calls summed (reasoning included) */
+    public int $outputTokens = 0;
+
+    /** @var int Reasoning (thinking) tokens the provider reported for the model calls whose snapshot stored a count */
+    public int $reasoningTokens = 0;
+
+    /** @var int Thinking blocks the provider dropped from the requests of the model calls (the Messages API) */
+    public int $droppedThinkingBlocks = 0;
+
     /** @var AIConversationRunReportToolTimes The slowest tools, at most {@see self::SLOWEST_TOOLS_SHOWN}, slowest first */
     public AIConversationRunReportToolTimes $slowestTools;
 
@@ -197,6 +215,14 @@ class AIConversationRunReport extends ValueObject
         $runReport->applyMetrics($metrics);
         $runReport->applyToolCallRows($rows->buildToolCallRows(), $metrics);
         $runReport->modelCostInUSD = $rows->sumCostInUSD();
+        foreach ($rows->getElements() as $row) {
+            $runReport->inputTokens += $row->getInputTokens();
+            $runReport->cachedInputTokens += $row->getCachedInputTokens();
+            $runReport->cacheWriteTokens += $row->getCacheWriteTokens();
+            $runReport->outputTokens += $row->getOutputTokens();
+            $runReport->reasoningTokens += $row->getReasoningTokens();
+            $runReport->droppedThinkingBlocks += $row->countDroppedThinkingBlocks();
+        }
         $runReport->applyFinalVariants($rows);
         $runReport->variantsTimeline = AIConversationRunReportVariantsTimeline::buildFromRows($rows, $skillSectionIdPrefixToDrop);
         $runReport->taskPlanSize = static::measureTaskPlanSize($rows);

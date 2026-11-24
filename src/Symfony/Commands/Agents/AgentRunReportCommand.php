@@ -81,6 +81,9 @@ class AgentRunReportCommand extends AgentConsoleCommand
     /** @var string[] The headers of the run table */
     public const array RUN_TABLE_HEADERS = ['run', 'case', 'judge', 'wall s', 'owner turns', 'model calls', 'tool calls', 'refused', 'repeats', 'agent s/turn', 'model s', 'overhead s', 'tool s Σ', 'tool s wall', 'driver s', 'ticks', 'loads', 'non-blocking', 'model $', 'decision $ (calls)', 'variants (final)', 'plan nodes', 'plan depth', 'plan tail tok (max / Σ)'];
 
+    /** @var string[] The headers of the usage table (`--usage`) */
+    public const array USAGE_TABLE_HEADERS = ['run', 'model calls', 'input tok', 'cached tok', 'cached %', 'cache write tok', 'output tok', 'output tok/call', 'thinking tok', 'thinking tok/call', 'dropped thinking blocks', 'model s/call', 'model $'];
+
     /** @var string[] The headers of the slowest-tools table */
     public const array SLOWEST_TOOLS_TABLE_HEADERS = ['run', 'tool', 'seconds Σ', 'calls', 'max s'];
 
@@ -104,6 +107,7 @@ class AgentRunReportCommand extends AgentConsoleCommand
             ->addOption('markdown', null, InputOption::VALUE_NONE, 'Print the tables as Markdown (for plans and knowledge docs)')
             ->addOption('findings', null, InputOption::VALUE_NONE, 'Print the judge findings (VIOLATED / PARTIAL lines) per run')
             ->addOption('no-tools', null, InputOption::VALUE_NONE, 'Skip the slowest-tools table')
+            ->addOption('usage', null, InputOption::VALUE_NONE, 'Print the usage table: per run the input, cached, cache-write, output and thinking tokens, the cached share, the tokens and model seconds per call and the thinking blocks the provider dropped')
             ->addOption('variants', null, InputOption::VALUE_NONE, 'Print the per-run variants timeline (one row per dimension change, with the sections rendered then and the tool called next)');
     }
 
@@ -139,6 +143,9 @@ class AgentRunReportCommand extends AgentConsoleCommand
         $unreadableLogFilesNote = $verdicts->getUnreadableLogFilesNote();
         if ($unreadableLogFilesNote !== null) {
             $symfonyStyle->writeln($unreadableLogFilesNote);
+        }
+        if ((bool)$input->getOption('usage')) {
+            $this->renderUsageTable($symfonyStyle, $conversationIds, $runReports, $markdown);
         }
         if (!(bool)$input->getOption('no-tools')) {
             $this->renderSlowestToolsTable($symfonyStyle, $conversationIds, $runReports, $markdown);
@@ -210,6 +217,61 @@ class AgentRunReportCommand extends AgentConsoleCommand
         $this->renderTable($symfonyStyle, static::RUN_TABLE_HEADERS, $printedRows, $markdown);
         $this->renderPlanSizeNotMeasuredNotes($symfonyStyle, $conversationIds, $runReports);
         $this->renderDecisionCostNotReadNotes($symfonyStyle, $conversationIds, $runReports);
+    }
+
+    /**
+     * The usage table: one row per reported run and a row over all of them — the tokens of the model calls, the share
+     * read from the prompt cache, the output and thinking tokens per call, the model seconds per call and the thinking
+     * blocks the provider dropped from the requests.
+     *
+     * @param SymfonyStyle $symfonyStyle
+     * @param int[] $conversationIds
+     * @param AIConversationRunReports $runReports
+     * @param bool $markdown
+     * @return void
+     */
+    protected function renderUsageTable(SymfonyStyle $symfonyStyle, array $conversationIds, AIConversationRunReports $runReports, bool $markdown): void
+    {
+        $printedRows = [];
+        $sums = ['modelCalls' => 0, 'inputTokens' => 0, 'cachedInputTokens' => 0, 'cacheWriteTokens' => 0, 'outputTokens' => 0, 'reasoningTokens' => 0, 'droppedThinkingBlocks' => 0, 'modelSeconds' => 0.0, 'modelCostInUSD' => 0.0];
+        foreach ($conversationIds as $conversationId) {
+            $runReport = $runReports->getByConversationId($conversationId);
+            if ($runReport === null) {
+                continue;
+            }
+            $printedRows[] = $this->buildPrintedUsageRow((string)$conversationId, $runReport->modelCalls, $runReport->inputTokens, $runReport->cachedInputTokens, $runReport->cacheWriteTokens, $runReport->outputTokens, $runReport->reasoningTokens, $runReport->droppedThinkingBlocks, $runReport->modelSeconds, $runReport->modelCostInUSD);
+            foreach (array_keys($sums) as $sumKey) {
+                $sums[$sumKey] += $runReport->{$sumKey};
+            }
+        }
+        if ($printedRows === []) {
+            return;
+        }
+        $printedRows[] = $this->buildPrintedUsageRow('Σ', $sums['modelCalls'], $sums['inputTokens'], $sums['cachedInputTokens'], $sums['cacheWriteTokens'], $sums['outputTokens'], $sums['reasoningTokens'], $sums['droppedThinkingBlocks'], $sums['modelSeconds'], $sums['modelCostInUSD']);
+        $this->renderTable($symfonyStyle, static::USAGE_TABLE_HEADERS, $printedRows, $markdown);
+    }
+
+    /**
+     * @return string[] one cell per column of {@see self::USAGE_TABLE_HEADERS}
+     */
+    protected function buildPrintedUsageRow(string $label, int $modelCalls, int $inputTokens, int $cachedInputTokens, int $cacheWriteTokens, int $outputTokens, int $reasoningTokens, int $droppedThinkingBlocks, float $modelSeconds, float $modelCostInUSD): array
+    {
+        $calls = max(1, $modelCalls);
+        return [
+            $label,
+            (string)$modelCalls,
+            (string)$inputTokens,
+            (string)$cachedInputTokens,
+            $inputTokens > 0 ? (string)round(100 * $cachedInputTokens / $inputTokens) : '',
+            (string)$cacheWriteTokens,
+            (string)$outputTokens,
+            (string)round($outputTokens / $calls),
+            (string)$reasoningTokens,
+            (string)round($reasoningTokens / $calls),
+            (string)$droppedThinkingBlocks,
+            number_format($modelSeconds / $calls, 1),
+            number_format($modelCostInUSD, 3),
+        ];
     }
 
     /**

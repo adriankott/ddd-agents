@@ -84,6 +84,13 @@ property of `AgentApplicationWording`.
 | `transferStallAbort` | `bytesPerSecond` and `seconds`: the transfer of a model call ends as a transport failure when fewer bytes per second arrive on average over that many seconds; `seconds` 0 switches it off |
 | `liteLlmEndpoint` | the load endpoint of a proxy egress (`POST:https://…/chat/completions`) that `AGENT_EGRESS=litellm` selects per process, for tests only; null ignores the switch with a log line |
 
+The wire API of a model is no key of this package: the model catalog of mgamadeus/ddd-ai names it
+(`settings.agentWireApi` in `config/app/AI/models.php`, which a host overrides at the same path: `chatCompletions`,
+`responses` for an OpenAI model, `messages` for an Anthropic model), and a conversation's run settings override it. The
+agent checks the value (`AgentWireConfiguration::resolveWireApiOfCatalogValue()`); `responses` and `messages` need the
+direct OpenRouter egress, so under `AGENT_EGRESS=litellm` every model speaks Chat Completions. Details:
+`ddd-module-agents-context-specialist` (prompt-cache-and-stable-prefix, sections 3 and 5a).
+
 ### `agentPersona.php`
 
 | Key | Meaning |

@@ -1,5 +1,58 @@
 # Changelog
 
+## 0.2.0
+
+The Anthropic Messages API as a third wire API of the agent, next to Chat Completions and Responses. Claude models get
+their own thinking back, load skills append-only and keep a stable prompt prefix.
+
+- **Wire API `messages`.** `RunSettings::AGENT_WIRE_API_MESSAGES`: an Anthropic model over the direct OpenRouter
+  egress (`https://openrouter.ai/api/v1/messages`). The value comes from the conversation's row (`--agent-wire-api`,
+  a purpose's run settings, an eval arm) or from the model catalog of mgamadeus/ddd-ai 3.5.0, which names it for Claude
+  Opus 5.5, Sonnet 5.5, Haiku 5.5, Fable 5.1 and Fable 5.2. A row naming it for another vendor or another egress is
+  refused (`REJECTION_MESSAGES_NEEDS_ANTHROPIC_MODEL`, `REJECTION_MESSAGES_NEEDS_DIRECT_OPENROUTER`); a catalog value
+  the egress cannot serve is Chat Completions.
+- **The catalog value is checked here.** ddd-ai 3.5.0 returns `settings.agentWireApi` as written.
+  `AgentWireConfiguration::resolveWireApiOfCatalogValue()` matches it against the forms this agent speaks
+  (`CATALOG_WIRE_APIS`), whatever its case; a value it does not speak is Chat Completions with one warning per model
+  and process.
+- **Append-only skill loading on Messages.** `conversationAppend` is the default there as on Responses: a skill's
+  instructions go out as a `role: "system"` message at the place of the load, its tools as `tool_addition` blocks
+  (declared top-level with `defer_loading`). The notes of a call (signals, the plan, the time) go out as one
+  `role: "system"` message with `clear_at: next_user_message` and stay in the history of later calls, hidden from
+  the model.
+- **Thinking carried over.** The answer's content blocks are stored per step and sent back verbatim. A thinking block
+  is bound to everything before it, so the newer part of the history is frozen (`AgentMessagesWireReplay`): stored
+  answers, full tool results and unshortened arguments from a recorded floor on; below it the history renders as on
+  every other wire API. `previousReasoningCarryOver` works as before: `capped` (the default on Messages, cap 4,000
+  thinking tokens: the oldest steps' thinking leaves in one block), `all`, `currentTurn` (the frozen part starts at
+  the newest owner turn), `off` (no frozen part, no thinking).
+- **Dropped blocks are reported, not fatal.** Every request asks the provider to drop a thinking block whose prefix
+  or model changed instead of refusing the request. The drops are recorded on the snapshot
+  (`RequestSnapshot::$inputTransformations`), traced (`turn.modelCall.inputTransformations`), shown by
+  `app:ai-agent:cache-diff` (column `thinking`) and `app:ai-agent:inspect --snapshots`, and later calls send thinking
+  from that step on. A refusal that names a thinking block repeats the call once without carried thinking.
+- **Answer reading.** `AgentMessagesResponse` reads text, calls, usage (input = uncached + cache read + cache write;
+  thinking tokens) and the dropped blocks; an answer without text and call fails the call (`messagesAnswerUnusable`).
+  The egress overrides the three answer hooks of ddd-ai's language-model trait for this shape.
+- **Prompt cache.** Four `cache_control` markers: two in the system content, the newest stable message and the one the
+  previous call marked. The writes are booked at the 5-minute write rate; no service tier is noted for a Messages
+  body, so no tier multiplier enters its booking.
+- **Provider pin.** A Messages call goes to Anthropic only, without fallback. A console provider order
+  (`forceProviderOrder()`) replaces the pin for that process; the egress then sends no carried reasoning on a call it
+  would have pinned (Messages, and reasoning items of an OpenAI model).
+- **Console.** `app:ai-agent:run-report --usage` (per run: input, cached, cache-write, output and thinking tokens, the
+  cached share, tokens and model seconds per call, dropped thinking blocks); `app:ai-agent:probe-reasoning-replay
+  --wire=messages` with the scenarios `capped-cut` and `current-turn-strip`; `--agent-wire-api=messages` on the chat
+  and the evaluation commands.
+- **Changed:** `REJECTION_CONVERSATION_APPEND_NEEDS_RESPONSES` names both append-capable APIs in its text; the
+  constant keeps its name.
+- **Host step:** update together with `mgamadeus/ddd-ai` ^3.5.0 (required here; ddd-ai 3.5.0 conflicts with
+  ddd-agents below 0.2.0). A host that overrides a Claude model in its own `config/app/AI/models.php` sets
+  `settings.agentWireApi` to `messages` there to move that model; without it the model stays on Chat Completions. A
+  running conversation of such a model that was stamped `systemPromptSwap` keeps the swap; a new one loads
+  append-only. No schema change: the new facts live in the request snapshot's JSON.
+- Web: version in step with the package, no change.
+
 ## 0.1.44
 
 - Web: the "Working on it…" line no longer stays under a finished answer. Rows that owe no work — the frontend's

@@ -189,7 +189,7 @@ class AgentChatCommand extends AgentConsoleCommand
             ->addOption('max-turn-cost', null, InputOption::VALUE_OPTIONAL, 'runSettings.maxTurnCostUsd: the USD cost ceiling of one owner turn (own steps and delegation children). A breach ends the turn with a stop message. Stored.')
             ->addOption('store-snapshot', null, InputOption::VALUE_NONE, 'Debug: contextRetentionSettings.storeRequestSnapshot: store the full sent payload and the raw model response on every message. Stored.')
             ->addOption('hint-recent-tool-calls', null, InputOption::VALUE_NONE, 'Test: contextRetentionSettings.hintRecentToolCallsToDiscourageRepeats: append an owner message at the wire tail listing the recent read tool calls with a reuse instruction. Stored.')
-            ->addOption('agent-wire-api', null, InputOption::VALUE_REQUIRED, 'The wire API of the agent calls: `chatCompletions` | `responses` (`inherit` clears it). Stored as a run-settings row.')
+            ->addOption('agent-wire-api', null, InputOption::VALUE_REQUIRED, 'The wire API of the agent calls: `chatCompletions` | `responses` | `messages` (the Anthropic Messages API, Anthropic models over the direct OpenRouter egress) (`inherit` clears it). Stored as a run-settings row.')
             ->addOption('previous-reasoning-carry-over', null, InputOption::VALUE_REQUIRED, 'Send the reasoning items of the previous calls back on the later calls: `all` | `currentTurn` | `off` | `capped` (`inherit` = the default). Stored as a run-settings row.')
             ->addOption('previous-reasoning-cap-tokens', null, InputOption::VALUE_REQUIRED, 'The cap of --previous-reasoning-carry-over=capped in reasoning tokens (`0` = the configured default). Stored as a run-settings row.');
     }

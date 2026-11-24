@@ -43,7 +43,7 @@ class AgentProbeReasoningReplayCommand extends AgentConsoleCommand
         $this
             ->addOption('model', null, InputOption::VALUE_REQUIRED, 'The catalog model (e.g. ANTHROPIC.CLAUDE_OPUS_5_5, MOONSHOT.KIMI_K3_1_PRO)')
             ->addOption('scenario', null, InputOption::VALUE_REQUIRED, 'One or more of ' . implode(', ', AgentReasoningReplayProbeService::SCENARIOS) . ' (comma-separated), or "all" (every scenario the wire allows; model-switch only with --switch-model)', AgentReasoningReplayProbeService::SCENARIO_CLEAN)
-            ->addOption('wire', null, InputOption::VALUE_REQUIRED, 'chatCompletions or responses (responses for a non-OpenAI model bypasses the agent\'s runtime refusal, in this probe only)', RunSettings::AGENT_WIRE_API_CHAT_COMPLETIONS)
+            ->addOption('wire', null, InputOption::VALUE_REQUIRED, 'chatCompletions, responses or messages (responses for a non-OpenAI model bypasses the agent\'s runtime refusal, in this probe only; messages = the Anthropic Messages API with its own task, drop_block on every call — use --effort high so the steps think)', RunSettings::AGENT_WIRE_API_CHAT_COMPLETIONS)
             ->addOption('switch-model', null, InputOption::VALUE_REQUIRED, 'The model of call 2 in the model-switch scenario')
             ->addOption('drop-block', null, InputOption::VALUE_NONE, 'Replaying calls ask the provider to drop mismatching thinking blocks (thinking.block_binding.prefix_mismatch_behavior = drop_block) instead of refusing')
             ->addOption('effort', null, InputOption::VALUE_REQUIRED, 'Reasoning effort of every call', 'medium')
@@ -95,8 +95,8 @@ class AgentProbeReasoningReplayCommand extends AgentConsoleCommand
     }
 
     /**
-     * The scenarios to run: the comma-separated list, or for "all" every scenario the wire allows (append-only only on
-     * Responses, model-switch only with a switch model).
+     * The scenarios to run: the comma-separated list, or for "all" every scenario the wire allows (append-only on
+     * Responses and Messages, capped-cut and current-turn-strip on Messages, model-switch only with a switch model).
      *
      * @return string[]
      */
@@ -107,7 +107,10 @@ class AgentProbeReasoningReplayCommand extends AgentConsoleCommand
         }
         $scenarios = [];
         foreach (AgentReasoningReplayProbeService::SCENARIOS as $scenario) {
-            if ($scenario === AgentReasoningReplayProbeService::SCENARIO_APPEND_ONLY && $wireApi !== RunSettings::AGENT_WIRE_API_RESPONSES) {
+            if ($scenario === AgentReasoningReplayProbeService::SCENARIO_APPEND_ONLY && !in_array($wireApi, AgentReasoningReplayProbeService::APPEND_ONLY_WIRE_APIS, true)) {
+                continue;
+            }
+            if (in_array($scenario, AgentReasoningReplayProbeService::MESSAGES_ONLY_SCENARIOS, true) && $wireApi !== RunSettings::AGENT_WIRE_API_MESSAGES) {
                 continue;
             }
             if ($scenario === AgentReasoningReplayProbeService::SCENARIO_MODEL_SWITCH && ($switchModelName === null || $switchModelName === '')) {
@@ -133,7 +136,7 @@ class AgentProbeReasoningReplayCommand extends AgentConsoleCommand
                 $symfonyStyle->warning('Responses API for a non-OpenAI model: the agent refuses this at runtime (REJECTION_RESPONSES_NEEDS_OPENAI_MODEL); this probe bypasses the refusal for itself only.');
             }
             $table = new Table($output);
-            $table->setHeaders(['call', 'model', 'HTTP', 'ok', 'provider', 'tool choice', 'tools called', 'reasoning back', 'signed', 'replayed', 'input', 'cached', 'cache share', 'cache write', 'cost $', 'ms']);
+            $table->setHeaders(['call', 'model', 'HTTP', 'ok', 'provider', 'tool choice', 'tools called', 'reasoning back', 'signed', 'replayed', 'dropped', 'thinking tok', 'input', 'cached', 'cache share', 'cache write', 'cost $', 'ms']);
             foreach ($reasoningReplayProbeResult->calls->getElements() as $reasoningReplayProbeCall) {
                 $table->addRow([
                     $reasoningReplayProbeCall->label,
@@ -146,6 +149,8 @@ class AgentProbeReasoningReplayCommand extends AgentConsoleCommand
                     $reasoningReplayProbeCall->reasoningItemCount . ($reasoningReplayProbeCall->reasoningItemTypes !== [] ? ' (' . implode(', ', array_unique($reasoningReplayProbeCall->reasoningItemTypes)) . ')' : ''),
                     $reasoningReplayProbeCall->hasSignedReasoning ? 'yes' : 'no',
                     $reasoningReplayProbeCall->replayedReasoningItemCount,
+                    $reasoningReplayProbeCall->droppedThinkingBlockCount,
+                    $reasoningReplayProbeCall->reasoningTokens ?? '-',
                     $reasoningReplayProbeCall->inputTokens ?? '-',
                     $reasoningReplayProbeCall->cachedInputTokens ?? '-',
                     $reasoningReplayProbeCall->getCacheShare() !== null ? number_format($reasoningReplayProbeCall->getCacheShare() * 100, 1) . ' %' : '-',

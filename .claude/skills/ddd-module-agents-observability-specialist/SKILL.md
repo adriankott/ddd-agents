@@ -175,7 +175,8 @@ The override points of every command and how a new command is added:
 | Did a change of an MCP package change what the model receives? | `app:mcp:compare-tool-calls --script=<Package> --record=<file>` before, `--replay-and-compare=<file>` after |
 | Run the evaluation | `app:ai-agent:eval-suite --dry-run`, then without it; one area: `app:ai-agent:eval-tools --skill=<skill>` |
 | Analyse a failed run | `app:ai-agent:eval-analyze [<run>]`, `app:ai-agent:run-report <ids> --log-dir=<folder>` |
-| Does a model accept its reasoning back, a forced tool choice, append-only loading on Responses? | `app:ai-agent:probe-reasoning-replay --model=<name> --scenario=all [--wire=responses] [--switch-model=<name>]` (real calls, nothing persisted) |
+| Does a model accept its reasoning back, a forced tool choice, append-only loading on Responses or Messages? | `app:ai-agent:probe-reasoning-replay --model=<name> --scenario=all [--wire=responses\|messages] [--switch-model=<name>]` (real calls, nothing persisted) |
+| Did the provider drop thinking blocks of a Messages call; what did thinking cost per call? | `app:ai-agent:cache-diff <id>` (column `thinking`), `app:ai-agent:inspect <id> --snapshots` (the `messages wire:` line), `app:ai-agent:run-report <ids> --usage` |
 | Clean up evaluation conversations | `app:ai-agent:eval-conversations-purge` (dry run), then `--apply` |
 
 ## Task or symptom → reference

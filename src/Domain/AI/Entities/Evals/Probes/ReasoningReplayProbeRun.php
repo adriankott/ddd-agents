@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DDD\Domain\AI\Entities\Evals\Probes;
 
+use DDD\Domain\AI\Entities\Conversations\Messages\RunSettings;
 use DDD\Domain\AI\Entities\Models\AIModel;
 use DDD\Domain\Base\Entities\ValueObject;
 
@@ -13,7 +14,7 @@ class ReasoningReplayProbeRun extends ValueObject
     /** The model of the scenario's calls (the model-switch scenario sends its second call elsewhere) */
     public AIModel $aiModel;
 
-    /** @var string `chatCompletions` or `responses` */
+    /** @var string `chatCompletions`, `responses` or `messages` */
     public string $wireApi = '';
 
     /** @var bool Whether replaying calls ask to drop mismatching thinking blocks */
@@ -24,4 +25,12 @@ class ReasoningReplayProbeRun extends ValueObject
 
     /** @var int The total timeout of one call in seconds */
     public int $timeoutSeconds = 120;
+
+    /** @var int How many calls the scenario has sent (the Messages API: numbers the note each call ends on) */
+    public int $sentCallCount = 0;
+
+    public function usesMessagesApi(): bool
+    {
+        return $this->wireApi === RunSettings::AGENT_WIRE_API_MESSAGES;
+    }
 }

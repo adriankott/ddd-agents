@@ -62,7 +62,7 @@ prints every message of the turn as it is produced.
 | `--max-turn-cost` | none | `runSettings.maxTurnCostUsd`, stored |
 | `--store-snapshot` | flag | `contextRetentionSettings.storeRequestSnapshot`, stored |
 | `--hint-recent-tool-calls` | flag | `contextRetentionSettings.hintRecentToolCallsToDiscourageRepeats`, stored |
-| `--agent-wire-api` | none | `chatCompletions` or `responses` (`inherit` clears it), stored as a run-settings row |
+| `--agent-wire-api` | none | `chatCompletions`, `responses` or `messages` (`inherit` clears it), stored as a run-settings row |
 | `--previous-reasoning-carry-over` | none | `all`, `currentTurn`, `off` or `capped` (`inherit` = the default), stored as a run-settings row |
 | `--previous-reasoning-cap-tokens` | none | the cap of `capped` in reasoning tokens (`0` = the configured default) |
 | the context-retention options | none | `--eager` (flag), `--evict-soft`, `--evict-hard`, `--evict-ref`, `--evict-tool-tokens`, `--evict-tool-turns`, `--evict-skill-tokens`, `--evict-skill-turns`, `--evict-min-residency`, `--unload-granularity`, `--skill-loading-strategy` (a new conversation only), `--rebuild-epoch-on-situation-change`, `--state-change-delivery` (`ContextRetentionSettingsOptionsTrait`) |
@@ -191,7 +191,7 @@ live printer, the request snapshots (`--snapshots`), the delegation children and
 | `--debug` | flag | payloads untruncated |
 | `--collapse-threads` | flag | delegations as call and verdict only |
 | `--no-transcript` | flag | skip the transcript |
-| `--snapshots` | flag | dump the stored debug payloads (only present with `storeRequestSnapshot` on) |
+| `--snapshots` | flag | dump the stored debug payloads (only present with `storeRequestSnapshot` on); a call on the Messages API adds the line `messages wire: frozen from msg #… · thinking from msg #… · answer stored … · thinking tokens …` and one red line per thinking block the provider dropped (type, path, reason); its answer is summarised with `stop_reason`, the output and thinking tokens and the thinking block count |
 | `--html` | none | also write the HTML transcript to this path |
 
 - **Writes:** only the `--html` file.
@@ -287,6 +287,7 @@ default account for console work.
 | `--findings` | flag | print the judge findings per run |
 | `--no-tools` | flag | skip the slowest-tools table |
 | `--variants` | flag | print the per-run variants timeline |
+| `--usage` | flag | print the usage table: per run and over all runs the model calls, the input, cached, cache-write, output and thinking tokens, the cached share, the output and thinking tokens per call, the thinking blocks the provider dropped from the requests (Messages API), the model seconds per call and the model cost |
 
 - **Writes:** nothing. **Envelope:** no model call. **Exit codes:** `0`.
 - **Budget:** no option.
@@ -319,7 +320,9 @@ model call. The skill-granular default pass is not simulated.
 ### `app:ai-agent:cache-diff` — `AgentCacheDiffCommand`
 
 The prompt-cache diff of a conversation: per model call where the request first differs from the previous one, the
-cache credit, the gap and the cause class; rights lifted.
+cache credit, the gap and the cause class; rights lifted. The column `thinking` shows the thinking tokens of a call's
+answer and, after a slash, the thinking blocks the provider dropped from its request (a call on the Messages API;
+`—` on another wire API); a line under the table sums the dropped blocks.
 
 | Option / argument | Default | Meaning |
 |---|---|---|
@@ -915,16 +918,16 @@ and the hit rate per question.
 
 Live probe of reasoning replay on OpenRouter: a small synthetic tool conversation built in memory (system, two tools,
 one owner question), sent with the agent's own composers (`AgentChatCompletionsRequestComposer`,
-`AgentResponsesRequestComposer`), the model's catalog provider filters and the agent's OpenRouter key
-(`AI.modelCalls.openRouterApiKeyEnvName`). It changes nothing in the agent and persists nothing; it costs real tokens.
-Built for the decision whether Anthropic models can get their own reasoning back (Chat Completions, Responses, or a new
-Messages wire).
+`AgentResponsesRequestComposer`, `AgentMessagesRequestComposer`), the model's catalog provider filters and the agent's
+OpenRouter key (`AI.modelCalls.openRouterApiKeyEnvName`). It changes nothing in the agent and persists nothing; it
+costs real tokens. On `--wire=messages` the task is a three-tool order lookup that draws thinking, every call ends on
+a `clear_at` note, the calls are pinned to Anthropic and always ask for `drop_block`.
 
 | Option / argument | Default | Meaning |
 |---|---|---|
 | `--model` | none (required) | catalog name, e.g. `ANTHROPIC.CLAUDE_OPUS_5_5`, `MOONSHOT.KIMI_K3_1_PRO` |
 | `--scenario` | `clean` | comma-separated, or `all` (every scenario the wire allows; `model-switch` only with `--switch-model`) |
-| `--wire` | `chatCompletions` | or `responses`; a non-OpenAI model on `responses` bypasses the agent's runtime refusal (`REJECTION_RESPONSES_NEEDS_OPENAI_MODEL`) for this probe only, and the output says so |
+| `--wire` | `chatCompletions` | or `responses` or `messages` (Anthropic models); a non-OpenAI model on `responses` bypasses the agent's runtime refusal (`REJECTION_RESPONSES_NEEDS_OPENAI_MODEL`) for this probe only, and the output says so |
 | `--switch-model` | none | the model of call 2 in `model-switch` |
 | `--drop-block` | flag | replaying calls send `thinking.block_binding.prefix_mismatch_behavior: drop_block` |
 | `--effort` | `medium` | reasoning effort of every call |
@@ -939,7 +942,13 @@ Messages wire).
 | `edit-system` | as clean; call 2's system text gains a skill-catalog line | same |
 | `model-switch` | as clean; call 2 goes to `--switch-model` with call 1's reasoning | PASS accepted; FINDING refused |
 | `forced-tool-choice` | 1: the delivery step's named pin; 2: `auto` plus the `[SIGNAL:tool-expected]` line | PASS pin accepted; FINDING pin refused (the 400 text); FAIL the `auto` form refused |
-| `append-only` (`responses` only) | 1: tools → 2: a skill appended (`additional_tools` item + developer message, top-level tools unchanged) with call 1's reasoning → 3: the reasoning of both carried | PASS all accepted; FINDING call 2 or 3 refused |
+| `append-only` (`responses`, `messages`) | 1: tools → 2: a skill appended (`additional_tools` item + developer message, top-level tools unchanged; on `messages` a deferred tool, a `tool_addition` block and a `role: "system"` message) with call 1's reasoning → 3: the reasoning of both carried | PASS all accepted; FINDING call 2 or 3 refused |
+| `capped-cut` (`messages` only) | four steps of one turn, then a call that sends only the two newest steps' thinking (a leading run removed), then one more | PASS nothing dropped; FINDING blocks dropped or a call refused |
+| `current-turn-strip` (`messages` only) | turn 1 with thinking; turn 2 starts with every earlier block stripped, then a second call of turn 2 carries turn 2's thinking | PASS nothing dropped; FINDING blocks dropped or a call refused |
+
+On `messages` a replay over an unchanged prefix that loses a block is a FAIL (`clean`, `append-only`); after an edit
+(`edit-history`, `edit-tools`, `edit-system`, `model-switch`) dropped blocks are the FINDING, with the
+`input_transformations` of the answer in the verdict line.
 
 Every scenario FAILs when call 1 is refused on the agent's own route (on a bypassed Responses route that is a FINDING),
 calls no tool, or — for a replay — returns no reasoning items. Per call the table shows HTTP status, provider, the tool
@@ -951,7 +960,8 @@ upstream's raw message.
 - **Envelope:** none — the calls go to OpenRouter directly (`AgentReasoningReplayProbeTransportService`) and are booked on
   no account; the output sums the reported cost.
 - **Exit codes:** `0` every scenario PASS or FINDING; `1` a scenario FAILed or the probe stopped; `2` invalid options
-  (unknown model or scenario, `append-only` without `--wire=responses`, `model-switch` without `--switch-model`).
+  (unknown model or scenario, `append-only` on `chatCompletions`, `capped-cut` or `current-turn-strip` without
+  `--wire=messages`, `model-switch` without `--switch-model`).
 - **Budget:** none (no account budget applies).
 - **Override points:** `AgentReasoningReplayProbeService::getTransportService()`, `findModel()`; the command's
   `resolveScenarios()`, `renderTables()`.
