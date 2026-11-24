@@ -46,8 +46,9 @@ schema fix. Files (PDF, Office: text extraction, an artifact, page images on dem
 
 **Host steps:**
 
-- Shared cache: set `sharedCache.cacheGroup` to a shared group (`'redis'`). On a Redis or Valkey that also holds keys
-  without a TTL, use `maxmemory-policy volatile-lru`.
+- Shared cache: set `sharedCache.cacheGroup` to a shared group (`'redis'`). `maxmemory-policy`: a shared instance that also
+  holds keys without a TTL → `volatile-lru`/`volatile-ttl`; a dedicated cache instance → `allkeys-lru`; never
+  `noeviction` for L2.
 - Durable pictures:
   - configure the object store `agentToolImages` (`OBJECT_STORAGE_AGENTTOOLIMAGES_*`, `async-aws/s3`);
   - give its key prefix an expiry rule in the bucket;

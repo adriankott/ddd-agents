@@ -59,10 +59,11 @@ Nothing in the store throws into a tool call or a model call: a missing picture 
 
 **L2 on a shared Redis or Valkey.** Use a group of Core's Cache API (`'redis'`, `'redisSentinel'`); the batch reads
 and writes work on Redis and Valkey (phpredis pipelines; Predis, cluster and Relay fall back to one command per key).
-Every picture key carries a TTL. When the same instance also holds keys WITHOUT a TTL (sessions, queues, locks), set
-`maxmemory-policy volatile-lru` (or `volatile-ttl`): under memory pressure only keys with a TTL are evicted — pictures
-first, never your keys without TTL. allkeys-lru would evict those too; noeviction makes picture writes fail (the
-store then skips L2). Size: a wire-profile WebP is typically 50–400 KB; pictures × TTL window is the L2 footprint.
+Every picture key carries a TTL. Pick `maxmemory-policy` by what the instance holds:
+- a shared instance that also holds keys WITHOUT a TTL (sessions, queues, locks, rankings) → `volatile-lru` (or
+  `volatile-ttl`): under memory pressure only keys with a TTL are evicted, never the keys without one;
+- a dedicated cache instance (every key may be evicted) → `allkeys-lru`;
+- never `noeviction` for L2: picture writes then fail and the store skips L2. Size: a wire-profile WebP is typically 50–400 KB; pictures × TTL window is the L2 footprint.
 
 **L3 object store.** Configure a Core object store named `agentToolImages` (or the name in `objectStore.objectStorage`)
 in the application's Core object storage configuration (config/app/Common/ObjectStorage.php) or by environment:
