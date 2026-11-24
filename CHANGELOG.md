@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.3.9
+
+**Changed:**
+
+- **The write gate after an untrusted read is configurable and off by default.** `AI.untrustedContent.writeAfterUntrustedRead`
+  takes `off` (the new package default), `ownerConsent` or `refuse`. Under `off` a WRITE or DELETE after an untrusted
+  read of the turn runs as before 0.1.30: no consent is reserved, and a scheduled run or a delegated sub-task is not
+  refused. `ownerConsent` and `refuse` behave as before. An unknown value reads as `off` (before: `ownerConsent`) and
+  is reported once per process in the issues log (`MCPToolContentTrust::normalizeWriteAfterUntrustedReadMode()`).
+- The unseen-URL refusal (`MCPToolFetchesModelChosenUrl`) has its own key `AI.untrustedContent.unseenUrlAfterUntrustedRead`:
+  `refuse` (default, unchanged behaviour) or `off`.
+- Unchanged: a READ or WORKSPACE tool is untrusted unless it declares trust.
+
+**Host steps:**
+
+- A host that wants the write gate sets `'writeAfterUntrustedRead' => 'ownerConsent'` (and the decision site
+  `ownerConsent` `on`) or `'refuse'` in its own `config/app/AI/untrustedContent.php`. A host with its own copy of that
+  file adds `'unseenUrlAfterUntrustedRead' => 'refuse'` only to be explicit (a missing key is `refuse`).
+
 ## 0.3.8
 
 **Fixed:**

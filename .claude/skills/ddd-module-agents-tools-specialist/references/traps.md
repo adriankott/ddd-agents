@@ -112,6 +112,12 @@ forgets, the loop keeps:
 - The HTTP path and executor-direct calls are not gated by the owner-confirmation and mandate gates: the authenticated
   owner is the consent-giver there. Do not expose a destructive tool on a mount for clients that are not the owner.
 
+- A write after an untrusted read is NOT held by default (`AI.untrustedContent.writeAfterUntrustedRead: off`): a tool
+  that must not run on injected instructions needs the host's `ownerConsent` (or `refuse`), or its own consent step
+  (`MCPToolRequiresOwnerConfirmation`). The unseen-URL refusal of `MCPToolFetchesModelChosenUrl` is on by default and
+  has its own key (`unseenUrlAfterUntrustedRead`). A test that expects `OWNER_CONFIRMATION_REQUIRED` after a web read
+  sets the mode.
+
 ## Package maintainer traps
 
 - The core never names a tool of an application. A rule about a kind of tool is an attribute read by the catalog

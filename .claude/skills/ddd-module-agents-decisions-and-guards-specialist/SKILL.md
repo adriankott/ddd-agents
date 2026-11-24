@@ -155,7 +155,7 @@ return [
 | Switch the layer or one site for a single conversation (kill switch, row, admin override) | [decision sites](references/decision-sites.md) |
 | Add a decision of the host's own (a tool-side check, a host service) | [adding a decision site](references/adding-a-decision-site.md) |
 | Write or tune a question; probe it on recorded cases before wiring | [adding a decision site](references/adding-a-decision-site.md) |
-| Mark a tool whose result carries third-party text or declare one trusted; a write answers OWNER_CONFIRMATION_REQUIRED or WRITE_AFTER_UNTRUSTED_READ after a web read; a URL fetch is refused as unseen; replace the gate rules; a result reads "removed for security" | [injection defence](references/injection-defence.md) |
+| Mark a tool whose result carries third-party text or declare one trusted; switch the write gate after an untrusted read on (default off) or the unseen-URL refusal off; a write answers OWNER_CONFIRMATION_REQUIRED or WRITE_AFTER_UNTRUSTED_READ after a web read; a URL fetch is refused as unseen; replace the gate rules; a result reads "removed for security" | [injection defence](references/injection-defence.md) |
 | An owner message shows the filter notice to the model | [injection defence](references/injection-defence.md) |
 | A tool must not act without the owner's explicit yes; the tool answers NOT DONE | [owner consent](references/owner-consent.md) |
 | Decisions show `fallback:breaker` or `fallback:transport`; the decision model seems down | [circuit breaker and statistics](references/circuit-breaker-and-statistics.md) |
