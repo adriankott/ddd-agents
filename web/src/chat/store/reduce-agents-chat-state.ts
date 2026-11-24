@@ -22,9 +22,27 @@ const withRefusedSendError = (state: AgentsChatState, error: AgentsClientError):
   };
 };
 
-/** The messages a send's answer brings, merged over the loaded ones without the optimistic message (the last one). */
+/**
+ * The messages a send's answer brings, merged over the loaded ones without the optimistic message it answers. The
+ * optimistic owner rows are the rows without an index; the answer replaces the one whose text its saved owner row
+ * carries (else the oldest one) — not blindly "the last row": a live read that merged in between already moved
+ * indexed rows behind it, and dropping the last row then removed a real message and kept the optimistic one (a second
+ * owner bubble, the activity line stuck on). A second message sent while the first was in flight keeps its bubble.
+ */
 const mergeSendAnswer = (loadedMessages: ChatMessage[] | null, answerMessages: ChatMessage[]): ChatMessage[] => {
-  const messagesWithoutOptimisticMessage = loadedMessages ? loadedMessages.slice(0, loadedMessages.length - 1) : [];
+  const optimisticMessages = (loadedMessages ?? []).filter((message) => message.indexInConversation == null);
+  const answeredOwnerTexts = answerMessages
+    .filter((message) => message.role === "USER" && message.indexInConversation != null)
+    .map((message) => message.message ?? "");
+  let replacedOptimisticMessage: ChatMessage | undefined =
+    optimisticMessages.find((message) => answeredOwnerTexts.includes(message.message ?? "")) ?? optimisticMessages[0];
+  const messagesWithoutOptimisticMessage = (loadedMessages ?? []).filter((message) => {
+    if (message === replacedOptimisticMessage) {
+      replacedOptimisticMessage = undefined;
+      return false;
+    }
+    return true;
+  });
   return mergeChatMessagesByIndex(
     messagesWithoutOptimisticMessage,
     tagFreshChatMessages(answerMessages, messagesWithoutOptimisticMessage),

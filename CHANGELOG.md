@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.44
+
+- Web: the "Working on it…" line no longer stays under a finished answer. Rows that owe no work — the frontend's
+  widget render report and the other no-work SIGNAL rows, ERROR and CHECKPOINT rows — are stored with role USER and
+  may land after the answer; the activity now skips them (the same walk as `lastWireMessageIsUnansweredUserMessage`).
+  A saved owner message right after a send still shows the line while the run status is not yet `running`.
+- Web: a send's answer replaces exactly its optimistic owner row (matched by text, else the oldest one) instead of
+  dropping the last row: a live read that merged in between no longer leaves a second owner bubble, and a second
+  message sent while the first was in flight keeps its bubble.
+
 ## 0.1.43
 
 - `showDriveFiles` shows folders too: a folder reference goes onto the DriveFiles card (a folder row with its

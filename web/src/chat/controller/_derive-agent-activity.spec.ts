@@ -134,3 +134,34 @@ describe("deriveAgentActivity — thinking face starts on send, not on the serve
     expect(deriveAgentActivity(null, "idle")).toEqual({ active: false, label: "" });
   });
 });
+
+describe("deriveAgentActivity — rows that owe no work never keep the line on under a finished answer", () => {
+  const row = (overrides: Partial<AgentsConversationMessage>): AgentsConversationMessage =>
+    ({ role: "USER", messageType: "TEXT", ...overrides }) as unknown as AgentsConversationMessage;
+
+  it("the frontend's widget render report after the answer leaves the turn at rest", () => {
+    const messages = [
+      row({ indexInConversation: 4, role: "USER" }),
+      row({ indexInConversation: 5, role: "ASSISTANT", authorType: "ASSISTANT" }),
+      row({ indexInConversation: 6, messageType: "SIGNAL", signalSource: "FRONTEND_WIDGET_RENDER_REPORT" }),
+    ];
+    expect(deriveAgentActivity(messages, "idle")).toEqual({ active: false, label: "" });
+  });
+
+  it("checkpoint and error rows after the answer leave the turn at rest", () => {
+    const messages = [
+      row({ indexInConversation: 5, role: "ASSISTANT", authorType: "ASSISTANT" }),
+      row({ indexInConversation: 6, messageType: "CHECKPOINT" }),
+      row({ indexInConversation: 7, messageType: "ERROR" }),
+    ];
+    expect(deriveAgentActivity(messages, "idle")).toEqual({ active: false, label: "" });
+  });
+
+  it("a signal that owes work (a widget click) still starts the line", () => {
+    const messages = [
+      row({ indexInConversation: 5, role: "ASSISTANT", authorType: "ASSISTANT" }),
+      row({ indexInConversation: 6, messageType: "SIGNAL", signalSource: "WIDGET_ANSWER" }),
+    ];
+    expect(deriveAgentActivity(messages, "idle")).toEqual({ active: true, label: "" });
+  });
+});

@@ -1,6 +1,7 @@
 import type { ConversationMessageStatus } from "../../contract/conversation";
 import type { ChatMessage } from "../chat-message";
 import { textKey } from "../../provider/text-key";
+import { SIGNAL_SOURCES_THAT_OWE_NO_WORK } from "../last-wire-message-is-unanswered-user-message";
 
 /** Mirrors App\Domain\AI\Entities\Conversations\Agent\Tools\DelegateTool::NAME. */
 const DELEGATE_TOOL_NAME = "delegate";
@@ -21,6 +22,17 @@ const UNRESOLVED_RUN_STATUSES: string[] = ["QUEUED", "RUNNING"];
  * status is a mirror that a write race can leave stale (a delegate call left RUNNING kept the whole customer
  * chat "thinking" for the rest of a setup). An empty or missing expansion proves nothing and falls back to the status.
  */
+/**
+ * Rows that never start or continue a turn: the bookkeeping rows (ERROR, CHECKPOINT) and the SIGNAL rows that owe no
+ * work (the frontend's widget render report, the platform's own widget notice, phone call markers, a suppressed
+ * repeat). They are stored with role USER and may land after the agent's answer; read as the tail they would keep the
+ * "Working on it…" line under a finished answer forever.
+ */
+const isRowThatOwesNoWork = (message: ChatMessage): boolean =>
+  message.messageType === "ERROR" ||
+  message.messageType === "CHECKPOINT" ||
+  (message.messageType === "SIGNAL" && SIGNAL_SOURCES_THAT_OWE_NO_WORK.includes(message.signalSource ?? ""));
+
 const isEffectivelyResolved = (message: ChatMessage | undefined): boolean => {
   if (message == null) return false;
   if (isResolved(message.toolCall?.status)) return true;
@@ -100,7 +112,7 @@ export const deriveAgentActivity = (
 
   // An optimistic (just-sent, not yet server-assigned) row carries no index — it belongs at the TAIL, the newest
   // thing in the conversation, never at the front, where `?? 0` would park it ahead of every real message.
-  const sorted = [...(messages ?? [])].sort(
+  const sorted = [...(messages ?? [])].filter((message) => !isRowThatOwesNoWork(message)).sort(
     (a, b) => (a.indexInConversation ?? Number.POSITIVE_INFINITY) - (b.indexInConversation ?? Number.POSITIVE_INFINITY),
   );
   const lastMessage = sorted[sorted.length - 1];
