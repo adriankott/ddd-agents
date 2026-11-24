@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.3.5
+
+**Fixed:**
+
+- **Responses API: the call after a cut reads the cache again.** On the explicit-breakpoint wire a breakpoint is part
+  of the prefix, so the entries a cut call wrote without the base-prompt marker were never found by the next call (it
+  read only the system prefix and wrote the history again). The system item now carries the same markers on every
+  call: one at its end under append-only loading, the base prompt and the end under the system-prompt swap. The other
+  slots of the four go to the stable message and either the previous call's message or the two cut markers; a cut call
+  with one free slot marks no cut (`ArgusAIAgentConversation::addSystemMessageAndPromptCacheMarkers()`). On the
+  Messages API nothing changes. Under append-only loading a Responses call no longer marks the base prompt on its own:
+  after a compaction the base prompt is not read separately. The first call after the update writes the system entry
+  once again.
+
+**Host steps:** none.
+
 ## 0.3.4
 
 **Fixed:**

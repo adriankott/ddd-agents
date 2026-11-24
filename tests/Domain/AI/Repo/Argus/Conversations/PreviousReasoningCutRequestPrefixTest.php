@@ -45,6 +45,11 @@ class PreviousReasoningCutRequestPrefixTest extends UnitTestCase
         $systemOf = static fn (array $body): string => json_encode(static::withoutMarkers($wireApi === RunSettings::AGENT_WIRE_API_MESSAGES ? $body['system'] : $body['input'][0]));
         self::assertSame($systemOf($bodyBeforeTheCut), $systemOf($bodyOfTheCutCall), 'the system parts keep their split and bytes on the cut call');
         self::assertSame($systemOf($bodyOfTheCutCall), $systemOf($bodyAfterTheCut));
+        if ($wireApi === RunSettings::AGENT_WIRE_API_RESPONSES) {
+            // on this wire a breakpoint is part of the prefix: the system item carries the same markers on every call
+            self::assertSame(json_encode($bodyBeforeTheCut['input'][0]), json_encode($bodyOfTheCutCall['input'][0]));
+            self::assertSame(json_encode($bodyOfTheCutCall['input'][0]), json_encode($bodyAfterTheCut['input'][0]));
+        }
 
         // the cut call up to its last marker = the call after it
         $lastMarkerPosition = static::findLastMarkedHistoryPosition($bodyOfTheCutCall[$historyKey]);
@@ -65,7 +70,17 @@ class PreviousReasoningCutRequestPrefixTest extends UnitTestCase
     }
 
     /** The request body of one call over `$stepCount` steps, the items from `$itemsFromStep`; a moved cut names its anchor. */
-    protected function composeBody(string $wireApi, string $promptCacheMarkers, int $stepCount, int $itemsFromStep, ?int $anchorStepOfAMovedCut): array
+    public function testUnderTheSystemPromptSwapAResponsesCutCallKeepsTheSystemMarkersAndMarksNoCut(): void
+    {
+        $bodyOfTheCutCall = $this->composeBody(RunSettings::AGENT_WIRE_API_RESPONSES, ArgusAIAgentConversation::PROMPT_CACHE_MARKERS_EXPLICIT_BREAKPOINTS, 6, 5, 3, ContextRetentionSettings::SKILL_LOADING_STRATEGY_SYSTEM_PROMPT_SWAP);
+        $bodyAfterTheCut = $this->composeBody(RunSettings::AGENT_WIRE_API_RESPONSES, ArgusAIAgentConversation::PROMPT_CACHE_MARKERS_EXPLICIT_BREAKPOINTS, 7, 5, null, ContextRetentionSettings::SKILL_LOADING_STRATEGY_SYSTEM_PROMPT_SWAP);
+
+        self::assertSame(2, substr_count(json_encode($bodyOfTheCutCall['input'][0]), 'prompt_cache_breakpoint'), 'base prompt and end, as on every call');
+        self::assertSame(json_encode($bodyOfTheCutCall['input'][0]), json_encode($bodyAfterTheCut['input'][0]));
+        self::assertSame(3, static::countMarkers($bodyOfTheCutCall), 'one slot left: no pair of cut markers fits');
+    }
+
+    protected function composeBody(string $wireApi, string $promptCacheMarkers, int $stepCount, int $itemsFromStep, ?int $anchorStepOfAMovedCut, string $skillLoadingStrategy = ContextRetentionSettings::SKILL_LOADING_STRATEGY_CONVERSATION_APPEND): array
     {
         $wireMessages = [['role' => 'user', 'content' => 'question']];
         $assistantPositionsByStep = [];
@@ -84,7 +99,7 @@ class PreviousReasoningCutRequestPrefixTest extends UnitTestCase
         $argusAIAgentConversation = self::instantiateWithoutConstructor(ArgusAIAgentConversation::class);
         $agentWireConfiguration = new AgentWireConfiguration();
         $agentWireConfiguration->wireApi = $wireApi;
-        $agentWireConfiguration->skillLoadingStrategy = ContextRetentionSettings::SKILL_LOADING_STRATEGY_CONVERSATION_APPEND;
+        $agentWireConfiguration->skillLoadingStrategy = $skillLoadingStrategy;
         $agentWireConfiguration->previousReasoningCarryOver = RunSettings::PREVIOUS_REASONING_CARRY_OVER_CAPPED;
         $argusAIAgentConversation->agentWireConfiguration = $agentWireConfiguration;
         $argusAIAgentConversation->stableWireMessageCount = $stableWireMessageCount;

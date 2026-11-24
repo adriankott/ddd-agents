@@ -1208,21 +1208,33 @@ class ArgusAIAgentConversation extends ArgusAIConversation
             // on the Responses API the wire marker goes on the newest stable USER / TOOL / developer item — a marker on
             // an assistant `output_text` part is not probed (a tool result's part is)
             $usesResponsesApi = $this->agentWireConfiguration?->usesResponsesApi() === true;
+            // The markers of the system parts are the same on EVERY call of a conversation: on this wire a marker is
+            // part of the prefix (a call without the base-prompt marker reads one token less of the same system
+            // content), so an entry written by a call with other system markers is never found by the calls after
+            // it. An append-only epoch's loaded-skills segment is fixed — no split before it; on the Responses API
+            // under append-only loading the system content is the same for the whole epoch, so it carries one marker
+            // at its end and the slots go to the wire messages (the stable message, the previous call's message, or
+            // on a call that moves the reasoning cut the entries before the earlier and the new cut).
+            $systemContentParts = $this->buildSystemContentPartsWithPromptCacheBreakpoints(
+                $this->lastSystemSegments,
+                !$usesResponsesApi && $this->agentWireConfiguration?->usesConversationAppend() !== true,
+                !$usesResponsesApi || $this->agentWireConfiguration?->usesConversationAppend() !== true
+            );
+            $freeMarkerSlots = AgentResponsesRequestComposer::MAX_PROMPT_CACHE_BREAKPOINTS
+                - self::countPromptCacheBreakpointsOfContent($systemContentParts) - 1;
             $this->addPromptCacheBreakpointToLastStableWireMessage($wireMessages, $usesResponsesApi);
-            $marksPreviousReasoningCut = $this->addPromptCacheBreakpointsAtPreviousReasoningCut($wireMessages, $usesResponsesApi);
-            if ($usesResponsesApi && !$marksPreviousReasoningCut) {
+            // a cut call needs two slots; with fewer it marks neither cut (and no previous call: its entry lies after
+            // the first step the cut changes)
+            $movesThePreviousReasoningCut = $this->lastPreviousReasoningCut?->movedOnThisCall === true;
+            if ($movesThePreviousReasoningCut && $freeMarkerSlots >= 2) {
+                $this->addPromptCacheBreakpointsAtPreviousReasoningCut($wireMessages, $usesResponsesApi);
+            }
+            if ($usesResponsesApi && !$movesThePreviousReasoningCut && $freeMarkerSlots >= 1) {
                 // a Responses request reads the cache only at breakpoints it carries itself: it re-marks the
                 // item the previous call marked, so the entry that call wrote is looked up
                 $this->addPromptCacheBreakpointToPreviousCallsWireMessage($wireMessages);
             }
-            // an append-only epoch's loaded-skills segment is fixed — no marker before it (the slot the
-            // state delivery needs); on the Responses API the two wire markers take that slot under the cap of four;
-            // a cut call's two cut markers take the marker slots of the inner system parts (the parts stay split)
-            array_unshift($wireMessages, ['role' => 'system', 'content' => $this->buildSystemContentPartsWithPromptCacheBreakpoints(
-                $this->lastSystemSegments,
-                !$usesResponsesApi && $this->agentWireConfiguration?->usesConversationAppend() !== true,
-                !$marksPreviousReasoningCut
-            )]);
+            array_unshift($wireMessages, ['role' => 'system', 'content' => $systemContentParts]);
             return $wireMessages;
         }
         if ($promptCacheMarkers === self::PROMPT_CACHE_MARKERS_ANTHROPIC_CACHE_CONTROL) {
@@ -1349,6 +1361,22 @@ class ArgusAIAgentConversation extends ArgusAIConversation
             $systemContentParts[] = ['type' => 'text', 'text' => $currentPartText, 'prompt_cache_breakpoint' => self::PROMPT_CACHE_BREAKPOINT];
         }
         return $systemContentParts;
+    }
+
+    /**
+     * The cache breakpoints a content carries.
+     *
+     * @param array<int, array<string, mixed>> $contentParts
+     */
+    protected static function countPromptCacheBreakpointsOfContent(array $contentParts): int
+    {
+        $breakpointCount = 0;
+        foreach ($contentParts as $contentPart) {
+            if (isset($contentPart['prompt_cache_breakpoint'])) {
+                $breakpointCount++;
+            }
+        }
+        return $breakpointCount;
     }
 
     /** One text part of the system content, with the cache breakpoint when `$isMarked`. */
