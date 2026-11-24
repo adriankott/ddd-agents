@@ -20,6 +20,9 @@ class InMemoryAgentDriveStore implements AgentDriveStore
     public const string STORE_NAME = 'testdrive';
 
     /** @var string[] Workspace paths of the files, path => reference */
+    /** @var string[] Paths of referencesByPath that are folders */
+    public array $folderPaths = [];
+
     public array $referencesByPath = [
         'reports/Plan.md' => 'drive/1',
         'drivespaces/library/Brand/Logo.svg' => 'drive/2',
@@ -117,8 +120,9 @@ class InMemoryAgentDriveStore implements AgentDriveStore
         $agentDriveFile->reference = $reference;
         $agentDriveFile->path = $path;
         $agentDriveFile->name = basename($path);
-        $agentDriveFile->sizeBytes = 2048;
-        $agentDriveFile->versionNumber = 1;
+        $agentDriveFile->isFolder = in_array($path, $this->folderPaths, true);
+        $agentDriveFile->sizeBytes = $agentDriveFile->isFolder ? null : 2048;
+        $agentDriveFile->versionNumber = $agentDriveFile->isFolder ? null : 1;
         return $agentDriveFile;
     }
 }

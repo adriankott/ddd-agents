@@ -156,8 +156,8 @@ class AgentDriveMCPPackage extends MCPPackage
     }
 
     /**
-     * Shows files to the owner as cards in the chat (name, type, size, date; open and download for people with the
-     * right). Use it instead of pasting a link or the content. Uncommitted files are committed first by the drive;
+     * Shows files and folders to the owner as cards in the chat (name, type, size, date; open and download for people
+     * with the right; a folder row shows its entries). Use it instead of pasting a link or the content. Uncommitted files are committed first by the drive;
      * name files by workspace path or reference.
      *
      * @example {"paths": ["reports/Zuordnung.xlsx"]}
@@ -192,11 +192,10 @@ class AgentDriveMCPPackage extends MCPPackage
             $agentDriveStore = $agentDriveStoresService->requireDriveStoreOfPath($agentDrivePaths[0]);
             $foundFiles = $agentDriveStore->findDriveFiles($callProvenance, $agentDrivePaths);
             $references = [];
+            // folders are shown too: the card renders a folder row (its entries, a link to the drive screen)
             foreach ($foundFiles->getElements() as $foundFile) {
-                if (!$foundFile->isFolder) {
-                    $references[] = $foundFile->reference;
-                    $shownFiles->add($foundFile);
-                }
+                $references[] = $foundFile->reference;
+                $shownFiles->add($foundFile);
             }
             $missingArguments = [...$missingArguments, ...$this->findArgumentsWithoutFile($agentDrivePaths, $foundFiles)];
             if ($references === []) {
@@ -214,7 +213,7 @@ class AgentDriveMCPPackage extends MCPPackage
             }
         }
         if ($shownFiles->count() === 0) {
-            throw new NotFoundException('None of these files exists in a mounted drive (or they are folders): ' . implode(', ', $fileArguments) . '. Check the paths with listDriveFiles.');
+            throw new NotFoundException('None of these files or folders exists in a mounted drive: ' . implode(', ', $fileArguments) . '. Check the paths with listDriveFiles.');
         }
         $agentDriveFilesMcpResponseDto = new AgentDriveFilesMcpResponseDto();
         $agentDriveFilesMcpResponseDto->files = $shownFiles;

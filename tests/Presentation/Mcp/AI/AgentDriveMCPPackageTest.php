@@ -14,6 +14,10 @@ use DDD\Infrastructure\Exceptions\ForbiddenException;
 use DDD\Infrastructure\Libs\Config;
 use DDD\Presentation\Mcp\Client\AI\AgentDriveMCPPackage;
 use DDD\Presentation\Mcp\Client\AI\Dtos\AgentDriveFileSaveRequestDto;
+use DDD\Presentation\Mcp\Client\AI\Dtos\AgentDriveFilesShowRequestDto;
+use DDD\Domain\AI\Entities\Conversations\Widgets\ConversationWidgetDelivery;
+use DDD\Domain\AI\Entities\Conversations\Widgets\DriveFilesConversationWidget;
+use DDD\Domain\AI\Services\Conversations\AIConversationMessagesService;
 use DDD\Presentation\Mcp\Client\AI\Dtos\AgentDriveFilesListRequestDto;
 use DDD\Tests\Agents\Domain\AI\Services\Drives\Fixtures\InMemoryAgentDriveStore;
 use DDD\Tests\Agents\Support\UnitTestCase;
@@ -62,6 +66,30 @@ class AgentDriveMCPPackageTest extends UnitTestCase
         $listRequestDto->path = 'drivespaces';
         $mountsListing = $agentDriveMCPPackage->listDriveFiles($listRequestDto, $this->agentDriveStoresService, AgentToolCallProvenance::forEvalHarness(null));
         self::assertStringContainsString('mount drivespaces/library · internal · read-only', $mountsListing->toLlmMarkdown());
+    }
+
+    public function testAFolderIsShownAsACardRow(): void
+    {
+        $shownWidgets = [];
+        $aIConversationMessagesService = $this->createMock(AIConversationMessagesService::class);
+        $aIConversationMessagesService->method('appendWidget')->willReturnCallback(
+            function ($agentToolCallProvenance, $conversationWidget) use (&$shownWidgets) {
+                $shownWidgets[] = $conversationWidget;
+                return ConversationWidgetDelivery::noChat();
+            }
+        );
+        $this->inMemoryAgentDriveStore->referencesByPath['drivespaces/library/Brand'] = 'drive/3';
+        $this->inMemoryAgentDriveStore->folderPaths = ['drivespaces/library/Brand'];
+        $showRequestDto = new AgentDriveFilesShowRequestDto();
+        $showRequestDto->paths = ['drivespaces/library/Brand'];
+
+        $showResponse = (new AgentDriveMCPPackage())->showDriveFiles($showRequestDto, $this->agentDriveStoresService, $aIConversationMessagesService, AgentToolCallProvenance::forEvalHarness(null));
+
+        self::assertSame(1, $showResponse->files->count());
+        self::assertTrue($showResponse->files->first()->isFolder);
+        self::assertCount(1, $shownWidgets);
+        self::assertInstanceOf(DriveFilesConversationWidget::class, $shownWidgets[0]);
+        self::assertCount(1, $shownWidgets[0]->references);
     }
 
     public function testAReadOnlyMountRefusesTheCopy(): void

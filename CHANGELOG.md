@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.43
+
+- `showDriveFiles` shows folders too: a folder reference goes onto the DriveFiles card (a folder row with its
+  entries and the link to the drive screen) instead of being dropped; the not-found text names files or folders.
+
 ## 0.1.42
 
 - Web: the loading skeleton of a widget surface wraps only a plain text title in the title paragraph; an element
