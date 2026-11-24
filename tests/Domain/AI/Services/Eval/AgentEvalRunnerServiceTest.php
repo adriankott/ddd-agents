@@ -25,6 +25,7 @@ use DDD\Domain\AI\Exceptions\Evals\AgentEvalPreconditionNotEstablishedException;
 use DDD\Domain\AI\Services\AgentSpaces\AgentSpacesService;
 use DDD\Domain\AI\Services\Conversations\AIConversationSchedulesService;
 use DDD\Domain\AI\Services\Eval\AgentEvalRunHooksService;
+use DDD\Domain\AI\Exceptions\Evals\AgentEvalScopeWithoutOwnedAgentSpaceException;
 use DDD\Domain\AI\Services\Eval\AgentEvalRunnerService;
 use DDD\Domain\AI\Services\Mandates\AgentMandatesService;
 use DDD\Domain\Base\Entities\StaticRegistry;
@@ -741,7 +742,7 @@ class AgentEvalRunnerServiceTest extends IntegrationTestCase
         self::assertSame([], $this->hooksDouble->authenticatedAccountIdsDuringEligibilityRead, 'without a scope nothing is read');
         self::assertSame(77, AuthService::instance()->getAccount()?->id);
         self::assertSame(
-            ["applicability check failed (RuntimeException): The case 'c' names no agent space and the caller gave none."],
+            ["applicability check failed (" . AgentEvalScopeWithoutOwnedAgentSpaceException::class . "): The case 'c' names no agent space and the caller gave none."],
             $this->progressLinesRecorder->progressLines
         );
     }

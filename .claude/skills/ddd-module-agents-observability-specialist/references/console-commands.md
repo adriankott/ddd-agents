@@ -1044,8 +1044,11 @@ positive whole number; `resolveFallbackAccountId()`, kept for the run by `rememb
 evaluation command on the base runs a case without a space at account level for that account, and a case in a space
 without an owner for it (a space with an owner keeps its owner). The scope comes from
 `AgentEvalRunnerService::resolveEvalScopeWithFallbackAccount()` →
-`AgentEvalRunHooksService::resolveEvalScopeWithFallbackAccount()` (the account read by `findAccountOfEvalScope()`);
-without the option it is `resolveEvalScope()` unchanged, so a host's override of that method keeps deciding. The
+`AgentEvalRunHooksService::resolveEvalScopeWithFallbackAccount()` (the account read by `findAccountOfEvalScope()`).
+It asks `resolveEvalScope()` first, with and without the option, so a host's override of that method (its own scope
+keys in a case, e.g. a record that carries the space) decides also under `--accountId`; the named account steps in only
+where that hook throws `AgentEvalScopeWithoutOwnedAgentSpaceException` (no space, or a space without an owner). Any other
+failure of the hook fails the case — never a silent run at account level. The
 planning (`AgentEvalSuitePlanService::assignScopeOfCaseToTask()`) gives such a case the task scope
 `AgentEvalSuiteTask::$accountId` (`getScopeId()` = the negated account id, never a space's id), so a host without
 spaces plans its cases; without the option such a case is skipped as before.

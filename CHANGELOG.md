@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.3.10
+
+**Fixed:**
+
+- **Evaluation runs with `--accountId` skipped the host's scope hook.** `AgentEvalRunHooksService::resolveEvalScopeWithFallbackAccount()`
+  now asks `resolveEvalScope()` first, as every run without the option does, so a host's own scope keys in a case (a
+  record that carries the agent space) decide also under `--accountId`. Before, such a case ran at account level and
+  missed the space's drive ("no drive mounted"). The named account steps in only where the hook finds no space or a
+  space without an owner (`AgentEvalScopeWithoutOwnedAgentSpaceException`, thrown by the module's default); any other
+  failure of the hook fails the case.
+
+**Host steps:**
+
+- A host override of `resolveEvalScope()` that throws for "no space" itself throws
+  `DDD\Domain\AI\Exceptions\Evals\AgentEvalScopeWithoutOwnedAgentSpaceException` there (or calls the parent), so
+  `--accountId` runs such cases at account level.
+
 ## 0.3.9
 
 **Changed:**

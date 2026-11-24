@@ -18,6 +18,7 @@ use DDD\Domain\AI\Entities\MCPPackages\MCPToolAttributeCatalog;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolEffect;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolEffectCatalog;
 use DDD\Domain\AI\Entities\Skills\AISkills;
+use DDD\Domain\AI\Exceptions\Evals\AgentEvalScopeWithoutOwnedAgentSpaceException;
 use DDD\Domain\AI\Interfaces\AIConversationProgressReporterInterface;
 use DDD\Domain\AI\Services\AgentSpaces\AgentSpacesService;
 use DDD\Domain\Base\Entities\Entity;
@@ -65,15 +66,18 @@ class AgentEvalRunHooksService extends Service
      * @param AgentEvalCase $agentEvalCase the case to run
      * @param int|null $fallbackAgentSpaceId the agent space the caller names for cases that name none
      * @return AgentEvalScope
-     * @throws RuntimeException when the case and the caller name no agent space, the space is not stored, or its owner
-     *                          is not known — a run that names an account goes through
-     *                          {@see resolveEvalScopeWithFallbackAccount()} instead
+     * An application that keeps its own scope keys in a case (a space named by a record of its own) resolves them
+     * here: a run that names an account asks this method first too ({@see resolveEvalScopeWithFallbackAccount()}).
+     *
+     * @throws AgentEvalScopeWithoutOwnedAgentSpaceException when the case and the caller name no agent space or its
+     *                          owner is not known (a run that names an account then runs for that account)
+     * @throws RuntimeException when the space is not stored, or any failure of an application's own resolution
      */
     public function resolveEvalScope(AgentEvalCase $agentEvalCase, ?int $fallbackAgentSpaceId = null): AgentEvalScope
     {
         $agentSpaceId = $this->resolveAgentSpaceIdOfCase($agentEvalCase, $fallbackAgentSpaceId);
         if ($agentSpaceId === null) {
-            throw new RuntimeException("The case '{$agentEvalCase->getId()}' names no agent space and the caller gave none.");
+            throw new AgentEvalScopeWithoutOwnedAgentSpaceException("The case '{$agentEvalCase->getId()}' names no agent space and the caller gave none.");
         }
         $agentSpacesService = $this->getAgentSpacesService();
         DDDService::instance()->deactivateEntityRightsRestrictions();
@@ -87,29 +91,36 @@ class AgentEvalRunHooksService extends Service
             throw new RuntimeException("Agent space {$agentSpaceId} not found");
         }
         if (!$ownerAccount instanceof Account) {
-            throw new RuntimeException("Could not resolve the account that owns agent space {$agentSpaceId}");
+            throw new AgentEvalScopeWithoutOwnedAgentSpaceException("Could not resolve the account that owns agent space {$agentSpaceId}");
         }
         return AgentEvalScope::forAgentSpace($agentSpace, $ownerAccount);
     }
 
     /**
-     * The scope of a run of `$agentEvalCase` for a run that names an account (`--accountId`): a case without a space
-     * (neither its own nor `$fallbackAgentSpaceId`) runs at account level for that account; a case in a space works in
-     * the space, for the account that owns it, or — a space without an owner, shared by several accounts — for
-     * `$fallbackAccountId`. Without `$fallbackAccountId` it is {@see resolveEvalScope()} unchanged (an application's
-     * override of that method keeps deciding). Reads only, with the rights restrictions lifted (the harness is an
-     * operator).
+     * The scope of a run of `$agentEvalCase` for a run that names an account (`--accountId`): first the scope hook of
+     * every run, {@see resolveEvalScope()} — so an application's own scope keys decide here too; only where it finds no
+     * space with a known owner ({@see AgentEvalScopeWithoutOwnedAgentSpaceException}) does the named account step in:
+     * a case without a space (neither its own nor `$fallbackAgentSpaceId`) runs at account level for that account, a
+     * space without an owner (shared by several accounts) runs for `$fallbackAccountId`. Any other failure of the hook
+     * stops the case. Without `$fallbackAccountId` it is {@see resolveEvalScope()} unchanged. Reads only, with the
+     * rights restrictions lifted (the harness is an operator).
      *
      * @param AgentEvalCase $agentEvalCase the case to run
      * @param int|null $fallbackAgentSpaceId the agent space the caller names for cases that name none
      * @param int|null $fallbackAccountId the account the caller names for a run at account level or in a space without an owner
      * @return AgentEvalScope
-     * @throws RuntimeException when the named space or account is not stored, or the space has no owner and no account is named
+     * @throws RuntimeException when the named space or account is not stored, the space has no owner and no account is
+     *                          named, or an application's own resolution failed
      */
     public function resolveEvalScopeWithFallbackAccount(AgentEvalCase $agentEvalCase, ?int $fallbackAgentSpaceId, ?int $fallbackAccountId): AgentEvalScope
     {
         if ($fallbackAccountId === null) {
             return $this->resolveEvalScope($agentEvalCase, $fallbackAgentSpaceId);
+        }
+        try {
+            return $this->resolveEvalScope($agentEvalCase, $fallbackAgentSpaceId);
+        } catch (AgentEvalScopeWithoutOwnedAgentSpaceException) {
+            // no space with a known owner: the named account steps in below
         }
         $agentSpaceId = $this->resolveAgentSpaceIdOfCase($agentEvalCase, $fallbackAgentSpaceId);
         $agentSpacesService = $this->getAgentSpacesService();

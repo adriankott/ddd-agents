@@ -42,7 +42,25 @@ class AgentEvalAccountLevelScopeTest extends IntegrationTestCase
         self::assertNull($agentEvalScope->getAgentSpace());
         self::assertFalse($agentEvalScope->hasStoredAgentSpace());
         self::assertSame(40, $agentEvalScope->getOwnerAccountId());
-        self::assertSame(0, $this->agentEvalRunHooksService->spaceOnlyScopeCalls);
+        self::assertSame(1, $this->agentEvalRunHooksService->spaceOnlyScopeCalls, 'the scope hook of every run is asked first');
+    }
+
+    public function testARunThatNamesAnAccountAsksTheApplicationsScopeHook(): void
+    {
+        $agentEvalRunHooksService = new AgentEvalRunHooksServiceWithOwnScopeKeyDouble();
+        $agentEvalRunHooksService->accountsById[40] = $this->buildAccount(40);
+        $agentEvalRunHooksService->ownerAccountOfHostSpaces = $this->buildAccount(7);
+        $agentSpaceOfTheRecord = new AgentSpace();
+        $agentSpaceOfTheRecord->id = 12;
+        $agentEvalRunHooksService->agentSpacesByHostRecordId[3] = $agentSpaceOfTheRecord;
+
+        $agentEvalScope = $agentEvalRunHooksService->resolveEvalScopeWithFallbackAccount(AgentEvalCase::fromArray(['id' => 'c', 'hostRecordId' => 3]), null, 40);
+
+        self::assertSame($agentSpaceOfTheRecord, $agentEvalScope->getAgentSpace(), 'the space of the record, not the account level');
+        self::assertSame(7, $agentEvalScope->getOwnerAccountId());
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Record 4 has no agent space');
+        $agentEvalRunHooksService->resolveEvalScopeWithFallbackAccount(AgentEvalCase::fromArray(['id' => 'c', 'hostRecordId' => 4]), null, 40);
     }
 
     public function testASpaceWithoutAnOwnerRunsForTheNamedAccountAndAnOwnedSpaceKeepsItsOwner(): void
@@ -57,7 +75,7 @@ class AgentEvalAccountLevelScopeTest extends IntegrationTestCase
         self::assertSame(40, $ownerlessScope->getOwnerAccountId());
         self::assertSame($ownedAgentSpace, $ownedScope->getAgentSpace());
         self::assertSame(5, $ownedScope->getOwnerAccountId());
-        self::assertSame([true, true], $this->agentSpacesServiceDouble->rightsLiftedPerRead);
+        self::assertSame([true, true, true], $this->agentSpacesServiceDouble->rightsLiftedPerRead, 'the scope hook of every run, then the named account; the owned space once');
     }
 
     public function testWithoutTheOptionTheSpaceOnlyScopeDecides(): void
