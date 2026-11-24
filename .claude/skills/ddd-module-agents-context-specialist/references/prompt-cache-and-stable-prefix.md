@@ -227,8 +227,8 @@ messages, appended `role: "system"` messages, a `clear_at` note left in place, t
 cache markers, and removing the thinking of a LEADING run of steps (each block is chained to the one before it; only a
 removal from the middle breaks).
 
-The harness edits history on purpose (the notes at the end of each call, cleared tool results, shortened arguments,
-the picture cap), so the history of a call has two parts, decided by `AgentMessagesWireReplay::decideFor()`:
+The harness edits history on purpose (the notes at the end of each call, cleared tool results, shortened arguments),
+so the history of a call has two parts, decided by `AgentMessagesWireReplay::decideFor()`:
 
 | Part | Rendering |
 |---|---|
@@ -244,15 +244,38 @@ Thinking rides from `thinkingFromMessageIndex` on, never below the frozen part:
 | `all` | the floor the newest earlier call recorded (`RequestSnapshot::$messagesWireFrozenFromMessageIndex`), else the newest turn initiator | the same |
 | `capped` (the default) | as `all` | the cut of `AgentPreviousReasoningCut`: the newest steps whose thinking fits the cap, never below the frozen floor |
 
-A call whose answer reported dropped thinking lifts the thinking floor to its own step
-(`RequestSnapshot::reportsDroppedThinkingBlocks()`): the earlier blocks are invalid for good. A stored answer is sent
+**After a drop.** The answer names each dropped block by its place (`messages.<position>.content.<block>`). The egress
+knows the step of every assistant message it sent (`AgentMessagesConversation::$stepMarkerMessageIndexesByMessagePosition`)
+and records the steps of the dropped blocks on the call's snapshot
+(`RequestSnapshot::$messagesWireDroppedThinkingStepIndexes`). From the next call on exactly those steps go out
+without their thinking (`AgentMessagesWireReplay::$droppedThinkingStepMessageIndexes`); every other step keeps its
+blocks and the thinking floor stays. That is the request the provider read and cached. Probed on Opus 5.5: the next
+call reads the whole cache and reports no drop, the blocks before the changed place and the reporting call's own
+block stay valid (live, after a picture left at a turn end: the call after the drop read 66k of 68k cached tokens,
+the last 2k behind a final answer whose thinking was dropped were written again). Sending the dropped blocks again also keeps the cache, but every call reports them again; removing
+the thinking of ALL earlier steps rewrites the cache of the whole history (this was the behaviour of 0.2.0). A call
+that reported a drop without the steps (a row of 0.2.0, or a path that names no step) lifts the thinking floor to its
+own step. Under `capped` the dropped steps do not count against the cap. A stored answer is sent
 verbatim only when its `tool_use` ids equal the call ids of the step's rows; otherwise the step is rendered from the
 rows, without thinking. Stored content of any Anthropic model is sent to the model of the call: the provider drops the
 blocks that model cannot read and reports it (`model_binding_mismatch`).
 
+**Pictures.** A picture inside a tool result of the frozen part is sent again unchanged and breaks nothing. The
+picture cap (`ContextRetentionSettings::getMaxToolCallImagesOnWire()`) is NOT suspended in the frozen part: when a
+newer picture pushes an older one off the wire, that result changes, the provider drops every thinking block after it
+(`prefix_binding_mismatch`, probed) and those steps go on without their thinking. The same happens when a picture
+that is not durable leaves at the end of its worker invocation (a turn end, a worker chunk): the first call of the
+next invocation sends the "no longer on the wire" marker in its place. Seen live: a page picture viewed in turn 1,
+turn 2's first call lost the cache from that result on and three thinking blocks after it. One drop per picture that
+leaves; the cache before the picture and the thinking before it stay. A tool whose pictures should survive a turn end
+returns durable references (`ToolCallImageStore`). `app:ai-agent:cache-diff` shows each drop.
+
 **Notes of a call.** The volatile tail (signals, the plan, the time) goes out as ONE `role: "system"` message with
 `clear_at: next_user_message` after the whole history: the model sees it on this call, later calls send it again at the
-same place and the provider hides it. A tool result's user message counts as the next user message.
+same place and the provider hides it. A tool result's user message counts as the next user message. The API accepts
+such a note only after a user turn and before an assistant turn or at the end; a note placed elsewhere (after an
+assistant message) goes out without `clear_at` and stays visible
+(`AgentMessagesRequestComposer::withClearAtOnlyWhereTheApiAcceptsIt()`).
 
 **Skill loads.** The instructions a load appends go out as a `role: "system"` message at that place, its tools as
 `tool_addition` blocks; the tools are declared top-level with `defer_loading: true`, which changes neither the tool
@@ -332,7 +355,7 @@ On both paths:
 | An older `update_task_plan` call's arguments stubbed (`{"superseded":true}`) | the history from that call | only calls of earlier turns, once at the turn boundary; the running turn's plan calls keep their arguments |
 | Carried reasoning items dropped by the `capped` cut | the history from the first dropped item | the cap (4000) well above the two kept steps; `all` drops none |
 | Messages API: the frozen floor moves up at a turn start (`currentTurn`) or the thinking floor moves (`capped`) | the history from the first step that returns to the plain rendering or loses its thinking | `all` and `capped` keep the recorded frozen floor across turns |
-| Messages API: an edit inside the frozen part (should not happen) | the provider drops the thinking after it and reports it | the frozen rendering; `app:ai-agent:cache-diff` and `inspect --snapshots` name the drop |
+| Messages API: an edit inside the frozen part (a picture leaving under the picture cap or at the end of its worker invocation; anything else should not happen) | the history from the edit on, once; the provider drops the thinking after it and reports it, and those steps go on without thinking | the frozen rendering; durable pictures; `app:ai-agent:cache-diff` and `inspect --snapshots` name the drop |
 | A picture leaving the image cap | that result | the cap keeps the newest pictures |
 
 ## 8. Host checklist

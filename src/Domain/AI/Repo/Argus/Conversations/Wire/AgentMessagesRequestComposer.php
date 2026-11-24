@@ -19,7 +19,8 @@ use stdClass;
  * - `tool` entries → `tool_result` blocks; the results of one step share ONE `user` message;
  * - a `developer` entry (the instructions a skill load appends) and a later `system` entry → a `role: "system"`
  *   message at that place; an entry marked {@see KEY_CLEAR_AT} carries `clear_at` (a note of one call that stays in the
- *   history and is hidden from the model from the next user message on);
+ *   history and is hidden from the model from the next user message on) where the API accepts it
+ *   ({@see withClearAtOnlyWhereTheApiAcceptsIt()});
  * - an `additional_tools` entry (the tools a skill load appends) → `tool_addition` blocks in a `role: "system"`
  *   message; the tools themselves are declared top-level with `defer_loading: true`, which does not change the tool
  *   set a thinking block is bound to.
@@ -61,6 +62,9 @@ class AgentMessagesRequestComposer
     /** The key of the `clear_at` value of an entry that goes out as a `role: "system"` message. */
     public const string KEY_CLEAR_AT = 'messages_clear_at';
 
+    /** The entry key with the row index of the step marker whose stored answer an assistant entry carries. */
+    public const string KEY_STEP_MARKER_MESSAGE_INDEX = 'messages_step_marker_message_index';
+
     /** `clear_at`: the message is hidden from the model from the next user message on; it stays in the history. */
     public const string CLEAR_AT_NEXT_USER_MESSAGE = 'next_user_message';
 
@@ -70,9 +74,9 @@ class AgentMessagesRequestComposer
     /**
      * @return array<string, mixed>
      */
-    public static function composeBody(AgentWireRequestParameters $agentWireRequestParameters): array
+    public static function composeBody(AgentWireRequestParameters $agentWireRequestParameters, ?AgentMessagesConversation $agentMessagesConversation = null): array
     {
-        $agentMessagesConversation = self::convertChatCompletionsMessages($agentWireRequestParameters->chatCompletionsMessages);
+        $agentMessagesConversation ??= self::convertChatCompletionsMessages($agentWireRequestParameters->chatCompletionsMessages);
         $body = [
             'model' => $agentWireRequestParameters->modelId,
             'max_tokens' => $agentWireRequestParameters->maxOutputTokens ?? 16000,
@@ -106,7 +110,7 @@ class AgentMessagesRequestComposer
     }
 
     /** @var string[] The keys the egress adds to a Chat-form entry for this composer only. */
-    public const array ENTRY_KEYS_OF_THIS_WIRE = [self::KEY_ASSISTANT_CONTENT_JSON, self::KEY_ASSISTANT_CONTENT_WITHOUT_THINKING, self::KEY_AS_SYSTEM_MESSAGE, self::KEY_CLEAR_AT];
+    public const array ENTRY_KEYS_OF_THIS_WIRE = [self::KEY_ASSISTANT_CONTENT_JSON, self::KEY_ASSISTANT_CONTENT_WITHOUT_THINKING, self::KEY_AS_SYSTEM_MESSAGE, self::KEY_CLEAR_AT, self::KEY_STEP_MARKER_MESSAGE_INDEX];
 
     /**
      * The Chat-form list without the keys of this wire — the form the views of a reconstructed call read.
@@ -166,7 +170,11 @@ class AgentMessagesRequestComposer
                 continue;
             }
             if ($role === 'assistant') {
+                $messageCountBefore = count($agentMessagesConversation->messages);
                 $agentMessagesConversation->addMessage('assistant', self::convertAssistantMessage($chatCompletionsMessage));
+                if (count($agentMessagesConversation->messages) > $messageCountBefore && is_int($chatCompletionsMessage[self::KEY_STEP_MARKER_MESSAGE_INDEX] ?? null)) {
+                    $agentMessagesConversation->stepMarkerMessageIndexesByMessagePosition[$messageCountBefore] = $chatCompletionsMessage[self::KEY_STEP_MARKER_MESSAGE_INDEX];
+                }
                 continue;
             }
             if ($role === 'tool') {
@@ -175,7 +183,80 @@ class AgentMessagesRequestComposer
             }
             $agentMessagesConversation->addMessage('user', self::convertUserContent($chatCompletionsMessage['content'] ?? ''));
         }
+        $agentMessagesConversation->messages = self::withClearAtOnlyWhereTheApiAcceptsIt($agentMessagesConversation->messages);
         return $agentMessagesConversation;
+    }
+
+    /**
+     * The row indexes of the steps the dropped thinking blocks of `$inputTransformations` belong to, ascending and
+     * without repeats: each `messages.<position>.…` path of a dropped block is looked up in
+     * `$stepMarkerMessageIndexesByMessagePosition` ({@see AgentMessagesConversation::$stepMarkerMessageIndexesByMessagePosition}
+     * of the request the answer belongs to). Empty when no block was dropped; null when a dropped block's path names
+     * no known step — the caller then has no list to rely on.
+     *
+     * @param AgentMessagesInputTransformation[] $inputTransformations
+     * @param array<int, int> $stepMarkerMessageIndexesByMessagePosition
+     * @return int[]|null
+     */
+    public static function findStepMarkerMessageIndexesOfDroppedThinking(array $inputTransformations, array $stepMarkerMessageIndexesByMessagePosition): ?array
+    {
+        $stepMarkerMessageIndexes = [];
+        foreach ($inputTransformations as $inputTransformation) {
+            if (!$inputTransformation->isDroppedThinking()) {
+                continue;
+            }
+            if (preg_match('/^messages\.(\d+)\./', $inputTransformation->path, $pathParts) !== 1) {
+                return null;
+            }
+            $stepMarkerMessageIndex = $stepMarkerMessageIndexesByMessagePosition[(int)$pathParts[1]] ?? null;
+            if ($stepMarkerMessageIndex === null) {
+                return null;
+            }
+            $stepMarkerMessageIndexes[$stepMarkerMessageIndex] = $stepMarkerMessageIndex;
+        }
+        ksort($stepMarkerMessageIndexes);
+        return array_values($stepMarkerMessageIndexes);
+    }
+
+    /**
+     * The messages with `clear_at` removed from every note that sits where the API refuses it. A `role: "system"`
+     * message with `clear_at` and content must follow a user turn and precede an assistant turn or end the messages
+     * (probed: a note after an assistant message answers 400 "clear_at … must follow a user turn and precede an
+     * assistant turn (or end the messages)", the same note without `clear_at` is accepted). A note placed elsewhere —
+     * after an assistant message the loop re-drives without a row of its own, or before a user message — goes out as
+     * a plain system message: it stays visible to the model, which costs a stale line and never a failed call. The
+     * rule reads only the neighbours, so a later call that sends the same history decides the same.
+     *
+     * @param array<int, array<string, mixed>> $messages
+     * @return array<int, array<string, mixed>>
+     */
+    public static function withClearAtOnlyWhereTheApiAcceptsIt(array $messages): array
+    {
+        $messages = array_values($messages);
+        $messageCount = count($messages);
+        foreach ($messages as $position => $message) {
+            if (($message['role'] ?? null) !== 'system' || !isset($message['clear_at'])) {
+                continue;
+            }
+            $roleBefore = null;
+            for ($earlierPosition = $position - 1; $earlierPosition >= 0; $earlierPosition--) {
+                if (($messages[$earlierPosition]['role'] ?? null) !== 'system') {
+                    $roleBefore = $messages[$earlierPosition]['role'] ?? null;
+                    break;
+                }
+            }
+            $roleAfter = null;
+            for ($laterPosition = $position + 1; $laterPosition < $messageCount; $laterPosition++) {
+                if (($messages[$laterPosition]['role'] ?? null) !== 'system') {
+                    $roleAfter = $messages[$laterPosition]['role'] ?? null;
+                    break;
+                }
+            }
+            if ($roleBefore !== 'user' || ($roleAfter !== null && $roleAfter !== 'assistant')) {
+                unset($messages[$position]['clear_at']);
+            }
+        }
+        return $messages;
     }
 
     /**
@@ -295,8 +376,9 @@ class AgentMessagesRequestComposer
     }
 
     /**
-     * A tool entry as a `tool_result` block: a text result as a string, a result with a picture as `text` / `image`
-     * blocks. A cache marker of a part moves to the block (a nested block carries none).
+     * A tool entry as a `tool_result` block: a text result as a string (also when it arrives as text parts, which a
+     * cache marker makes of it), a result with a picture as `text` / `image` blocks. A cache marker of a part moves to
+     * the block (a nested block carries none).
      *
      * @param array<string, mixed> $toolMessage
      * @return array<string, mixed>
@@ -312,16 +394,23 @@ class AgentMessagesRequestComposer
             return $toolResultBlock;
         }
         $resultBlocks = [];
+        $isTextOnly = true;
         foreach (self::convertUserContent($content) as $resultBlock) {
             if (isset($resultBlock['cache_control'])) {
                 $toolResultBlock['cache_control'] = $resultBlock['cache_control'];
                 unset($resultBlock['cache_control']);
             }
+            $isTextOnly = $isTextOnly && $resultBlock['type'] === 'text';
             $resultBlocks[] = $resultBlock;
         }
-        if ($resultBlocks !== []) {
-            $toolResultBlock['content'] = $resultBlocks;
+        if ($resultBlocks === []) {
+            return $toolResultBlock;
         }
+        // a result of text parts only is ONE string, as a result without a marker is: the same result reads the same
+        // on the call that marks it and on the later calls that do not
+        $toolResultBlock['content'] = $isTextOnly
+            ? implode('', array_map(static fn (array $resultBlock): string => $resultBlock['text'], $resultBlocks))
+            : $resultBlocks;
         return $toolResultBlock;
     }
 

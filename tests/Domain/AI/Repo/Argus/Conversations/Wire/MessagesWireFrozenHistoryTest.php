@@ -79,6 +79,24 @@ class MessagesWireFrozenHistoryTest extends UnitTestCase
         self::assertSame(2, $egress->lastMessagesWireReplay->thinkingFromMessageIndex);
     }
 
+    public function testAStepWhoseThinkingTheProviderDroppedGoesBackWithoutItAndTheStepsAroundItKeepTheirs(): void
+    {
+        $rows = [$this->ownerTextRow(0, 'read order 4711'), $this->stepRow(1, 'clock 10:00'), $this->stepRow(2, 'clock 10:01'), $this->stepRow(3, 'clock 10:02')];
+        $rows[1]->requestSnapshot->messagesWireFrozenFromMessageIndex = 0;
+        $rows[3]->requestSnapshot->inputTransformations = [['type' => 'thinking_dropped', 'path' => 'messages.5.content.0', 'reason' => 'prefix_binding_mismatch']];
+        $rows[3]->requestSnapshot->messagesWireDroppedThinkingStepIndexes = [2];
+
+        $egress = $this->buildEgress(RunSettings::PREVIOUS_REASONING_CARRY_OVER_ALL);
+        $entries = $egress->buildOpenAiChatMessagesArray($rows);
+
+        $assistantEntries = array_values(array_filter($entries, static fn (array $entry): bool => ($entry['role'] ?? null) === 'assistant'));
+        self::assertSame([1, 2, 3], array_column($assistantEntries, AgentMessagesRequestComposer::KEY_STEP_MARKER_MESSAGE_INDEX));
+        self::assertArrayNotHasKey(AgentMessagesRequestComposer::KEY_ASSISTANT_CONTENT_WITHOUT_THINKING, $assistantEntries[0], 'the block before the changed place is still valid');
+        self::assertTrue($assistantEntries[1][AgentMessagesRequestComposer::KEY_ASSISTANT_CONTENT_WITHOUT_THINKING]);
+        self::assertArrayNotHasKey(AgentMessagesRequestComposer::KEY_ASSISTANT_CONTENT_WITHOUT_THINKING, $assistantEntries[2]);
+        self::assertSame(0, $egress->lastMessagesWireReplay->thinkingFromMessageIndex);
+    }
+
     public function testWithoutCarryOverTheHistoryCarriesNoStoredAnswerAndNoStoredNote(): void
     {
         $rows = [$this->ownerTextRow(0, 'read order 4711'), $this->stepRow(1, 'clock 10:00')];

@@ -74,12 +74,20 @@ class AgentPreviousReasoningCut
      * The cut of a call on `$wireApi` over the rows of its context (oldest first), with the cap `$capTokens`.
      * `$lowestCutFromMessageIndex`: no step below it sends items whatever the anchor says — the Messages API passes
      * the start of its frozen part and the step of a reported drop ({@see AgentMessagesWireReplay}), so the sum counts
-     * only what the call can send.
+     * only what the call can send. `$stepMarkerMessageIndexesWithoutItems`: steps that send no items whatever the cut
+     * says (the Messages API passes the steps whose thinking blocks the provider dropped); they are not counted.
      *
      * @param AIConversationMessage[] $messages
+     * @param int[] $stepMarkerMessageIndexesWithoutItems
      */
-    public static function decideFor(array $messages, string $wireApi, int $capTokens, ?string $modelNameOfCall = null, int $lowestCutFromMessageIndex = 0): static
-    {
+    public static function decideFor(
+        array $messages,
+        string $wireApi,
+        int $capTokens,
+        ?string $modelNameOfCall = null,
+        int $lowestCutFromMessageIndex = 0,
+        array $stepMarkerMessageIndexesWithoutItems = []
+    ): static {
         $agentPreviousReasoningCut = new static();
         $agentPreviousReasoningCut->capTokens = $capTokens;
         $agentPreviousReasoningCut->anchorCutFromMessageIndex = self::findRecordedCutOfTheNewestEarlierCall($messages);
@@ -88,7 +96,9 @@ class AgentPreviousReasoningCut
         $reasoningTokensByStepMarkerIndex = [];
         foreach ($messages as $message) {
             $messageIndex = $message->indexInConversation ?? null;
-            if ($messageIndex === null || $messageIndex < $anchorCutFromMessageIndex || !self::isStepMarkerRowSentWithItsReasoning($message)) {
+            if ($messageIndex === null || $messageIndex < $anchorCutFromMessageIndex || !self::isStepMarkerRowSentWithItsReasoning($message)
+                || in_array($messageIndex, $stepMarkerMessageIndexesWithoutItems, true)
+            ) {
                 continue;
             }
             $stepReasoningTokens = self::estimateReasoningTokensOfStep($message->requestSnapshot, $wireApi, $modelNameOfCall);

@@ -73,8 +73,10 @@ starting after the compaction cover's edge. How a row renders:
   positions the calls that sent them recorded; they are wire items, never rows;
 - on the Anthropic Messages API the newer part of the history is FROZEN: a step there goes out as the content the
   provider returned (thinking blocks included, from the thinking floor on), its tool results in full and its calls
-  with their full arguments, and the stubs, the shortened arguments and the picture cap above apply only below that
-  part ([prompt-cache-and-stable-prefix.md](prompt-cache-and-stable-prefix.md), section 5a).
+  with their full arguments; the stubs and the shortened arguments above apply only below that part. The picture cap
+  still applies there, and a picture that is not durable leaves at the end of its worker invocation: a picture that
+  leaves the wire changes its result, the provider drops the thinking after it and those steps go on without it
+  ([prompt-cache-and-stable-prefix.md](prompt-cache-and-stable-prefix.md), section 5a).
 
 **Tool pictures.** `AIConversationModelCallsService::resolveToolCallImages()` runs where the wire is composed, the one
 point where both the resolved model and the pictures are known. Candidates are the completed tool results in the

@@ -40,9 +40,13 @@ use DDD\Domain\AI\Entities\Models\AIModel;
  *   the recording rows are behind a compaction cover); the thinking floor equals it.
  * - `capped`: the frozen floor as under `all`; the thinking floor is the cut of {@see AgentPreviousReasoningCut} (the
  *   newest steps whose thinking fits under the cap).
- * In every mode a call whose answer reported dropped thinking blocks
- * ({@see RequestSnapshot::reportsDroppedThinkingBlocks()}) lifts the thinking floor to its own step: the blocks before
- * it are invalid for good, sending them again would only have them dropped again.
+ * In every mode the steps whose thinking blocks the provider dropped
+ * ({@see RequestSnapshot::$messagesWireDroppedThinkingStepIndexes}) go without them from the next call on
+ * ({@see $droppedThinkingStepMessageIndexes}): that is the request the provider read and cached, so the cache keeps
+ * its hits, the thinking blocks before the changed place stay valid and the answer's own block stays bound (probed:
+ * the next call reads the whole cache and reports no drop; lifting the floor over all earlier steps instead rewrote
+ * the history's cache). A call that reported a drop without the steps (recorded before the list existed, or a path
+ * that names no step) lifts the thinking floor to its own step.
  *
  * @phpstan-consistent-constructor
  */
@@ -56,6 +60,9 @@ class AgentMessagesWireReplay
 
     /** @var int|null The row index of the newest call whose answer reported dropped thinking blocks; null = none in the context. */
     public ?int $droppedThinkingReportedAtMessageIndex = null;
+
+    /** @var int[] The row indexes of the steps whose thinking blocks the provider dropped on an earlier call: they ride without them. */
+    public array $droppedThinkingStepMessageIndexes = [];
 
     /** @var AgentPreviousReasoningCut|null The cut under `capped`; null under every other mode. */
     public ?AgentPreviousReasoningCut $previousReasoningCut = null;
@@ -80,10 +87,12 @@ class AgentMessagesWireReplay
         }
         $agentMessagesWireReplay->thinkingFromMessageIndex = $agentMessagesWireReplay->frozenFromMessageIndex;
         $agentMessagesWireReplay->droppedThinkingReportedAtMessageIndex = self::findMessageIndexOfTheNewestCallThatReportedDroppedThinking($messages);
-        if ($agentMessagesWireReplay->droppedThinkingReportedAtMessageIndex !== null) {
+        $agentMessagesWireReplay->droppedThinkingStepMessageIndexes = self::collectStepMarkerMessageIndexesOfDroppedThinking($messages);
+        $droppedThinkingWithoutStepsReportedAtMessageIndex = self::findMessageIndexOfTheNewestCallThatReportedDroppedThinking($messages, true);
+        if ($droppedThinkingWithoutStepsReportedAtMessageIndex !== null) {
             $agentMessagesWireReplay->thinkingFromMessageIndex = max(
                 $agentMessagesWireReplay->thinkingFromMessageIndex,
-                $agentMessagesWireReplay->droppedThinkingReportedAtMessageIndex
+                $droppedThinkingWithoutStepsReportedAtMessageIndex
             );
         }
         if ($agentWireConfiguration->carriesCappedPreviousReasoning()) {
@@ -92,7 +101,8 @@ class AgentMessagesWireReplay
                 AIModel::AGENT_WIRE_API_MESSAGES,
                 $agentWireConfiguration->previousReasoningCapTokens,
                 $modelNameOfCall,
-                $agentMessagesWireReplay->thinkingFromMessageIndex
+                $agentMessagesWireReplay->thinkingFromMessageIndex,
+                $agentMessagesWireReplay->droppedThinkingStepMessageIndexes
             );
             $agentMessagesWireReplay->thinkingFromMessageIndex = $agentMessagesWireReplay->previousReasoningCut->cutFromMessageIndex;
         }
@@ -102,11 +112,16 @@ class AgentMessagesWireReplay
     /**
      * The floors a recorded call rendered with ({@see RequestSnapshot::$messagesWireFrozenFromMessageIndex},
      * {@see RequestSnapshot::$messagesWireThinkingFromMessageIndex}) — what the forensic reconstruction of that call
-     * renders with; a call recorded without a frozen part has none.
+     * renders with; a call recorded without a frozen part has none. `$droppedThinkingStepMessageIndexes`: the steps
+     * the calls before it reported as dropped ({@see collectStepMarkerMessageIndexesOfDroppedThinking()} over the rows
+     * of its context).
+     *
+     * @param int[] $droppedThinkingStepMessageIndexes
      */
-    public static function fromRecordedFloors(?int $frozenFromMessageIndex, ?int $thinkingFromMessageIndex): static
+    public static function fromRecordedFloors(?int $frozenFromMessageIndex, ?int $thinkingFromMessageIndex, array $droppedThinkingStepMessageIndexes = []): static
     {
         $agentMessagesWireReplay = new static();
+        $agentMessagesWireReplay->droppedThinkingStepMessageIndexes = array_values($droppedThinkingStepMessageIndexes);
         $agentMessagesWireReplay->frozenFromMessageIndex = $frozenFromMessageIndex;
         $agentMessagesWireReplay->thinkingFromMessageIndex = $frozenFromMessageIndex === null ? PHP_INT_MAX : ($thinkingFromMessageIndex ?? $frozenFromMessageIndex);
         return $agentMessagesWireReplay;
@@ -121,7 +136,8 @@ class AgentMessagesWireReplay
     /** Whether the frozen step whose marker row has `$stepMarkerMessageIndex` rides with its thinking blocks. */
     public function sendsTheThinkingOfTheStepAt(?int $stepMarkerMessageIndex): bool
     {
-        return $this->rendersFrozen($stepMarkerMessageIndex) && $stepMarkerMessageIndex >= $this->thinkingFromMessageIndex;
+        return $this->rendersFrozen($stepMarkerMessageIndex) && $stepMarkerMessageIndex >= $this->thinkingFromMessageIndex
+            && !in_array($stepMarkerMessageIndex, $this->droppedThinkingStepMessageIndexes, true);
     }
 
     /**
@@ -164,24 +180,53 @@ class AgentMessagesWireReplay
 
     /**
      * The row index of the newest step marker whose call reported dropped thinking blocks; null when none did.
+     * `$onlyWithoutRecordedSteps`: only a call that recorded no steps for its dropped blocks
+     * ({@see RequestSnapshot::$messagesWireDroppedThinkingStepIndexes} null) counts.
      *
      * @param AIConversationMessage[] $messages
      */
-    public static function findMessageIndexOfTheNewestCallThatReportedDroppedThinking(array $messages): ?int
+    public static function findMessageIndexOfTheNewestCallThatReportedDroppedThinking(array $messages, bool $onlyWithoutRecordedSteps = false): ?int
     {
+        $messages = array_values($messages);
         for ($position = count($messages) - 1; $position >= 0; $position--) {
             $requestSnapshot = isset($messages[$position]->requestSnapshot) ? $messages[$position]->requestSnapshot : null;
-            if ($requestSnapshot !== null && $requestSnapshot->reportsDroppedThinkingBlocks() && ($messages[$position]->indexInConversation ?? null) !== null) {
-                return $messages[$position]->indexInConversation;
+            if ($requestSnapshot === null || !$requestSnapshot->reportsDroppedThinkingBlocks() || ($messages[$position]->indexInConversation ?? null) === null) {
+                continue;
             }
+            if ($onlyWithoutRecordedSteps && $requestSnapshot->messagesWireDroppedThinkingStepIndexes !== null) {
+                continue;
+            }
+            return $messages[$position]->indexInConversation;
         }
         return null;
     }
 
     /**
+     * The row indexes of the steps whose thinking blocks the calls of the context reported as dropped
+     * ({@see RequestSnapshot::$messagesWireDroppedThinkingStepIndexes} of every row), ascending and without repeats.
+     *
+     * @param AIConversationMessage[] $messages
+     * @return int[]
+     */
+    public static function collectStepMarkerMessageIndexesOfDroppedThinking(array $messages): array
+    {
+        $stepMarkerMessageIndexes = [];
+        foreach ($messages as $message) {
+            if (!isset($message->requestSnapshot)) {
+                continue;
+            }
+            foreach ($message->requestSnapshot->messagesWireDroppedThinkingStepIndexes ?? [] as $stepMarkerMessageIndex) {
+                $stepMarkerMessageIndexes[(int)$stepMarkerMessageIndex] = (int)$stepMarkerMessageIndex;
+            }
+        }
+        ksort($stepMarkerMessageIndexes);
+        return array_values($stepMarkerMessageIndexes);
+    }
+
+    /**
      * Whether `$requestSnapshot` holds a stored answer of the Messages API that a frozen step sends back: the content
      * blocks of the call, whatever model produced them (a block another model cannot read is dropped by the provider
-     * and reported, which lifts the thinking floor).
+     * and reported, and its step rides without thinking from then on).
      */
     public static function holdsStoredAnswerOfTheMessagesApi(?RequestSnapshot $requestSnapshot): bool
     {

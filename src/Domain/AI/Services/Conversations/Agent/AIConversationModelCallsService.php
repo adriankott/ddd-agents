@@ -531,6 +531,12 @@ class AIConversationModelCallsService extends Service
                     ? array_map(static fn (AgentMessagesInputTransformation $inputTransformation): array => $inputTransformation->toArray(), $argusAIAgentConversation->capturedInputTransformations)
                     : null;
                 if ($requestSnapshot->inputTransformations !== null) {
+                    // the steps of the dropped blocks: every later call sends them without their thinking blocks
+                    $droppedThinkingStepIndexes = AgentMessagesRequestComposer::findStepMarkerMessageIndexesOfDroppedThinking(
+                        $argusAIAgentConversation->capturedInputTransformations,
+                        $argusAIAgentConversation->lastMessagesWireStepMarkerMessageIndexesByMessagePosition
+                    );
+                    $requestSnapshot->messagesWireDroppedThinkingStepIndexes = $droppedThinkingStepIndexes === [] ? null : $droppedThinkingStepIndexes;
                     // the provider changed the request before the model read it (dropped thinking blocks): traced with
                     // the place and the reason of every block, so a cause in the history building is found
                     $this->aiTrace('turn.modelCall.inputTransformations', [
@@ -539,6 +545,7 @@ class AIConversationModelCallsService extends Service
                         'droppedThinkingBlocks' => $requestSnapshot->countDroppedThinkingBlocks(),
                         'frozenFromMessageIndex' => $requestSnapshot->messagesWireFrozenFromMessageIndex,
                         'thinkingFromMessageIndex' => $requestSnapshot->messagesWireThinkingFromMessageIndex,
+                        'droppedThinkingStepIndexes' => $requestSnapshot->messagesWireDroppedThinkingStepIndexes,
                         'inputTransformations' => $requestSnapshot->inputTransformations,
                     ]);
                 }
@@ -978,7 +985,8 @@ class AIConversationModelCallsService extends Service
             $argusAIAgentConversation->agentWireConfiguration = $agentWireConfigurationOfRecordedCall;
             $argusAIAgentConversation->messagesWireReplayOfRecordedCall = AgentMessagesWireReplay::fromRecordedFloors(
                 $message->requestSnapshot->messagesWireFrozenFromMessageIndex,
-                $message->requestSnapshot->messagesWireThinkingFromMessageIndex
+                $message->requestSnapshot->messagesWireThinkingFromMessageIndex,
+                AgentMessagesWireReplay::collectStepMarkerMessageIndexesOfDroppedThinking($producingContext->messages)
             );
         }
         // an append-only call's history carries the items the epoch's calls appended

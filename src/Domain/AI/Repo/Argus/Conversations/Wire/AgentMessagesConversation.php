@@ -21,6 +21,13 @@ class AgentMessagesConversation
     public array $appendedChatCompletionsTools = [];
 
     /**
+     * @var array<int, int> The row index of the step marker per position in {@see $messages}, for every assistant
+     *      message that carries the stored answer of its step — where a `messages.<position>…` path of the answer's
+     *      `input_transformations` points.
+     */
+    public array $stepMarkerMessageIndexesByMessagePosition = [];
+
+    /**
      * Adds a message of `$contentBlocks`; nothing for an empty block list (the API refuses an empty message). A message
      * of the same role as the newest one extends it — a step's tool results share one `user` message, a tool addition
      * and the instructions after it one `system` message — except across a different `clear_at`: a note of one call

@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.2.1
+
+Messages API, found on the first live runs:
+
+- A note of a call (`clear_at`) is sent with `clear_at` only where the API accepts it: after a user turn and before an
+  assistant turn or at the end of the messages. A note after an assistant message was answered with a 400 ("clear_at …
+  must follow a user turn and precede an assistant turn"); it now goes out as a plain `role: "system"` message
+  (`AgentMessagesRequestComposer::withClearAtOnlyWhereTheApiAcceptsIt()`).
+- A text tool result is one string whether or not it carries the cache marker. Before, the result the call marked went
+  out as a list of text blocks and as a string on the later calls: the provider read both the same (cache and thinking
+  held), but `app:ai-agent:cache-diff` named every such call a rewrite of that message.
+- `app:ai-agent:run-report` reads every named run with the rights lifted, like `inspect` and `cache-diff`: the runs of
+  an evaluation belong to the account they ran for, and the report showed `no rows` for them.
+- After the provider dropped thinking blocks, only the steps of those blocks go on without thinking; the other steps
+  keep theirs and the thinking floor stays. 0.2.0 removed the thinking of every earlier step on the next call, which
+  rewrote the cache of the whole history (seen live: 29k of 70k tokens read, 41k written). The request without the
+  dropped blocks is the one the provider read and cached (probed: the next call reads the whole cache and reports no
+  drop; seen live after a picture left at a turn end: 66k of 68k tokens read, nothing dropped). The steps are recorded per call (`RequestSnapshot::$messagesWireDroppedThinkingStepIndexes`, from the paths
+  of `input_transformations` and `AgentMessagesConversation::$stepMarkerMessageIndexesByMessagePosition`); a call
+  recorded without them lifts the floor as before. `AgentMessagesRequestComposer::composeBody()` takes the converted
+  conversation as an optional second argument; `AgentMessagesWireReplay::fromRecordedFloors()` and
+  `AgentPreviousReasoningCut::decideFor()` take the dropped steps as an optional last argument.
+- Docs: a picture that leaves the wire changes its tool result also in the frozen part of a Messages history, under
+  the picture cap and, for a picture that is not durable, at the end of its worker invocation (a turn end): the
+  provider drops the thinking after it and the cache is read up to that result (probed and seen live).
+- Web: version in step with the package, no change.
+
 ## 0.2.0
 
 The Anthropic Messages API as a third wire API of the agent, next to Chat Completions and Responses. Claude models get

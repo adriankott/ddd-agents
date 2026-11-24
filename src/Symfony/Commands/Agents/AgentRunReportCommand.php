@@ -117,6 +117,15 @@ class AgentRunReportCommand extends AgentConsoleCommand
     }
 
     /**
+     * The report reads every named run, whoever owns it: an evaluation run belongs to the account it was run for, not
+     * to the account of console work. Read-only, like the conversation inspector and the cache diff.
+     */
+    protected function liftsEntityRightsRestrictions(): bool
+    {
+        return true;
+    }
+
+    /**
      * Reads the report of every named run and prints the run table, the slowest tools, the variants timelines and the
      * findings, as the options ask.
      *

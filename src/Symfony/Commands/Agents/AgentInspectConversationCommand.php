@@ -607,6 +607,11 @@ class AgentInspectConversationCommand extends AgentConsoleCommand
                 (string)($inputTransformation['reason'] ?? '?')
             );
         }
+        if ($requestSnapshot->reportsDroppedThinkingBlocks()) {
+            $messagesWireLines[] = $requestSnapshot->messagesWireDroppedThinkingStepIndexes !== null
+                ? 'steps without thinking from the next call on: ' . implode(', ', array_map(static fn (int $stepMarkerMessageIndex): string => '#' . $stepMarkerMessageIndex, $requestSnapshot->messagesWireDroppedThinkingStepIndexes))
+                : 'the steps of the dropped blocks are unknown: the thinking floor moves to this call';
+        }
         return $messagesWireLines;
     }
 

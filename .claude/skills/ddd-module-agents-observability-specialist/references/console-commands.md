@@ -191,7 +191,7 @@ live printer, the request snapshots (`--snapshots`), the delegation children and
 | `--debug` | flag | payloads untruncated |
 | `--collapse-threads` | flag | delegations as call and verdict only |
 | `--no-transcript` | flag | skip the transcript |
-| `--snapshots` | flag | dump the stored debug payloads (only present with `storeRequestSnapshot` on); a call on the Messages API adds the line `messages wire: frozen from msg #… · thinking from msg #… · answer stored … · thinking tokens …` and one red line per thinking block the provider dropped (type, path, reason); its answer is summarised with `stop_reason`, the output and thinking tokens and the thinking block count |
+| `--snapshots` | flag | dump the stored debug payloads (only present with `storeRequestSnapshot` on); a call on the Messages API adds the line `messages wire: frozen from msg #… · thinking from msg #… · answer stored … · thinking tokens …` and one red line per thinking block the provider dropped (type, path, reason), then the steps that go without thinking from the next call on (`steps without thinking from the next call on: #…`, or the note that the thinking floor moves to this call); its answer is summarised with `stop_reason`, the output and thinking tokens and the thinking block count |
 | `--html` | none | also write the HTML transcript to this path |
 
 - **Writes:** only the `--html` file.
@@ -277,7 +277,7 @@ with them, the pipeline without and with an envelope, the rerank probe) and prin
 
 The per-run report of stored conversations: judge verdict and findings from evaluation logs, wall and agent seconds,
 model and tool calls, the time split, the slowest tools, the variants timeline, the plan size, the totals. Works as the
-default account for console work.
+default account for console work, rights lifted (a run of an evaluation belongs to the account it ran for).
 
 | Option / argument | Default | Meaning |
 |---|---|---|

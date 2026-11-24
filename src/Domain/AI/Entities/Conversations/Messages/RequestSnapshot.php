@@ -302,6 +302,15 @@ class RequestSnapshot extends ValueObject
     public ?array $inputTransformations = null;
 
     /**
+     * @var int[]|null Messages API: the row indexes of the steps whose thinking blocks the provider dropped from this
+     *      call's request (the steps at the paths of {@see $inputTransformations}). Every later call sends these
+     *      steps without their thinking blocks, which is the request the provider read and cached. Null when nothing
+     *      was dropped, and for a call whose dropped blocks could not be placed on a step (a call recorded before the
+     *      field existed): such a call lifts the thinking floor to its own step instead.
+     */
+    public ?array $messagesWireDroppedThinkingStepIndexes = null;
+
+    /**
      * @var string|null TEST-ONLY server-state arm: the id of the response OpenAI stored for this
      *      call (`store: true`) — the next call of the conversation continues it with `previous_response_id`. Null on
      *      every other arm and on a failed call.

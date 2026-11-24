@@ -560,7 +560,9 @@ class ArgusAIAgentConversation extends ArgusAIConversation
             return $this->composeResponsesServerStatePayload($aiModel, $agentWireRequestParameters);
         }
         if ($this->agentWireConfiguration?->usesMessagesApi() === true) {
-            $payload = $this->applyEgressAuthentication(['body' => AgentMessagesRequestComposer::composeBody($agentWireRequestParameters)]);
+            $agentMessagesConversation = AgentMessagesRequestComposer::convertChatCompletionsMessages($agentWireRequestParameters->chatCompletionsMessages);
+            $this->lastMessagesWireStepMarkerMessageIndexesByMessagePosition = $agentMessagesConversation->stepMarkerMessageIndexesByMessagePosition;
+            $payload = $this->applyEgressAuthentication(['body' => AgentMessagesRequestComposer::composeBody($agentWireRequestParameters, $agentMessagesConversation)]);
             foreach (AgentMessagesRequestComposer::buildHeaders() as $headerName => $headerValue) {
                 $payload['headers'][$headerName] = $headerValue;
             }
@@ -814,6 +816,13 @@ class ArgusAIAgentConversation extends ArgusAIConversation
      *      before the model read it (dropped thinking blocks); empty when nothing was changed.
      */
     public array $capturedInputTransformations = [];
+
+    /**
+     * @var array<int, int> The row index of the step marker per message position of the LAST request on the Messages
+     *      API ({@see AgentMessagesConversation::$stepMarkerMessageIndexesByMessagePosition}) — what places a dropped
+     *      thinking block of the answer on its step.
+     */
+    public array $lastMessagesWireStepMarkerMessageIndexesByMessagePosition = [];
 
     /**
      * @var AgentMessagesWireReplay|null The frozen part and the thinking floor of the LAST fold on the Messages API;
@@ -1922,6 +1931,7 @@ class ArgusAIAgentConversation extends ArgusAIConversation
             return $assistantEntry;
         }
         $assistantEntry[AgentMessagesRequestComposer::KEY_ASSISTANT_CONTENT_JSON] = $requestSnapshot->wireReasoningItemsJson;
+        $assistantEntry[AgentMessagesRequestComposer::KEY_STEP_MARKER_MESSAGE_INDEX] = $stepMarkerMessageIndex;
         if (!$this->lastMessagesWireReplay->sendsTheThinkingOfTheStepAt($stepMarkerMessageIndex)) {
             $assistantEntry[AgentMessagesRequestComposer::KEY_ASSISTANT_CONTENT_WITHOUT_THINKING] = true;
         }

@@ -66,7 +66,45 @@ class AgentMessagesWireReplayTest extends UnitTestCase
         self::assertSame(3, $agentMessagesWireReplay->frozenFromMessageIndex, 'the first call on this wire, or the recording rows are behind a compaction cover');
     }
 
-    public function testACallThatReportedDroppedThinkingLiftsTheThinkingFloorToItsStepAndKeepsTheFrozenPart(): void
+    public function testTheStepsOfDroppedThinkingRideWithoutItAndEveryOtherStepKeepsItsThinking(): void
+    {
+        $messages = $this->buildTwoTurns();
+        $messages[4]->requestSnapshot->messagesWireFrozenFromMessageIndex = 0;
+        $messages[4]->requestSnapshot->inputTransformations = [['type' => 'thinking_dropped', 'path' => 'messages.4.content.0', 'reason' => 'prefix_binding_mismatch']];
+        $messages[4]->requestSnapshot->messagesWireDroppedThinkingStepIndexes = [2];
+
+        $agentMessagesWireReplay = AgentMessagesWireReplay::decideFor($messages, $this->buildConfiguration(RunSettings::PREVIOUS_REASONING_CARRY_OVER_ALL));
+
+        self::assertSame(0, $agentMessagesWireReplay->thinkingFromMessageIndex, 'the floor stays: stripping every earlier step would rewrite the cache of the history');
+        self::assertSame(4, $agentMessagesWireReplay->droppedThinkingReportedAtMessageIndex);
+        self::assertSame([2], $agentMessagesWireReplay->droppedThinkingStepMessageIndexes);
+        self::assertTrue($agentMessagesWireReplay->sendsTheThinkingOfTheStepAt(1), 'a block before the changed place is still valid');
+        self::assertFalse($agentMessagesWireReplay->sendsTheThinkingOfTheStepAt(2), 'the provider read the request without this block');
+        self::assertTrue($agentMessagesWireReplay->rendersFrozen(2), 'the step stays frozen, only its thinking is gone');
+        self::assertTrue($agentMessagesWireReplay->sendsTheThinkingOfTheStepAt(4));
+    }
+
+    public function testTheDroppedStepsOfEveryCallAddUpAndDoNotCountAgainstTheCap(): void
+    {
+        $messages = [$this->ownerTextRow(0), $this->stepRow(1, 1500), $this->stepRow(2, 1500), $this->stepRow(3, 1500), $this->stepRow(4, 100)];
+        $messages[1]->requestSnapshot->messagesWireFrozenFromMessageIndex = 0;
+        $messages[3]->requestSnapshot->inputTransformations = [['type' => 'thinking_dropped', 'path' => 'messages.2.content.0', 'reason' => 'prefix_binding_mismatch']];
+        $messages[3]->requestSnapshot->messagesWireDroppedThinkingStepIndexes = [1];
+        $messages[4]->requestSnapshot->inputTransformations = [['type' => 'thinking_dropped', 'path' => 'messages.6.content.0', 'reason' => 'prefix_binding_mismatch']];
+        $messages[4]->requestSnapshot->messagesWireDroppedThinkingStepIndexes = [3];
+        $agentWireConfiguration = $this->buildConfiguration(RunSettings::PREVIOUS_REASONING_CARRY_OVER_CAPPED);
+        $agentWireConfiguration->previousReasoningCapTokens = 4000;
+
+        $agentMessagesWireReplay = AgentMessagesWireReplay::decideFor($messages, $agentWireConfiguration, 'ANTHROPIC.TEST');
+
+        self::assertSame([1, 3], $agentMessagesWireReplay->droppedThinkingStepMessageIndexes);
+        self::assertFalse($agentMessagesWireReplay->previousReasoningCut->movedOnThisCall, 'the dropped steps send nothing, so 1,600 tokens ride under the cap of 4,000');
+        self::assertSame(1600, $agentMessagesWireReplay->previousReasoningCut->sentReasoningTokens);
+        self::assertTrue($agentMessagesWireReplay->sendsTheThinkingOfTheStepAt(2));
+        self::assertFalse($agentMessagesWireReplay->sendsTheThinkingOfTheStepAt(3));
+    }
+
+    public function testACallThatReportedDroppedThinkingWithoutItsStepsLiftsTheThinkingFloorToItsStepAndKeepsTheFrozenPart(): void
     {
         $messages = $this->buildTwoTurns();
         $messages[4]->requestSnapshot->messagesWireFrozenFromMessageIndex = 0;
@@ -123,6 +161,10 @@ class AgentMessagesWireReplayTest extends UnitTestCase
         self::assertTrue($recordedReplay->rendersFrozen(4));
         self::assertFalse($recordedReplay->sendsTheThinkingOfTheStepAt(4));
         self::assertTrue($recordedReplay->sendsTheThinkingOfTheStepAt(6));
+
+        $withDroppedSteps = AgentMessagesWireReplay::fromRecordedFloors(2, 2, [4]);
+        self::assertTrue($withDroppedSteps->sendsTheThinkingOfTheStepAt(3));
+        self::assertFalse($withDroppedSteps->sendsTheThinkingOfTheStepAt(4), 'a step an earlier call reported as dropped was sent without its thinking');
 
         $withoutFrozenPart = AgentMessagesWireReplay::fromRecordedFloors(null, null);
         self::assertFalse($withoutFrozenPart->rendersFrozen(0));

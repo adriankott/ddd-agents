@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DDD\Tests\Agents\Domain\AI\Repo\Argus\Conversations\Wire;
 
+use DDD\Domain\AI\Repo\Argus\Conversations\Wire\AgentMessagesInputTransformation;
 use DDD\Domain\AI\Repo\Argus\Conversations\Wire\AgentMessagesRequestComposer;
 use DDD\Domain\AI\Repo\Argus\Conversations\Wire\AgentWireRequestParameters;
 use DDD\Tests\Agents\Support\UnitTestCase;
@@ -150,6 +151,88 @@ class AgentMessagesRequestComposerTest extends UnitTestCase
         ], $body['messages']);
     }
 
+    public function testADroppedThinkingBlockIsPlacedOnTheStepOfItsAssistantMessage(): void
+    {
+        $agentMessagesConversation = AgentMessagesRequestComposer::convertChatCompletionsMessages([
+            ['role' => 'system', 'content' => 'You are an assistant.'],
+            ['role' => 'user', 'content' => 'Hello'],
+            ['role' => 'assistant', 'content' => '', AgentMessagesRequestComposer::KEY_ASSISTANT_CONTENT_JSON => self::STORED_ANSWER, AgentMessagesRequestComposer::KEY_STEP_MARKER_MESSAGE_INDEX => 7],
+            ['role' => 'tool', 'tool_call_id' => 'toolu_1', 'content' => 'order'],
+            ['role' => 'user', 'content' => 'note', AgentMessagesRequestComposer::KEY_AS_SYSTEM_MESSAGE => true],
+            ['role' => 'assistant', 'content' => 'Plain answer of a step without a stored one.'],
+            ['role' => 'user', 'content' => 'And now?'],
+            ['role' => 'assistant', 'content' => '', AgentMessagesRequestComposer::KEY_ASSISTANT_CONTENT_JSON => self::STORED_ANSWER, AgentMessagesRequestComposer::KEY_STEP_MARKER_MESSAGE_INDEX => 12],
+        ]);
+
+        // the system prompt is no message: user 0, assistant 1, results 2, note 3, assistant 4, user 5, assistant 6
+        self::assertSame([1 => 7, 6 => 12], $agentMessagesConversation->stepMarkerMessageIndexesByMessagePosition);
+
+        $dropped = static function (string $path, string $type = 'thinking_dropped'): AgentMessagesInputTransformation {
+            $inputTransformation = new AgentMessagesInputTransformation();
+            $inputTransformation->type = $type;
+            $inputTransformation->path = $path;
+            $inputTransformation->reason = 'prefix_binding_mismatch';
+            return $inputTransformation;
+        };
+        $map = $agentMessagesConversation->stepMarkerMessageIndexesByMessagePosition;
+        self::assertSame(
+            [7, 12],
+            AgentMessagesRequestComposer::findStepMarkerMessageIndexesOfDroppedThinking([$dropped('messages.6.content.0'), $dropped('messages.1.content.0'), $dropped('messages.6.content.1')], $map)
+        );
+        self::assertSame([], AgentMessagesRequestComposer::findStepMarkerMessageIndexesOfDroppedThinking([$dropped('messages.1.content.0', 'something_else')], $map));
+        self::assertNull(AgentMessagesRequestComposer::findStepMarkerMessageIndexesOfDroppedThinking([$dropped('messages.4.content.0')], $map), 'a path that names no stored step gives no list');
+        self::assertNull(AgentMessagesRequestComposer::findStepMarkerMessageIndexesOfDroppedThinking([$dropped('system.0')], $map));
+    }
+
+    public function testANoteAfterAnAssistantMessageGoesOutWithoutClearAt(): void
+    {
+        $note = [
+            'role' => 'user',
+            'content' => '[SIGNAL:tool-expected] Call getOrder now.',
+            AgentMessagesRequestComposer::KEY_AS_SYSTEM_MESSAGE => true,
+            AgentMessagesRequestComposer::KEY_CLEAR_AT => AgentMessagesRequestComposer::CLEAR_AT_NEXT_USER_MESSAGE,
+        ];
+
+        $body = AgentMessagesRequestComposer::composeBody($this->buildParameters([
+            ['role' => 'user', 'content' => 'Hello'],
+            ['role' => 'assistant', 'content' => 'I will look it up.'],
+            $note,
+        ]));
+
+        // the API answers 400 to a `clear_at` note that does not follow a user turn; the plain system message is accepted
+        self::assertSame(
+            ['role' => 'system', 'content' => [['type' => 'text', 'text' => '[SIGNAL:tool-expected] Call getOrder now.']]],
+            $body['messages'][2]
+        );
+    }
+
+    public function testANoteKeepsClearAtBetweenAUserTurnAndAnAssistantTurnAndLosesItBeforeAUserMessage(): void
+    {
+        $note = static fn (string $text): array => [
+            'role' => 'user',
+            'content' => $text,
+            AgentMessagesRequestComposer::KEY_AS_SYSTEM_MESSAGE => true,
+            AgentMessagesRequestComposer::KEY_CLEAR_AT => AgentMessagesRequestComposer::CLEAR_AT_NEXT_USER_MESSAGE,
+        ];
+
+        $body = AgentMessagesRequestComposer::composeBody($this->buildParameters([
+            ['role' => 'user', 'content' => 'Hello'],
+            $note('note of call 1'),
+            ['role' => 'assistant', 'content' => 'Answer 1.'],
+            ['role' => 'user', 'content' => 'Second question'],
+            ['role' => 'developer', 'content' => 'Skill instructions.'],
+            $note('note of a call without a stored answer'),
+            ['role' => 'user', 'content' => 'Third question'],
+            $note('note of this call'),
+        ]));
+
+        $messages = $body['messages'];
+        self::assertSame('next_user_message', $messages[1]['clear_at'] ?? null, 'between a user turn and an assistant turn');
+        self::assertArrayNotHasKey('clear_at', $messages[5], 'before a user message the API refuses it');
+        self::assertSame('note of a call without a stored answer', $messages[5]['content'][0]['text']);
+        self::assertSame('next_user_message', $messages[7]['clear_at'] ?? null, 'at the end of the messages, after a user turn');
+    }
+
     public function testASkillLoadIsAToolAdditionAndItsToolsAreDeclaredDeferred(): void
     {
         $parameters = $this->buildParameters([
@@ -214,6 +297,21 @@ class AgentMessagesRequestComposerTest extends UnitTestCase
                 ['type' => 'image', 'source' => ['type' => 'base64', 'media_type' => 'image/png', 'data' => 'AAAA']],
             ],
         ], $body['messages'][2]['content'][0]);
+    }
+
+    public function testATextResultReadsTheSameWithAndWithoutACacheMarker(): void
+    {
+        $marked = AgentMessagesRequestComposer::convertToolResult([
+            'role' => 'tool',
+            'tool_call_id' => 'toolu_1',
+            'content' => [['type' => 'text', 'text' => '{"km":412}', 'cache_control' => ['type' => 'ephemeral']]],
+        ]);
+        $unmarked = AgentMessagesRequestComposer::convertToolResult(['role' => 'tool', 'tool_call_id' => 'toolu_1', 'content' => '{"km":412}']);
+
+        self::assertSame('{"km":412}', $marked['content'], 'the call that marks a result sends the same string as the later calls that do not');
+        self::assertSame(['type' => 'ephemeral'], $marked['cache_control']);
+        unset($marked['cache_control']);
+        self::assertSame($unmarked, $marked);
     }
 
     public function testACacheMarkerOnAnEntryWithAStoredAnswerMovesToItsNewestBlockThatIsNoThinking(): void
