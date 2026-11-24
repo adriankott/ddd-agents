@@ -459,6 +459,7 @@ class AIConversationModelCallsService extends Service
             // the tool choice the egress sent — the admin composition rebuilds the
             // answer-step tail line from it (snapshot JSON only; the wire is unchanged).
             $requestSnapshot->recordForceToolChoice($argusAIAgentConversation->forceToolChoice);
+            $requestSnapshot->forcedToolChoiceSentAsNote = $argusAIAgentConversation->sendsForcedToolChoiceAsNote() ? true : null;
             // DEBUG (per-conversation opt-in): store the FULL outgoing request (system + messages + tools + tool_choice)
             // and the raw model response, the data the slim snapshot drops for O(n²). Stamped on whatever message this
             // turn produces (assistant turn OR the loop's empty-turn nudge), so a stall is inspectable too. Captures the

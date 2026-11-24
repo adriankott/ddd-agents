@@ -30,6 +30,7 @@ use DDD\Symfony\Commands\Agents\AgentExecuteToolCallCommand;
 use DDD\Symfony\Commands\Agents\AgentFireDueSchedulesCommand;
 use DDD\Symfony\Commands\Agents\AgentInspectConversationCommand;
 use DDD\Symfony\Commands\Agents\AgentJevProbeCommand;
+use DDD\Symfony\Commands\Agents\AgentProbeReasoningReplayCommand;
 use DDD\Symfony\Commands\Agents\AgentLoadedCapabilitiesCompactCommand;
 use DDD\Symfony\Commands\Agents\AgentMarkFinalizedConversationsCommand;
 use DDD\Symfony\Commands\Agents\AgentModelInputEvictionSimCommand;
@@ -92,6 +93,7 @@ class PackageAgentCommandsRegistrationTest extends IntegrationTestCase
         'app:ai-agent:inspect' => AgentInspectConversationCommand::class,
         'app:ai-agent:reap' => AgentReapStuckConversationsCommand::class,
         'app:ai-agent:jev-probe' => AgentJevProbeCommand::class,
+        'app:ai-agent:probe-reasoning-replay' => AgentProbeReasoningReplayCommand::class,
         'app:ai-conversation:deliver-owed-reports-and-resume-owed-turns' => AgentDeliverOwedReportsAndResumeOwedTurnsCommand::class,
         'app:ai-conversation:scorecards' => AIConversationScorecardsCommand::class,
         'app:ai-schedule:close-for-inactive-agent-spaces' => AgentCloseSchedulesForInactiveAgentSpacesCommand::class,
@@ -155,12 +157,12 @@ class PackageAgentCommandsRegistrationTest extends IntegrationTestCase
 
         $visibleCommandNames = array_keys(self::COMMAND_CLASSES_BY_NAME);
         $visibleCommandNames = array_values(array_diff($visibleCommandNames, [self::HIDDEN_COMMAND_NAME]));
-        self::assertCount(45, $visibleCommandNames);
+        self::assertCount(46, $visibleCommandNames);
         self::assertSame([], array_values(array_diff($visibleCommandNames, $listedCommandNames)), 'every visible command is listed');
         self::assertNotContains(self::HIDDEN_COMMAND_NAME, $listedCommandNames);
         self::assertContains(self::HIDDEN_COMMAND_NAME, $hiddenCommandNames);
         $textListProcess = $this->runConsoleScript('list', '--raw');
-        self::assertSame(45, preg_match_all('/^app:(ai-(agent|conversation|schedule)|mcp|ai:composed-view):\S+/m', $textListProcess->getOutput()), 'the text listing names the 45 visible commands');
+        self::assertSame(46, preg_match_all('/^app:(ai-(agent|conversation|schedule)|mcp|ai:composed-view):\S+/m', $textListProcess->getOutput()), 'the text listing names the 46 visible commands');
 
         $helpProcess = $this->runConsoleScript('help', self::HIDDEN_COMMAND_NAME);
         self::assertSame(0, $helpProcess->getExitCode(), $helpProcess->getErrorOutput());

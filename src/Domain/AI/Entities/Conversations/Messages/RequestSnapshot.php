@@ -102,6 +102,14 @@ class RequestSnapshot extends ValueObject
     public ?string $forceToolChoice = null;
 
     /**
+     * @var bool|null True when this call's forced tool choice ({@see $forceToolChoice}: `required` or a named function)
+     *      went out as `auto` plus the `[SIGNAL:tool-expected]` tail line, because the model rejects a forced choice
+     *      ({@see \DDD\Domain\AI\Entities\Models\AIModel::acceptsForcedToolChoice()}); null when the choice went out as
+     *      recorded, and on snapshots written before the field existed.
+     */
+    public ?bool $forcedToolChoiceSentAsNote = null;
+
+    /**
      * @var string[]|null One `<segment type>:<hash>` per system segment of this call, in wire order
      *      (`BASE_PROMPT:9f2c…`, `LOADED_SKILLS:41ab…`) — the cache diff ({@see \DDD\Domain\AI\Entities\Conversations\Diagnostics\PromptCacheDiffReport})
      *      names the first segment that changed against the previous call on every call, without the debug payload.

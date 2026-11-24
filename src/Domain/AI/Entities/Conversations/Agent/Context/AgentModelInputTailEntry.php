@@ -56,6 +56,12 @@ class AgentModelInputTailEntry extends ValueObject
     /** The `[SIGNAL:answer-step]` line of a step whose tools are paused (`tool_choice = none`). */
     public const string KIND_ANSWER_STEP = 'ANSWER_STEP';
 
+    /**
+     * The `[SIGNAL:tool-expected]` line of a step whose forced tool choice went out as `auto` because the model
+     * rejects a forced choice: it names the tool the step expects.
+     */
+    public const string KIND_TOOL_EXPECTED = 'TOOL_EXPECTED';
+
     /** The reply-language cue — always present, always the last entry. */
     public const string KIND_REPLY_LANGUAGE_CUE = 'REPLY_LANGUAGE_CUE';
 

@@ -114,7 +114,11 @@ user-role wire entry after the whole history, never stored. Order:
     widget's tool result lists, in its order, no recap beyond them), the step after an owner question recorded in this
     turn (`askOwner`: the results of the items closed in the turn, never the question again), every other forced step
     (the result the owed plan item promises or its one question, never a report);
-14. the reply-language cue `[SIGNAL:reply-language]`, always last.
+14. `[SIGNAL:tool-expected]` on a step whose forced tool choice (`required` or a named function) went out as `auto`
+    because the model rejects a forced choice (catalog `supportsForcedToolChoice` false: Claude Opus 5.5, Fable 5.1;
+    `ArgusAIAgentConversation::sendsForcedToolChoiceAsNote()`): it names the expected tool, or "one of your tools" for
+    `required`; recorded on the snapshot (`RequestSnapshot::$forcedToolChoiceSentAsNote`) so the composition view shows it;
+15. the reply-language cue `[SIGNAL:reply-language]`, always last.
 
 ### The client context
 

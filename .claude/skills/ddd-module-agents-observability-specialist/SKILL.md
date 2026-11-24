@@ -11,7 +11,7 @@ metadata:
 
 How to see what a run of the agent did and what the model saw, how to reproduce it, and how to measure and evaluate
 the agent — with the console commands the package ships and the services and value objects behind them. The package
-ships 46 commands (45 listed, plus the hidden tool-call child) on the base `AgentConsoleCommand` (the account of a run,
+ships 47 commands (46 listed, plus the hidden tool-call child) on the base `AgentConsoleCommand` (the account of a run,
 lifted rights, the budget option, the usage envelope, the progress reporter `AgentConsoleProgressReporter`, the space
 options) and, for evaluation, `AgentEvalConsoleCommand` (scope fallback, child processes, stop signals), with the
 option traits `ContextRetentionSettingsOptionsTrait` and `AgentEvalArmOptionsTrait` and the arms object
@@ -24,6 +24,7 @@ siblings), the tool-call comparison of one MCP package (`app:mcp:compare-tool-ca
 (`app:ai-agent:eval-conversations-purge` on `AIConversationEvalPurgeService`), the seed-account lease and clean start
 (`AgentEvalSeedAccountLeasesService`, `AgentEvalSeedAccountResetService`), the decision commands
 (`app:ai-agent:decision-fixtures`, `app:ai-agent:decision-stats`, the abstract replay base `AgentDecisionReplayCommand`),
+the live reasoning-replay probe (`app:ai-agent:probe-reasoning-replay` on `AgentReasoningReplayProbeService`),
 the scheduled maintenance and the line editor a console chat reads its input with (`src/Symfony/Commands/Agents/Chat/`).
 Every command, option, default and exit code: [console-commands](references/console-commands.md); the fixtures the
 evaluation commands read: [evaluation-fixtures](references/evaluation-fixtures.md). The fixtures and the comparison
@@ -174,6 +175,7 @@ The override points of every command and how a new command is added:
 | Did a change of an MCP package change what the model receives? | `app:mcp:compare-tool-calls --script=<Package> --record=<file>` before, `--replay-and-compare=<file>` after |
 | Run the evaluation | `app:ai-agent:eval-suite --dry-run`, then without it; one area: `app:ai-agent:eval-tools --skill=<skill>` |
 | Analyse a failed run | `app:ai-agent:eval-analyze [<run>]`, `app:ai-agent:run-report <ids> --log-dir=<folder>` |
+| Does a model accept its reasoning back, a forced tool choice, append-only loading on Responses? | `app:ai-agent:probe-reasoning-replay --model=<name> --scenario=all [--wire=responses] [--switch-model=<name>]` (real calls, nothing persisted) |
 | Clean up evaluation conversations | `app:ai-agent:eval-conversations-purge` (dry run), then `--apply` |
 
 ## Task or symptom → reference

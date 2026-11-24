@@ -1622,10 +1622,12 @@ class AgentModelInput extends ValueObject
      *
      * `$forceToolChoice` is the step's tool choice (only `'none'` adds the answer-step line); `$toolLessStepIsTheBudgetClosingStep`
      * selects that line's budget-closing wording — the caller decides it ({@see self::isNewestMessageABudgetClosingSignal()}).
+     * `$forcedToolChoiceSentAsNote`: the step's forced choice (`required` or a named function) went out as `auto` because
+     * the model rejects a forced choice — the `[SIGNAL:tool-expected]` line names the expected tool instead.
      *
      * @param string|array<string, mixed>|null $forceToolChoice
      */
-    public function buildTailEntries(string|array|null $forceToolChoice, bool $toolLessStepIsTheBudgetClosingStep): AgentModelInputTailEntries
+    public function buildTailEntries(string|array|null $forceToolChoice, bool $toolLessStepIsTheBudgetClosingStep, bool $forcedToolChoiceSentAsNote = false): AgentModelInputTailEntries
     {
         $agentModelInputTailEntries = new AgentModelInputTailEntries();
         // Recent-tool-calls reuse hint (opt-in, default off).
@@ -1732,6 +1734,16 @@ class AgentModelInput extends ValueObject
             );
             $agentModelInputTailEntries->add($agentModelInputTailEntry);
         }
+        // Expected-tool line: a forced tool choice the model would reject (a 400) went out as `auto`; the line says which
+        // tool this step must call, appended at the tail — earlier messages stay untouched.
+        if ($forcedToolChoiceSentAsNote && (is_array($forceToolChoice) || $forceToolChoice === 'required')) {
+            $agentModelInputTailEntry = AgentModelInputTailEntry::ofText(
+                AgentModelInputTailEntry::KIND_TOOL_EXPECTED,
+                AgentContextSegmentType::SIGNAL,
+                self::buildToolExpectedTailHint($forceToolChoice)
+            );
+            $agentModelInputTailEntries->add($agentModelInputTailEntry);
+        }
         // Reply-language tail cue (unconditional): the language flips
         // ALSO happen on steps whose wire did NOT end on harness content, so the cue is renewed at the ABSOLUTE tail on
         // EVERY step ({@see self::buildReplyLanguageTailCue()}). Within one turn-loop the cue bytes are constant, and
@@ -1751,6 +1763,23 @@ class AgentModelInput extends ValueObject
         return $newestMessage !== null
             && ($newestMessage->messageType ?? null) === AIConversationMessage::MESSAGE_SIGNAL
             && ($newestMessage->signalSource ?? null) === AIConversationMessage::SIGNAL_SOURCE_BUDGET_CLOSING;
+    }
+
+    /**
+     * The `[SIGNAL:tool-expected]` line: the tool a step expects when its forced choice went out as `auto` — a named
+     * function by name, `required` as "one of your tools".
+     *
+     * @param string|array<string, mixed> $forceToolChoice
+     */
+    public static function buildToolExpectedTailHint(string|array $forceToolChoice): string
+    {
+        $expectedToolName = is_array($forceToolChoice)
+            ? (string)($forceToolChoice['function']['name'] ?? $forceToolChoice['name'] ?? '')
+            : '';
+        if ($expectedToolName !== '') {
+            return '[SIGNAL:tool-expected] This step must call the tool `' . $expectedToolName . '` now. Call it in this reply; do not answer in prose instead.';
+        }
+        return '[SIGNAL:tool-expected] This step must call one of your tools now. Call the fitting tool in this reply; do not answer in prose instead.';
     }
 
     /**

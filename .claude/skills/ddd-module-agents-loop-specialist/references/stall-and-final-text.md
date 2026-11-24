@@ -81,7 +81,10 @@ is its counter, so it is derived from rows and survives a chunk.
 3. **One forced re-drive on the last attempt.** With `MAX_STALL_SIGNALS` − 1 nudges trailing (or when the decision chose
    a work-tool call), one re-drive with `tool_choice` required over the work tools runs and its response replaces the
    stalled one; a decision-forced re-drive replaces the ladder's own for the rest of the turn. Never for an answer-shape
-   stall or a turn that reads sub-agent results.
+   stall or a turn that reads sub-agent results. A model whose catalog sets `supportsForcedToolChoice` false (Claude Opus 5.5,
+   Fable 5.1 answer a forced choice with a 400) gets the re-drive — and every other forced choice — as `auto` plus the
+   `[SIGNAL:tool-expected]` tail line naming the tool; when it still answers without the tool, the ladder goes on as
+   for any stalled response.
 4. **Out of nudges.** With the budget spent no further signal is written: the response goes on as the step's final text
    (an empty one ends the loop as `EMPTY_FINAL_TEXT`).
 5. **The give-up.** At the resume boundary, a turn that produced only loop steering while inbound is owed is released

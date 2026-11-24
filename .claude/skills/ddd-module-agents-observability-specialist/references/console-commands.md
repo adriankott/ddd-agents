@@ -911,6 +911,51 @@ and the hit rate per question.
 - **Budget:** `--ignore-budget`.
 - **Override points:** `getFixtureAgentSpaceKey()`, `findAgentSpaceOfFixture()`.
 
+### `app:ai-agent:probe-reasoning-replay` — `AgentProbeReasoningReplayCommand`
+
+Live probe of reasoning replay on OpenRouter: a small synthetic tool conversation built in memory (system, two tools,
+one owner question), sent with the agent's own composers (`AgentChatCompletionsRequestComposer`,
+`AgentResponsesRequestComposer`), the model's catalog provider filters and the agent's OpenRouter key
+(`AI.modelCalls.openRouterApiKeyEnvName`). It changes nothing in the agent and persists nothing; it costs real tokens.
+Built for the decision whether Anthropic models can get their own reasoning back (Chat Completions, Responses, or a new
+Messages wire).
+
+| Option / argument | Default | Meaning |
+|---|---|---|
+| `--model` | none (required) | catalog name, e.g. `ANTHROPIC.CLAUDE_OPUS_5_5`, `MOONSHOT.KIMI_K3_1_PRO` |
+| `--scenario` | `clean` | comma-separated, or `all` (every scenario the wire allows; `model-switch` only with `--switch-model`) |
+| `--wire` | `chatCompletions` | or `responses`; a non-OpenAI model on `responses` bypasses the agent's runtime refusal (`REJECTION_RESPONSES_NEEDS_OPENAI_MODEL`) for this probe only, and the output says so |
+| `--switch-model` | none | the model of call 2 in `model-switch` |
+| `--drop-block` | flag | replaying calls send `thinking.block_binding.prefix_mismatch_behavior: drop_block` |
+| `--effort` | `medium` | reasoning effort of every call |
+| `--timeout` | `120` | total timeout of one call in seconds (at least 10) |
+| `--format` | `table` | or `json` (the `ReasoningReplayProbeResults` object) |
+
+| Scenario | Calls | Verdict |
+|---|---|---|
+| `clean` | 1: tools → 2: replays call 1's reasoning over the unchanged prefix | PASS accepted; FAIL refused |
+| `edit-history` | as clean; before call 2 the owner's earlier message is re-rendered (as the image-marker swap does) | PASS accepted (see `input_transformations`); FINDING refused, with the upstream text |
+| `edit-tools` | as clean; call 2 adds a third top-level tool | same |
+| `edit-system` | as clean; call 2's system text gains a skill-catalog line | same |
+| `model-switch` | as clean; call 2 goes to `--switch-model` with call 1's reasoning | PASS accepted; FINDING refused |
+| `forced-tool-choice` | 1: the delivery step's named pin; 2: `auto` plus the `[SIGNAL:tool-expected]` line | PASS pin accepted; FINDING pin refused (the 400 text); FAIL the `auto` form refused |
+| `append-only` (`responses` only) | 1: tools → 2: a skill appended (`additional_tools` item + developer message, top-level tools unchanged) with call 1's reasoning → 3: the reasoning of both carried | PASS all accepted; FINDING call 2 or 3 refused |
+
+Every scenario FAILs when call 1 is refused on the agent's own route (on a bypassed Responses route that is a FINDING),
+calls no tool, or — for a replay — returns no reasoning items. Per call the table shows HTTP status, provider, the tool
+choice sent, tools called, reasoning items back (types, signed or encrypted), items replayed, input / cached / cache-write
+tokens, the cache share, the cost OpenRouter reports and the wall time; refused calls print the provider's text with the
+upstream's raw message.
+
+- **Writes:** nothing.
+- **Envelope:** none — the calls go to OpenRouter directly (`AgentReasoningReplayProbeTransportService`) and are booked on
+  no account; the output sums the reported cost.
+- **Exit codes:** `0` every scenario PASS or FINDING; `1` a scenario FAILed or the probe stopped; `2` invalid options
+  (unknown model or scenario, `append-only` without `--wire=responses`, `model-switch` without `--switch-model`).
+- **Budget:** none (no account budget applies).
+- **Override points:** `AgentReasoningReplayProbeService::getTransportService()`, `findModel()`; the command's
+  `resolveScenarios()`, `renderTables()`.
+
 ### `AgentDecisionReplayCommand` (abstract base, no name)
 
 The base of an application's command that replays one decision on stored conversations: for every tool call the
@@ -1125,4 +1170,7 @@ class ApplicationInspectConversationCommand extends AgentInspectConversationComm
 `DDD\Domain\AI\Entities\Evals\AgentEvalArms` ·
 `DDD\Symfony\Commands\Agents\MCPCompareToolCallsCommand` ·
 `DDD\Domain\AI\Entities\MCPPackages\ToolCallComparisons\{ToolCallComparisonScript, ToolCallComparisonSession, ToolCallComparisonRecording}` ·
-`DDD\Domain\AI\Services\Eval\{AgentRecordedRunsService, ToolCallComparisonsService}`
+`DDD\Domain\AI\Services\Eval\{AgentRecordedRunsService, ToolCallComparisonsService}` ·
+`DDD\Symfony\Commands\Agents\AgentProbeReasoningReplayCommand` ·
+`DDD\Domain\AI\Services\Eval\Probes\{AgentReasoningReplayProbeService, AgentReasoningReplayProbeTransportService}` ·
+`DDD\Domain\AI\Entities\Evals\Probes\{ReasoningReplayProbeResult(s), ReasoningReplayProbeCall(s), ReasoningReplayProbeStep, ReasoningReplayProbeRun, ReasoningReplayProbeHttpAnswer}`

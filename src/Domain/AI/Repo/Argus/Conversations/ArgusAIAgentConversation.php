@@ -477,7 +477,36 @@ class ArgusAIAgentConversation extends ArgusAIConversation
         if ($this->toolSchemas === []) {
             return null;
         }
+        // a model that rejects a forced choice gets `auto`; the wire tail then names the expected tool
+        if ($this->sendsForcedToolChoiceAsNote()) {
+            return 'auto';
+        }
         return $this->forceToolChoice ?? 'auto';
+    }
+
+    /**
+     * Whether this call's forced tool choice ({@see $forceToolChoice}: `required` or a named function) goes out as
+     * `auto` plus a tail note naming the expected tool, because the catalog says the model answers a forced choice
+     * with a 400 ({@see AIModel::acceptsForcedToolChoice()}; Claude Opus 5.5, Fable 5.1). `none` and `auto` are never
+     * forced choices.
+     */
+    public function sendsForcedToolChoiceAsNote(): bool
+    {
+        if (!self::isForcedToolChoice($this->forceToolChoice) || $this->toolSchemas === []) {
+            return false;
+        }
+        $aiModel = $this->getAIModel();
+        return $aiModel !== null && !$aiModel->acceptsForcedToolChoice();
+    }
+
+    /**
+     * Whether a tool choice forces a tool call: `required` or a named-function pin.
+     *
+     * @param string|array<string, mixed>|null $toolChoice
+     */
+    public static function isForcedToolChoice(string|array|null $toolChoice): bool
+    {
+        return is_array($toolChoice) || $toolChoice === 'required';
     }
 
     /**
@@ -1246,7 +1275,7 @@ class ArgusAIAgentConversation extends ArgusAIConversation
         // whether the context THIS repository holds ends on the budget-closing signal (its own `modelInput`, the
         // object {@see buildModelContext()} passes in on the live wire).
         $toolLessStepIsTheBudgetClosingStep = $this->modelInput !== null && $this->modelInput->isNewestMessageABudgetClosingSignal();
-        foreach ($agentContext->buildTailEntries($this->forceToolChoice, $toolLessStepIsTheBudgetClosingStep)->toWireMessages() as $tailWireMessage) {
+        foreach ($agentContext->buildTailEntries($this->forceToolChoice, $toolLessStepIsTheBudgetClosingStep, $this->sendsForcedToolChoiceAsNote())->toWireMessages() as $tailWireMessage) {
             $messages[] = $tailWireMessage;
         }
         return $messages;

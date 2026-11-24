@@ -2349,7 +2349,8 @@ class AIConversationMessage extends Entity
     protected function appendTailSegmentsToComposition(ModelCallComposition $modelCallComposition, AgentModelInput $producingContext): void
     {
         $storedForceToolChoice = isset($this->requestSnapshot) ? $this->requestSnapshot->forceToolChoice : null;
-        $agentModelInputTailEntries = $producingContext->buildTailEntries($storedForceToolChoice, $producingContext->isNewestMessageABudgetClosingSignal());
+        $storedForcedToolChoiceSentAsNote = isset($this->requestSnapshot) && $this->requestSnapshot->forcedToolChoiceSentAsNote === true;
+        $agentModelInputTailEntries = $producingContext->buildTailEntries($storedForceToolChoice, $producingContext->isNewestMessageABudgetClosingSignal(), $storedForcedToolChoiceSentAsNote);
         foreach ($agentModelInputTailEntries->getElements() as $agentModelInputTailEntry) {
             $tailSegment = AgentContextSegment::of($agentModelInputTailEntry->segmentType, $agentModelInputTailEntry->buildCompositionText());
             $this->estimateSegmentTokens($tailSegment);

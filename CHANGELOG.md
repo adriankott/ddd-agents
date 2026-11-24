@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.1.41
+
+- Forced tool choice for models that reject it: when the model's catalog sets `supportsForcedToolChoice` false
+  (mgamadeus/ddd-ai 3.4.8: Claude Opus 5.5, Fable 5.1 answer `tool_choice: "required"` or a named function with a 400),
+  every forced choice of the loop (the stall re-drive, a supervisor steer's pin, the `call_tool` delivery pin) goes out
+  as `auto`, and the wire tail appends a `[SIGNAL:tool-expected]` line naming the expected tool — earlier messages stay
+  untouched. A model that still answers without the tool goes on through the existing stall ladder.
+  `ArgusAIAgentConversation::sendsForcedToolChoiceAsNote()`, `RequestSnapshot::$forcedToolChoiceSentAsNote` (the
+  composition view shows the line), `AgentModelInputTailEntry::KIND_TOOL_EXPECTED`. `none` and `auto` are unchanged.
+- New console command `app:ai-agent:probe-reasoning-replay`: a live probe on OpenRouter with the agent's composers,
+  catalog provider filters and key, nothing persisted, nothing booked — scenarios `clean`, `edit-history`,
+  `edit-tools`, `edit-system`, `model-switch`, `forced-tool-choice` and (`--wire=responses`) `append-only`, options
+  `--drop-block`, `--switch-model`, `--effort`, `--format=json`. Per call: acceptance, provider, reasoning items back
+  (signed or encrypted), items replayed, cache share, reported cost. On `--wire=responses` a non-OpenAI model bypasses
+  the runtime refusal (`REJECTION_RESPONSES_NEEDS_OPENAI_MODEL`) for the probe only; the runtime refusal is unchanged.
+- Requires mgamadeus/ddd-ai ^3.4.8.
+
 ## 0.1.40
 
 - Reasoning carry-over per model: the conversation's row, else the model's catalog value
