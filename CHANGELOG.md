@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.42
+
+- Web: the loading skeleton of a widget surface wraps only a plain text title in the title paragraph; an element
+  title (a widget's own headline, e.g. DriveFiles) is rendered as it is — before, a paragraph sat inside a paragraph
+  (invalid HTML, a React hydration error while a DriveFiles card loaded).
+
 ## 0.1.41
 
 - Forced tool choice for models that reject it: when the model's catalog sets `supportsForcedToolChoice` false

@@ -17,11 +17,15 @@ export const WidgetSurfaceSkeleton = (props: WidgetSurfaceSkeletonProps) => {
   const { title, rowCount = 3, level = "elevated", testId } = props;
   return (
     <WidgetSurface level={level} testId={testId}>
-      {title ? (
+      {/* a plain text title gets the title paragraph; an element (a widget's own headline) already renders its text
+          block — wrapping it would nest a paragraph in a paragraph (invalid HTML, a hydration error) */}
+      {typeof title === "string" || typeof title === "number" ? (
         <Text role="intro" weight="bold" translate={false}>
           {title}
         </Text>
-      ) : null}
+      ) : (
+        (title ?? null)
+      )}
       <div className={styles.rows} aria-busy="true">
         {Array.from({ length: rowCount }, (unused, rowIndex) => (
           <div key={rowIndex} className={styles.row}>
