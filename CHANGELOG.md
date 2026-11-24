@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.11
+
+**Fixed:**
+
+- **The shipped ComposedView node schema lacked the widget `DriveFiles`.** `web/src/renderer/widget-tree/composed-node-schema.json`
+  (Composer package and npm `dist/files/renderer/widget-tree/`) is regenerated from `ComposedViewNodeSchemaParts::buildModuleSchemaJson()`,
+  which has listed `DriveFiles` since 0.1.26; the parity fixture `composed-view-parity.json` (`stubSchema`, read by
+  hosts' parity tests) carries it too. `ComposedViewNodeSchemaExportCommandTest` is green again.
+- New checks: `ComposedViewParityFixtureSchemaTest` (PHP: the shipped schema equals the export; the fixture carries
+  every widget, embeddable widget and data source of the module) and `_composed-view-parity-fixture.spec.ts` (web CI:
+  the fixture carries every widget, embeddable widget and data source of the shipped schema).
+
+**Host steps:** none (a host's own parity expectations regenerated against the package fixture now include `DriveFiles`).
+
 ## 0.3.10
 
 **Fixed:**
