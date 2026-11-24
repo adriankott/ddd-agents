@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.39
+
+- Agent loop: a model call is sent again after a transport failure (cURL timeout, refused or reset connection), a 429
+  or 5xx of the router or an empty body — at most twice, after 2 s and 6 s (a 429's `Retry-After` up to 20 s). No tool
+  ran, so a retry is safe; a 4xx answer and a model's own refusal are never retried. The claim is heartbeated around
+  each wait and a lost claim stops the retries. Retry n rotates the OpenRouter `order` by n positions (the next host is
+  asked first; the allowed hosts never widen). Trace event `turn.modelCall.retry`; the request snapshot keeps the
+  failed attempts (`modelCallRetriesJson`). When the retries are spent the turn ends as before.
+- Each attempt of the agent's model call gets the model's `transportTimeoutSeconds` (ddd-ai 3.4.6; Kimi K3.1 Pro 120 s).
+- `app:ai-agent:eval-tools` runs a case once more after an infrastructure error (in process and with `--parallel`), as
+  `eval-suite` does; `cURL error 7` and `cURL error 52` count as infrastructure errors in both.
+- Requires `mgamadeus/ddd-ai` ^3.4.6.
+
 ## 0.1.38
 
 - Web: the package renders the `DriveFiles` widget (the cards `showDriveFiles` writes): one row per file or folder with

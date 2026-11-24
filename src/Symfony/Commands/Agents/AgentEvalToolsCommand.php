@@ -10,6 +10,8 @@ use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Entities\Conversations\Messages\OwnerDevice;
 use DDD\Domain\AI\Entities\Evals\AgentEvalCase;
 use DDD\Domain\AI\Entities\Evals\AgentEvalCaseRow;
+use DDD\Symfony\Commands\Agents\Eval\AgentEvalSuiteRetriedCases;
+use DDD\Symfony\Commands\Agents\Eval\AgentEvalSuiteRetriedCase;
 use DDD\Domain\AI\Entities\Evals\AgentEvalCaseRows;
 use DDD\Domain\AI\Entities\Evals\AgentEvalCaseRunMeasurement;
 use DDD\Domain\AI\Entities\Evals\AgentEvalExpectation;
@@ -414,6 +416,17 @@ class AgentEvalToolsCommand extends AgentEvalConsoleCommand
                 $agentEvalToolsCaseRun = $this->prepareCaseRun($runSettings, $agentEvalFixture, $agentEvalCase, $agentEvalSuitePlanOptions, $output);
                 if ($agentEvalToolsCaseRun !== null) {
                     $agentEvalCaseRow = $this->runCase($runSettings, $agentEvalToolsCaseRun, $output);
+                    // an infrastructure error (a model transport timeout, a deadlock) says nothing about the agent: once more
+                    $infrastructureError = $this->findRetriedInfrastructureErrorOfRow($agentEvalCaseRow);
+                    if ($infrastructureError !== null) {
+                        $this->writeRetryLine($runSettings, $output, $agentEvalCase->getId(), $infrastructureError);
+                        $retryCaseRun = $this->prepareCaseRun($runSettings, $agentEvalFixture, $agentEvalCase, $agentEvalSuitePlanOptions, $output);
+                        if ($retryCaseRun !== null) {
+                            $firstAttemptRow = $agentEvalCaseRow;
+                            $agentEvalCaseRow = $this->runCase($runSettings, $retryCaseRun, $output);
+                            $agentEvalCaseRow->markAsRetriedAfter($infrastructureError, $firstAttemptRow);
+                        }
+                    }
                     $agentEvalCaseRows->add($agentEvalCaseRow);
                 }
             }
@@ -887,6 +900,7 @@ class AgentEvalToolsCommand extends AgentEvalConsoleCommand
         $queuedTasks = $agentEvalSuiteSchedule->orderTasksForStart($plannedTasks->buildRepeatedTasks($runSettings->repeat));
         $runningCases = AgentEvalSuiteRunningCases::newInstance();
         $agentEvalCaseRows = AgentEvalCaseRows::newInstance();
+        $retriedCases = AgentEvalSuiteRetriedCases::newInstance();
         while ($queuedTasks->count() > 0 || $runningCases->count() > 0) {
             foreach ($agentEvalSuiteSchedule->selectRunnableTasks($queuedTasks, $runningCases->buildTasks())->getElements() as $startingTask) {
                 $runningCase = $this->startChildProcessOfTask($startingTask, $input, $runSettings);
@@ -900,6 +914,18 @@ class AgentEvalToolsCommand extends AgentEvalConsoleCommand
                 }
                 $finishedTask = $runningCase->task;
                 $runningCases->remove($runningCase);
+                // an infrastructure error says nothing about the agent: the task runs once more, at the head of the queue
+                $infrastructureError = $this->findRetriedInfrastructureErrorOfRow($agentEvalCaseRow);
+                if ($infrastructureError !== null && $retriedCases->getByTaskId($finishedTask->taskId) === null) {
+                    $retriedCases->add(AgentEvalSuiteRetriedCase::forFirstAttempt($finishedTask->taskId, $infrastructureError, $agentEvalCaseRow));
+                    $queuedTasks->prependTask($finishedTask);
+                    $this->writeRetryLine($runSettings, $output, $finishedTask->caseId, $infrastructureError);
+                    continue;
+                }
+                $retriedCase = $retriedCases->getByTaskId($finishedTask->taskId);
+                if ($retriedCase !== null) {
+                    $agentEvalCaseRow->markAsRetriedAfter($retriedCase->infrastructureError, $retriedCase->firstAttemptRow);
+                }
                 $agentEvalCaseRows->add($agentEvalCaseRow);
                 $agentEvalResultFilesService->writeCaseFileOfToolsRun($runDirectory, $finishedTask->caseId, $finishedTask->repetition, $agentEvalCaseRow);
                 if (!$runSettings->jsonOutput) {
@@ -911,6 +937,36 @@ class AgentEvalToolsCommand extends AgentEvalConsoleCommand
             }
         }
         return $agentEvalCaseRows;
+    }
+
+    /**
+     * The infrastructure error a case row ended on (a model transport timeout, a dropped connection, a deadlock — the
+     * texts of {@see getRetriedInfrastructureErrors()}), null for a row that says something about the agent.
+     */
+    protected function findRetriedInfrastructureErrorOfRow(AgentEvalCaseRow $agentEvalCaseRow): ?string
+    {
+        if ($agentEvalCaseRow->isRestoreFailed()) {
+            return null;
+        }
+        return $agentEvalCaseRow->findInfrastructureError($this->getRetriedInfrastructureErrors());
+    }
+
+    /**
+     * Override point: the texts that mark an infrastructure error (the case runs once more) — the same as eval-suite's.
+     *
+     * @return string[]
+     */
+    protected function getRetriedInfrastructureErrors(): array
+    {
+        return AgentEvalSuiteCommand::RETRIED_INFRASTRUCTURE_ERRORS;
+    }
+
+    /** The `RETRY` line of a case that runs once more after an infrastructure error */
+    protected function writeRetryLine(AgentEvalToolsRunSettings $runSettings, OutputInterface $output, string $caseId, string $infrastructureError): void
+    {
+        if (!$runSettings->jsonOutput) {
+            $output->writeln(sprintf('  <comment>RETRY</comment> %-44s <fg=gray>%s</>', mb_substr($caseId, 0, 44), $infrastructureError));
+        }
     }
 
     /**

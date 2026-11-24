@@ -135,6 +135,9 @@ class AgentEvalSuiteCommand extends AgentEvalConsoleCommand
         'Deadlock found when trying to get lock',
         'Lock wait timeout exceeded',
         'cURL error 28',
+        // the model provider refused the connection or closed it without an answer
+        'cURL error 7',
+        'cURL error 52',
         // the model provider reset the connection while the answer was read
         'cURL error 56',
         // the TLS handshake with the model provider broke off (unexpected eof while reading)

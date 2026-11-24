@@ -300,6 +300,14 @@ class RequestSnapshot extends ValueObject
     public ?string $serverStateFallbackError = null;
 
     /**
+     * @var string|null The failed attempts of this model call before the one recorded here, as JSON
+     *      `[{attempt, reason, statusCode, waitedSeconds, providerOrder}]` — a transport failure or a 5xx/429 of the router
+     *      that the call retried ({@see \DDD\Domain\AI\Services\Conversations\Agent\AIConversationModelCallsService::sendModelCallWithRetries()}).
+     *      Null when the first attempt answered.
+     */
+    public ?string $modelCallRetriesJson = null;
+
+    /**
      * Hydration from a stored or posted form, then the two state-delivery values turned back into plain
      * arrays all the way down: the loader keeps a list's ELEMENTS as the objects it decoded them to, so every stored
      * state note came back as an object — and {@see \DDD\Domain\AI\Entities\Conversations\Agent\StateDelivery\AgentStateDelta::fromArray()},

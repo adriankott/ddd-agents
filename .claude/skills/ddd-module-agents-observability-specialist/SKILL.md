@@ -105,6 +105,7 @@ scripts are the application's.
 - `--agentSpaceId` with an empty value is refused, never read as account level; together with one of the application's
   own space options it is refused too.
 - An evaluation command prints its progress on the error output; read the standard output for its `--json` document.
+- `app:ai-agent:eval-tools` runs a case once more after an infrastructure error (a model transport failure, a deadlock — `AgentEvalSuiteCommand::RETRIED_INFRASTRUCTURE_ERRORS`), as `eval-suite` does; the row keeps its first attempt.
 - `app:ai-agent:eval-tools --case=<id>` runs in this process even with `--parallel`; only `--repeat` > 1 forces child
   processes for one case.
 - A judged verdict `ERROR` with `judge call failed: <model>: <reason>` is the provider refusing the judge's call, not

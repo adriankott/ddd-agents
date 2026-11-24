@@ -35,6 +35,9 @@ use DDD\Infrastructure\Base\DateTime\DateTime;
 use DDD\Infrastructure\Exceptions\InternalErrorException;
 use DDD\Infrastructure\Services\Service;
 use GuzzleHttp\Exception\TransferException;
+use DDD\Domain\AI\Exceptions\Conversations\AgentRunClaimLostException;
+use DDD\Domain\AI\Services\Conversations\AIConversationRunClaimsService;
+use DDD\Domain\AI\Traits\Conversations\AITraceLogTrait;
 use DDD\Domain\AI\Entities\Models\CustomerSelection\AgentCustomerSelectableModels;
 use DDD\Domain\AI\Services\AIModelsService;
 use DDD\Infrastructure\Libs\Config;
@@ -50,6 +53,17 @@ use DDD\Domain\AI\Services\SystemPrompts\AgentBaseSystemPromptCacheService;
  */
 class AIConversationModelCallsService extends Service
 {
+    use AITraceLogTrait;
+
+    /** @var int How often one model call is sent again after a transport failure or a 5xx/429 of the router */
+    public const int MAX_MODEL_CALL_RETRIES = 2;
+
+    /** @var int[] The wait before each retry in seconds (index = retry - 1) */
+    public const array MODEL_CALL_RETRY_WAIT_SECONDS = [2, 6];
+
+    /** @var int The longest wait a router's Retry-After may ask for before a retry; a longer one is capped */
+    public const int MAX_MODEL_CALL_RETRY_AFTER_SECONDS = 20;
+
     /**
      * The model call of one loop step with this step's call settings (moved from the agent loop): the owner turn's DECIDED reasoning effort (every step and chunk of the turn) wins over the
      * catalog value; a purpose may ask for the model's FAST service tier, and
@@ -401,7 +415,8 @@ class AIConversationModelCallsService extends Service
         }
         $loopStepOverheadMs['contextBuild'] = (int)round((hrtime(true) - $stampStartedAt) / 1e6);
         $stampStartedAt = hrtime(true);
-        $this->sendModelCallThroughEgress($argusAIAgentConversation, false);
+        $this->applyTransportTimeoutOfModel($argusAIAgentConversation);
+        $modelCallRetriesJson = $this->sendModelCallWithRetries($argusAIAgentConversation, $conversation, $agentRun);
         // TEST-ONLY server-state arm: OpenAI rejected the chain (an unknown or expired `previous_response_id`, any 4xx on
         // it) — resend ONCE as a fresh chain (the whole input, no `previous_response_id`); the snapshot records it
         if ($argusAIAgentConversation->isRejectedResponsesServerStateChain()) {
@@ -434,6 +449,7 @@ class AIConversationModelCallsService extends Service
             $requestSnapshot->reasoningEffort = ($argusLanguageModelInstance !== null ? $argusLanguageModelInstance->reasoningEffort : null)
                 ?? $argusAIAgentConversation->getAIModel()?->agenticUseCase?->reasoningEffort;
             $requestSnapshot->sentAt = new DateTime();
+            $requestSnapshot->modelCallRetriesJson = $modelCallRetriesJson;
             $requestSnapshot->clockAt = $argusAIAgentConversation->modelInput->clockInstant;
             // the zone this call was rendered in — a reconstruction renders THIS, not the current one.
             $requestSnapshot->timezoneIdentifier = $argusAIAgentConversation->modelInput->timezone?->getName();
@@ -699,6 +715,160 @@ class AIConversationModelCallsService extends Service
             // the transfer failed (a connect or read timeout, a dropped connection, a Guzzle response exception): transient,
             // released for the owed-turn recovery pass — never the provider-error fail-fast and never the generic turn error
             throw new AIModelCallTransportFailedException($transportFailure);
+        }
+    }
+
+    /**
+     * Sends the model call and sends it again — at most {@see MAX_MODEL_CALL_RETRIES} times — when the attempt failed in
+     * a way a new attempt can fix: the transfer failed (a cURL timeout, a refused or reset connection, a dropped read),
+     * the router answered 429 or 5xx, or no body arrived. Safe because no tool runs before an answer arrives. A 4xx
+     * other than 429 and a model's own refusal are answers and are never retried.
+     *
+     * - The wait before retry n is {@see MODEL_CALL_RETRY_WAIT_SECONDS}[n-1], or the router's Retry-After on a 429 (at
+     *   most {@see MAX_MODEL_CALL_RETRY_AFTER_SECONDS}).
+     * - Before each retry the run claim is heartbeated; a lost claim stops with {@see AgentRunClaimLostException}.
+     * - Retry n rotates the catalog's OpenRouter `order` by n positions (the next host is asked first; `only`, `ignore`,
+     *   `quantizations` and `data_collection` stay), and it bypasses the caches.
+     * - Each failed attempt is a trace event `turn.modelCall.retry` and an entry of the returned JSON, which the request
+     *   snapshot keeps.
+     *
+     * @return string|null The failed attempts as JSON, null when the first attempt answered
+     * @throws AIModelCallTransportFailedException the last attempt's transfer failed too
+     * @throws AgentRunClaimLostException the claim was lost while waiting
+     */
+    protected function sendModelCallWithRetries(ArgusAIAgentConversation $argusAIAgentConversation, AIConversation $conversation, ?AgentRun $agentRun): ?string
+    {
+        $failedAttempts = [];
+        for ($attemptNumber = 0; ; $attemptNumber++) {
+            $transportFailure = null;
+            $argusAIAgentConversation->providerOrderRotation = $attemptNumber;
+            try {
+                $this->sendModelCallThroughEgress($argusAIAgentConversation, $attemptNumber > 0);
+            } catch (AIModelCallTransportFailedException $transportFailedException) {
+                $transportFailure = $transportFailedException;
+            }
+            $retryReason = $this->findRetryReasonOfModelCallAttempt($argusAIAgentConversation, $transportFailure);
+            if ($retryReason === null) {
+                return $failedAttempts !== [] ? (string)json_encode($failedAttempts, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : null;
+            }
+            if ($attemptNumber >= static::MAX_MODEL_CALL_RETRIES) {
+                $this->aiTrace('turn.modelCall.retriesExhausted', ['conversationId' => $conversation->id ?? null, 'attempts' => $attemptNumber + 1, 'reason' => $retryReason]);
+                if ($transportFailure !== null) {
+                    throw $transportFailure;
+                }
+                // a 5xx/429 or an empty body on the last attempt: the loop reads the answer as it is (provider error)
+                return (string)json_encode($failedAttempts, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            }
+            $waitSeconds = $this->findWaitSecondsBeforeRetry($argusAIAgentConversation, $attemptNumber + 1);
+            $failedAttempt = [
+                'attempt' => $attemptNumber + 1,
+                'reason' => mb_substr($retryReason, 0, 300),
+                'statusCode' => $transportFailure === null ? $argusAIAgentConversation->lastResponseStatusCode : null,
+                'waitedSeconds' => $waitSeconds,
+                'providerOrder' => $this->findProviderOrderOfLastRequest($argusAIAgentConversation),
+            ];
+            $failedAttempts[] = $failedAttempt;
+            $this->aiTrace('turn.modelCall.retry', ['conversationId' => $conversation->id ?? null] + $failedAttempt);
+            $this->keepRunClaimWhileWaiting($conversation);
+            $this->waitBeforeModelCallRetry($waitSeconds);
+            $this->keepRunClaimWhileWaiting($conversation);
+            $argusAIAgentConversation->capturedToolCalls = null;
+            $argusAIAgentConversation->lastRawResponse = null;
+            $argusAIAgentConversation->lastResponseStatusCode = null;
+        }
+    }
+
+    /**
+     * Why an attempt of the model call should be sent again, or null when its answer stands: the transfer failed, the
+     * router answered 429 or 5xx (as the HTTP status or as the error code of an `{error: …}` body), or the transfer
+     * ended without a body.
+     */
+    public function findRetryReasonOfModelCallAttempt(ArgusAIAgentConversation $argusAIAgentConversation, ?AIModelCallTransportFailedException $transportFailure): ?string
+    {
+        if ($transportFailure !== null) {
+            return $transportFailure->getMessage();
+        }
+        $statusCode = $argusAIAgentConversation->lastResponseStatusCode;
+        if ($statusCode !== null && static::isRetryableStatusCode($statusCode)) {
+            return 'HTTP ' . $statusCode;
+        }
+        $lastRawResponse = $argusAIAgentConversation->lastRawResponse;
+        $errorCode = is_object($lastRawResponse) && isset($lastRawResponse->error) && is_object($lastRawResponse->error)
+            && isset($lastRawResponse->error->code) && is_numeric($lastRawResponse->error->code)
+            ? (int)$lastRawResponse->error->code
+            : null;
+        if ($errorCode !== null && static::isRetryableStatusCode($errorCode)) {
+            return 'provider error ' . $errorCode;
+        }
+        if ($argusAIAgentConversation->lastRequestPayload !== null && $lastRawResponse === null) {
+            return 'empty response body';
+        }
+        return null;
+    }
+
+    /** A status a new attempt can fix: 429 (rate limit) and every 5xx */
+    public static function isRetryableStatusCode(int $statusCode): bool
+    {
+        return $statusCode === 429 || ($statusCode >= 500 && $statusCode <= 599);
+    }
+
+    /** The wait before retry `$retryNumber` (1-based): the router's Retry-After on a 429 (capped), else the backoff step */
+    public function findWaitSecondsBeforeRetry(ArgusAIAgentConversation $argusAIAgentConversation, int $retryNumber): int
+    {
+        $backoffWaits = static::MODEL_CALL_RETRY_WAIT_SECONDS;
+        $waitSeconds = $backoffWaits[min($retryNumber, count($backoffWaits)) - 1] ?? 2;
+        if ($argusAIAgentConversation->lastResponseStatusCode === 429) {
+            foreach ($argusAIAgentConversation->getLastResponseHeaders() ?? [] as $headerName => $headerValues) {
+                if (strtolower((string)$headerName) !== 'retry-after') {
+                    continue;
+                }
+                $retryAfter = is_array($headerValues) ? (string)($headerValues[0] ?? '') : (string)$headerValues;
+                if (is_numeric($retryAfter)) {
+                    $waitSeconds = max($waitSeconds, min((int)ceil((float)$retryAfter), static::MAX_MODEL_CALL_RETRY_AFTER_SECONDS));
+                }
+            }
+        }
+        return $waitSeconds;
+    }
+
+    /** @return string[]|null The OpenRouter `order` the last request was sent with, when it carried one */
+    protected function findProviderOrderOfLastRequest(ArgusAIAgentConversation $argusAIAgentConversation): ?array
+    {
+        $order = $argusAIAgentConversation->lastRequestPayload['body']['provider']['order'] ?? null;
+        return is_array($order) ? array_values(array_map('strval', $order)) : null;
+    }
+
+    /** Heartbeats the claim this process holds on the conversation; a lost claim stops the retries */
+    protected function keepRunClaimWhileWaiting(AIConversation $conversation): void
+    {
+        /** @var AIConversationRunClaimsService $aIConversationRunClaimsService */
+        $aIConversationRunClaimsService = DDDService::instance()->getService(AIConversationRunClaimsService::class);
+        $runToken = $aIConversationRunClaimsService->getRunTokenClaimedInThisProcess($conversation);
+        if ($runToken !== null && !$aIConversationRunClaimsService->heartbeat($conversation, $runToken)) {
+            throw new AgentRunClaimLostException('Run-claim lost while waiting to retry a model call — another worker owns this conversation.');
+        }
+    }
+
+    /**
+     * Gives each HTTP attempt of the call the model's transport timeout when the catalog sets one
+     * (`transportTimeoutSeconds`, e.g. 120 s for a model behind a router whose hosts can hang): a total timeout per
+     * attempt is what reliably fires — OpenRouter keeps a hanging upstream connection open with padding bytes, so a
+     * first-byte or idle timeout on the raw stream never triggers. Without a catalog value the repo's timeout stays
+     * (the language-model default of 300 s).
+     */
+    public function applyTransportTimeoutOfModel(ArgusAIAgentConversation $argusAIAgentConversation): void
+    {
+        $aiModel = $this->findAgentModelOfEgress($argusAIAgentConversation);
+        if ($aiModel?->transportTimeoutSeconds !== null && $aiModel->transportTimeoutSeconds > 0) {
+            $argusAIAgentConversation->getArgusSettings()->timeout = (float)$aiModel->getTransportTimeoutSeconds();
+        }
+    }
+
+    /** Waits before a retry (a seam for tests) */
+    protected function waitBeforeModelCallRetry(int $waitSeconds): void
+    {
+        if ($waitSeconds > 0) {
+            sleep($waitSeconds);
         }
     }
 

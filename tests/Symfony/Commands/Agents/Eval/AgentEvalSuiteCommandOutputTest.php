@@ -118,7 +118,7 @@ class AgentEvalSuiteCommandOutputTest extends IntegrationTestCase
         $retriedInfrastructureErrors = $this->buildProbeCommand()->exposeRetriedInfrastructureErrors();
 
         self::assertSame(
-            ['Deadlock found when trying to get lock', 'Lock wait timeout exceeded', 'cURL error 28', 'cURL error 56', 'cURL error 35', 'MySQL server has gone away', '/var/cache/'],
+            ['Deadlock found when trying to get lock', 'Lock wait timeout exceeded', 'cURL error 28', 'cURL error 7', 'cURL error 52', 'cURL error 56', 'cURL error 35', 'MySQL server has gone away', '/var/cache/'],
             $retriedInfrastructureErrors
         );
         self::assertSame('Deadlock found when trying to get lock', AgentEvalCaseRow::fromArray(['passed' => false, 'error' => 'An exception occurred while executing a query: SQLSTATE[40001]: Serialization failure: 1213 Deadlock found when trying to get lock; try restarting transaction'])->findInfrastructureError($retriedInfrastructureErrors));

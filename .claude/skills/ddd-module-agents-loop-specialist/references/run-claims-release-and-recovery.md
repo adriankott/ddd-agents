@@ -144,8 +144,27 @@ How the exceptions reach the release (`resumeConversationIfReady()`):
 A transport failure is the HTTP transfer itself failing: a connect timeout, the read timeout
 (`ArgusAILanguageModelTrait::DEFAULT_ARGUS_TIMEOUT`), a dropped connection, or a Guzzle response exception raised during
 the transfer; the Guzzle exception rides as the previous exception. An HTTP error status of the provider is not one:
-the Argus layer sends with `http_errors` false, so a 4xx or 5xx arrives as a response with an error body and is read as
-a provider error (`AIModelCallFailedException`, no retry).
+the Argus layer sends with `http_errors` false, so a 4xx or 5xx arrives as a response with an error body.
+
+Before either reaches the loop, `AIConversationModelCallsService::sendModelCallWithRetries()` sends the same model call
+again — safe, no tool ran — at most `MAX_MODEL_CALL_RETRIES` (2) times:
+
+| Attempt outcome | Retried | Wait |
+|---|---|---|
+| transfer failed (cURL 28/7/52/56, reset, timeout) | yes | 2 s, then 6 s |
+| HTTP 429 or 5xx (status, or the code of an `{error: …}` body) | yes | backoff, or `Retry-After` capped at 20 s |
+| 2xx/3xx without a body | yes | backoff |
+| 4xx other than 429, a model's own refusal | no — it is an answer | — |
+
+- Retry n rotates the catalog's OpenRouter `order` by n positions (`providerOrderRotation`), so the next host is asked
+  first; `only`, `ignore`, `quantizations`, `data_collection` and `allow_fallbacks` never change. A hung attempt has
+  no response, so the failed host is unknown — rotating is the only way not to land on it again.
+- The claim is heartbeated before and after each wait; a lost claim throws `AgentRunClaimLostException`.
+- Each failed attempt is a trace event `turn.modelCall.retry` and an entry of `RequestSnapshot::$modelCallRetriesJson`.
+- Each attempt gets the model's `transportTimeoutSeconds` from the catalog (ddd-ai; Kimi K3.1 Pro 120 s, default 300 s).
+  A total timeout per attempt is the one that fires: OpenRouter keeps a hanging upstream open with padding bytes.
+- When the retries are spent, a transfer failure is thrown as before (`afterModelCallTransportFailure()`), and a
+  5xx/429 answer is read as a provider error (`AIModelCallFailedException`).
 
 ## 7. Retry
 
