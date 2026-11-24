@@ -18,6 +18,14 @@ Contents
 |---|---|---|
 | Tool | a public method with the `MCPTool` attribute | one callable action; its name is the method name |
 | Package | a subclass of `MCPPackage` | a group of tools; static `$name` (the package id) and `$description` |
+
+The package id is `<provider>.<topic>.<feature>` in the words of the skill it serves (`ddd.system.issues` for the
+skill `System.Issues`, the reference kernel's `demo.notes` for `Demo.Notes`): the provider is the host's prefix (`AI.packageIdProvider`), `ddd` for a feature of Core, or a
+module's word; where provider and topic are one word it is written once (`agent.memory` for `Agent.Memory`). The id
+never comes from the folder: `src/Presentation/Mcp/Client/Agents/` names the audience of the endpoint, and the
+`agent.web.search` it holds carries no audience. The binding names the class; the id stays the public name in call rows and logs. The lint
+(`findBindingNamingProblems()`) checks the form; the full rule set is the framework's rulebook `ddd-module-orchestrator` › references/package-cuts-and-names.md (mgamadeus/ddd) and the skills skill
+(`ddd-module-agents-skills-and-purposes-specialist`, catalog-binding-overrides-and-lint.md, section "Names").
 | Bundle | a subclass of `MCPBundle` | the tool list of one HTTP mount: `INCLUDED_PACKAGES` |
 
 The same tool method is reached two ways, and both end in one execution core, `MCPToolExecutorService`:

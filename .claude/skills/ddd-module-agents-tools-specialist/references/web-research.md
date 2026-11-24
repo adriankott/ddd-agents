@@ -86,6 +86,20 @@ is in the configuration: queries per search (5), pages per read (5), pages per r
 (48,000 characters), cache lifetimes and timeouts per capability (`cacheTtlSeconds`, `timeoutSeconds`), and whether a
 capability's answers are cached in the database too (`cacheInDatabase`).
 
+## A page reader instead of the endpoint (`WebPageTextSource`)
+
+`DDD\Domain\AI\Services\WebSearch\WebPageTextSource` is the port for a page reader of another package or the host
+(e.g. a browser that reads over HTTP and renders thin pages). A service implementing it is registered by its tag
+(autoconfigured); while one answers `isAvailable()`, `AIWebSearchService::getWebPageAsMarkdown()` and
+`getWebPagesAsMarkdown()` read every page through it, and `urlToMarkdown` counts as available without an endpoint.
+Without one, or when it throws (logged), the endpoint reads as before.
+
+- The refusals before a read stay first and are never handed to the reader: research or capability switched off, a
+  search engine's results page, a host without a DNS record, a private address.
+- The reader answers one `WebPageMarkdown` per URL (`url` = the URL asked), a failure on its element, and names how it
+  read the page in `WebPageMarkdown::$fetchedVia` (null = the endpoint). A URL it leaves unanswered is a `FETCH_FAILED`.
+- The bot-challenge downgrade runs on its answers too. The tool `getWebPageAsMarkdown` stays in this package.
+
 ## Degrading
 
 - Off, or a capability without an endpoint: the packages are not offered; a direct call is refused with a sentence the

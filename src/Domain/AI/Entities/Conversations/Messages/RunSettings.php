@@ -294,7 +294,8 @@ class RunSettings extends ValueObject
 
     /**
      * @var string|null The wire API this conversation's agent calls speak — `chatCompletions` /
-     *      `responses` / `responsesServerState` (test-only arm: direct OpenAI, `store: true` + `previous_response_id`);
+     *      `responses` / `messages` (Anthropic Messages API) / `responsesServerState` (test-only arm: direct OpenAI,
+     *      `store: true` + `previous_response_id`);
      *      null (`inherit`) = the model catalog's `agentWireApi` ({@see AIModel::getAgentWireApi()}).
      *      Written by the admin run-settings override, the admin start and the eval arm `--agent-wire-api`; inherited by
      *      delegation children (an arm measures the whole tree). Never an environment variable. Audit:
@@ -335,8 +336,9 @@ class RunSettings extends ValueObject
      *      on the later calls of this conversation (Responses `reasoning` items, Chat-Completions `reasoning_details`) —
      *      `all` (the items of every earlier step), `currentTurn` (only the items of the steps since the newest owner
      *      message), `capped` (every earlier step's until they exceed {@see $previousReasoningCapTokens}, then only the
-     *      newest steps' — a stable cut, moved once per crossing) / `off`; null (`inherit`) = the default per wire API:
-     *      `all` for `responses`, `off` for `chatCompletions`
+     *      newest steps' — a stable cut, moved once per crossing) / `off`; null (`inherit`) = the model catalog's value,
+     *      else the default per wire API: `capped` for `responses` and `messages`, `off` for `chatCompletions` and
+     *      `responsesServerState`
      *      ({@see \DDD\Domain\AI\Entities\Conversations\Agent\Wire\AgentWireConfiguration::resolveFor()}).
      *      Written by the admin run-settings override, the console option and the eval arm
      *      `--previous-reasoning-carry-over`; inherited by delegation children.
@@ -353,7 +355,8 @@ class RunSettings extends ValueObject
     /**
      * @var int|null The cap of the carry-over `capped`, in reasoning tokens: while the reasoning items the call would send
      *      back stay at or below it, all of them go; above it the older ones are dropped in one block. Null = the
-     *      committed default `AI.contextRetention.previousReasoningCapTokens`
+     *      committed default of the run's wire API (`AI.contextRetention.previousReasoningCapTokensByAgentWireApi`,
+     *      else `AI.contextRetention.previousReasoningCapTokens`)
      *      ({@see \DDD\Domain\AI\Entities\Conversations\Agent\Wire\AgentWireConfiguration::resolveDefaultPreviousReasoningCapTokens()}).
      *      Inert under every other mode. Written by the admin run-settings override, the console option and the eval
      *      arm `--previous-reasoning-cap-tokens`; inherited by delegation children.

@@ -112,12 +112,13 @@ class AgentClientAttachment extends Entity
         if ($uiStateJson === null || $uiStateJson === '') {
             return null;
         }
-        $uiStateArray = json_decode($uiStateJson, true);
-        if (!is_array($uiStateArray)) {
+        // setPropertiesFromObject() takes its argument by reference: it needs a variable, never an expression
+        $uiStateObject = json_decode($uiStateJson);
+        if (!is_object($uiStateObject)) {
             return null;
         }
         $agentUIState = new AgentUIState();
-        $agentUIState->setPropertiesFromObject((object)$uiStateArray);
+        $agentUIState->setPropertiesFromObject($uiStateObject);
         return $agentUIState->normalize();
     }
 

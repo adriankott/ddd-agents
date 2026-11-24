@@ -2,10 +2,26 @@
 
 **Reader:** host developer
 
-Contents: the table · the shared shape of a host command · 1 fire due schedules · 2 sweep schedule state · 3 deliver
+Contents: what a host does not build · the table · the shared shape of a host command · 1 fire due schedules · 2 sweep schedule state · 3 deliver
 owed reports and resume owed turns · 4 reap runs whose worker died · 5 mark and reduce finalized conversations ·
 6 workers · 7 base system prompt cache · 8 purge the event tables · 9 cancel a live run · the optional duties · the
 cron list.
+
+## What a host does not build
+
+Before a host writes a tool, it asks: does the tool read a table or call a service of a `mgamadeus` package? Then the
+tool belongs to that package, and the host asks for it there. Core ships no agent part: tools for Core's features
+(issues, workers, crons, health) ship with this package (`System.*`), the drive's with ddd-clouddrive, the browser's and
+the sandbox's with their packages.
+
+| Belongs to a package | Belongs to the host |
+|---|---|
+| tools and skills for a feature of the framework: issues, workers, crons, health, texts, drive, browser, sandbox, the user's UI | its domain topics |
+| the mechanism of a capability: channel, protocol, state note, defaults | adapters and ports: the screen catalog (`AgentUIScreenCatalogService`), how a record is described, navigation targets, health sections (`SystemHealthSectionProvider`) |
+| generic recipes | its know-how as preloaded content and sentences in a same-path skill override |
+| right constants | the mapping to roles (`AI.accountRights`), feature switches |
+
+Names of the host's own skills, package ids and rights: the framework's rulebook `ddd-module-orchestrator` › references/package-cuts-and-names.md (mgamadeus/ddd).
 
 ## The table
 

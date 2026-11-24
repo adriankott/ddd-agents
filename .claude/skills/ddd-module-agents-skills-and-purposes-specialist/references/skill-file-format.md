@@ -8,7 +8,9 @@ model sees once the skill is loaded · YAML traps · checking a file
 ## Where the file lives
 
 One agent skill is one markdown file below `config/app/AI/Skills/` of a config root. Its dotted name is its path:
-`Agent/Mandates.md` is the skill `Agent.Mandates`. There is no id besides the name. The name is the key of
+`Agent/Mandates.md` is the skill `Agent.Mandates`. There is no id besides the name. The name is `<Topic>.<Feature>`
+(a functional subject, then what is done or read in it, three parts at most, no file beside a folder of the same name):
+[catalog-binding-overrides-and-lint.md](catalog-binding-overrides-and-lint.md), section "Names". The name is the key of
 `AISkillsService::getAISkillByName()`, which reads it as the config value `AI.Skills.<name>` from the FIRST config
 root that holds the file (the application's roots before a module's). A file alone is not offered: the skill also
 needs its entry in the binding `AI.skillPackages` (reference [catalog-binding-overrides-and-lint.md](catalog-binding-overrides-and-lint.md)).

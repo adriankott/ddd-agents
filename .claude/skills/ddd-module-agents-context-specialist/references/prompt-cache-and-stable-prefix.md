@@ -216,6 +216,14 @@ input, so the cap is a cache and cost lever, not a latency one. A host that want
 (`RunSettings::$previousReasoningCarryOver`, a purpose's `runSettings`); a host that wants another cap sets
 `previousReasoningCapTokens`.
 
+**A cap per wire API.** `previousReasoningCapTokensByAgentWireApi` (`AI.contextRetention`, keyed by the wire API:
+`responses`, `messages`) gives one wire API its own cap; a wire API without an entry takes `previousReasoningCapTokens`,
+a conversation's `RunSettings::$previousReasoningCapTokens` wins over both. The package ships no entry (every wire API at
+4000). The reason to set one: on the Messages API a cut drops thinking blocks from the cached history, so the next call
+writes that history to the cache again, while the blocks below the cap cost little to keep — in a measured
+conversation the carried thinking stayed under 3,000 tokens after nine calls, so a cut there costs far more than it
+saves. On the Responses API the cut is what bounds the input and stays wanted.
+
 ## 5a. The Messages API: thinking blocks and the frozen part
 
 On the Anthropic Messages API a thinking block is signed and bound to the prefix that produced it: the system prompt,

@@ -26,6 +26,8 @@ use DDD\Domain\AI\Repo\Argus\WebSearch\ArgusWebSearchHitLists;
 use DDD\Infrastructure\Http\PublicUrlGuard;
 use DDD\Infrastructure\Services\DDDService;
 use DDD\Infrastructure\Services\Service;
+use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
+use Symfony\Contracts\Service\Attribute\Required;
 use DDD\Domain\AI\Exceptions\Conversations\AgentToolExecutionTimeoutException;
 use Throwable;
 
@@ -54,6 +56,33 @@ class AIWebSearchService extends Service
     /** @var string[] host => its {@see PublicUrlGuard} class, for the life of the process */
     protected static array $hostClassByHost = [];
 
+    /** @var iterable<WebPageTextSource> */
+    protected iterable $webPageTextSources = [];
+
+    /** @param iterable<WebPageTextSource> $webPageTextSources */
+    #[Required]
+    public function setWebPageTextSources(
+        #[AutowireIterator(WebPageTextSource::TAG)]
+        iterable $webPageTextSources
+    ): void {
+        $this->webPageTextSources = $webPageTextSources;
+    }
+
+    /** The first available page reader that replaces the url-to-markdown endpoint; null = the endpoint reads */
+    public function findAvailableWebPageTextSource(): ?WebPageTextSource
+    {
+        foreach ($this->webPageTextSources as $webPageTextSource) {
+            try {
+                if ($webPageTextSource->isAvailable()) {
+                    return $webPageTextSource;
+                }
+            } catch (Throwable $throwable) {
+                DDDService::instance()->getLogger()->warning('[AIWebSearch] a web page text source failed its availability check', ['source' => $webPageTextSource::class, 'reason' => $throwable->getMessage()]);
+            }
+        }
+        return null;
+    }
+
     /** Whether the web research is switched on at all (`AI.webSearch.enabled`, default off). */
     public function isWebSearchEnabled(): bool
     {
@@ -71,7 +100,8 @@ class AIWebSearchService extends Service
         }
         return match ($capability) {
             self::CAPABILITY_SEARCH => ArgusWebSearchHitList::findConfiguredLoadEndpoint() !== null,
-            self::CAPABILITY_URL_TO_MARKDOWN => ArgusWebPageMarkdown::findConfiguredLoadEndpoint() !== null,
+            self::CAPABILITY_URL_TO_MARKDOWN => ArgusWebPageMarkdown::findConfiguredLoadEndpoint() !== null
+                || $this->findAvailableWebPageTextSource() !== null,
             default => false,
         };
     }
@@ -360,6 +390,13 @@ class AIWebSearchService extends Service
      */
     public function getWebPageAsMarkdown(string $url, bool $noCache = false, ?float $crawlTimeoutSeconds = null): WebPageMarkdown
     {
+        $webPageTextSource = $this->findAvailableWebPageTextSource();
+        if ($webPageTextSource !== null) {
+            $sourceWebPageMarkdowns = $this->readWebPagesThroughTextSource($webPageTextSource, [trim($url)], $noCache, $crawlTimeoutSeconds);
+            if ($sourceWebPageMarkdowns !== null) {
+                return $sourceWebPageMarkdowns->getElements()[0];
+            }
+        }
         $refusedWebPageMarkdown = $this->refuseWebPageUrlBeforeCrawl($url);
         if ($refusedWebPageMarkdown !== null) {
             return $refusedWebPageMarkdown;
@@ -400,6 +437,13 @@ class AIWebSearchService extends Service
         $webPageMarkdowns = WebPageMarkdowns::newInstance();
         if ($cleanUrls === []) {
             return $webPageMarkdowns;
+        }
+        $webPageTextSource = $this->findAvailableWebPageTextSource();
+        if ($webPageTextSource !== null) {
+            $sourceWebPageMarkdowns = $this->readWebPagesThroughTextSource($webPageTextSource, $cleanUrls, $noCache, $crawlTimeoutSeconds);
+            if ($sourceWebPageMarkdowns !== null) {
+                return $sourceWebPageMarkdowns;
+            }
         }
         if (count($cleanUrls) === 1) {
             $webPageMarkdown = $this->getWebPageAsMarkdown($cleanUrls[0], $noCache, $crawlTimeoutSeconds);
@@ -456,12 +500,76 @@ class AIWebSearchService extends Service
     }
 
     /**
+     * The pages read through `$webPageTextSource`: the refusals before any read decided here (the capability switch
+     * aside: the source stands in for the endpoint), the rest handed to the source as one read, one element per URL in
+     * the order asked; an element the source did not answer is a FETCH_FAILED. Null when the source threw: the caller
+     * reads through the endpoint instead (logged).
+     *
+     * @param string[] $urls trimmed, non-empty
+     */
+    protected function readWebPagesThroughTextSource(WebPageTextSource $webPageTextSource, array $urls, bool $noCache, ?float $timeoutSeconds): ?WebPageMarkdowns
+    {
+        $refusedPagesByPosition = [];
+        $urlsToRead = [];
+        foreach ($urls as $position => $url) {
+            $refusedWebPageMarkdown = $this->refuseWebPageUrlBeforeRead($url);
+            if ($refusedWebPageMarkdown !== null) {
+                $refusedPagesByPosition[$position] = $refusedWebPageMarkdown;
+                continue;
+            }
+            $urlsToRead[WebPageMarkdown::canonicalUrlKey($url)] = $url;
+        }
+        $readPagesByUrlKey = [];
+        if ($urlsToRead !== []) {
+            try {
+                $sourceWebPageMarkdowns = $webPageTextSource->getWebPagesAsMarkdown(array_values($urlsToRead), $noCache, $timeoutSeconds);
+            } catch (AgentToolExecutionTimeoutException $agentToolExecutionTimeoutException) {
+                throw $agentToolExecutionTimeoutException;
+            } catch (Throwable $throwable) {
+                DDDService::instance()->getLogger()->warning('[AIWebSearch] the web page text source failed, the endpoint reads instead', ['source' => $webPageTextSource::class, 'reason' => $throwable->getMessage()]);
+                return null;
+            }
+            foreach ($sourceWebPageMarkdowns->getElements() as $sourceWebPageMarkdown) {
+                if ($sourceWebPageMarkdown->url !== null) {
+                    $readPagesByUrlKey[WebPageMarkdown::canonicalUrlKey($sourceWebPageMarkdown->url)] ??= $sourceWebPageMarkdown;
+                }
+            }
+        }
+        $webPageMarkdowns = WebPageMarkdowns::newInstance();
+        foreach ($urls as $position => $url) {
+            if (isset($refusedPagesByPosition[$position])) {
+                $webPageMarkdowns->add($refusedPagesByPosition[$position]);
+                continue;
+            }
+            $readWebPageMarkdown = $readPagesByUrlKey[WebPageMarkdown::canonicalUrlKey($url)] ?? null;
+            if (!$readWebPageMarkdown instanceof WebPageMarkdown) {
+                $readWebPageMarkdown = WebPageMarkdown::fromRefusedUrl($url, WebPageMarkdown::REASON_FETCH_FAILED);
+            }
+            $readWebPageMarkdown->downgradeBotChallengeToFailure();
+            $webPageMarkdowns->add($readWebPageMarkdown);
+        }
+        return $webPageMarkdowns;
+    }
+
+    /**
      * The refusals of a page URL decided BEFORE any crawl: the capability is off, a search engine's results page, a
      * host without a DNS record, a private address. Null = the crawler decides.
      */
     protected function refuseWebPageUrlBeforeCrawl(string $url): ?WebPageMarkdown
     {
         if (!$this->isCapabilityAvailable(self::CAPABILITY_URL_TO_MARKDOWN)) {
+            return WebPageMarkdown::fromRefusedUrl($url, WebPageMarkdown::REASON_CAPABILITY_OFF);
+        }
+        return $this->refuseWebPageUrlBeforeRead($url);
+    }
+
+    /**
+     * The refusals of a page URL that hold for every reader: the research or the capability switched off, a search
+     * engine's results page, a host without a DNS record, a private address. Null = the reader decides.
+     */
+    protected function refuseWebPageUrlBeforeRead(string $url): ?WebPageMarkdown
+    {
+        if (!$this->isWebSearchEnabled() || WebSearchConfiguration::findValue('capabilities.' . self::CAPABILITY_URL_TO_MARKDOWN, true) === false) {
             return WebPageMarkdown::fromRefusedUrl($url, WebPageMarkdown::REASON_CAPABILITY_OFF);
         }
         if (WebPageMarkdown::isSearchEngineResultsPageUrl($url)) {

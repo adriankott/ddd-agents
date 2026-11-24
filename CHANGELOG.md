@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.3.1
+
+**Fixed:**
+
+- `Agent.UI`: a run-state read that carries `uiStateJson` and the UI state note of a client whose state is stored no
+  longer fail with "could not be passed by reference" (`AIConversationRunStateGetRequestDto::findUIState()`,
+  `AgentClientAttachment::getUIState()`). With 0.3.0 every client that reported its UI state got an error on the read.
+
+**New:**
+
+- **A carry-over cap per wire API.** `AI.contextRetention.previousReasoningCapTokensByAgentWireApi` (keyed by the wire
+  API: `responses`, `messages`) gives one wire API its own cap of the carry-over `capped`; a wire API without an entry
+  takes `previousReasoningCapTokens`, a conversation's run settings win over both
+  (`AgentWireConfiguration::resolveDefaultPreviousReasoningCapTokens($wireApi)`). The package ships no entry: every
+  wire API stays at 4,000. A host that replaces `contextRetention.php` needs nothing; to give the Messages API its own
+  cap it adds the key.
+- **`WebPageTextSource`**, the port for a page reader of another package or the host
+  (`DDD\Domain\AI\Services\WebSearch\WebPageTextSource`, a tagged service). While one is available,
+  `getWebPageAsMarkdown()` / `getWebPagesAsMarkdown()` read through it after the refusals (results page, unresolvable
+  host, private address) and `urlToMarkdown` counts as available without an endpoint; without one, or when it throws,
+  the endpoint reads as before. `WebPageMarkdown::$fetchedVia` names how a reader read a page (null = the endpoint).
+  The tool `getWebPageAsMarkdown` stays in this package.
+- `RunSettings::$agentWireApi` documents `messages` among its values (the value has been accepted since 0.2.0): a host
+  whose generated client types lack it regenerates them from the OpenAPI document.
+
+**Docs:** the naming and rights rules in the agent skills (skill file names, package ids, rights constants and their
+mapping, platform skills, what a host does not build), linked to the framework's rulebook
+(`ddd-module-orchestrator` › package-cuts-and-names). Database tests for the client tool tables on MariaDB and
+PostgreSQL.
+
 ## 0.3.0
 
 One release for the module cut: what moved to its own package leaves, the agent's skills get their final names, and

@@ -104,6 +104,12 @@ class WebPageMarkdown extends ValueObject
     public ?string $reason = null;
 
     /**
+     * How the page was read, as the reader names it (e.g. `http`, `browser`); null = the url-to-markdown endpoint of
+     * the web research. Set by a {@see \DDD\Domain\AI\Services\WebSearch\WebPageTextSource}.
+     */
+    public ?string $fetchedVia = null;
+
+    /**
      * One identity per page (the cache key of a page read and the merge key of search hits): the scheme and the
      * fragment dropped, the host lower-cased without a leading `www.`, trailing slashes dropped; path and query kept as
      * typed (`/shop` and `/shop?x=1` are different pages).

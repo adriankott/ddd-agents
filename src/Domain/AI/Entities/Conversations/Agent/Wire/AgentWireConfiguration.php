@@ -77,7 +77,8 @@ class AgentWireConfiguration
 
     /**
      * @var int The cap of the carry-over `capped` in reasoning tokens — the conversation's row, else the committed default
-     *      ({@see resolveDefaultPreviousReasoningCapTokens()}); read only under `capped` ({@see AgentPreviousReasoningCut}).
+     *      of the run's wire API ({@see resolveDefaultPreviousReasoningCapTokens()}); read only under `capped`
+     *      ({@see AgentPreviousReasoningCut}).
      */
     public int $previousReasoningCapTokens = self::DEFAULT_PREVIOUS_REASONING_CAP_TOKENS;
 
@@ -122,7 +123,7 @@ class AgentWireConfiguration
         $previousReasoningCapTokensRow = $runSettings->previousReasoningCapTokens ?? null;
         $agentWireConfiguration->previousReasoningCapTokens = $previousReasoningCapTokensRow !== null && $previousReasoningCapTokensRow > 0
             ? $previousReasoningCapTokensRow
-            : self::resolveDefaultPreviousReasoningCapTokens();
+            : static::resolveDefaultPreviousReasoningCapTokens($agentWireConfiguration->wireApi);
         $agentWireConfiguration->rejectionReason = self::findRejectionReason(
             $agentWireConfiguration->wireApi,
             $agentWireConfiguration->skillLoadingStrategy,
@@ -302,17 +303,30 @@ class AgentWireConfiguration
         return $this->previousReasoningCarryOver !== RunSettings::PREVIOUS_REASONING_CARRY_OVER_OFF;
     }
 
+    /** The config key (below `AI.contextRetention`) of the caps per wire API. */
+    public const string CONFIG_KEY_PREVIOUS_REASONING_CAP_TOKENS_BY_AGENT_WIRE_API = 'previousReasoningCapTokensByAgentWireApi';
+
     /**
-     * The committed default cap of the carry-over `capped`: `AI.contextRetention.previousReasoningCapTokens` (a positive
-     * count), else {@see DEFAULT_PREVIOUS_REASONING_CAP_TOKENS}. No environment variable. Never throws.
+     * The committed default cap of the carry-over `capped` on `$wireApi` (null = no wire API known): the wire API's
+     * entry in `AI.contextRetention.previousReasoningCapTokensByAgentWireApi` (a positive count, keyed by the wire API,
+     * e.g. `messages`), else `AI.contextRetention.previousReasoningCapTokens` (a positive count), else
+     * {@see DEFAULT_PREVIOUS_REASONING_CAP_TOKENS}. A wire API whose carried reasoning is cheap to keep and costly to
+     * cut (a cut rewrites the cached history once) gets its own, higher cap here. No environment variable. Never throws.
      */
-    public static function resolveDefaultPreviousReasoningCapTokens(): int
+    public static function resolveDefaultPreviousReasoningCapTokens(?string $wireApi = null): int
     {
         try {
             $configured = Config::get(ContextRetentionSettings::CONFIG_KEY);
-            $configuredCapTokens = is_array($configured) ? ($configured['previousReasoningCapTokens'] ?? null) : null;
-            if (is_int($configuredCapTokens) && $configuredCapTokens > 0) {
-                return $configuredCapTokens;
+            if (is_array($configured)) {
+                $capTokensByWireApi = $configured[self::CONFIG_KEY_PREVIOUS_REASONING_CAP_TOKENS_BY_AGENT_WIRE_API] ?? null;
+                $wireApiCapTokens = $wireApi !== null && is_array($capTokensByWireApi) ? ($capTokensByWireApi[$wireApi] ?? null) : null;
+                if (is_int($wireApiCapTokens) && $wireApiCapTokens > 0) {
+                    return $wireApiCapTokens;
+                }
+                $configuredCapTokens = $configured['previousReasoningCapTokens'] ?? null;
+                if (is_int($configuredCapTokens) && $configuredCapTokens > 0) {
+                    return $configuredCapTokens;
+                }
             }
         } catch (Throwable) {
             // no config file — the built-in default

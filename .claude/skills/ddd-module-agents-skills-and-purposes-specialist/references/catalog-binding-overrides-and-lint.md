@@ -42,6 +42,8 @@ return [
 | A package several skills bind keeps a feature of its own | rb.admin.finder, agent.drive | |
 | The binding names classes; a rename is code and config, no alias (an old name in a stored conversation is skipped) | | |
 
+The same rules for every package and host, with the other layers (Composer, console, config, env, images): the framework's rulebook `ddd-module-orchestrator` › references/package-cuts-and-names.md (mgamadeus/ddd).
+
 Every MCP package names itself with its static `MCPPackage::$name` (the package's own: `agent.mandates`,
 `agent.tasks`, `agent.taskRunReports`, `agent.memory`, `agent.web.search`, `agent.ui`, `ddd.system.health`,
 `ddd.system.issues`, `ddd.system.workers`, `ddd.system.crons`; the kernel's: `demo.notes`). `MCPPackageIdsService` finds the packages by scanning the

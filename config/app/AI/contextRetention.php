@@ -13,6 +13,8 @@ declare(strict_types=1);
  * (append-only skill rows inside a prefix epoch, Responses API only; a Chat Completions model falls back to the swap).
  * `rebuildEpochOnSituationChange`, `stateChangeDelivery` (`everyCall` / `onceWhenChanged`),
  * `appendOnlyReachableToolSetCeilingTokens` and `previousReasoningCapTokens`: see the settings class.
+ * `previousReasoningCapTokensByAgentWireApi`: the cap of the carry-over `capped` per wire API (`responses`, `messages`),
+ * e.g. `['messages' => 12000]`; a wire API without an entry takes `previousReasoningCapTokens`.
  * `toolDelivery` (`native` / `callTool` / `callToolJsonSchema`, append-only loading only): `callTool` declares the meta
  * tools plus one fixed `call_tool(name, arguments)` and lists a loaded skill's tools as text in its load; `native`
  * declares every tool. `dropColdSkillsAtCompactionRebase`: at the first model call after a compaction, skills unused for
@@ -26,6 +28,7 @@ return [
     'stateChangeDelivery' => 'onceWhenChanged',
     'appendOnlyReachableToolSetCeilingTokens' => 55000,
     'previousReasoningCapTokens' => 4000,
+    'previousReasoningCapTokensByAgentWireApi' => [],
     'toolDelivery' => 'callTool',
     'dropColdSkillsAtCompactionRebase' => true,
 ];

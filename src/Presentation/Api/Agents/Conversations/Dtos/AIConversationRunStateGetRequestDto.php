@@ -31,12 +31,13 @@ class AIConversationRunStateGetRequestDto extends RequestDto
     /** The UI state the read carries; null when it carries none */
     public function findUIState(): ?AgentUIState
     {
-        $uiStateArray = json_decode((string)($this->uiStateJson ?? ''), true);
-        if (!is_array($uiStateArray)) {
+        // setPropertiesFromObject() takes its argument by reference: it needs a variable, never an expression
+        $uiStateObject = json_decode((string)($this->uiStateJson ?? ''));
+        if (!is_object($uiStateObject)) {
             return null;
         }
         $agentUIState = new AgentUIState();
-        $agentUIState->setPropertiesFromObject((object)$uiStateArray);
+        $agentUIState->setPropertiesFromObject($uiStateObject);
         return $agentUIState;
     }
 }

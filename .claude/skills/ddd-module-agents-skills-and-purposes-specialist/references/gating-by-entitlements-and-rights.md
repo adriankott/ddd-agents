@@ -51,10 +51,12 @@ A module's skill knows no host flag. `AI.skillRequirements` (`AISkillsService::C
 without editing a file:
 
 ```php
+use DDD\Domain\AI\Entities\Conversations\Entitlements\AgentAccountRights;
+
 return [
     'Agent.Mandates' => [
         'requiredFeatureFlags' => ['AGENT.MANDATES'],
-        'requiredAccountRights' => ['manageAgent'],
+        'requiredAccountRights' => [AgentAccountRights::SCHEDULE_AGENT_TASKS],
     ],
 ];
 ```
@@ -62,8 +64,21 @@ return [
 `AISkillsService::applySkillRequirementOverlay()` UNITES the overlay with the frontmatter (frontmatter values first,
 so the frontmatter's first any-of flag stays the upgrade offer; duplicates dropped; the bool keys OR-ed). The overlay
 can add a gate, never remove one. Keys: `requiredFeatureFlags`, `anyOfRequiredFeatureFlags`, `requiredAccountRights`,
-`requiresAccountBillingAccess`. Purposes have `AI.purposeRequirements` with `requiredFeatureFlags` only. The flag and
-right names above are placeholders of the host.
+`requiresAccountBillingAccess`. Purposes have `AI.purposeRequirements` with `requiredFeatureFlags` only. The flag name
+above is a placeholder of the host; a right is always a package's constant, never a host string.
+
+## Rights: who declares, who maps
+
+| Rule | How |
+|---|---|
+| A package declares the right its tools need, as a constant of its rights class | `AgentAccountRights::USE_WEB`; the sandbox's `useSandbox`, the browser's `useBrowser` in their own packages |
+| The package class carries the right; the skill names the same right | `#[MCPRequiresAccountRights(AgentAccountRights::USE_WEB)]` on the package, `requiredAccountRights: [useWeb]` in the skill |
+| A host maps rights to its roles; no role name in a package or a skill | `AI.accountRights` (`operatePlatform => [Role::SUPERADMIN]`) or its own `AgentAccountRightsInterface` |
+| An unmapped right is not held | a platform skill stays closed until the host opens it |
+| Platform skills (`System.*`, `Translations.*`) are for superadmins | the right plus `#[MCPRequiresAdminWithAccessToAllResources]` on the package: they read across every account |
+| A host adds a gate to a package's tool by a same-path subclass of the package | it repeats the package's rights attribute (the attributes of the parent class are not read on the subclass) |
+
+The naming rules of the whole ecosystem: the framework's rulebook `ddd-module-orchestrator` › references/package-cuts-and-names.md (mgamadeus/ddd).
 
 ## Offer is not authorization
 

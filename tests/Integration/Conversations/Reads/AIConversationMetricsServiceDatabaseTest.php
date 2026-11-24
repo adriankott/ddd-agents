@@ -60,7 +60,8 @@ class AIConversationMetricsServiceDatabaseTest extends DatabaseTestCase
         self::assertSame([0, 1, 2, 3], array_map('intval', array_column($messageRows, 'i')));
         self::assertSame(
             ['i', 'role', 't', 'author', 'signal', 'c', 'u', 'snap', 'dur', 'startedAt', 'egress', 'cost', 'tool', 'args', 'toolStatus',
-                'refusedFlag', 'gateRefused', 'dupRefused', 'resultHead', 'variants', 'skillSections'],
+                'refusedFlag', 'gateRefused', 'dupRefused', 'resultHead', 'variants', 'skillSections',
+                'inTok', 'cachedTok', 'writeTok', 'outTok', 'reasoningTok', 'inputTransformations'],
             array_keys($messageRows[0]),
             'every key keeps its case on both engines'
         );

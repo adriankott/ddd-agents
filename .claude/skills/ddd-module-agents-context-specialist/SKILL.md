@@ -165,6 +165,7 @@ Keep the method a single indexed read.
 | `stateChangeDelivery` | `onceWhenChanged` | `everyCall` | `ContextRetentionSettings::resolveDefaultStateChangeDelivery()` |
 | `appendOnlyReachableToolSetCeilingTokens` | 55000 | 55000 | `ContextRetentionSettings::resolveAppendOnlyReachableToolSetCeilingTokens()` |
 | `previousReasoningCapTokens` | 4000 | 4000 | `AgentWireConfiguration::resolveDefaultPreviousReasoningCapTokens()` |
+| `previousReasoningCapTokensByAgentWireApi` | `[]` (every wire API takes `previousReasoningCapTokens`) | `[]` | `AgentWireConfiguration::resolveDefaultPreviousReasoningCapTokens($wireApi)` |
 | `toolDelivery` | `callTool` | `callTool` (a conversation without the stamp: `native`) | `ContextRetentionSettings::resolveDefaultToolDelivery()` |
 | `dropColdSkillsAtCompactionRebase` | `true` | `true` (a conversation without the stamp: no drop) | `ContextRetentionSettings::resolveDefaultDropColdSkillsAtCompactionRebase()` |
 
