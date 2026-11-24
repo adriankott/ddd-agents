@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.3.6
+
+**Fixed:**
+
+- **Responses API: one fixed system marker, on the base prompt.** The markers inside the multi-part system item are part
+  of the provider's cache key there; markers on separate items are not. 0.3.5 marked the system end instead of the base
+  prompt on every call; the system item now carries one marker on the base prompt on every call and never one on its
+  end (`ArgusAIAgentConversation::buildSystemContentPartsWithPromptCacheBreakpoints(…, $marksEnd)`). A normal call marks
+  the base prompt, the newest stable message and the previous call's message; a call that moves the reasoning cut marks
+  the base prompt, the entries before the earlier and the new cut and the newest stable message. Under the
+  system-prompt swap the cut markers now fit as well. Cost: a change right behind the system content (a compaction
+  summary, a changed variant) reads only the base prompt (about 12k tokens) instead of the whole system content. The
+  first call after the update writes the system entry again. The Messages API is unchanged (`cache_control` is not part
+  of the cache key there).
+
+**Host steps:** none.
+
 ## 0.3.5
 
 **Fixed:**

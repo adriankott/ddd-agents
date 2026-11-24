@@ -1208,17 +1208,18 @@ class ArgusAIAgentConversation extends ArgusAIConversation
             // on the Responses API the wire marker goes on the newest stable USER / TOOL / developer item — a marker on
             // an assistant `output_text` part is not probed (a tool result's part is)
             $usesResponsesApi = $this->agentWireConfiguration?->usesResponsesApi() === true;
-            // The markers of the system parts are the same on EVERY call of a conversation: on this wire a marker is
-            // part of the prefix (a call without the base-prompt marker reads one token less of the same system
-            // content), so an entry written by a call with other system markers is never found by the calls after
-            // it. An append-only epoch's loaded-skills segment is fixed — no split before it; on the Responses API
-            // under append-only loading the system content is the same for the whole epoch, so it carries one marker
-            // at its end and the slots go to the wire messages (the stable message, the previous call's message, or
-            // on a call that moves the reasoning cut the entries before the earlier and the new cut).
+            // The markers of the system parts are the same on EVERY call of a conversation: on the Responses API the
+            // markers inside the system item are part of the provider's cache key, so an entry written by a call with
+            // other system markers is never found by the calls after it (markers on separate items do not matter).
+            // There the system item carries ONE marker, on the base prompt, never on its end: the slots go to the wire
+            // messages (the stable message, the previous call's message, or on a call that moves the reasoning cut the
+            // entries before the earlier and the new cut). A change right behind the system content then reads only
+            // the base prompt. An append-only epoch's loaded-skills segment is fixed — no split before it.
             $systemContentParts = $this->buildSystemContentPartsWithPromptCacheBreakpoints(
                 $this->lastSystemSegments,
                 !$usesResponsesApi && $this->agentWireConfiguration?->usesConversationAppend() !== true,
-                !$usesResponsesApi || $this->agentWireConfiguration?->usesConversationAppend() !== true
+                true,
+                !$usesResponsesApi
             );
             $freeMarkerSlots = AgentResponsesRequestComposer::MAX_PROMPT_CACHE_BREAKPOINTS
                 - self::countPromptCacheBreakpointsOfContent($systemContentParts) - 1;
@@ -1339,7 +1340,7 @@ class ArgusAIAgentConversation extends ArgusAIConversation
      * @param AgentContextSegment[] $systemSegments {@see AgentModelInput::buildSystemSegments()} of this call
      * @return array<int, array<string, mixed>>
      */
-    public function buildSystemContentPartsWithPromptCacheBreakpoints(array $systemSegments, bool $marksBeforeLoadedSkills = true, bool $marksInnerParts = true): array
+    public function buildSystemContentPartsWithPromptCacheBreakpoints(array $systemSegments, bool $marksBeforeLoadedSkills = true, bool $marksInnerParts = true, bool $marksEnd = true): array
     {
         $systemContentParts = [];
         $currentPartText = '';
@@ -1358,7 +1359,7 @@ class ArgusAIAgentConversation extends ArgusAIConversation
             }
         }
         if ($currentPartText !== '') {
-            $systemContentParts[] = ['type' => 'text', 'text' => $currentPartText, 'prompt_cache_breakpoint' => self::PROMPT_CACHE_BREAKPOINT];
+            $systemContentParts[] = self::buildSystemContentPart($currentPartText, $marksEnd);
         }
         return $systemContentParts;
     }

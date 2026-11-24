@@ -224,16 +224,18 @@ three calls around a cut on both wires and checks that the bodies, without marke
 earlier cut and up to the cut call's last marker. On Responses the markers skip assistant entries like the other wire
 markers.
 
-**The system markers never change on the explicit-breakpoint wire.** On the Responses API a breakpoint is part of the
-prefix: a cut call without the base-prompt marker read one token less of the same system content than the other calls,
-and the call after a cut call read only the system prefix, while a cut call read the entry of the cut call before it
-and a normal call the entry of the normal call before it. So the system
-item carries the same markers on every call: under append-only loading one marker at its end (the system content is
-fixed for the epoch; after a compaction the base prompt is no longer read on its own), under the system-prompt swap the
-base prompt and the end. The wire gets what is left of the four: the stable message, then either the previous call's
-message or, on a call that moves the cut, the two cut markers — when only one slot is left (the swap), a cut call marks
-neither cut. On the Messages API `cache_control` is not part of the prefix (the call after a cut reads its whole history), so a cut
-call there gives up the inner system markers. Without these markers every cut call read only the system prefix (measured on Luna: 23 cut calls in
+**The system markers never change on the Responses API.** There the markers inside the multi-part system item are part
+of the provider's cache key (markers on separate items are not): two calls whose system text and split were the same
+and whose system markers differed did not share an entry, so the call after each cut call read only the system prefix.
+The system item therefore carries ONE marker on every call, on the base prompt, never on its end. Normal call: the base
+prompt, the newest stable message and the previous call's message (three). Cut call: the base prompt, the entry before
+the earlier cut, the entry before the new cut and the newest stable message (four). Cost: a change right behind the
+system content (a compaction summary, a changed variant) reads only the base prompt (about 12k tokens of a typical
+system prefix) instead of the whole system content. On the Messages API `cache_control` is not part of the cache key
+(the call after a cut reads its whole history), so it stays as it is: a cut call there leaves out the inner system
+markers.
+
+Without the cut markers every cut call read only the system prefix (measured on Luna: 23 cut calls in
 196, each reading exactly the system prefix). On the Messages API the entry lives 5 minutes from its last read; a gap of
 more than that between two cut calls reads the system prefix only, as before. A step's reasoning size is the provider's count (`RequestSnapshot::$wireReasoningTokens`),
 else an estimate from the items' JSON (`AgentPreviousReasoningCut::ESTIMATED_REASONING_ITEMS_JSON_OVERHEAD_BYTES`,

@@ -49,11 +49,19 @@ class PreviousReasoningCutRequestPrefixTest extends UnitTestCase
             // on this wire a breakpoint is part of the prefix: the system item carries the same markers on every call
             self::assertSame(json_encode($bodyBeforeTheCut['input'][0]), json_encode($bodyOfTheCutCall['input'][0]));
             self::assertSame(json_encode($bodyOfTheCutCall['input'][0]), json_encode($bodyAfterTheCut['input'][0]));
+            $systemItem = json_encode($bodyOfTheCutCall['input'][0]);
+            self::assertSame(1, substr_count($systemItem, 'prompt_cache_breakpoint'), 'one marker in the system item');
+            self::assertStringContainsString('"text":"persona and rules ","prompt_cache_breakpoint"', $systemItem, 'on the base prompt, not on the end');
+            self::assertSame(4, static::countMarkers($bodyOfTheCutCall));
+            self::assertSame(3, static::countMarkers($bodyAfterTheCut), 'base prompt, stable message, the previous call\'s message');
         }
 
         // the cut call up to its last marker = the call after it
         $lastMarkerPosition = static::findLastMarkedHistoryPosition($bodyOfTheCutCall[$historyKey]);
         self::assertNotNull($lastMarkerPosition);
+        // the cut call marks its newest stable message: the result of its newest step
+        $stableEntry = $bodyOfTheCutCall[$historyKey][$lastMarkerPosition];
+        self::assertStringContainsString('result 6', json_encode($stableEntry));
         self::assertSame(
             json_encode(static::withoutMarkers(array_slice($bodyOfTheCutCall[$historyKey], 0, $lastMarkerPosition + 1))),
             json_encode(static::withoutMarkers(array_slice($bodyAfterTheCut[$historyKey], 0, $lastMarkerPosition + 1)))
@@ -70,14 +78,14 @@ class PreviousReasoningCutRequestPrefixTest extends UnitTestCase
     }
 
     /** The request body of one call over `$stepCount` steps, the items from `$itemsFromStep`; a moved cut names its anchor. */
-    public function testUnderTheSystemPromptSwapAResponsesCutCallKeepsTheSystemMarkersAndMarksNoCut(): void
+    public function testUnderTheSystemPromptSwapAResponsesCutCallKeepsTheSystemMarkersAndMarksBothCuts(): void
     {
         $bodyOfTheCutCall = $this->composeBody(RunSettings::AGENT_WIRE_API_RESPONSES, ArgusAIAgentConversation::PROMPT_CACHE_MARKERS_EXPLICIT_BREAKPOINTS, 6, 5, 3, ContextRetentionSettings::SKILL_LOADING_STRATEGY_SYSTEM_PROMPT_SWAP);
         $bodyAfterTheCut = $this->composeBody(RunSettings::AGENT_WIRE_API_RESPONSES, ArgusAIAgentConversation::PROMPT_CACHE_MARKERS_EXPLICIT_BREAKPOINTS, 7, 5, null, ContextRetentionSettings::SKILL_LOADING_STRATEGY_SYSTEM_PROMPT_SWAP);
 
-        self::assertSame(2, substr_count(json_encode($bodyOfTheCutCall['input'][0]), 'prompt_cache_breakpoint'), 'base prompt and end, as on every call');
+        self::assertSame(1, substr_count(json_encode($bodyOfTheCutCall['input'][0]), 'prompt_cache_breakpoint'), 'the base prompt only, as on every call');
         self::assertSame(json_encode($bodyOfTheCutCall['input'][0]), json_encode($bodyAfterTheCut['input'][0]));
-        self::assertSame(3, static::countMarkers($bodyOfTheCutCall), 'one slot left: no pair of cut markers fits');
+        self::assertSame(4, static::countMarkers($bodyOfTheCutCall), 'base prompt, stable message and the two cut markers');
     }
 
     protected function composeBody(string $wireApi, string $promptCacheMarkers, int $stepCount, int $itemsFromStep, ?int $anchorStepOfAMovedCut, string $skillLoadingStrategy = ContextRetentionSettings::SKILL_LOADING_STRATEGY_CONVERSATION_APPEND): array
