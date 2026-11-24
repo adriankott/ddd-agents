@@ -31,6 +31,14 @@ class PromptCacheDiffReport extends ValueObject
     public const string CAUSE_RESULT_STUB = 'resultStub';
     public const string CAUSE_ARGUMENT_STUB = 'argumentStub';
     public const string CAUSE_HISTORY_REWRITE = 'historyRewrite';
+    /** A tool result of the history changed (not by the clearing stub) — on the Messages API it sits in a user message. */
+    public const string CAUSE_TOOL_RESULT_REWRITE = 'toolResultRewrite';
+    /**
+     * A tool result that sent its pictures on the previous call sends fewer (the dropped marker instead): a later
+     * picture took its place under the cap, or the bytes could not be produced again (no transient carry, no durable
+     * store, a spool on a process-local cache).
+     */
+    public const string CAUSE_PICTURE_LEFT_WIRE = 'pictureLeftWire';
     /** System and tools unchanged, no payload to diff the wire messages (a call without the debug snapshot). */
     public const string CAUSE_SYSTEM_AND_TOOLS_UNCHANGED = 'systemAndToolsUnchanged';
     /**
@@ -289,6 +297,8 @@ class PromptCacheDiffReport extends ValueObject
             $subject = $after ?? $before ?? [];
             $content = $subject['content'] ?? ($subject['output'] ?? ($subject['tool_calls'][0]['function']['name'] ?? ($subject['name'] ?? '')));
             $head = is_string($content) ? $content : self::buildPartsHead($content);
+            $previousPictureCount = $before !== null ? self::countPictures($before) : 0;
+            $currentPictureCount = $after !== null ? self::countPictures($after) : 0;
             return PromptCacheMessageDifference::forPosition(
                 $position,
                 // a Responses item without a role (function_call / function_call_output) reads as its type
@@ -296,10 +306,39 @@ class PromptCacheDiffReport extends ValueObject
                 $before === null
                     ? PromptCacheMessageDifference::KIND_APPEND
                     : ($after === null ? PromptCacheMessageDifference::KIND_REMOVED : PromptCacheMessageDifference::KIND_CHANGE),
-                mb_substr(preg_replace('/\s+/', ' ', $head) ?? $head, 0, 80)
+                mb_substr(preg_replace('/\s+/', ' ', $head) ?? $head, 0, 80),
+                self::holdsAToolResult($subject),
+                $before !== null && $after !== null && $currentPictureCount < $previousPictureCount
             );
         }
         return null;
+    }
+
+    /** The number of picture parts in one wire message (Chat `image_url`, Messages `image`, Responses `input_image`). */
+    protected static function countPictures(mixed $wireMessage): int
+    {
+        if (!is_array($wireMessage)) {
+            return 0;
+        }
+        $pictureCount = in_array($wireMessage['type'] ?? null, ['image', 'image_url', 'input_image'], true) ? 1 : 0;
+        foreach ($wireMessage as $innerValue) {
+            $pictureCount += self::countPictures($innerValue);
+        }
+        return $pictureCount;
+    }
+
+    /** Whether one wire message holds a tool result, on any of the three wires. */
+    protected static function holdsAToolResult(array $wireMessage): bool
+    {
+        if (($wireMessage['role'] ?? null) === 'tool' || ($wireMessage['type'] ?? null) === 'function_call_output') {
+            return true;
+        }
+        foreach (is_array($wireMessage['content'] ?? null) ? $wireMessage['content'] : [] as $contentPart) {
+            if (is_array($contentPart) && ($contentPart['type'] ?? null) === 'tool_result') {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -322,8 +361,14 @@ class PromptCacheDiffReport extends ValueObject
             return $toolsChanged ? self::CAUSE_TOOLS : self::CAUSE_APPEND;
         }
         $head = $firstMessageDifference->head;
+        if ($firstMessageDifference->picturesLeftTheWire) {
+            return self::CAUSE_PICTURE_LEFT_WIRE;
+        }
         if (in_array($firstMessageDifference->role, ['tool', 'function_call_output'], true) && str_starts_with($head, '[earlier tool result cleared')) {
             return self::CAUSE_RESULT_STUB;
+        }
+        if ($firstMessageDifference->changesAToolResult) {
+            return str_contains($head, '[earlier tool result cleared') ? self::CAUSE_RESULT_STUB : self::CAUSE_TOOL_RESULT_REWRITE;
         }
         if (in_array($firstMessageDifference->role, ['assistant', 'function_call'], true) && str_contains($head, '"superseded"')) {
             return self::CAUSE_ARGUMENT_STUB;

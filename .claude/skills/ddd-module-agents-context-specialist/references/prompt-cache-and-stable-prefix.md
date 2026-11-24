@@ -328,9 +328,15 @@ leaves; the cache before the picture and the thinking before it stay. Since 0.3.
 own is written to the package's spool when its call completes (`AgentToolCallImageSpoolService`,
 `ToolCallImageReference::SOURCE_STORE_SPOOL`, settings `AI.toolCallImageSpool`): every later call re-reads the same
 base64 text, so the result stays byte-identical across the worker boundary and the drop above is gone. It still
-happens where the spool cannot help: the spool is off, its store is a per-process cache (APCu under the CLI), the
-cache TTL ran out, or the picture cap pushes the picture off. A tool may also return its own durable references
-(`ToolCallImageStore`). `app:agent:cache-diff` shows each drop.
+happens where the spool cannot help: the spool is off, its store is a per-process cache, the cache TTL ran out, or
+the picture cap pushes the picture off. The spool's cache is Core's default group (APCu) unless `cacheGroup` names a
+shared one: APCu is local to one process, so a worker, a CLI run or the next turn cannot read what another process
+wrote, and the picture leaves at the turn change exactly as without the spool (the first diff is the picture's tool
+result; on the Messages API the thinking of the steps after it is dropped). The spool reports that once per process in
+the issues log; set `'cacheGroup' => 'redis'` or configure the object store. A tool may also return its own durable
+references (`ToolCallImageStore`). `app:agent:cache-diff` names such a change `pictureLeftWire` (a tool result that
+sent pictures on the previous call and sends fewer now) and any other rewrite of a tool result `toolResultRewrite` —
+on the Messages API a tool result sits in a user message, which is not an owner-message rewrite.
 
 **Notes of a call.** The volatile tail (signals, the plan, the time) goes out as ONE `role: "system"` message with
 `clear_at: next_user_message` after the whole history: the model sees it on this call, later calls send it again at the

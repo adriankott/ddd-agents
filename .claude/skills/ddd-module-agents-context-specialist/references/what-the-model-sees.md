@@ -84,8 +84,8 @@ context that carried pictures (`ToolCall::$imageReferences`) and still ride in f
 The bytes come from what the current worker invocation captured (`AIConversation::$transientToolCallImages`), or, for
 a durable picture, are re-resolved on every call through the loaded package that implements `ToolCallImageStore`. A
 picture without a store of its own (a browser viewport) is spooled when its call completes and re-read from the spool
-(`AgentToolCallImageSpoolService`, `AI.toolCallImageSpool`: the configured object store, else the shared cache with a
-TTL; checked again by hash and magic type on every read); only when the spool could not take it is it gone once its
+(`AgentToolCallImageSpoolService`, `AI.toolCallImageSpool`: the configured object store, else the cache group
+`cacheGroup` names (a shared one such as `redis`; the default APCu group reaches no other process) with a TTL; checked again by hash and magic type on every read); only when the spool could not take it is it gone once its
 invocation ended. The cap counts pictures, not results
 (`ContextRetentionSettings::getMaxToolCallImagesOnWire()`, default 2, a purpose's `contextRetention:` map can raise
 it): newest results first and whole, the newest result always rides, truncated to the cap

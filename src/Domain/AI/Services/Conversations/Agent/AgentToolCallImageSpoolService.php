@@ -8,13 +8,18 @@ use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Entities\MCPPackages\ToolCallImageReference;
 use DDD\Domain\AI\Entities\MCPPackages\ToolResult;
 use DDD\Domain\AI\Entities\MCPPackages\ToolResultImage;
+use DDD\Infrastructure\Cache\Apc;
 use DDD\Infrastructure\Cache\Cache;
 use DDD\Infrastructure\Libs\Config;
 use DDD\Infrastructure\ObjectStorage\ObjectStorage;
 use DDD\Infrastructure\Services\DDDService;
+use DDD\Infrastructure\Services\IssuesLogService;
 use DDD\Infrastructure\Services\ObjectStorageService;
 use DDD\Infrastructure\Services\Service;
 use DDD\Infrastructure\Untrusted\RasterImageDecoder;
+use Psr\Log\LogLevel;
+use RuntimeException;
+use Throwable;
 
 /**
  * The durable spool of tool-result pictures that have no store of their own (a browser viewport, a workspace image).
@@ -28,7 +33,9 @@ use DDD\Infrastructure\Untrusted\RasterImageDecoder;
  * a compaction).
  *
  * Where the bytes go (`AI.toolCallImageSpool`, `config/app/AI/toolCallImageSpool.php`): the configured Core object store,
- * else the application cache with a TTL. A failed or impossible write leaves the picture inline (the single-turn
+ * else the cache group `cacheGroup` (null = Core's default group) with a TTL. The workers must share that cache (Redis):
+ * a process-local cache (APCu) finds nothing in the next worker, which the package reports once per process in the
+ * issues log ({@see warnOnceWhenTheSpoolCacheIsProcessLocal()}). A failed or impossible write leaves the picture inline (the single-turn
  * behaviour before); a failed read is a dropped picture. A spooled picture is checked again on every read: its hash
  * against the reference, its type from the magic bytes against the allow-list.
  */
@@ -43,6 +50,9 @@ class AgentToolCallImageSpoolService extends Service
     public const string DEFAULT_OBJECT_KEY_PREFIX = 'agent-tool-images/';
 
     public const string CACHE_KEY_PREFIX = 'agentToolCallImageSpool.';
+
+    /** @var bool Whether this process already reported a process-local spool cache */
+    protected static bool $processLocalCacheReported = false;
 
     /**
      * Writes the inline pictures of a completed call's result to the spool and points them at it (their references
@@ -125,7 +135,9 @@ class AgentToolCallImageSpoolService extends Service
         if ($toolResultImage->byteSize > $this->getMaxCachedBytesPerPicture()) {
             return false;
         }
-        Cache::instance()->set(self::CACHE_KEY_PREFIX . $spoolImageId, $toolResultImage->base64Data, $this->getCacheTtlSeconds());
+        $spoolCache = $this->getSpoolCache();
+        $this->warnOnceWhenTheSpoolCacheIsProcessLocal($spoolCache);
+        $spoolCache->set(self::CACHE_KEY_PREFIX . $spoolImageId, $toolResultImage->base64Data, $this->getCacheTtlSeconds());
         return true;
     }
 
@@ -136,8 +148,45 @@ class AgentToolCallImageSpoolService extends Service
         if ($objectStorage !== null) {
             return $objectStorage->getObjectContent($this->buildObjectKey($spoolImageId));
         }
-        $cachedValue = Cache::instance()->get(self::CACHE_KEY_PREFIX . $spoolImageId);
+        $cachedValue = $this->getSpoolCache()->get(self::CACHE_KEY_PREFIX . $spoolImageId);
         return is_string($cachedValue) ? $cachedValue : null;
+    }
+
+    /** The cache of the spool: the group `cacheGroup` names, Core's default group when it names none. */
+    protected function getSpoolCache(): Cache
+    {
+        $cacheGroup = $this->getSpoolSetting('cacheGroup');
+        return Cache::instance(is_string($cacheGroup) && $cacheGroup !== '' ? $cacheGroup : null);
+    }
+
+    /** Whether a cache keeps its entries in this process only (APCu): the next worker cannot read them. */
+    public function isProcessLocalCache(Cache $cache): bool
+    {
+        return $cache instanceof Apc;
+    }
+
+    /**
+     * Reports in the issues log, once per process, that the spool writes into a process-local cache: the picture
+     * cannot be re-read by the next worker, so it leaves at the end of its invocation as without the spool.
+     */
+    protected function warnOnceWhenTheSpoolCacheIsProcessLocal(Cache $spoolCache): void
+    {
+        if (static::$processLocalCacheReported || !$this->isProcessLocalCache($spoolCache)) {
+            return;
+        }
+        static::$processLocalCacheReported = true;
+        $warning = new RuntimeException(
+            'The tool picture spool writes into a process-local cache (' . get_class($spoolCache) . '): the next worker '
+            . 'cannot read the pictures, so they leave the wire at the end of their invocation. Set '
+            . "AI.toolCallImageSpool 'cacheGroup' to a shared group (e.g. 'redis') or configure the object store."
+        );
+        try {
+            /** @var IssuesLogService $issuesLogService */
+            $issuesLogService = DDDService::instance()->getService(IssuesLogService::class);
+            $issuesLogService->logThrowable($warning, LogLevel::WARNING, ['cacheClass' => get_class($spoolCache)]);
+        } catch (Throwable) {
+            error_log('AgentToolCallImageSpoolService: ' . $warning->getMessage());
+        }
     }
 
     protected function findSpoolObjectStorage(): ?ObjectStorage

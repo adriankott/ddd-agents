@@ -31,20 +31,30 @@ class PromptCacheMessageDifference extends ValueObject
     /** @var string The first 80 characters of the message content, whitespace collapsed */
     public string $head = '';
 
+    /** @var bool Whether the changed message holds a tool result (a Chat `tool` entry, a Messages `tool_result` block, a Responses `function_call_output`) */
+    public bool $changesAToolResult = false;
+
+    /** @var bool Whether the previous call sent a picture in this message and this call sends fewer (the picture left the wire) */
+    public bool $picturesLeftTheWire = false;
+
     /**
      * @param int $position
      * @param string $role
      * @param string $kind
      * @param string $head
+     * @param bool $changesAToolResult
+     * @param bool $picturesLeftTheWire
      * @return static
      */
-    public static function forPosition(int $position, string $role, string $kind, string $head): static
+    public static function forPosition(int $position, string $role, string $kind, string $head, bool $changesAToolResult = false, bool $picturesLeftTheWire = false): static
     {
         $promptCacheMessageDifference = new static();
         $promptCacheMessageDifference->position = $position;
         $promptCacheMessageDifference->role = $role;
         $promptCacheMessageDifference->kind = $kind;
         $promptCacheMessageDifference->head = $head;
+        $promptCacheMessageDifference->changesAToolResult = $changesAToolResult;
+        $promptCacheMessageDifference->picturesLeftTheWire = $picturesLeftTheWire;
         return $promptCacheMessageDifference;
     }
 

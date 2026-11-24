@@ -11,9 +11,13 @@ use DDD\Domain\AI\Entities\MCPPackages\ToolCallImageReference;
 use DDD\Domain\AI\Entities\MCPPackages\ToolResult;
 use DDD\Domain\AI\Entities\MCPPackages\ToolResultImage;
 use DDD\Domain\AI\Services\Conversations\Agent\AgentToolCallImageSpoolService;
+use DDD\Infrastructure\Cache\Apc;
+use DDD\Infrastructure\Services\IssuesLogService;
 use DDD\Infrastructure\Services\DDDService;
 use DDD\Presentation\Mcp\Services\MCPToolExecutorService;
 use DDD\Tests\Agents\Support\IntegrationTestCase;
+use Psr\Log\LogLevel;
+use ReflectionClass;
 
 /**
  * A picture without a store of its own is spooled when its call completes, so the next worker invocation (no
@@ -106,6 +110,18 @@ class ToolCallImageSpoolTest extends IntegrationTestCase
         $this->spoolDouble->spoolInlineToolResultImages($toolResult, static::buildConversation());
         self::assertSame('catalog', $toolResult->images[0]->sourceStore);
         self::assertSame([], $this->spoolDouble->spooledBase64TextsBySpoolImageId);
+    }
+
+    public function testAProcessLocalSpoolCacheIsReportedOncePerProcess(): void
+    {
+        $issuesLogServiceDouble = new RecordingIssuesLogServiceDouble();
+        $this->replaceService(IssuesLogService::class, $issuesLogServiceDouble);
+        $processLocalCache = (new ReflectionClass(Apc::class))->newInstanceWithoutConstructor();
+        $spoolService = new ProcessLocalCacheReportingSpoolServiceDouble();
+
+        self::assertTrue($spoolService->isProcessLocalCache($processLocalCache), 'APCu is local to one process');
+        $spoolService->reportTwoWritesInto($processLocalCache);
+        self::assertSame([LogLevel::WARNING], $issuesLogServiceDouble->loggedLevels);
     }
 
     protected static function buildToolResultWithPicture(): ToolResult

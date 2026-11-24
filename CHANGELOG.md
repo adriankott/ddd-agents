@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.3.8
+
+**Fixed:**
+
+- **A picture left the wire at the turn change.** Root cause of the thinking drop in the first call of a new turn: the
+  changed message was the tool result of the picture (a user message on the Messages API), not an owner message. The
+  first call of the new turn runs in a new process; the picture had no transient carry there, and the spool wrote it
+  into Core's default cache group, APCu, which no other process reads. The result then carried the "no longer on the
+  wire" marker, and the provider dropped the thinking of the steps after it (`prefix_binding_mismatch`). With a shared
+  spool cache the result is byte-identical across the turn change on both wire APIs (new request-prefix test).
+- `app:agent:cache-diff` names that change `pictureLeftWire` (a tool result that sent pictures on the previous call
+  sends fewer) and any other changed tool result `toolResultRewrite`. Before, a changed tool result on the Messages API
+  was counted as `ownerMessageRewrite`.
+
+**Added:**
+
+- `AI.toolCallImageSpool` `cacheGroup`: the cache group of the spool (`Cache::instance($cacheGroup)`), null = Core's
+  default group. When the spool writes into a process-local cache (APCu), it reports this once per process in the
+  issues log (warning).
+
+**Host steps:**
+
+- Without the object store, set `'cacheGroup' => 'redis'` (or another group all workers share) in an own
+  `config/app/AI/toolCallImageSpool.php`, or configure `OBJECT_STORAGE_AGENTTOOLIMAGES_*`. No table, no DDL.
+
 ## 0.3.7
 
 **Added:**

@@ -57,6 +57,29 @@ class PromptCacheDiffReportTest extends UnitTestCase
         self::assertSame(1, $report->callsByCause[PromptCacheDiffReport::CAUSE_SYSTEM]);
     }
 
+    public function testAMessagesToolResultThatLostItsPictureIsPictureLeftWireNotAnOwnerRewrite(): void
+    {
+        $tools = [['name' => 'viewWorkspaceImages', 'input_schema' => ['type' => 'object']]];
+        $owner = ['role' => 'user', 'content' => [['type' => 'text', 'text' => 'which colours are in the logo?']]];
+        $assistant = ['role' => 'assistant', 'content' => [['type' => 'tool_use', 'id' => 'toolu_1', 'name' => 'viewWorkspaceImages', 'input' => []]]];
+        $resultWithPicture = ['role' => 'user', 'content' => [['type' => 'tool_result', 'tool_use_id' => 'toolu_1', 'content' => [
+            ['type' => 'text', 'text' => 'logo.png'],
+            ['type' => 'image', 'source' => ['type' => 'base64', 'media_type' => 'image/png', 'data' => '[redacted]']],
+        ]]]];
+        $resultWithMarker = ['role' => 'user', 'content' => [['type' => 'tool_result', 'tool_use_id' => 'toolu_1', 'content' => 'logo.png [the picture this result carried is no longer on the wire]']]];
+        $resultRewritten = ['role' => 'user', 'content' => [['type' => 'tool_result', 'tool_use_id' => 'toolu_1', 'content' => 'logo.png, other text']]];
+        $messages = new AIConversationMessages();
+        $messages->add($this->call(1, ['tools' => $tools, 'system' => 'BASE', 'messages' => [$owner, $assistant, $resultWithPicture]], 1000, 0));
+        $messages->add($this->call(2, ['tools' => $tools, 'system' => 'BASE', 'messages' => [$owner, $assistant, $resultWithMarker]], 1000, 600));
+        $messages->add($this->call(3, ['tools' => $tools, 'system' => 'BASE', 'messages' => [$owner, $assistant, $resultRewritten]], 1000, 600));
+
+        $report = PromptCacheDiffReport::fromMessages($messages);
+
+        self::assertSame(PromptCacheDiffReport::CAUSE_PICTURE_LEFT_WIRE, $report->rows[1]['cause'], 'the user message holds a tool result, not an owner message');
+        self::assertSame(2, $report->rows[1]['firstDiff']['position']);
+        self::assertSame(PromptCacheDiffReport::CAUSE_TOOL_RESULT_REWRITE, $report->rows[2]['cause']);
+    }
+
     public function testAMovedBreakpointAndSystemContentPartsAreNoChange(): void
     {
         $breakpoint = ['mode' => 'explicit'];

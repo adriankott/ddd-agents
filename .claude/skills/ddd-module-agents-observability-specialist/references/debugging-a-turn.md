@@ -73,7 +73,8 @@ of a "what filled the context" view. `ModelCallComposition::unavailable()` marks
 `PromptCacheDiffReport::fromMessages($messages)` walks the snapshot-bearing rows in order and names, per call, where
 its request first differs from the previous call's — the tools, the system content and its first changed segment,
 or a wire message — with the provider's cached tokens and a cause (`CAUSE_*`: `append`, `system`, `tools`,
-`toolsAppended`, `resultStub`, `ownerMessageRewrite`, …). `hitPercent()`, `$callsByCause` and `$cachedByCause` sum it
+`toolsAppended`, `resultStub`, `pictureLeftWire`, `toolResultRewrite`, `ownerMessageRewrite`, …; a tool result in
+a Messages user message is `toolResultRewrite` or `pictureLeftWire`, never `ownerMessageRewrite`). `hitPercent()`, `$callsByCause` and `$cachedByCause` sum it
 up. The tools and system causes work on every call (they compare hashes); the wire-message causes need the full
 payload, so measure with full snapshots on. What busts the cache and how to keep the prefix stable:
 `ddd-module-agents-context-specialist`. `app:agent:cache-diff <conversationId>` prints this report per call with a

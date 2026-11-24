@@ -15,15 +15,17 @@ declare(strict_types=1);
  * `enabled`: false keeps the single-turn behaviour (the picture leaves at the end of its worker invocation).
  * `objectStorage`: the name of a Core object store (`config/app/Common/ObjectStorage.php` + `OBJECT_STORAGE_<NAME>_*`);
  * when that store is configured the bytes go there under `<objectKeyPrefix><conversation id>/<sha256>` (give the
- * prefix a lifecycle rule, e.g. 30 days). Otherwise the bytes go to the application cache (`Cache::instance()`) for
- * `cacheTtlSeconds` — a cache shared by the workers (Redis) is needed; a per-process cache (APCu under the CLI) finds
- * nothing in the next worker and the picture leaves as before.
+ * prefix a lifecycle rule, e.g. 30 days). Otherwise the bytes go to the cache group `cacheGroup` for `cacheTtlSeconds`
+ * (`Cache::instance($cacheGroup)`; null = Core's default group, which is APCu). The workers must share it: set
+ * `'cacheGroup' => 'redis'` (or another shared group). A process-local cache (APCu) finds nothing in the next worker,
+ * the picture leaves as before, and the package reports it once per process in the issues log.
  * `maxCachedBytesPerPicture`: a larger picture is not put into the cache (object storage takes any accepted picture).
  */
 return [
     'enabled' => true,
     'objectStorage' => 'agentToolImages',
     'objectKeyPrefix' => 'agent-tool-images/',
+    'cacheGroup' => null,
     'cacheTtlSeconds' => 86400,
     'maxCachedBytesPerPicture' => 2_097_152,
 ];
