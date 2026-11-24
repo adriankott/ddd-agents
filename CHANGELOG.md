@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.3.13
+
+The files release: documents of a drive reach the model as text by default, page images only when asked for.
+
+**Added:**
+
+- **`readDriveDocument`** (package `agent.drive`): the text of a drive document page by page — PDF (poppler
+  `pdftotext`; a PDF without a text layer by `tesseract`, at most 20 pages), Word, Excel (one page per sheet, rows with
+  their row number, cells tab-separated in their columns), PowerPoint (one page per slide, in the presentation's
+  order), OpenDocument text, spreadsheet and presentation, plain text. One read returns as many pages as fit into
+  `maxCharactersPerRead` and names the next page (`fromPage`); the text is one untrusted passage
+  (`MCPToolReturnsUntrustedContent`); parallel-safe.
+- **`viewDriveDocumentPages`**: PDF pages as PNG (`pdftoppm`), at most `pageImages.maxPerCall` per call (default 4,
+  cap 12); the images go through the tool picture store of 0.3.12 like every tool picture.
+- **`AgentDriveFileContentReader`** (`DDD\Domain\AI\Services\Drives`): implemented by a drive store whose files the
+  agent may read. The store reads the released version's bytes through its own backend or service layer under the
+  call's rights — never a presigned or client URL — and refuses what the caller may not read. A store without it keeps
+  its files unread; the tools say so. `AgentDriveFileContent` carries the bytes (never serialized).
+- **`AgentDocumentTextExtractionService`** (`DDD\Domain\AI\Services\Documents`, `AgentDocumentText`,
+  `AgentDocumentPagesRead`): the kind comes from the bytes, never from the name or a claimed type; poppler and
+  tesseract run as Core's `IsolatedProcess`; Office and OpenDocument files are checked by `ArchiveInspector` and their
+  XML parsed by `SafeXml` (macros are never read); legacy `.doc`/`.xls`/`.ppt`, other ZIPs and binary files answer
+  with a reason. The text is cached by the document's sha256 (`cacheGroup`, `cacheTtlSeconds`).
+- **Config `AI.documents`** (`config/app/AI/documents.php`, `AgentDocumentSettings`): `enabled`, `maxDocumentBytes`
+  (25 MB), `maxExtractedPages` (500), `maxCharactersPerRead` (40000), `ocr`, `cacheGroup` (null = Core's default),
+  `cacheTtlSeconds` (86400), `pageImages` (`enabled`, `maxPerCall`, `resolutionDpi` 110).
+
+**Host steps:**
+
+1. `composer update mgamadeus/ddd-agents mgamadeus/ddd-clouddrive -W` (clouddrive 0.3.3 implements the reader; it
+   conflicts with older agents).
+2. Install `poppler-utils` (pdftotext, pdftoppm, pdfinfo) and, for scanned PDFs, `tesseract-ocr` with the needed
+   languages in the image that runs the agent workers. Without poppler a PDF answers "the document reader is not
+   available on this host"; Office files need no binary.
+3. Optional: `config/app/AI/documents.php` with `'cacheGroup' => 'redis'` so every worker reuses an extraction.
+4. Restart the agent workers.
+
 ## 0.3.12
 
 The image release. It was planned as 0.3.10; 0.3.10 went to the evaluation scope fix and 0.3.11 to the `DriveFiles`

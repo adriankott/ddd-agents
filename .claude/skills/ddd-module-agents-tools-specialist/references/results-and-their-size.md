@@ -142,6 +142,11 @@ every page looks like the first; the model calls again to check, and a reader ca
 class carries this: it is a convention of the response DTO, set from the applied query options and rendered first
 (the template's `toLlmMarkdown()` shows the shape).
 
+A document read is the same convention by pages: `readDriveDocument` returns as many pages as fit into
+`maxCharactersPerRead` of `AI.documents` (each under a `--- page N ---` line, a sheet with its name), leads with
+"pages 1–6 of 14 · next: fromPage 7" and wraps the text as one untrusted passage; the extracted text is cached by the
+document's sha256, so the next page costs no second extraction.
+
 ## Measuring
 
 Measure the characters of the result as the model reads it and divide by four — the same estimate the loop uses for

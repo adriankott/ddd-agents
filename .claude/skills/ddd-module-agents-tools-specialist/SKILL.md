@@ -1,6 +1,6 @@
 ---
 name: ddd-module-agents-tools-specialist
-description: "Writes MCP tools of mgamadeus/ddd-agents for the agent and MCP clients. Covers MCPPackage, MCPBundle, the MCPController mount, binding by class and package ids, request and response DTOs and the generated schema, MCPToolExecutorService, markdown results, failure texts, images, result and schema size, AgentToolCallProvenance, time limits, parallel calls in child processes, loop-control fields, askOwner, every tool attribute (MCPToolEffect, MCPToolExecutionTimeout, MCPToolParallelSafe, MCPToolRequiresOwnerConfirmation, MCPRequiresAccountRights), the web research tools (AI.webSearch), the Agent.UI tools with their client channel, [SIGNAL:ui] note and screen catalog port, and the System.* tools (health sections port, issues, workers, crons). Use when adding or changing an MCP tool, a tool times out, a read may run in parallel, a result or schema is too large, a tool is not found, switching on web search, wiring Agent.UI or the System tools, or testing a tool."
+description: "Writes MCP tools of mgamadeus/ddd-agents for the agent and MCP clients. Covers MCPPackage, MCPBundle, the MCPController mount, binding by class and package ids, request and response DTOs and the generated schema, MCPToolExecutorService, markdown results, failure texts, images, result and schema size, AgentToolCallProvenance, time limits, parallel calls in child processes, loop-control fields, askOwner, every tool attribute (MCPToolEffect, MCPToolExecutionTimeout, MCPToolParallelSafe, MCPToolRequiresOwnerConfirmation, MCPRequiresAccountRights), the web research tools (AI.webSearch), drive documents (readDriveDocument, AI.documents), the Agent.UI tools with their client channel, [SIGNAL:ui] note and screen catalog port, and the System.* tools (health sections port, issues, workers, crons). Use when adding or changing an MCP tool, a tool times out, a read may run in parallel, a result or schema is too large, a tool is not found, switching on web search, wiring Agent.UI or the System tools, or testing a tool."
 metadata:
   author: mgamadeus
   version: "0.1.0"
@@ -141,8 +141,21 @@ whole), e.g. `'Demo.Notes' => [DemoNotesMCPPackage::class]`, and write the skill
 A file store module (e.g. a cloud drive) implements `DDD\Domain\AI\Services\Drives\AgentDriveStore`; the package's
 `agent.drive` tools (`listDriveFiles`, `saveDriveFile`, `showDriveFiles`) and the file card `DriveFiles` reach it
 through `AgentDriveStoresService`, which also resolves file arguments (a path of the own drive, `drivespaces/<name>/…`,
-`drive/<id>`). The store answers under the caller's rights, hands out facts only (no content, no content URL; at most `AgentDriveFile::$openLink`, the host screen showing the
+`drive/<id>`). The store answers under the caller's rights, hands out facts only (no content URL; at most `AgentDriveFile::$openLink`, the host screen showing the
 file, set through `setOpenLinkIfSafe()`) and copies on the server; the tool checks the mount's mode and asks the owner for a `WRITE_WITH_CONSENT` mount.
+
+Documents: a store that also implements `DDD\Domain\AI\Services\Drives\AgentDriveFileContentReader` hands the bytes of
+a released version to `readDriveDocument` (the text page by page: PDF with OCR fallback, Word, Excel one page per sheet,
+PowerPoint one per slide, OpenDocument, plain text; one untrusted passage, the next page named) and
+`viewDriveDocumentPages` (PDF pages as PNG, through the tool picture store). The store reads through its own backend
+or service layer under the call's rights and refuses what the caller may not read (scan, trash, right, size); never
+a presigned or client URL. A store without the reader keeps its files unread (the tools refuse with a reason).
+`AgentDocumentTextExtractionService` takes the kind from the bytes, runs poppler and tesseract as `IsolatedProcess`,
+reads Office XML through `ArchiveInspector` and `SafeXml` (macros never read), and caches the text by sha256;
+legacy `.doc`/`.xls`/`.ppt` answer with a reason. Config `config/app/AI/documents.php` (`AI.documents`): `enabled`,
+`maxDocumentBytes`, `maxExtractedPages`, `maxCharactersPerRead`, `ocr`, `cacheGroup` (set `redis` to share between
+workers), `cacheTtlSeconds`, `pageImages` (`enabled`, `maxPerCall` ≤ 12, `resolutionDpi`). Hosts install
+poppler-utils (and tesseract for OCR) in the image that runs the workers.
 
 ## The contract every meta tool shares
 

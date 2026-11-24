@@ -14,8 +14,8 @@ use DDD\Infrastructure\Modules\DDDModule;
  * directory: every class sits below one of the namespaces it owns, and no other package has a file there. Owned
  * namespaces ({@see self::OWNED_NAMESPACES}, declared to Core by {@see getOwnedNamespaces()} and checked by Core's
  * `ModuleNamespacesTestCase` and the package's contract test):
- * - `DDD\Domain\AI\Entities\AgentSpaces\`, `…\Entities\ClientTools\`, `…\Entities\Conversations\`, `…\Entities\Discovery\`, `…\Entities\Drives\`,
- *   `…\Entities\Environment\`,
+ * - `DDD\Domain\AI\Entities\AgentSpaces\`, `…\Entities\ClientTools\`, `…\Entities\Conversations\`, `…\Entities\Discovery\`, `…\Entities\Documents\`,
+ *   `…\Entities\Drives\`, `…\Entities\Environment\`,
  *   `…\Entities\Evals\`, `…\Entities\MCPPackages\`, `…\Entities\Mandates\`, `…\Entities\Models\CustomerSelection\`,
  *   `…\Entities\RecordedRuns\`, `…\Entities\Skills\`, `…\Entities\SystemHealth\`, `…\Entities\Texts\Embeddings\`, `…\Entities\WebSearch\`;
  * - `DDD\Domain\AI\Exceptions\Conversations\`, `…\Exceptions\Evals\`, `…\Exceptions\Texts\Embeddings\`;
@@ -24,8 +24,8 @@ use DDD\Infrastructure\Modules\DDDModule;
  *   `DDD\Domain\AI\Messenger\Conversations\`, `DDD\Domain\AI\Traits\Conversations\`;
  * - `DDD\Domain\AI\Repo\Argus\Conversations\`, `…\Repo\Argus\Guard\`, `…\Repo\Argus\Mandates\`, `…\Repo\Argus\WebSearch\`,
  *   `…\Repo\DB\AgentSpaces\`, `…\Repo\DB\ClientTools\`, `…\Repo\DB\Conversations\`, `…\Repo\DB\Evals\`, `…\Repo\DB\Mandates\`;
- * - `DDD\Domain\AI\Services\AgentSpaces\`, `…\Services\ClientTools\`, `…\Services\Conversations\`, `…\Services\Decisions\`, `…\Services\Drives\`,
- *   `…\Services\Eval\`, `…\Services\Mandates\`,
+ * - `DDD\Domain\AI\Services\AgentSpaces\`, `…\Services\ClientTools\`, `…\Services\Conversations\`, `…\Services\Decisions\`, `…\Services\Documents\`,
+ *   `…\Services\Drives\`, `…\Services\Eval\`, `…\Services\Mandates\`,
  *   `…\Services\Skills\`, `…\Services\SystemHealth\`, `…\Services\SystemPrompts\`, `…\Services\Texts\Embeddings\`, `…\Services\WebSearch\`;
  * - `DDD\Modules\Agents\`, `DDD\Presentation\Api\Agents\`, `DDD\Presentation\Mcp\` (the MCP / JSON-RPC wire DTOs,
  *   the tool executor, the console printer and the JSON-RPC base controller);
@@ -50,6 +50,7 @@ class AgentsModule extends DDDModule
         'DDD\\Domain\\AI\\Entities\\ClientTools\\',
         'DDD\\Domain\\AI\\Entities\\Conversations\\',
         'DDD\\Domain\\AI\\Entities\\Discovery\\',
+        'DDD\\Domain\\AI\\Entities\\Documents\\',
         'DDD\\Domain\\AI\\Entities\\Drives\\',
         'DDD\\Domain\\AI\\Entities\\Environment\\',
         'DDD\\Domain\\AI\\Entities\\Evals\\',
@@ -82,6 +83,7 @@ class AgentsModule extends DDDModule
         'DDD\\Domain\\AI\\Services\\ClientTools\\',
         'DDD\\Domain\\AI\\Services\\Conversations\\',
         'DDD\\Domain\\AI\\Services\\Decisions\\',
+        'DDD\\Domain\\AI\\Services\\Documents\\',
         'DDD\\Domain\\AI\\Services\\Drives\\',
         'DDD\\Domain\\AI\\Services\\Eval\\',
         'DDD\\Domain\\AI\\Services\\Mandates\\',
@@ -130,6 +132,8 @@ class AgentsModule extends DDDModule
             'DDD\\Domain\\AI\\Services\\WebSearch\\',
             // the drive stores' registry (the drive tools and the file card fetch it)
             'DDD\\Domain\\AI\\Services\\Drives\\',
+            // the document text extraction of the drive read tools
+            'DDD\\Domain\\AI\\Services\\Documents\\',
             // the client tool request channel of Agent.UI (the tools, the chat routes and the purge command fetch it)
             'DDD\\Domain\\AI\\Services\\ClientTools\\',
             // the health report of System.Health and its sections port
@@ -157,6 +161,7 @@ class AgentsModule extends DDDModule
             'DDD\\Domain\\AI\\Services\\WebSearch\\',
             'DDD\\Domain\\AI\\Services\\ClientTools\\',
             'DDD\\Domain\\AI\\Services\\SystemHealth\\',
+            'DDD\\Domain\\AI\\Services\\Documents\\',
         ];
     }
 
