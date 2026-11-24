@@ -1,0 +1,127 @@
+/**
+ * The pure half of the screen reader: references and the Markdown lines of fields, tables, buttons and messages.
+ * The DOM walk (`domScreenReader.ts`) collects plain values and these functions write them, so the logic tests cover
+ * the format without a DOM.
+ *
+ * References (stable within one read, `highlightOnScreen` takes them):
+ * - `f.<name>` a form field (its `name`, else its label as a slug)
+ * - `row.<key>` a table row (the row key: `data-row-key`, else the visible id cell)
+ * - `b.<slug>` a button or link that acts
+ * - `s.<slug>` a section (its heading)
+ * - `t.<slug>` a tab
+ * - `a.<anchor>` an anchor the application set (`data-agent-anchor`)
+ */
+
+/** The most rows of one table in a read. */
+export const MAX_TABLE_ROWS = 25;
+
+/** The most characters of one value in a read (a long text says how long it is; `focus` reads it whole). */
+export const MAX_VALUE_CHARS = 200;
+
+/** The most buttons in a read. */
+export const MAX_BUTTONS = 30;
+
+/** A value standing in for a secret. */
+export const HIDDEN_VALUE = '(hidden)';
+
+/** A slug for a reference: lower case letters, digits and `-`, at most 40 characters. */
+export const slugOf = (text: string): string =>
+  text
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40)
+    .replace(/-+$/g, '') || 'x';
+
+/** A reference name from a field name (`order.endDate` stays, other characters become `-`). */
+export const fieldReferenceNameOf = (name: string): string =>
+  name.replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^[^A-Za-z0-9]+/, '').slice(0, 60) || 'x';
+
+/** One line of text: whitespace collapsed. */
+export const oneLine = (text: string): string => text.replace(/\s+/g, ' ').trim();
+
+/** A value cut to {@link MAX_VALUE_CHARS}, saying how long it was. */
+export const capValue = (value: string, maxChars: number = MAX_VALUE_CHARS): string => {
+  const flat = oneLine(value);
+  return flat.length <= maxChars ? flat : `${flat.slice(0, maxChars)}… (${flat.length} characters)`;
+};
+
+/** Makes a reference unique within one read by a number suffix. */
+export class ReferenceNames {
+  protected readonly used = new Set<string>();
+
+  take(reference: string): string {
+    let candidate = reference;
+    for (let suffix = 2; this.used.has(candidate); suffix += 1) candidate = `${reference}-${suffix}`;
+    this.used.add(candidate);
+    return candidate;
+  }
+}
+
+export interface FieldFacts {
+  reference: string;
+  label: string;
+  value: string;
+  kind: string;
+  required?: boolean;
+  disabled?: boolean;
+  invalidMessage?: string | null;
+  isSecret?: boolean;
+}
+
+/** `- End date (f.endDate, date): 2026-12-31 · required · error "…"` */
+export const formatFieldLine = (field: FieldFacts): string => {
+  const value = field.isSecret ? HIDDEN_VALUE : field.value.trim() === '' ? '(empty)' : capValue(field.value);
+  const flags: string[] = [];
+  if (field.required) flags.push('required');
+  if (field.disabled) flags.push('read-only');
+  if (field.invalidMessage) flags.push(`error "${capValue(field.invalidMessage, 120)}"`);
+  return `- ${capValue(field.label, 80) || field.reference} (${field.reference}, ${field.kind}): ${value}${flags.length > 0 ? ` · ${flags.join(' · ')}` : ''}`;
+};
+
+export interface TableFacts {
+  caption: string | null;
+  columns: string[];
+  rows: { reference: string; cells: string[]; selected?: boolean }[];
+  /** All rows of the table in the DOM (more than shown) */
+  totalRows: number;
+}
+
+/** A table as `| … |` lines with the row reference first, at most {@link MAX_TABLE_ROWS} rows. */
+export const formatTable = (table: TableFacts, maxRows: number = MAX_TABLE_ROWS): string[] => {
+  const lines: string[] = [];
+  const shownRows = table.rows.slice(0, maxRows);
+  lines.push(`Table${table.caption ? ` "${capValue(table.caption, 80)}"` : ''}: ${table.totalRows} rows on screen`);
+  lines.push(`| ref | ${table.columns.map(column => capValue(column, 40) || '-').join(' | ')} |`);
+  for (const row of shownRows) {
+    const cells = row.cells.map(cell => capValue(cell, 80).replace(/\|/g, '/'));
+    lines.push(`| ${row.reference}${row.selected ? ' (selected)' : ''} | ${cells.join(' | ')} |`);
+  }
+  if (table.totalRows > shownRows.length) lines.push(`… ${table.totalRows - shownRows.length} more rows on screen`);
+  return lines;
+};
+
+export interface ButtonFacts {
+  reference: string;
+  label: string;
+  disabled?: boolean;
+}
+
+/** `Buttons: b.save "Save" · b.delete "Delete" (disabled)` */
+export const formatButtons = (buttons: ButtonFacts[]): string | null => {
+  if (buttons.length === 0) return null;
+  const shown = buttons.slice(0, MAX_BUTTONS).map(button => `${button.reference} "${capValue(button.label, 40)}"${button.disabled ? ' (disabled)' : ''}`);
+  const more = buttons.length > MAX_BUTTONS ? ` · … ${buttons.length - MAX_BUTTONS} more` : '';
+  return `Buttons: ${shown.join(' · ')}${more}`;
+};
+
+/** Joins the parts of a read and cuts the whole at `maxChars`, saying so. */
+export const joinScreenParts = (parts: string[], maxChars: number): string => {
+  const text = parts.filter(part => part !== '').join('\n');
+  if (text.length <= maxChars) return text;
+  const cut = text.slice(0, maxChars);
+  const lastLineBreak = cut.lastIndexOf('\n');
+  return `${lastLineBreak > maxChars * 0.8 ? cut.slice(0, lastLineBreak) : cut}\n… (screen cut at ${maxChars} of ${text.length} characters; read one part with focus)`;
+};

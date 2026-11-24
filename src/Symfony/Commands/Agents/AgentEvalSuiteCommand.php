@@ -72,7 +72,8 @@ use Throwable;
  * LIVE: real model and tool calls in the children.
  */
 #[AsCommand(
-    name: 'app:ai-agent:eval-suite',
+    name: 'app:agent:eval-suite',
+    aliases: ['app:ai-agent:eval-suite'],
     description: 'Run the whole eval suite in parallel (reads pooled, writes in lanes per agent space and resource); report correctness and performance, compare with a baseline (live).'
 )]
 class AgentEvalSuiteCommand extends AgentEvalConsoleCommand
@@ -89,13 +90,13 @@ class AgentEvalSuiteCommand extends AgentEvalConsoleCommand
     public const string BASELINE_LATEST = 'latest';
 
     /** @var string The child command of a case of a tools-style fixture */
-    public const string CHILD_COMMAND_TOOLS_CASE = 'app:ai-agent:eval-tools';
+    public const string CHILD_COMMAND_TOOLS_CASE = 'app:agent:eval-tools';
 
     /** @var string The child command of a skill-selection case */
-    public const string CHILD_COMMAND_SELECTION_CASE = 'app:ai-agent:eval-selection';
+    public const string CHILD_COMMAND_SELECTION_CASE = 'app:agent:eval-selection';
 
     /** @var string The child command of a recall case */
-    public const string CHILD_COMMAND_RECALL_CASE = 'app:ai-agent:eval-recall';
+    public const string CHILD_COMMAND_RECALL_CASE = 'app:agent:eval-recall';
 
     /** @var string How the settings name the conversation's own model (a run without a model name; as its run key) */
     public const string DEFAULT_MODEL_LABEL = 'default';

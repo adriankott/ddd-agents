@@ -134,12 +134,12 @@ costs are booked under `AI.MEMORY.EXTRACT.CANDIDATES` and `AI.MEMORY.RECONCILE.D
 `ENVELOPE.AI.MEMORY.CURATE`, billed to the space's billing entity. A model that gives no answer puts the harvest back
 (at most five times); a turn still running defers it.
 
-**Tools** (`AgentMemoriesMCPPackage`, id `agent.memories`, skill `Memory.Management`, bound in the package's default
+**Tools** (`AgentMemoriesMCPPackage`, id `agent.memory`, skill `Agent.Memory`, bound in the package's default
 `skillPackages.php`): `listMemories`, `searchMemory`, `remember`, `updateMemory`, `forget`. The account is the one the
 call acts for; the space defaults to the conversation's. The three writes declare `MCPToolWritesAgentMemoryOnly`, so a
 new directive reaches the running conversation. While the store is off the package reports itself unavailable
 (`MCPPackage::isAvailable()`): the binding leaves it out, the skill disappears, and a direct call is refused. A host
-whose `skillPackages.php` replaces the package's file lists `AISkill::MEMORY_MANAGEMENT => ['agent.memories']` itself.
+whose `skillPackages.php` replaces the package's file lists `AISkill::AGENT_MEMORY => [AgentMemoriesMCPPackage::class]` itself.
 
 **Adopting the store with an existing memory table.** A host that already keeps memories in its own table maps the
 store onto it through `tableNames` (its database config, `Base.Repo.database.tableNames`) only when the columns match the table above;

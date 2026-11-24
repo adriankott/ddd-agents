@@ -21,7 +21,7 @@ use DDD\Domain\Common\Services\AccountsService;
 use DDD\Infrastructure\Exceptions\BadRequestException;
 use DDD\Infrastructure\Exceptions\InternalErrorException;
 use DDD\Infrastructure\Services\DDDService;
-use DDD\Presentation\Mcp\Agent\ConversationHtmlTranscript;
+use DDD\Presentation\Mcp\Agents\ConversationHtmlTranscript;
 use DDD\Symfony\Commands\Agents\Inspect\ConversationHeaderRow;
 use Psr\Cache\InvalidArgumentException;
 use ReflectionException;
@@ -50,12 +50,13 @@ use Symfony\Component\Console\Output\OutputInterface;
  * What the header says about the space of the conversation comes from {@see self::describeAgentSpaceRow()}: an
  * application that knows its space by an entity of its own prints that entity there.
  *
- *   php bin/console app:ai-agent:inspect 48
- *   php bin/console app:ai-agent:inspect 48 --include-truncated --full --debug
- *   php bin/console app:ai-agent:inspect 48 --html=/tmp/conversation-48.html
+ *   php bin/console app:agent:inspect 48
+ *   php bin/console app:agent:inspect 48 --include-truncated --full --debug
+ *   php bin/console app:agent:inspect 48 --html=/tmp/conversation-48.html
  */
 #[AsCommand(
-    name: 'app:ai-agent:inspect',
+    name: 'app:agent:inspect',
+    aliases: ['app:ai-agent:inspect'],
     description: 'Inspect one persisted agent conversation: metadata, per-message table, full transcript, delegation children.',
 )]
 class AgentInspectConversationCommand extends AgentConsoleCommand
@@ -649,7 +650,7 @@ class AgentInspectConversationCommand extends AgentConsoleCommand
     }
 
     /**
-     * Prints the child conversations the rows spawned (recursive, ids only — `app:ai-agent:inspect <childId>` shows a
+     * Prints the child conversations the rows spawned (recursive, ids only — `app:agent:inspect <childId>` shows a
      * child in detail), the sub-agents (one per `delegate` row, read from the loaded rows' records, every run with its
      * deadline row) and the legacy delegation batches the conversation forked: per batch the wake condition, expected
      * against the live member tally (completed / failed / running / queued) and the settled / folded / deadline state.

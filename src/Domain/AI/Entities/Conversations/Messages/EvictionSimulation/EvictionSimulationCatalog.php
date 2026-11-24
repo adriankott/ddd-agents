@@ -86,9 +86,9 @@ class EvictionSimulationCatalog extends ValueObject
             ['Notes.Drafts', LoadedCapability::TYPE_SKILL, 1400, false, null],
             ['getNotes', LoadedCapability::TYPE_TOOL, 500, false, 'Notes.Drafts'],
             ['createNote', LoadedCapability::TYPE_TOOL, 650, false, 'Notes.Drafts'],
-            ['Assistant.Settings', LoadedCapability::TYPE_SKILL, 1200, false, null],
-            ['getSettings', LoadedCapability::TYPE_TOOL, 400, false, 'Assistant.Settings'],
-            ['updateSettings', LoadedCapability::TYPE_TOOL, 450, false, 'Assistant.Settings'],
+            ['Agent.Settings', LoadedCapability::TYPE_SKILL, 1200, false, null],
+            ['getSettings', LoadedCapability::TYPE_TOOL, 400, false, 'Agent.Settings'],
+            ['updateSettings', LoadedCapability::TYPE_TOOL, 450, false, 'Agent.Settings'],
         ];
         foreach ($catalogEntries as [$capabilityName, $capabilityType, $residentTokens, $isAlwaysLoaded, $parentSkillName]) {
             $evictionSimulationCatalog->addCapability(

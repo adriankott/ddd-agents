@@ -29,7 +29,8 @@ use Throwable;
  * clean replay was refused), 2 invalid options.
  */
 #[AsCommand(
-    name: 'app:ai-agent:probe-reasoning-replay',
+    name: 'app:agent:probe-reasoning-replay',
+    aliases: ['app:ai-agent:probe-reasoning-replay'],
     description: 'Live probe: does a model accept its own reasoning sent back (clean, after history/tool/system edits, after a model switch), a forced tool choice, and append-only skill loading on the Responses API? Real model calls with the agent\'s OpenRouter key; persists nothing'
 )]
 class AgentProbeReasoningReplayCommand extends AgentConsoleCommand

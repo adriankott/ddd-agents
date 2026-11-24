@@ -61,10 +61,11 @@ use Throwable;
  * (its usage-log cost, its prefix of skill section ids) is the one that runs. An application replaces the command by a
  * subclass that repeats `#[AsCommand]` with this name.
  *
- *   php bin/console app:ai-agent:run-report 4711 4712 --log-dir=<eval log folder> --findings --variants --markdown
+ *   php bin/console app:agent:run-report 4711 4712 --log-dir=<eval log folder> --findings --variants --markdown
  */
 #[AsCommand(
-    name: 'app:ai-agent:run-report',
+    name: 'app:agent:run-report',
+    aliases: ['app:ai-agent:run-report'],
     description: 'The standard per-run report: judge verdict + findings, wall seconds, owner turns, model/tool calls, time split with the parallel gain, refusals, slowest tools, suite total.'
 )]
 class AgentRunReportCommand extends AgentConsoleCommand

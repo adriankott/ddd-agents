@@ -30,7 +30,7 @@ use DDD\Domain\AI\Services\Conversations\AIConversationMessagesService;
 use DDD\Domain\AI\Services\Conversations\AIConversationRealtimeSignalService;
 use DDD\Domain\AI\Services\Conversations\AIConversationSchedulesService;
 use DDD\Domain\AI\Services\Conversations\AIConversationsService;
-use DDD\Presentation\Mcp\Agent\AgentConsoleStream;
+use DDD\Presentation\Mcp\Agents\AgentConsoleStream;
 use DDD\Domain\AI\Traits\Conversations\AITraceLogTrait;
 use DDD\Domain\AI\Entities\Conversations\Eligibility\AgentAutomationEligibility;
 use DDD\Domain\AI\Entities\Conversations\Eligibility\AgentEligibilityLogContext;

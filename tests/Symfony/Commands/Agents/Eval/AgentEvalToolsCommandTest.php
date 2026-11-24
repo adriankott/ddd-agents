@@ -87,7 +87,7 @@ class AgentEvalToolsCommandTest extends AgentEvalResultFilesTestCase
 
         $storedRun = $probeCommand->suiteRunsServiceDouble->insertedAgentEvalSuiteRun;
         self::assertNotNull($storedRun);
-        self::assertSame('app:ai-agent:eval-tools', $storedRun->command);
+        self::assertSame('app:agent:eval-tools', $storedRun->command);
         self::assertSame('all', $storedRun->suiteLabel);
         self::assertSame(basename($runDirectory), $storedRun->logDirectoryName);
         self::assertSame(['model' => null, 'flavor' => 'call', 'arms' => [], 'repeat' => 2, 'skill' => null, 'case' => null], $storedRun->getRunOptions()->toArray());
@@ -262,7 +262,7 @@ class AgentEvalToolsCommandTest extends AgentEvalResultFilesTestCase
 
         self::assertSame(
             [
-                'php', '-d', 'memory_limit=2G', DDDService::instance()->getRootDir() . '/bin/console', 'app:ai-agent:eval-tools',
+                'php', '-d', 'memory_limit=2G', DDDService::instance()->getRootDir() . '/bin/console', 'app:agent:eval-tools',
                 '--case=catalog.compare', '--json', '--no-save', '--fixture=/fixtures/Tools/Catalog.Search.json',
                 '--agentSpaceId=7', '--model=VENDOR.MODEL', '--owner-device=' . OwnerDevice::SURFACES[0],
                 '--judge', '--judge-model=VENDOR.JUDGE', '--driver-model=VENDOR.DRIVER',

@@ -7,6 +7,7 @@ namespace DDD\Tests\Agents\Kernel;
 use DDD\Symfony\Commands\Agents\AgentActivityLinesCommand;
 use DDD\Symfony\Commands\Agents\AgentCacheDiffCommand;
 use DDD\Symfony\Commands\Agents\AgentChatCommand;
+use DDD\Symfony\Commands\Agents\AgentClientToolsPurgeCommand;
 use DDD\Symfony\Commands\Agents\AgentChatTuiCommand;
 use DDD\Symfony\Commands\Agents\AgentCloseSchedulesForInactiveAgentSpacesCommand;
 use DDD\Symfony\Commands\Agents\AgentCompactConversationCommand;
@@ -67,57 +68,58 @@ class PackageAgentCommandsRegistrationTest extends IntegrationTestCase
 {
     /** @var string[] The command class by command name */
     public const array COMMAND_CLASSES_BY_NAME = [
-        'app:ai-conversation:backfill-message-embeddings' => AIConversationBackfillEmbeddingsCommand::class,
-        'app:ai-conversation:repair-zero-embeddings' => AIConversationEmbeddingsRepairCommand::class,
-        'app:ai-conversation:backfill-environment' => AIConversationBackfillEnvironmentCommand::class,
-        'app:ai-conversation:search-inspect' => AISearchInspectCommand::class,
-        'app:ai-agent:activity-lines' => AgentActivityLinesCommand::class,
-        'app:ai-agent:cache-diff' => AgentCacheDiffCommand::class,
-        'app:ai-agent:compact' => AgentCompactConversationCommand::class,
-        'app:ai-conversation:compact-finalized' => AgentCompactFinalizedConversationsCommand::class,
-        'app:ai-agent:diagnose' => AgentDiagnoseResumeCommand::class,
-        'app:ai-agent:execute-tool-call' => AgentExecuteToolCallCommand::class,
-        'app:ai-conversation:fire-due-schedules' => AgentFireDueSchedulesCommand::class,
-        'app:ai-agent:loaded-capabilities-compact' => AgentLoadedCapabilitiesCompactCommand::class,
-        'app:ai-conversation:mark-finalized' => AgentMarkFinalizedConversationsCommand::class,
-        'app:ai-agent:context-eviction-sim' => AgentModelInputEvictionSimCommand::class,
-        'app:ai-agent:request-snapshot-debug-payloads-strip' => AgentRequestSnapshotDebugPayloadsStripCommand::class,
-        'app:ai-agent:tool-response-stats' => AgentToolResponseStatsCommand::class,
-        'app:ai-agent:trace-events-purge' => AgentTraceEventsPurgeCommand::class,
-        'app:ai-agent:turn-events-purge' => AgentTurnEventsPurgeCommand::class,
-        'app:ai-agent:validate-conversation' => AgentValidateConversationCommand::class,
-        'app:ai-agent:run-report' => AgentRunReportCommand::class,
-        'app:ai-agent:skill-token-map' => SkillTokenMapCommand::class,
-        'app:ai-agent:chat' => AgentChatCommand::class,
-        'app:ai-agent:chat-tui' => AgentChatTuiCommand::class,
-        'app:ai-agent:inspect' => AgentInspectConversationCommand::class,
-        'app:ai-agent:reap' => AgentReapStuckConversationsCommand::class,
-        'app:ai-agent:jev-probe' => AgentJevProbeCommand::class,
-        'app:ai-agent:probe-reasoning-replay' => AgentProbeReasoningReplayCommand::class,
-        'app:ai-conversation:deliver-owed-reports-and-resume-owed-turns' => AgentDeliverOwedReportsAndResumeOwedTurnsCommand::class,
-        'app:ai-conversation:scorecards' => AIConversationScorecardsCommand::class,
-        'app:ai-schedule:close-for-inactive-agent-spaces' => AgentCloseSchedulesForInactiveAgentSpacesCommand::class,
+        'app:agent:purge-client-tool-requests' => AgentClientToolsPurgeCommand::class,
+        'app:agent:backfill-message-embeddings' => AIConversationBackfillEmbeddingsCommand::class,
+        'app:agent:repair-zero-embeddings' => AIConversationEmbeddingsRepairCommand::class,
+        'app:agent:backfill-conversation-environment' => AIConversationBackfillEnvironmentCommand::class,
+        'app:agent:conversation-search-inspect' => AISearchInspectCommand::class,
+        'app:agent:activity-lines' => AgentActivityLinesCommand::class,
+        'app:agent:cache-diff' => AgentCacheDiffCommand::class,
+        'app:agent:compact' => AgentCompactConversationCommand::class,
+        'app:agent:compact-finalized-conversations' => AgentCompactFinalizedConversationsCommand::class,
+        'app:agent:diagnose' => AgentDiagnoseResumeCommand::class,
+        'app:agent:execute-tool-call' => AgentExecuteToolCallCommand::class,
+        'app:agent:fire-due-schedules' => AgentFireDueSchedulesCommand::class,
+        'app:agent:loaded-capabilities-compact' => AgentLoadedCapabilitiesCompactCommand::class,
+        'app:agent:mark-finalized-conversations' => AgentMarkFinalizedConversationsCommand::class,
+        'app:agent:context-eviction-sim' => AgentModelInputEvictionSimCommand::class,
+        'app:agent:request-snapshot-debug-payloads-strip' => AgentRequestSnapshotDebugPayloadsStripCommand::class,
+        'app:agent:tool-response-stats' => AgentToolResponseStatsCommand::class,
+        'app:agent:trace-events-purge' => AgentTraceEventsPurgeCommand::class,
+        'app:agent:turn-events-purge' => AgentTurnEventsPurgeCommand::class,
+        'app:agent:validate-conversation' => AgentValidateConversationCommand::class,
+        'app:agent:run-report' => AgentRunReportCommand::class,
+        'app:agent:skill-token-map' => SkillTokenMapCommand::class,
+        'app:agent:chat' => AgentChatCommand::class,
+        'app:agent:chat-tui' => AgentChatTuiCommand::class,
+        'app:agent:inspect' => AgentInspectConversationCommand::class,
+        'app:agent:reap' => AgentReapStuckConversationsCommand::class,
+        'app:agent:jev-probe' => AgentJevProbeCommand::class,
+        'app:agent:probe-reasoning-replay' => AgentProbeReasoningReplayCommand::class,
+        'app:agent:deliver-owed-reports-and-resume-owed-turns' => AgentDeliverOwedReportsAndResumeOwedTurnsCommand::class,
+        'app:agent:conversation-scorecards' => AIConversationScorecardsCommand::class,
+        'app:agent:close-schedules-for-inactive-agent-spaces' => AgentCloseSchedulesForInactiveAgentSpacesCommand::class,
         'app:mcp:documentation' => MCPDocumentationCommand::class,
         'app:mcp:clear-cache' => MCPClearCacheCommand::class,
         'app:mcp:compare-tool-calls' => MCPCompareToolCallsCommand::class,
-        'app:ai:composed-view:export-node-schema' => ComposedViewNodeSchemaExportCommand::class,
-        'app:ai-agent:eval-tools' => AgentEvalToolsCommand::class,
-        'app:ai-agent:eval-selection' => AgentEvalSelectionCommand::class,
-        'app:ai-agent:eval-recall' => AgentEvalRecallCommand::class,
-        'app:ai-agent:eval-tiers' => AgentEvalTiersCommand::class,
-        'app:ai-agent:eval-analyze' => AgentEvalAnalyzeCommand::class,
-        'app:ai-agent:eval-suite' => AgentEvalSuiteCommand::class,
-        'app:ai-agent:eval-eviction' => AgentEvalEvictionCommand::class,
-        'app:ai-agent:eval-guard' => AgentEvalGuardCommand::class,
-        'app:ai-agent:eval-schedule-runs' => AgentEvalScheduleRunsCommand::class,
-        'app:ai-agent:eval-conversations-purge' => AgentEvalConversationsPurgeCommand::class,
-        'app:ai-agent:decision-stats' => AgentDecisionStatsCommand::class,
-        'app:ai-agent:decision-fixtures' => AgentDecisionFixturesCommand::class,
-        'app:ai-agent:eval-compaction-tree' => AgentEvalCompactionTreeCommand::class,
+        'app:agent:export-composed-view-node-schema' => ComposedViewNodeSchemaExportCommand::class,
+        'app:agent:eval-tools' => AgentEvalToolsCommand::class,
+        'app:agent:eval-selection' => AgentEvalSelectionCommand::class,
+        'app:agent:eval-recall' => AgentEvalRecallCommand::class,
+        'app:agent:eval-tiers' => AgentEvalTiersCommand::class,
+        'app:agent:eval-analyze' => AgentEvalAnalyzeCommand::class,
+        'app:agent:eval-suite' => AgentEvalSuiteCommand::class,
+        'app:agent:eval-eviction' => AgentEvalEvictionCommand::class,
+        'app:agent:eval-guard' => AgentEvalGuardCommand::class,
+        'app:agent:eval-schedule-runs' => AgentEvalScheduleRunsCommand::class,
+        'app:agent:eval-conversations-purge' => AgentEvalConversationsPurgeCommand::class,
+        'app:agent:decision-stats' => AgentDecisionStatsCommand::class,
+        'app:agent:decision-fixtures' => AgentDecisionFixturesCommand::class,
+        'app:agent:eval-compaction-tree' => AgentEvalCompactionTreeCommand::class,
     ];
 
     /** @var string The tool-call child: run by name, never listed */
-    public const string HIDDEN_COMMAND_NAME = 'app:ai-agent:execute-tool-call';
+    public const string HIDDEN_COMMAND_NAME = 'app:agent:execute-tool-call';
 
     public function testEveryPlainCommandIsRegisteredUnderItsName(): void
     {
@@ -136,8 +138,8 @@ class PackageAgentCommandsRegistrationTest extends IntegrationTestCase
         $application = new Application(static::bootTestKernel());
 
         // the console's own wrapper decides the list, not the command object behind it
-        self::assertTrue($application->find('app:ai-agent:execute-tool-call')->isHidden());
-        self::assertArrayNotHasKey('app:ai-agent:execute-tool-call', array_filter($application->all(), static fn ($command): bool => !$command->isHidden()));
+        self::assertTrue($application->find('app:agent:execute-tool-call')->isHidden());
+        self::assertArrayNotHasKey('app:agent:execute-tool-call', array_filter($application->all(), static fn ($command): bool => !$command->isHidden()));
     }
 
     public function testTheConsoleScriptListsEveryVisibleCommandAndFindsTheHiddenOneByName(): void
@@ -157,12 +159,12 @@ class PackageAgentCommandsRegistrationTest extends IntegrationTestCase
 
         $visibleCommandNames = array_keys(self::COMMAND_CLASSES_BY_NAME);
         $visibleCommandNames = array_values(array_diff($visibleCommandNames, [self::HIDDEN_COMMAND_NAME]));
-        self::assertCount(46, $visibleCommandNames);
+        self::assertCount(47, $visibleCommandNames);
         self::assertSame([], array_values(array_diff($visibleCommandNames, $listedCommandNames)), 'every visible command is listed');
         self::assertNotContains(self::HIDDEN_COMMAND_NAME, $listedCommandNames);
         self::assertContains(self::HIDDEN_COMMAND_NAME, $hiddenCommandNames);
         $textListProcess = $this->runConsoleScript('list', '--raw');
-        self::assertSame(46, preg_match_all('/^app:(ai-(agent|conversation|schedule)|mcp|ai:composed-view):\S+/m', $textListProcess->getOutput()), 'the text listing names the 46 visible commands');
+        self::assertSame(47, preg_match_all('/^app:(agent|mcp):\S+/m', $textListProcess->getOutput()), 'the text listing names the 47 visible commands');
 
         $helpProcess = $this->runConsoleScript('help', self::HIDDEN_COMMAND_NAME);
         self::assertSame(0, $helpProcess->getExitCode(), $helpProcess->getErrorOutput());
@@ -179,7 +181,7 @@ class PackageAgentCommandsRegistrationTest extends IntegrationTestCase
     public function testTheEvictionSimulatorPlaysAScenarioThroughTheKernel(): void
     {
         $application = new Application(static::bootTestKernel());
-        $commandTester = new CommandTester($application->find('app:ai-agent:context-eviction-sim'));
+        $commandTester = new CommandTester($application->find('app:agent:context-eviction-sim'));
 
         self::assertSame(0, $commandTester->execute(['--scenario' => 'flood', '--soft' => '6000', '--hard' => '10000']));
         self::assertStringContainsString('══ scenario: flood ══', $commandTester->getDisplay());

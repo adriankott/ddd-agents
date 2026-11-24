@@ -25,7 +25,7 @@ use Throwable;
 /**
  * The standard per-run report of one stored conversation ({@see AIConversationRunReport}): it reads the conversation's
  * message rows and delegation figures ({@see AIConversationMetricsService}), the plan snapshots of the rows and the
- * decision model's cost, and builds the report from them. The console command `app:ai-agent:run-report` prints it; an
+ * decision model's cost, and builds the report from them. The console command `app:agent:run-report` prints it; an
  * application may return it from a tool of its own.
  *
  * What the module cannot know is an override point an application implements in its class of the same name at the

@@ -8,13 +8,13 @@ use DDD\Domain\AI\Entities\MCPPackages\MCPPackageDocumentation;
 use DDD\Domain\AI\Entities\Skills\AISkill;
 use DDD\Domain\Base\Entities\LazyLoad\LazyLoadRepo;
 use DDD\Infrastructure\Libs\Config;
-use DDD\Presentation\Mcp\Client\AI\AgentTaskSchedulesMCPPackage;
+use DDD\Presentation\Mcp\Client\Agents\AgentTaskSchedulesMCPPackage;
 use DDD\Tests\Agents\Support\UnitTestCase;
 
 /**
  * The schedule tools' schema builds (every request and response class documents without a type error), the package
  * exposes the ten tool names the run purpose and the skill file refer to, every tool is described, and the package's
- * default binding offers it under `Assistant.Tasks`.
+ * default binding offers it under `Agent.Tasks`.
  */
 class AgentTaskSchedulesMCPPackageSchemaTest extends UnitTestCase
 {
@@ -53,7 +53,7 @@ class AgentTaskSchedulesMCPPackageSchemaTest extends UnitTestCase
         $expectedToolNames = self::TOOL_NAMES;
         sort($expectedToolNames);
         self::assertSame($expectedToolNames, $toolNames);
-        self::assertSame('agent.taskSchedules', $packageDocumentation->name);
+        self::assertSame('agent.tasks', $packageDocumentation->name);
     }
 
     public function testTheSchemaCarriesNoUnparsedGenericArrayType(): void
@@ -64,11 +64,11 @@ class AgentTaskSchedulesMCPPackageSchemaTest extends UnitTestCase
         self::assertStringNotContainsString('array<', $serializedDocumentation);
     }
 
-    public function testThePackagesBindingOffersTheToolsUnderAssistantTasks(): void
+    public function testThePackagesBindingOffersTheToolsUnderAgentTasks(): void
     {
         $packageBinding = require dirname(__DIR__, 4) . '/config/app/AI/skillPackages.php';
 
-        self::assertSame(['agent.taskSchedules'], $packageBinding[AISkill::ASSISTANT_TASKS] ?? null);
-        self::assertFileExists(dirname(__DIR__, 4) . '/config/app/AI/Skills/Assistant/Tasks.md');
+        self::assertSame([AgentTaskSchedulesMCPPackage::class], $packageBinding[AISkill::AGENT_TASKS] ?? null);
+        self::assertFileExists(dirname(__DIR__, 4) . '/config/app/AI/Skills/Agent/Tasks.md');
     }
 }

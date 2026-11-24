@@ -34,7 +34,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  * The run works as the configured default account for console work.
  */
 #[AsCommand(
-    name: 'app:ai-agent:decision-stats',
+    name: 'app:agent:decision-stats',
+    aliases: ['app:ai-agent:decision-stats'],
     description: 'Decision statistics over the agent turn events (per site, mode, arm, day; shadow agreement; floor sweep; reconciliation) — read-only'
 )]
 class AgentDecisionStatsCommand extends AgentConsoleCommand

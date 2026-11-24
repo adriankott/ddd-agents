@@ -26,7 +26,7 @@ use DDD\Infrastructure\Services\DDDService;
 use DDD\Infrastructure\Services\Service;
 
 /**
- * The live probe behind `app:ai-agent:probe-reasoning-replay`: a small synthetic tool conversation (built in memory,
+ * The live probe behind `app:agent:probe-reasoning-replay`: a small synthetic tool conversation (built in memory,
  * nothing persisted) sent to OpenRouter with the agent's own composers ({@see AgentChatCompletionsRequestComposer},
  * {@see AgentResponsesRequestComposer} over {@see AgentResponsesInputItems}), the model's catalog provider filters and
  * the agent's key. Each scenario asks one question the reasoning-replay concept needs answered:

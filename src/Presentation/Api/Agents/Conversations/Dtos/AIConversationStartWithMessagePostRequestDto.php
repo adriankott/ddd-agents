@@ -7,6 +7,7 @@ namespace DDD\Presentation\Api\Agents\Conversations\Dtos;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
 use DDD\Domain\AI\Entities\Conversations\Messages\AgentClientContext;
 use DDD\Presentation\Base\Dtos\RequestDto;
+use DDD\Domain\AI\Entities\ClientTools\AgentUIState;
 use DDD\Presentation\Base\OpenApi\Attributes\Parameter;
 
 class AIConversationStartWithMessagePostRequestDto extends RequestDto
@@ -116,4 +117,15 @@ class AIConversationStartWithMessagePostRequestDto extends RequestDto
      */
     #[Parameter(in: Parameter::QUERY, required: false)]
     public ?bool $storeRequestSnapshot = null;
+
+    /** @var string|null The id of the client that sends (random per mount of the agent window; `Agent.UI`) */
+    #[Parameter(in: Parameter::BODY, required: false)]
+    public ?string $clientId = null;
+
+    /**
+     * @var AgentUIState|null What the client's UI shows (`Agent.UI`): route, tab, view, references of unsaved and
+     * invalid fields, an open dialog. Normalized on arrival: what does not match its pattern is dropped, never refused
+     */
+    #[Parameter(in: Parameter::BODY, required: false)]
+    public ?AgentUIState $uiState = null;
 }

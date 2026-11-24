@@ -6,7 +6,7 @@ namespace DDD\Tests\Agents\Domain\AI\Entities\WebSearch;
 
 use DDD\Domain\AI\Entities\WebSearch\WebPageMarkdown;
 use DDD\Domain\AI\Entities\WebSearch\WebPageMarkdowns;
-use DDD\Presentation\Mcp\Client\AI\Dtos\WebPageMarkdownMcpResponseDto;
+use DDD\Presentation\Mcp\Client\Agents\Dtos\WebPageMarkdownMcpResponseDto;
 use DDD\Tests\Agents\Support\UnitTestCase;
 
 /**

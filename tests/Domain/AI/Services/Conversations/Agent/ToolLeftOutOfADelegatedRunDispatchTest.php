@@ -123,7 +123,7 @@ class ToolLeftOutOfADelegatedRunDispatchTest extends UnitTestCase
         ]);
         $conversation = $this->stubbingConversation(88, $loadRow);
         $conversation->stubbedLoadableSubSkillTools = new LoadableSubSkillTools();
-        $conversation->stubbedLoadableSubSkillTools->addToolOfSubSkillOnce('grantMandate', 'Assistant.Mandates', 'Grant a standing mandate');
+        $conversation->stubbedLoadableSubSkillTools->addToolOfSubSkillOnce('grantMandate', 'Agent.Mandates', 'Grant a standing mandate');
 
         $this->dispatch(new ExecutionRecordingDispatchService(), $conversation, $loadRow);
 
@@ -172,10 +172,10 @@ class ToolLeftOutOfADelegatedRunDispatchTest extends UnitTestCase
     {
         $callRow = $this->row(AIConversationMessage::ROLE_ASSISTANT, AIConversationMessage::AUTHOR_ASSISTANT, '', $index);
         $callRow->messageType = AIConversationMessage::MESSAGE_TOOL_CALL;
-        $loadedCapabilityEntries = ['Assistant.Mandates' => ['name' => 'Assistant.Mandates', 'type' => LoadedCapability::TYPE_SKILL]];
+        $loadedCapabilityEntries = ['Agent.Mandates' => ['name' => 'Agent.Mandates', 'type' => LoadedCapability::TYPE_SKILL]];
         if ($toolsAreResident) {
-            $loadedCapabilityEntries['grantMandate'] = ['name' => 'grantMandate', 'type' => LoadedCapability::TYPE_TOOL, 'parentSkillNames' => ['Assistant.Mandates']];
-            $loadedCapabilityEntries['listMandates'] = ['name' => 'listMandates', 'type' => LoadedCapability::TYPE_TOOL, 'parentSkillNames' => ['Assistant.Mandates']];
+            $loadedCapabilityEntries['grantMandate'] = ['name' => 'grantMandate', 'type' => LoadedCapability::TYPE_TOOL, 'parentSkillNames' => ['Agent.Mandates']];
+            $loadedCapabilityEntries['listMandates'] = ['name' => 'listMandates', 'type' => LoadedCapability::TYPE_TOOL, 'parentSkillNames' => ['Agent.Mandates']];
         }
         $callRow->loadedCapabilities = LoadedCapabilities::fromCanonicalEntries($loadedCapabilityEntries);
         $toolCall = new ToolCall();
@@ -205,8 +205,8 @@ class ToolLeftOutOfADelegatedRunDispatchTest extends UnitTestCase
     public function testTheLoadToolCatalogLeavesTheBlockedToolOutOfTheSubSkillTools(): void
     {
         $loadableSubSkillTools = new LoadableSubSkillTools();
-        $loadableSubSkillTools->addToolOfSubSkillOnce('grantMandate', 'Assistant.Mandates', 'Grant a standing mandate');
-        $loadableSubSkillTools->addToolOfSubSkillOnce('listMandates', 'Assistant.Mandates', 'List the mandates');
+        $loadableSubSkillTools->addToolOfSubSkillOnce('grantMandate', 'Agent.Mandates', 'Grant a standing mandate');
+        $loadableSubSkillTools->addToolOfSubSkillOnce('listMandates', 'Agent.Mandates', 'List the mandates');
         $agentOfferedToolsInputs = new AgentOfferedToolsInputs();
         $agentOfferedToolsInputs->allowThreads = false;
         $agentOfferedToolsInputs->loadedSkillToolDefinitions = new ToolDefinitions();
@@ -262,9 +262,9 @@ class ToolLeftOutOfADelegatedRunDispatchTest extends UnitTestCase
         $callRow = $this->row(AIConversationMessage::ROLE_ASSISTANT, AIConversationMessage::AUTHOR_ASSISTANT, '', $index);
         $callRow->messageType = AIConversationMessage::MESSAGE_TOOL_CALL;
         $callRow->loadedCapabilities = LoadedCapabilities::fromCanonicalEntries([
-            'Assistant.Mandates' => ['name' => 'Assistant.Mandates', 'type' => LoadedCapability::TYPE_SKILL],
-            'grantMandate' => ['name' => 'grantMandate', 'type' => LoadedCapability::TYPE_TOOL, 'parentSkillNames' => ['Assistant.Mandates']],
-            'listMandates' => ['name' => 'listMandates', 'type' => LoadedCapability::TYPE_TOOL, 'parentSkillNames' => ['Assistant.Mandates']],
+            'Agent.Mandates' => ['name' => 'Agent.Mandates', 'type' => LoadedCapability::TYPE_SKILL],
+            'grantMandate' => ['name' => 'grantMandate', 'type' => LoadedCapability::TYPE_TOOL, 'parentSkillNames' => ['Agent.Mandates']],
+            'listMandates' => ['name' => 'listMandates', 'type' => LoadedCapability::TYPE_TOOL, 'parentSkillNames' => ['Agent.Mandates']],
         ]);
         $toolCall = new ToolCall();
         $toolCall->toolCallId = 'call_' . $index;

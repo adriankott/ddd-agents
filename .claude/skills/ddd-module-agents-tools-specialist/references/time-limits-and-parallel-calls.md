@@ -83,7 +83,7 @@ something only the parent process holds does not reach it.
 
 ## The child-process command and the host's console script
 
-The package ships the command a child runs: `app:ai-agent:execute-tool-call` (`AgentExecuteToolCallCommand`, hidden
+The package ships the command a child runs: `app:agent:execute-tool-call` (`AgentExecuteToolCallCommand`, hidden
 from the command list), the default of `commandName` (`AgentToolCallForkJoinService::DEFAULT_CHILD_PROCESS_COMMAND_NAME`).
 The package's `config/app/AI/agentToolCallChildProcess.php` declares no `consoleScript`, so every call runs inline. A
 host that wants parallel calls replaces the file whole (keys are never merged) and names `consoleScript` (relative to

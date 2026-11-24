@@ -9,18 +9,17 @@ use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessages;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolContentTrust;
 use DDD\Domain\AI\Entities\MCPPackages\ToolResultUntrustedSegments;
-use DDD\Domain\AI\Entities\WebSearch\PageScreenshots\PageScreenshot;
-use DDD\Presentation\Mcp\Agent\ConversationHtmlTranscript;
-use DDD\Presentation\Mcp\Client\AI\AgentMandatesMCPPackage;
-use DDD\Presentation\Mcp\Client\AI\AgentMemoriesMCPPackage;
-use DDD\Presentation\Mcp\Client\AI\WebSearchMCPPackage;
+use DDD\Presentation\Mcp\Agents\ConversationHtmlTranscript;
+use DDD\Presentation\Mcp\Client\Agents\AgentMandatesMCPPackage;
+use DDD\Presentation\Mcp\Client\Agents\AgentMemoriesMCPPackage;
+use DDD\Presentation\Mcp\Client\Agents\WebSearchMCPPackage;
 use DDD\Tests\Agents\Presentation\Services\Probes\ProbeUntrustedReadGateMCPPackage;
 use DDD\Tests\Agents\Support\UnitTestCase;
 use ReflectionClass;
 
 /**
  * The untrusted-content defaults: a READ or WORKSPACE tool is untrusted unless declared trusted, a write is trusted,
- * an unmarked untrusted result carries the reading rule, a screenshot decodes only a PNG, the transcript runs no script.
+ * an unmarked untrusted result carries the reading rule, the transcript runs no script.
  */
 class UntrustedContentDefaultsTest extends UnitTestCase
 {
@@ -61,23 +60,6 @@ class UntrustedContentDefaultsTest extends UnitTestCase
         self::assertNull(ToolResultUntrustedSegments::buildPlatformNoteWithReadingRule(null, 'record', false));
         $markedText = ToolResultUntrustedSegments::wrap('https://example.org', 'text');
         self::assertSame(ToolResultUntrustedSegments::READING_RULE, ToolResultUntrustedSegments::buildPlatformNoteWithReadingRule(null, $markedText, true));
-    }
-
-    public function testAScreenshotDecodesOnlyAPng(): void
-    {
-        $pngScreenshot = new PageScreenshot();
-        $gdImage = imagecreatetruecolor(4, 3);
-        ob_start();
-        imagepng($gdImage);
-        $pngScreenshot->content = base64_encode((string)ob_get_clean());
-        self::assertSame(4, $pngScreenshot->getPixelWidth());
-        self::assertSame(3, $pngScreenshot->getPixelHeight());
-        self::assertCount(1, $pngScreenshot->buildSegmentWindowBase64(100, 0, 1));
-
-        $postScriptScreenshot = new PageScreenshot();
-        $postScriptScreenshot->content = base64_encode("%!PS-Adobe-3.0\nshowpage\n");
-        self::assertSame(0, $postScriptScreenshot->getPixelWidth());
-        self::assertSame([], $postScriptScreenshot->buildSegmentWindowBase64(100, 0, 1));
     }
 
     public function testTheTranscriptRunsNoScript(): void

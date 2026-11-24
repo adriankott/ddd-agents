@@ -51,7 +51,7 @@ use DDD\Domain\AI\Services\Conversations\AIConversationDelegationBatchesService;
 use DDD\Domain\AI\Services\Conversations\AIConversationMessagesService;
 use DDD\Domain\AI\Services\Conversations\AIConversationRunClaimsService;
 use DDD\Domain\AI\Services\Conversations\AIConversationTransactionsService;
-use DDD\Presentation\Mcp\Agent\AgentConsoleStream;
+use DDD\Presentation\Mcp\Agents\AgentConsoleStream;
 use DDD\Domain\AI\Exceptions\Conversations\AgentRunClaimLostException;
 use DDD\Domain\AI\Traits\Conversations\AITraceLogTrait;
 use DDD\Domain\AI\Services\AgentSpaces\AgentSpacesService;

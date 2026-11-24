@@ -31,13 +31,14 @@ use Throwable;
  *   2. --tool=<name>              — the LARGEST single responses of that tool (message/conversation ids + sizes).
  *   3. --message=<id>             — the full arguments + result payload of one tool-call message.
  *
- *   php bin/console app:ai-agent:tool-response-stats                          # ranking, last 30 days, by avg chars
- *   php bin/console app:ai-agent:tool-response-stats --order-by=max --days=7
- *   php bin/console app:ai-agent:tool-response-stats --tool=searchDocuments --samples=10
- *   php bin/console app:ai-agent:tool-response-stats --message=812345         # the payload to optimise
+ *   php bin/console app:agent:tool-response-stats                          # ranking, last 30 days, by avg chars
+ *   php bin/console app:agent:tool-response-stats --order-by=max --days=7
+ *   php bin/console app:agent:tool-response-stats --tool=searchDocuments --samples=10
+ *   php bin/console app:agent:tool-response-stats --message=812345         # the payload to optimise
  */
 #[AsCommand(
-    name: 'app:ai-agent:tool-response-stats',
+    name: 'app:agent:tool-response-stats',
+    aliases: ['app:ai-agent:tool-response-stats'],
     description: 'Analyse agent tool-response sizes: per-tool totals ranking, largest responses of one tool, full payload of one tool-call message.',
 )]
 class AgentToolResponseStatsCommand extends AgentConsoleCommand

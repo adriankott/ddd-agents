@@ -5,8 +5,8 @@
 Contents: what ships and what an application adapts · the printer contract · one streamed turn · the contract of the chat command · after the turn · transcripts and the TUI view model · replacing the printer · for the package maintainer · full class names
 
 A console chat is the developer's fastest loop: type, watch every tool call and result stream past, read the payload
-of a call. The package ships the chat commands `app:ai-agent:chat` (line-oriented, scriptable) and
-`app:ai-agent:chat-tui` (full screen, needs `php-tui/php-tui`), the rendering, and the line editor with its slash
+of a call. The package ships the chat commands `app:agent:chat` (line-oriented, scriptable) and
+`app:agent:chat-tui` (full screen, needs `php-tui/php-tui`), the rendering, and the line editor with its slash
 commands (`src/Symfony/Commands/Agents/Chat/`). Their options, exit codes and override points:
 [console-commands](console-commands.md#run-and-drive-a-conversation). An application adapts a chat by a same-name
 subclass; it writes a command of its own only for a chat the two do not cover — the contract below is what both follow.
@@ -15,7 +15,7 @@ subclass; it writes a command of its own only for a chat the two do not cover �
 
 | Ships in the package | An application adapts (subclass of the chat command) |
 |---|---|
-| `app:ai-agent:chat`, `app:ai-agent:chat-tui` (`AgentChatCommand`, `AgentChatTuiCommand`, scope rules in `AgentConsoleChatScopeTrait`) | whom the chat talks as and where a new conversation is placed (`resolveChatScope()`, `findAgentSpaceForNewConversation()`, `createConversationInAgentSpace()`) |
+| `app:agent:chat`, `app:agent:chat-tui` (`AgentChatCommand`, `AgentChatTuiCommand`, scope rules in `AgentConsoleChatScopeTrait`) | whom the chat talks as and where a new conversation is placed (`resolveChatScope()`, `findAgentSpaceForNewConversation()`, `createConversationInAgentSpace()`) |
 | `AgentMessagePrinterInterface`, its implementation `AgentConsolePrinter` | the printer, by an alias (below) |
 | `AgentConsoleStream` (built by the loop from the output it is given) | the memory curation after a turn (`curateMemoryAfterTurn()`) |
 | `ConsoleMarkdownRenderer` (assistant Markdown to ANSI or plain lines) | its slash commands (`buildSlashCommandRegistry()`) |
@@ -41,7 +41,7 @@ hides a sub-agent's own rows (the delegate call and its verdict stay). The assis
 ## One streamed turn
 
 `AIConversationAgentService::generateAgentReply()` streams every row it persists to the output it is given (through
-an `AgentConsoleStream`); `$timings` adds a line per model call and tool with its seconds. `app:ai-agent:chat` drives
+an `AgentConsoleStream`); `$timings` adds a line per model call and tool with its seconds. `app:agent:chat` drives
 one owner turn in these three steps; an application's own command does the same (inside its command class; services
 from the container):
 
@@ -148,9 +148,9 @@ The classes this reference names, with their namespace (for the `use` lines of a
 `DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessages` ·
 `DDD\Domain\AI\Services\Conversations\AIConversationMessagesService` ·
 `DDD\Domain\AI\Services\AIUsageEnvelopesService` · `DDD\Domain\AI\Entities\Environment\AgentApplicationNames` ·
-`DDD\Presentation\Mcp\Agent\AgentConsolePrinter` · `DDD\Presentation\Mcp\Agent\AgentConsoleStream` ·
+`DDD\Presentation\Mcp\Agents\AgentConsolePrinter` · `DDD\Presentation\Mcp\Agents\AgentConsoleStream` ·
 `DDD\Domain\AI\Services\Conversations\AgentMessagePrinterInterface` ·
 `DDD\Domain\AI\Services\AgentSpaces\AgentSpacesService` · `DDD\Infrastructure\Services\AuthService` ·
-`DDD\Presentation\Mcp\Agent\ConsoleMarkdownRenderer` · `DDD\Presentation\Mcp\Agent\Tui\ConsoleViewBlock` ·
-`DDD\Presentation\Mcp\Agent\Tui\ConsoleViewLine` · `DDD\Presentation\Mcp\Agent\Tui\ConsoleViewModel` ·
-`DDD\Presentation\Mcp\Agent\Tui\ConsoleViewModelBuilder` · `DDD\Presentation\Mcp\Agent\ConversationHtmlTranscript`
+`DDD\Presentation\Mcp\Agents\ConsoleMarkdownRenderer` · `DDD\Presentation\Mcp\Agents\Tui\ConsoleViewBlock` ·
+`DDD\Presentation\Mcp\Agents\Tui\ConsoleViewLine` · `DDD\Presentation\Mcp\Agents\Tui\ConsoleViewModel` ·
+`DDD\Presentation\Mcp\Agents\Tui\ConsoleViewModelBuilder` · `DDD\Presentation\Mcp\Agents\ConversationHtmlTranscript`

@@ -18,7 +18,7 @@ use RuntimeException;
 use Symfony\Component\Console\Tester\CommandTester;
 
 /**
- * The printout of `app:ai-agent:run-report` over the runs of {@see RunReportPrintoutRuns} keeps its stored format,
+ * The printout of `app:agent:run-report` over the runs of {@see RunReportPrintoutRuns} keeps its stored format,
  * character for character (the fixture file): the run table with the verdicts and the totals, the slowest tools, the
  * variants timelines and the findings, in console and Markdown form. An application's command that redeclares the
  * run table's headers prints its own headers. The services are the container's, replaced by doubles that read nothing; the decision model's cost comes
@@ -60,7 +60,7 @@ class AgentRunReportCommandPrintoutTest extends IntegrationTestCase
     public function testTheCommandKeepsItsNameAndOptionsAndRunsOnTheBase(): void
     {
         $asCommandAttributes = (new ReflectionClass(AgentRunReportCommand::class))->getAttributes(AsCommand::class);
-        self::assertSame('app:ai-agent:run-report', $asCommandAttributes[0]->newInstance()->name);
+        self::assertSame('app:agent:run-report', explode('|', $asCommandAttributes[0]->newInstance()->name)[0], 'the old name stays an alias');
 
         $agentRunReportCommand = new AgentRunReportCommand();
         self::assertInstanceOf(AgentConsoleCommand::class, $agentRunReportCommand);

@@ -41,14 +41,15 @@ use Throwable;
  * either loops (re-fires forever) or parks IDLE with the user's message silently unanswered. Both tails are printed
  * side by side with `hasUnansweredInboundMessage` computed on EACH, so the disagreement is visible at a glance.
  *
- *   php bin/console app:ai-agent:diagnose 2118
- *   php bin/console app:ai-agent:diagnose 2118 --include-truncated
+ *   php bin/console app:agent:diagnose 2118
+ *   php bin/console app:agent:diagnose 2118 --include-truncated
  *
  * The reconstruction itself is {@see AIConversationResumeDiagnosis}. `--drive` and `--retry` mutate (see their
  * option texts). The budget cap is lifted for `--drive` only when the conversation itself carries `budgetBypass`.
  */
 #[AsCommand(
-    name: 'app:ai-agent:diagnose',
+    name: 'app:agent:diagnose',
+    aliases: ['app:ai-agent:diagnose'],
     description: 'Reconstruct (read-only) the resume/derive decision for one agent conversation — why it loops, parks, or leaves a message unanswered.',
 )]
 class AgentDiagnoseResumeCommand extends AgentConsoleCommand
@@ -167,7 +168,7 @@ class AgentDiagnoseResumeCommand extends AgentConsoleCommand
             } finally {
                 $this->closeUsageEnvelope($usageEnvelopeContext);
             }
-            $output->writeln("\n<fg=green>✓ drive returned without throwing.</> Re-run `app:ai-agent:diagnose {$conversation->id}` to see the appended reply.");
+            $output->writeln("\n<fg=green>✓ drive returned without throwing.</> Re-run `app:agent:diagnose {$conversation->id}` to see the appended reply.");
         } catch (Throwable $driveError) {
             $output->writeln("\n<fg=red;options=bold>⛔ DRIVE THREW — this is the error the worker was hiding:</>");
             $output->writeln('<fg=red>' . $driveError::class . ': ' . $driveError->getMessage() . '</>');

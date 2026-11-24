@@ -66,7 +66,7 @@ class AgentToolCallForkJoinService extends Service
      * ({@see \DDD\Symfony\Commands\Agents\AgentExecuteToolCallCommand}). An application's config file replaces the
      * module's file whole, so a file that only declares the console script still gets this command.
      */
-    public const string DEFAULT_CHILD_PROCESS_COMMAND_NAME = 'app:ai-agent:execute-tool-call';
+    public const string DEFAULT_CHILD_PROCESS_COMMAND_NAME = 'app:agent:execute-tool-call';
 
     /**
      * The recorded-run comparison runs every tool call in its own process: its Argus transport is recorded and

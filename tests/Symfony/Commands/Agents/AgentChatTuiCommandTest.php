@@ -12,8 +12,8 @@ use DDD\Domain\AI\Entities\Conversations\Usage\AgentAIUsageScope;
 use DDD\Domain\AI\Entities\UsageLogs\AIUsageEnvelopeContext;
 use DDD\Domain\Common\Entities\Accounts\Account;
 use DDD\Infrastructure\Services\AuthService;
-use DDD\Presentation\Mcp\Agent\Tui\ConsoleViewBlock;
-use DDD\Presentation\Mcp\Agent\Tui\ConsoleViewModel;
+use DDD\Presentation\Mcp\Agents\Tui\ConsoleViewBlock;
+use DDD\Presentation\Mcp\Agents\Tui\ConsoleViewModel;
 use DDD\Symfony\Commands\Agents\AgentChatCommand;
 use DDD\Symfony\Commands\Agents\AgentChatTuiCommand;
 use DDD\Symfony\Commands\Agents\AgentConsoleCommand;
@@ -65,7 +65,7 @@ class AgentChatTuiCommandTest extends UnitTestCase
     public function testTheCommandKeepsItsNameAndItsOptions(): void
     {
         $asCommandAttributes = (new ReflectionClass(AgentChatTuiCommand::class))->getAttributes(AsCommand::class);
-        self::assertSame('app:ai-agent:chat-tui', $asCommandAttributes[0]->newInstance()->name);
+        self::assertSame('app:agent:chat-tui', explode('|', $asCommandAttributes[0]->newInstance()->name)[0], 'the old name stays an alias');
 
         $chatTuiProbeCommand = $this->buildProbeCommand();
         self::assertInstanceOf(AgentConsoleCommand::class, $chatTuiProbeCommand);
@@ -133,9 +133,9 @@ class AgentChatTuiCommandTest extends UnitTestCase
     {
         $listProcess = $this->runConsoleWithoutTerminalLibrary('list', '--raw');
         self::assertSame(0, $listProcess->getExitCode(), $listProcess->getErrorOutput());
-        self::assertMatchesRegularExpression('/^app:ai-agent:chat-tui\s/m', $listProcess->getOutput());
+        self::assertMatchesRegularExpression('/^app:agent:chat-tui\s/m', $listProcess->getOutput());
 
-        $chatTuiProcess = $this->runConsoleWithoutTerminalLibrary('app:ai-agent:chat-tui', '--' . AgentConsoleCommand::OPTION_AGENT_SPACE_ID . '=1');
+        $chatTuiProcess = $this->runConsoleWithoutTerminalLibrary('app:agent:chat-tui', '--' . AgentConsoleCommand::OPTION_AGENT_SPACE_ID . '=1');
         self::assertSame(Command::FAILURE, $chatTuiProcess->getExitCode(), $chatTuiProcess->getErrorOutput());
         self::assertStringContainsString('needs the library php-tui/php-tui', $chatTuiProcess->getOutput());
     }

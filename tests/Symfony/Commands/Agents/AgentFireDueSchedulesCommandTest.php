@@ -26,7 +26,7 @@ class AgentFireDueSchedulesCommandTest extends UnitTestCase
     public function testTheCommandKeepsItsNameAndRunsOnTheBase(): void
     {
         $asCommandAttributes = (new ReflectionClass(AgentFireDueSchedulesCommand::class))->getAttributes(AsCommand::class);
-        self::assertSame('app:ai-conversation:fire-due-schedules', $asCommandAttributes[0]->newInstance()->name);
+        self::assertSame('app:agent:fire-due-schedules', explode('|', $asCommandAttributes[0]->newInstance()->name)[0], 'the old name stays an alias');
 
         $agentFireDueSchedulesCommand = new AgentFireDueSchedulesCommand();
         self::assertInstanceOf(AgentConsoleCommand::class, $agentFireDueSchedulesCommand);

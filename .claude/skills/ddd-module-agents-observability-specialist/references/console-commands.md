@@ -29,7 +29,7 @@ on top of it. Run them through the application's `bin/console`, as the same user
 
 ## Run and drive a conversation
 
-### `app:ai-agent:chat` — `AgentChatCommand`
+### `app:agent:chat` — `AgentChatCommand`
 
 Talks to the agent from the console: one owner turn per call (`-m`), several turns from a file, or an interactive loop;
 prints every message of the turn as it is produced.
@@ -74,7 +74,7 @@ prints every message of the turn as it is produced.
 **The recorded-run comparison** (both options need a stored conversation; `--interactive` wins over them):
 
 - **Record:** reads the lines of `--turns-file`, drives them under a recording session and writes the recording
-  pretty-printed to the path as given (its folder is created): harness `app:ai-agent:chat`, the settings the caller
+  pretty-printed to the path as given (its folder is created): harness `app:agent:chat`, the settings the caller
   passed (`agentSpaceId`), `async`, the turns, the wire settings of the conversation, then the id normalization, the
   Argus calls, the tool results and the normalized tree and dispatches. Prints
   `run recording for comparison: <n> turns, … → <file>`; exit `0`.
@@ -100,21 +100,21 @@ prints every message of the turn as it is produced.
   not thrown.
 - **Budget:** `--ignore-budget`.
 - **Override points:** `resolveChatScope()`, `findAgentSpaceForNewConversation()`, `createConversationInAgentSpace()`,
-  `describeAgentSpaceOptions()` (from `AgentConsoleChatScopeTrait`, shared with `app:ai-agent:chat-tui`);
+  `describeAgentSpaceOptions()` (from `AgentConsoleChatScopeTrait`, shared with `app:agent:chat-tui`);
   `curateMemoryAfterTurn()` (the memory curation after a turn); `startRecordedRunSession()` /
   `finishRecordedRunSession()` (the recorded-run comparison), `buildRecordedRunSettingsPassedByCaller()` (the settings
   a replay must match; the application's own scope option), `buildRecordedRunScope()` and
   `buildRecordedRunConcludingScopeIds()` (its scope names), `buildWireRecordingKeys()` (the wire settings a recording
   carries); `buildSlashCommandRegistry()` (the interactive slash commands); `getInteractiveChatTitle()` (the headline).
 
-### `app:ai-agent:chat-tui` — `AgentChatTuiCommand`
+### `app:agent:chat-tui` — `AgentChatTuiCommand`
 
 The same chat on a full screen: a scrollable transcript, tool results that open on a click, a pinned status line. Needs
 the library `php-tui/php-tui` (suggested, not required) and a real terminal.
 
 | Option | Default | Meaning |
 |---|---|---|
-| `--accountId` | none | as in `app:ai-agent:chat` |
+| `--accountId` | none | as in `app:agent:chat` |
 | `-m`, `--message` | none | an opening message sent as the first turn |
 | `--conversationId` | none | resume a stored conversation (ignored with `--ephemeral`) |
 | `--ephemeral` | flag | store nothing |
@@ -126,13 +126,13 @@ the library `php-tui/php-tui` (suggested, not required) and a real terminal.
 | `--agentSpaceId` and the application's space options | none | [scope options](#scope-options) |
 | `--ignore-budget` | flag | [the budget grant](#the-budget-grant) |
 
-- **Writes:** as `app:ai-agent:chat` (conversation, messages, the `--html` file).
+- **Writes:** as `app:agent:chat` (conversation, messages, the `--html` file).
 - **Envelope:** each turn `ENVELOPE.AI.CONVERSATION.TURN`.
 - **Exit codes:** `0`; `1` when the library is missing and for every scope refusal.
 - **Budget:** `--ignore-budget`.
-- **Override points:** the scope methods of `AgentConsoleChatScopeTrait` (see `app:ai-agent:chat`).
+- **Override points:** the scope methods of `AgentConsoleChatScopeTrait` (see `app:agent:chat`).
 
-### `app:ai-agent:compact` — `AgentCompactConversationCommand`
+### `app:agent:compact` — `AgentCompactConversationCommand`
 
 Runs one compaction round of a stored conversation in the console and prints the node tree and the cover the model
 would receive; rights lifted, the model calls made as the conversation's account.
@@ -152,7 +152,7 @@ would receive; rights lifted, the model calls made as the conversation's account
 - **Budget:** `--ignore-budget`.
 - **Override points:** none beyond the base.
 
-### `app:ai-agent:execute-tool-call` — `AgentExecuteToolCallCommand` (hidden)
+### `app:agent:execute-tool-call` — `AgentExecuteToolCallCommand` (hidden)
 
 The child process of a parallel tool call: executes ONE persisted tool-call row the turn worker created and writes the
 outcome into that row under the worker's lease. Started by the turn worker when the application names a
@@ -178,7 +178,7 @@ outcome into that row under the worker's lease. Started by the turn worker when 
 
 ## Inspect and diagnose
 
-### `app:ai-agent:inspect` — `AgentInspectConversationCommand`
+### `app:agent:inspect` — `AgentInspectConversationCommand`
 
 Read-only view of one stored conversation, rights lifted: a header, one table row per message, the transcript of the
 live printer, the request snapshots (`--snapshots`), the delegation children and sub-agents.
@@ -201,7 +201,7 @@ live printer, the request snapshots (`--snapshots`), the delegation children and
 - **Override points:** `describeAgentSpaceRow()` (the header row of the space; the default prints its id),
   `describeAccountRow()`, `buildHeaderRows()`.
 
-### `app:ai-agent:diagnose` — `AgentDiagnoseResumeCommand`
+### `app:agent:diagnose` — `AgentDiagnoseResumeCommand`
 
 Reconstructs, without driving a turn, the decision a resume would take for one conversation (the resume diagnosis);
 rights lifted.
@@ -220,7 +220,7 @@ rights lifted.
 - **Budget:** no option; `--drive` lifts the budget for the process only when the conversation carries `budgetBypass`.
 - **Override points:** none beyond the base.
 
-### `app:ai-agent:validate-conversation` — `AgentValidateConversationCommand`
+### `app:agent:validate-conversation` — `AgentValidateConversationCommand`
 
 Checks the integrity of stored conversations (preloads on their anchor, no reload of an admitted skill in a turn, final
 tool calls, unique tool-call ids, contiguous indexes); read-only, rights lifted.
@@ -233,7 +233,7 @@ tool calls, unique tool-call ids, contiguous indexes); read-only, rights lifted.
 - **Exit codes:** `0`; `1` when a conversation is missing or has a violation.
 - **Budget:** no option. **Override points:** none beyond the base.
 
-### `app:ai-agent:activity-lines` — `AgentActivityLinesCommand`
+### `app:agent:activity-lines` — `AgentActivityLinesCommand`
 
 Replays the tool calls of a stored conversation through the activity narrator and prints the lines an owner would have
 read, per model; or runs the endpoint's read of the newest turn (`--endpoint`). Works as the default account for
@@ -255,7 +255,7 @@ console work.
 - **Exit codes:** `0`; `1` without `--conversation`, for an unknown conversation, when the replay throws.
 - **Budget:** no option. **Override points:** none beyond the base.
 
-### `app:ai-conversation:search-inspect` — `AISearchInspectCommand`
+### `app:agent:conversation-search-inspect` — `AISearchInspectCommand`
 
 Runs the conversation recall search stage by stage (embedding coverage, the vector query with the rights lifted and
 with them, the pipeline without and with an envelope, the rerank probe) and prints the hit count at each.
@@ -273,7 +273,7 @@ with them, the pipeline without and with an envelope, the rerank probe) and prin
 - **Exit codes:** `0`; `1` for an unknown conversation or account, or when the query embedding is not generated.
 - **Budget:** no option. **Override points:** none beyond the base.
 
-### `app:ai-agent:run-report` — `AgentRunReportCommand`
+### `app:agent:run-report` — `AgentRunReportCommand`
 
 The per-run report of stored conversations: judge verdict and findings from evaluation logs, wall and agent seconds,
 model and tool calls, the time split, the slowest tools, the variants timeline, the plan size, the totals. Works as the
@@ -294,7 +294,7 @@ default account for console work, rights lifted (a run of an evaluation belongs 
 - **Override points:** `buildRunReportTotals()` (the totals object); the figures come from
   `AIConversationRunReportService`, which an application replaces at its mirrored path.
 
-### `app:ai-agent:context-eviction-sim` — `AgentModelInputEvictionSimCommand`
+### `app:agent:context-eviction-sim` — `AgentModelInputEvictionSimCommand`
 
 Simulates the per-tool eviction pass (`unloadGranularity: tool`) over scripted scenarios; no database, no account, no
 model call. The skill-granular default pass is not simulated.
@@ -317,7 +317,7 @@ model call. The skill-granular default pass is not simulated.
 
 ## Cost, cache and catalog
 
-### `app:ai-agent:cache-diff` — `AgentCacheDiffCommand`
+### `app:agent:cache-diff` — `AgentCacheDiffCommand`
 
 The prompt-cache diff of a conversation: per model call where the request first differs from the previous one, the
 cache credit, the gap and the cause class; rights lifted. The column `thinking` shows the thinking tokens of a call's
@@ -333,7 +333,7 @@ answer and, after a slash, the thinking blocks the provider dropped from its req
 - **Exit codes:** `0`; `1` for an unknown conversation or when no model call carries segment hashes or a debug payload.
 - **Budget:** no option. **Override points:** none beyond the base.
 
-### `app:ai-agent:tool-response-stats` — `AgentToolResponseStatsCommand`
+### `app:agent:tool-response-stats` — `AgentToolResponseStatsCommand`
 
 Ranks tools by stored result size, lists the largest results of one tool, or dumps one call's payload; reads the
 generated `virtual*` size columns of the messages table; rights lifted.
@@ -354,7 +354,7 @@ generated `virtual*` size columns of the messages table; rights lifted.
   message or a message without a tool call.
 - **Budget:** no option. **Override points:** none beyond the base.
 
-### `app:ai-agent:skill-token-map` — `SkillTokenMapCommand`
+### `app:agent:skill-token-map` — `SkillTokenMapCommand`
 
 The per-turn token size of every agent skill, by package and tool, measured on the wire schema the loop sends; reads
 reflection and the skill files, no database.
@@ -411,7 +411,7 @@ clear in the same process. No options.
 - **Override points:** `getBundleClasses()` (the bundles cleared), `getContainerCacheClearCommandName()` (default
   `cache:clear`), `getWorkerRestartNotice()` (the last line; a running worker still needs a restart).
 
-### `app:ai:composed-view:export-node-schema` — `ComposedViewNodeSchemaExportCommand`
+### `app:agent:export-composed-view-node-schema` — `ComposedViewNodeSchemaExportCommand`
 
 Writes the application's part of the composed-view node schema from the registered classes and compares the installed
 package's `composed-node-schema.json`; the package's file is never written.
@@ -425,7 +425,7 @@ package's `composed-node-schema.json`; the package's file is never written.
 - **Budget:** no option.
 - **Override points:** `getSchemaFilePaths()` (where both files lie; the default names no application part).
 
-### `app:ai-conversation:scorecards` — `AIConversationScorecardsCommand`
+### `app:agent:conversation-scorecards` — `AIConversationScorecardsCommand`
 
 Selects conversations and dispatches one scorecard message per conversation to the scorecard worker, writes inline
 (`--inline`) or prints the metrics (`--print`). Works as the default account for console work. Without an application's
@@ -458,7 +458,7 @@ The fixture format these commands read: [evaluation-fixtures](evaluation-fixture
 `AgentEvalConsoleCommand`: its progress lines go to the error output (indented two spaces), so a `--json` document on
 the standard output stays pure.
 
-### `app:ai-agent:eval-tools` — `AgentEvalToolsCommand`
+### `app:agent:eval-tools` — `AgentEvalToolsCommand`
 
 Runs the cases of the tools fixtures: deterministic (the case's `expect` block) or judged (`--judge`: a simulated owner
 and a judge model). Reports per case and overall, writes the run into the results folder and stores its record.
@@ -507,7 +507,7 @@ and a judge model). Reports per case and overall, writes the run into the result
 - **Override points:** `runCaseOfOwnShape()` (a case of the application's own shape), `buildPlanOptionsOfRun()` (the
   plan options), the `*_LABEL` and `*_SKIP_REASON` constants (the words of the output).
 
-### `app:ai-agent:eval-suite` — `AgentEvalSuiteCommand`
+### `app:agent:eval-suite` — `AgentEvalSuiteCommand`
 
 The whole suite in one run: every configured suite on every model in every flavor, each case in a child process of its
 kind's command; reads in a pool, writes in lanes per space and resource. Two verdicts: correctness and performance
@@ -545,8 +545,8 @@ against a baseline. LIVE.
   process with `128 + signal`.
 - **Budget:** inverted: lifted unless `--enforce-budget`.
 - **Stop:** a `STOP` file in the run folder or SIGINT / SIGTERM ([stop signals](#stop-signals-and-the-stop-file)).
-- **Child processes:** `app:ai-agent:eval-tools` (kind `toolsCase`), `app:ai-agent:eval-selection` (`selectionCase`),
-  `app:ai-agent:eval-recall` (`recallCase`); ceiling = the case's `timeoutSeconds` (default 600, at least 60); a case
+- **Child processes:** `app:agent:eval-tools` (kind `toolsCase`), `app:agent:eval-selection` (`selectionCase`),
+  `app:agent:eval-recall` (`recallCase`); ceiling = the case's `timeoutSeconds` (default 600, at least 60); a case
   that ended on an infrastructure error (`RETRIED_INFRASTRUCTURE_ERRORS`: deadlock, lock wait timeout, cURL 28 / 35 /
   56, server gone away, a missing compiled-container file) runs once more.
 - **Override points:** `getDefaultModelName()`, `getRetriedInfrastructureErrors()`, `getChildCommandNameOfKind()` (the
@@ -625,7 +625,7 @@ harness calls.
   and bundles). The session, the service and the stored formats are adapted at their own override points:
   [record-and-replay](record-and-replay.md#the-tool-call-comparison).
 
-### `app:ai-agent:eval-selection` — `AgentEvalSelectionCommand`
+### `app:agent:eval-selection` — `AgentEvalSelectionCommand`
 
 The skill-selection evaluation: per case the agent answers the prompt, and the case passes when one of the expected
 skills (`expectedSkill`, `A|B` for either) was loaded — or, with `expectedSkill: "none"`, when no skill was loaded — and
@@ -638,7 +638,7 @@ makes the case not applicable). Every write tool is refused.
 | `--case` | none | only this case id |
 | `--json` | flag | the run summary instead of the report |
 | `--result-file` | none | also write the result document here |
-| `--transient`, `--persist-conversations` | flag | as in `app:ai-agent:eval-tools` |
+| `--transient`, `--persist-conversations` | flag | as in `app:agent:eval-tools` |
 | `--model`, `--tier`, `--vendor` | none | [model and tier options](#model-and-tier-options) |
 | the arm options | none | [evaluation arm options](#evaluation-arm-options) |
 | `--ignore-budget` | flag | [the budget grant](#the-budget-grant) |
@@ -650,7 +650,7 @@ makes the case not applicable). Every write tool is refused.
 - **Budget:** `--ignore-budget`.
 - **Override points:** `getDefaultFixturePath()`, `findFallbackScopeValueOfRow()`, `describeMissingScope()`.
 
-### `app:ai-agent:eval-recall` — `AgentEvalRecallCommand`
+### `app:agent:eval-recall` — `AgentEvalRecallCommand`
 
 The cross-conversation recall evaluation: seeds past conversations, drives the agent on a fresh one and checks the
 recall tool and the seeded facts in the answer; every write tool refused; the seeds are deleted afterwards.
@@ -672,7 +672,7 @@ recall tool and the seeded facts in the answer; every write tool refused; the se
 - **Budget:** `--ignore-budget`. No scope options: a recall case names its own space.
 - **Override points:** `getDefaultFixturePaths()`, `getScopeWordOfOverallLine()`.
 
-### `app:ai-agent:eval-tiers` — `AgentEvalTiersCommand`
+### `app:agent:eval-tiers` — `AgentEvalTiersCommand`
 
 Runs every tools case under the model each tier selects and reports pass rate and efficiency per tier. A case runs only
 with its scope keys, `prompt`, `restore`, `blockedTools` and `allowExternalWrites` (`RUN_CASE_FIELD_NAMES`).
@@ -690,7 +690,7 @@ with its scope keys, `prompt`, `restore`, `blockedTools` and `allowExternalWrite
 - **Exit codes:** `0`; `1` when no case is found.
 - **Budget:** no option. **Override points:** `getDefaultFixturePaths()`.
 
-### `app:ai-agent:eval-eviction` — `AgentEvalEvictionCommand`
+### `app:agent:eval-eviction` — `AgentEvalEvictionCommand`
 
 The live eviction evaluation: each trajectory's prompts run on one continuing transient conversation and the load curve
 of the loaded capabilities is printed.
@@ -702,7 +702,7 @@ of the loaded capabilities is printed.
 | `--json` | flag | also print the per-turn capability snapshot |
 | `--model`, `--tier`, `--vendor` | none | [model and tier options](#model-and-tier-options) |
 | `--defaults` | flag | ignore the fixture's settings, run on the platform defaults |
-| the context-retention options | none | as in `app:ai-agent:chat`; they override the fixture or the defaults |
+| the context-retention options | none | as in `app:agent:chat`; they override the fixture or the defaults |
 | `--agentSpaceId` and the application's space options | none | the space of the trajectories that name none |
 | `--ignore-budget` | flag | [the budget grant](#the-budget-grant) |
 
@@ -712,7 +712,7 @@ of the loaded capabilities is printed.
 - **Budget:** `--ignore-budget`.
 - **Override points:** `trajectoryNamesItsScope()`, `getScopeWordOfSkipLine()`.
 
-### `app:ai-agent:eval-guard` — `AgentEvalGuardCommand`
+### `app:agent:eval-guard` — `AgentEvalGuardCommand`
 
 The injection-guard probe: guard-prompt variants × inputs × runs, each probe one guard model call; reports the
 false-block rate and the bypass rate per model and variant.
@@ -744,7 +744,7 @@ false-block rate and the bypass rate per model and variant.
 - **Override points:** none beyond the base (the guard is built with `newInstance()`, so an application's same-path
   guard class runs).
 
-### `app:ai-agent:eval-schedule-runs` — `AgentEvalScheduleRunsCommand`
+### `app:agent:eval-schedule-runs` — `AgentEvalScheduleRunsCommand`
 
 Runs one recurring task several times in a row in a space of an evaluation account: creates an evaluation schedule,
 fires it `--runs` times through the cron's own arm, claim and spawn, waits for each run on the workers and prints
@@ -770,7 +770,7 @@ whether each kept the structure of the run before it. Needs running workers.
   `runInsteadOfFiring()`, `afterRunEnded()`, `describeScope()`, `describeEvalAccountsSource()`,
   `describeRequiredOptions()`.
 
-### `app:ai-agent:eval-compaction-tree` — `AgentEvalCompactionTreeCommand`
+### `app:agent:eval-compaction-tree` — `AgentEvalCompactionTreeCommand`
 
 The judged evaluation of the compaction tree: a driver keeps a long conversation going with frequent compaction, a judge
 rates the tree from the per-turn snapshots.
@@ -802,7 +802,7 @@ rates the tree from the per-turn snapshots.
   `getFinalTreeHeading()`. An application's own case-file keys are read through
   `AgentEvalCompactionTreeCaseFile::getInteger()` / `getScalarText()` (the raw `getValue()` is protected).
 
-### `app:ai-agent:eval-analyze` — `AgentEvalAnalyzeCommand`
+### `app:agent:eval-analyze` — `AgentEvalAnalyzeCommand`
 
 Offline failure analysis of a stored run in the results folder: classifies each failed case, prints its trace and a
 reproduce command, then the count per class. No live call.
@@ -817,7 +817,7 @@ reproduce command, then the count per class. No live call.
 
 ## Evaluation housekeeping
 
-### `app:ai-agent:eval-conversations-purge` — `AgentEvalConversationsPurgeCommand`
+### `app:agent:eval-conversations-purge` — `AgentEvalConversationsPurgeCommand`
 
 Deletes the conversation trees of the evaluation accounts (`AgentEvalAccountsService`) whose last activity is older than
 `--older-than-hours`, with every dependent row, under a time budget and resumable. Dry run unless `--apply`. Works as the
@@ -854,7 +854,7 @@ Seed accounts have no command: a case that needs a clean account leases one thro
 
 ## Decisions
 
-### `app:ai-agent:decision-stats` — `AgentDecisionStatsCommand`
+### `app:agent:decision-stats` — `AgentDecisionStatsCommand`
 
 The decision statistics over the turn events for one site and window, evaluation traffic excluded twice; read-only.
 Works as the default account for console work.
@@ -873,7 +873,7 @@ Works as the default account for console work.
 - **Override points:** `buildStatisticsRequest()` (the request the options describe), `renderSection()` (how one
   section prints).
 
-### `app:ai-agent:decision-fixtures` — `AgentDecisionFixturesCommand`
+### `app:agent:decision-fixtures` — `AgentDecisionFixturesCommand`
 
 Sends synthetic decision calls from a JSON fixture to the decision model and scores each answer (the sub-skill pass, or
 `"site": "replyLanguage"`).
@@ -896,7 +896,7 @@ Sends synthetic decision calls from a JSON fixture to the decision model and sco
   the application's own fixture keys through `AgentDecisionFixture::getInteger()` / `getScalarText()` (the raw
   `getValue()` is protected).
 
-### `app:ai-agent:jev-probe` — `AgentJevProbeCommand`
+### `app:agent:jev-probe` — `AgentJevProbeCommand`
 
 Probes a decision-model question on labelled cases before a decision site is built; prints each answer beside its label
 and the hit rate per question.
@@ -914,7 +914,7 @@ and the hit rate per question.
 - **Budget:** `--ignore-budget`.
 - **Override points:** `getFixtureAgentSpaceKey()`, `findAgentSpaceOfFixture()`.
 
-### `app:ai-agent:probe-reasoning-replay` — `AgentProbeReasoningReplayCommand`
+### `app:agent:probe-reasoning-replay` — `AgentProbeReasoningReplayCommand`
 
 Live probe of reasoning replay on OpenRouter: a small synthetic tool conversation built in memory (system, two tools,
 one owner question), sent with the agent's own composers (`AgentChatCompletionsRequestComposer`,
@@ -995,19 +995,19 @@ model calls unless stated.
 
 | Command — class | Options (default) | Writes | Exit codes | Override points |
 |---|---|---|---|---|
-| `app:ai-conversation:fire-due-schedules` — `AgentFireDueSchedulesCommand` | `--batch` (`AIConversationSchedulesService::DUE_SCHEDULES_BATCH_LIMIT` = 50), `--dry-run` flag, `--ignore-budget` flag (stores `budgetBypass` on every run conversation it spawns) | expires, claims and spawns due schedules | `0` | none beyond the base |
-| `app:ai-conversation:mark-finalized` — `AgentMarkFinalizedConversationsCommand` | `--idle-minutes` (`DEFAULT_IDLE_MINUTES` = 60), `--dry-run` flag | `finalizedAt` in one UPDATE | `0` | none |
-| `app:ai-conversation:compact-finalized` — `AgentCompactFinalizedConversationsCommand` | `--batch` (`DEFAULT_BATCH_SIZE` = 50), `--dry-run` flag, `--inline` (none; one conversation id), `--rebuild-summary` flag, `--ignore-budget` flag | dispatches finalize jobs; `--inline` runs the chain (model calls under `ENVELOPE.AI.CONVERSATION.COMPACTION`) | `0`; `1` when `--inline` fails | none |
-| `app:ai-agent:trace-events-purge` — `AgentTraceEventsPurgeCommand` | `--days` (`RETENTION_DAYS` = 180), `--batch` (`'5000'`), `--dryRun` flag | deletes trace events | `0`; `1` on an error | none |
-| `app:ai-agent:turn-events-purge` — `AgentTurnEventsPurgeCommand` | `--days` (`RETENTION_DAYS` = 180), `--batch` (`'5000'`), `--dryRun` flag | deletes turn events and unreferenced snapshots | `0`; `1` on an error | none |
-| `app:ai-schedule:close-for-inactive-agent-spaces` — `AgentCloseSchedulesForInactiveAgentSpacesCommand` | `--batch` (`STATE_SWEEP_BATCH_LIMIT` = 200), `--dry-run` flag | closes, pauses or re-arms schedules | `0` | `describeScheduleScope()` |
-| `app:ai-conversation:deliver-owed-reports-and-resume-owed-turns` — `AgentDeliverOwedReportsAndResumeOwedTurnsCommand` | `--quiet-seconds` (`AGENT_TURN_OWED_QUIET_SECONDS` = 300), `--batch` (`OWED_CONVERSATIONS_BATCH_LIMIT` = 50), `--dry-run` flag | delivers owed reports, resumes owed turns and lost resumes | `0` | `runApplicationRecoveryPasses()`, `describeApplicationRecoveryPassCounts()` |
-| `app:ai-agent:reap` — `AgentReapStuckConversationsCommand` | `--hung-after` (`RUN_HUNG_AFTER_SECONDS` = 300), `--revive-max-age` (`RUN_REVIVE_MAX_AGE_SECONDS` = 1800), `--settle-only` (none; one id) | resumes, expires, times out, settles, notifies | `0` | `closeStaleChannelSessions()`, `getPurposeNamesClosedWithoutAnOwnerTurn()` |
-| `app:ai-agent:request-snapshot-debug-payloads-strip` — `AgentRequestSnapshotDebugPayloadsStripCommand` | `--olderThanDays` (`'2'`), `--windowSize` (`'1000'`), `--chunkSize` (`'50'`), `--pauseMs` (`'200'`), `--slowWriteMs` (`'2000'`), `--maxSeconds` (`'1500'`), `--maxThreadsRunning` (`'40'`), `--maxHistoryListLength` (`'200000'`), `--fromMessageId` (none), `--dryRun` flag | removes `sentPayloadJson` / `rawResponseJson`; moves its cursor | `0`; `1` on an error | none |
-| `app:ai-agent:loaded-capabilities-compact` — `AgentLoadedCapabilitiesCompactCommand` | `--conversationId` (none), `--fromConversationId` (none), `--batchSize` (`'200'`), `--pauseMs` (`'200'`), `--slowWriteMs` (`'2000'`), `--maxSeconds` (`'1500'`), `--maxThreadsRunning` (`'40'`), `--quietMinutes` (`'30'`), `--dryRun` flag, `--verify` flag | rewrites loaded-capability rows into the chain format | `0`; `1` on an error | none |
-| `app:ai-conversation:repair-zero-embeddings` — `AIConversationEmbeddingsRepairCommand` | from `AIConversationEmbeddingsRepairSettings`: `--target` (`all`; `messages`, `nodes`, `memories`), `--batchSize` (25), `--sleepMs` (1000), `--limit` (0 = all), `--scanWindow` (50000), `--maxThreadsRunning` (40), `--maxHistoryListLength` (200000), `--afterMessageEmbeddingId` (`'0'`), `--afterCompactionNodeId` (`'0'`), `--afterMemoryId` (`'0'`), `--newestRowsOnly` (0), `--maxSeconds` (0 = none; a positive value capped at 200), `--dryRun` flag, `--apply` flag | re-embeds zero vectors with `--apply` (embedding calls) | `0`; `1` when the repair failed or stopped on a failure | none |
-| `app:ai-conversation:backfill-message-embeddings` — `AIConversationBackfillEmbeddingsCommand` | `--batch` (`'100'`), `--max` (`'0'` = all), `--async` flag | embedding rows, or dispatched embedding jobs | `0` | none |
-| `app:ai-conversation:backfill-environment` — `AIConversationBackfillEnvironmentCommand` | `--environment` (`AIConversationsService::ENVIRONMENT_PRODUCTION` = `prod`), `--dryRun` flag | the environment stamp | `0`; `1` for an empty environment or a failed write | none |
+| `app:agent:fire-due-schedules` — `AgentFireDueSchedulesCommand` | `--batch` (`AIConversationSchedulesService::DUE_SCHEDULES_BATCH_LIMIT` = 50), `--dry-run` flag, `--ignore-budget` flag (stores `budgetBypass` on every run conversation it spawns) | expires, claims and spawns due schedules | `0` | none beyond the base |
+| `app:agent:mark-finalized-conversations` — `AgentMarkFinalizedConversationsCommand` | `--idle-minutes` (`DEFAULT_IDLE_MINUTES` = 60), `--dry-run` flag | `finalizedAt` in one UPDATE | `0` | none |
+| `app:agent:compact-finalized-conversations` — `AgentCompactFinalizedConversationsCommand` | `--batch` (`DEFAULT_BATCH_SIZE` = 50), `--dry-run` flag, `--inline` (none; one conversation id), `--rebuild-summary` flag, `--ignore-budget` flag | dispatches finalize jobs; `--inline` runs the chain (model calls under `ENVELOPE.AI.CONVERSATION.COMPACTION`) | `0`; `1` when `--inline` fails | none |
+| `app:agent:trace-events-purge` — `AgentTraceEventsPurgeCommand` | `--days` (`RETENTION_DAYS` = 180), `--batch` (`'5000'`), `--dryRun` flag | deletes trace events | `0`; `1` on an error | none |
+| `app:agent:turn-events-purge` — `AgentTurnEventsPurgeCommand` | `--days` (`RETENTION_DAYS` = 180), `--batch` (`'5000'`), `--dryRun` flag | deletes turn events and unreferenced snapshots | `0`; `1` on an error | none |
+| `app:agent:close-schedules-for-inactive-agent-spaces` — `AgentCloseSchedulesForInactiveAgentSpacesCommand` | `--batch` (`STATE_SWEEP_BATCH_LIMIT` = 200), `--dry-run` flag | closes, pauses or re-arms schedules | `0` | `describeScheduleScope()` |
+| `app:agent:deliver-owed-reports-and-resume-owed-turns` — `AgentDeliverOwedReportsAndResumeOwedTurnsCommand` | `--quiet-seconds` (`AGENT_TURN_OWED_QUIET_SECONDS` = 300), `--batch` (`OWED_CONVERSATIONS_BATCH_LIMIT` = 50), `--dry-run` flag | delivers owed reports, resumes owed turns and lost resumes | `0` | `runApplicationRecoveryPasses()`, `describeApplicationRecoveryPassCounts()` |
+| `app:agent:reap` — `AgentReapStuckConversationsCommand` | `--hung-after` (`RUN_HUNG_AFTER_SECONDS` = 300), `--revive-max-age` (`RUN_REVIVE_MAX_AGE_SECONDS` = 1800), `--settle-only` (none; one id) | resumes, expires, times out, settles, notifies | `0` | `closeStaleChannelSessions()`, `getPurposeNamesClosedWithoutAnOwnerTurn()` |
+| `app:agent:request-snapshot-debug-payloads-strip` — `AgentRequestSnapshotDebugPayloadsStripCommand` | `--olderThanDays` (`'2'`), `--windowSize` (`'1000'`), `--chunkSize` (`'50'`), `--pauseMs` (`'200'`), `--slowWriteMs` (`'2000'`), `--maxSeconds` (`'1500'`), `--maxThreadsRunning` (`'40'`), `--maxHistoryListLength` (`'200000'`), `--fromMessageId` (none), `--dryRun` flag | removes `sentPayloadJson` / `rawResponseJson`; moves its cursor | `0`; `1` on an error | none |
+| `app:agent:loaded-capabilities-compact` — `AgentLoadedCapabilitiesCompactCommand` | `--conversationId` (none), `--fromConversationId` (none), `--batchSize` (`'200'`), `--pauseMs` (`'200'`), `--slowWriteMs` (`'2000'`), `--maxSeconds` (`'1500'`), `--maxThreadsRunning` (`'40'`), `--quietMinutes` (`'30'`), `--dryRun` flag, `--verify` flag | rewrites loaded-capability rows into the chain format | `0`; `1` on an error | none |
+| `app:agent:repair-zero-embeddings` — `AIConversationEmbeddingsRepairCommand` | from `AIConversationEmbeddingsRepairSettings`: `--target` (`all`; `messages`, `nodes`, `memories`), `--batchSize` (25), `--sleepMs` (1000), `--limit` (0 = all), `--scanWindow` (50000), `--maxThreadsRunning` (40), `--maxHistoryListLength` (200000), `--afterMessageEmbeddingId` (`'0'`), `--afterCompactionNodeId` (`'0'`), `--afterMemoryId` (`'0'`), `--newestRowsOnly` (0), `--maxSeconds` (0 = none; a positive value capped at 200), `--dryRun` flag, `--apply` flag | re-embeds zero vectors with `--apply` (embedding calls) | `0`; `1` when the repair failed or stopped on a failure | none |
+| `app:agent:backfill-message-embeddings` — `AIConversationBackfillEmbeddingsCommand` | `--batch` (`'100'`), `--max` (`'0'` = all), `--async` flag | embedding rows, or dispatched embedding jobs | `0` | none |
+| `app:agent:backfill-conversation-environment` — `AIConversationBackfillEnvironmentCommand` | `--environment` (`AIConversationsService::ENVIRONMENT_PRODUCTION` = `prod`), `--dryRun` flag | the environment stamp | `0`; `1` for an empty environment or a failed write | none |
 
 ## The shared bases
 
@@ -1056,8 +1056,8 @@ spaces plans its cases; without the option such a case is skipped as before.
 work: the cap is lifted for this process, the spend is still booked, the grant ends with the process (the worker reset of
 `mgamadeus/ddd-ai` clears it). A child process is a process of its own: the evaluation base hands the option on
 (`buildBudgetArgumentsForChild()`). `isBudgetBypassRequested()` is the override point of a command whose option works
-the other way round (`app:ai-agent:eval-suite`: `--enforce-budget`). Commands with model calls and no option:
-`app:ai-agent:activity-lines`, `app:ai-conversation:search-inspect`, `app:ai-agent:eval-tiers`; `app:ai-agent:diagnose`
+the other way round (`app:agent:eval-suite`: `--enforce-budget`). Commands with model calls and no option:
+`app:agent:activity-lines`, `app:agent:conversation-search-inspect`, `app:agent:eval-tiers`; `app:agent:diagnose`
 lifts for `--drive` only from the conversation's own `budgetBypass`.
 
 ### The harness models
@@ -1096,7 +1096,7 @@ of the two traits for them.
 ### Stop signals and the STOP file
 
 An evaluation command stops gracefully only when `handlesStopSignals()` answers true (default no; the package's only such
-command is `app:ai-agent:eval-suite`). Then SIGINT and SIGTERM are counted by `handleSignal()`: the first asks for a stop
+command is `app:agent:eval-suite`). Then SIGINT and SIGTERM are counted by `handleSignal()`: the first asks for a stop
 (`isStopRequested()`), the second for the end of everything still running (`isKillRequested()`); `onStopSignal()` is the
 hook. `requestStop()` asks for a stop without a signal. The suite reads a file named `STOP` in its run folder as the first
 signal (`AgentEvalResultFilesService::isStopRequestedForSuiteRun()`): no new case starts; while cases are queued the queue
@@ -1112,10 +1112,10 @@ command's own name, so an application's subclass runs its own class in its child
 
 | Parent | Child | Ceiling |
 |---|---|---|
-| `app:ai-agent:eval-tools` (repeat or parallel) | itself per case | the case's `timeoutSeconds`, default 600 s, at least 60 s (`AgentEvalSuitePlanService`) |
-| `app:ai-agent:eval-suite` | the command of the task's kind | same |
-| `app:ai-agent:eval-guard` | itself per chunk of cells | 1200 s |
-| a turn worker (with `AI.agentToolCallChildProcess.consoleScript`) | `app:ai-agent:execute-tool-call` | the tool's own `--timeout` (SIGALRM) |
+| `app:agent:eval-tools` (repeat or parallel) | itself per case | the case's `timeoutSeconds`, default 600 s, at least 60 s (`AgentEvalSuitePlanService`) |
+| `app:agent:eval-suite` | the command of the task's kind | same |
+| `app:agent:eval-guard` | itself per chunk of cells | 1200 s |
+| a turn worker (with `AI.agentToolCallChildProcess.consoleScript`) | `app:agent:execute-tool-call` | the tool's own `--timeout` (SIGALRM) |
 
 A child that runs past its ceiling is ended and its case counts as failed.
 
@@ -1134,7 +1134,7 @@ it removes every service whose class lies below `DDD\Symfony\Commands\` — but 
 outside that namespace. The package's commands live in `DDD\Symfony\Commands\Agents\`, so the application's class wins
 regardless of the registration order. Two classes outside the namespace with one name are not resolved by the pass.
 
-A subclass that must also answer to an older name declares both: `name: 'app:ai-schedule:close-for-inactive-agent-spaces|<its old name>'`.
+A subclass that must also answer to an older name declares both: `name: 'app:agent:close-schedules-for-inactive-agent-spaces|<its old name>'`.
 An application that replaces the tool-call child under another name sets `commandName` in its
 `config/app/AI/agentToolCallChildProcess.php`; the suite's children follow `getChildCommandNameOfKind()`.
 
@@ -1151,7 +1151,7 @@ use DDD\Symfony\Commands\Agents\AgentInspectConversationCommand;
 use DDD\Symfony\Commands\Agents\Inspect\ConversationHeaderRow;
 use Symfony\Component\Console\Attribute\AsCommand;
 
-#[AsCommand(name: 'app:ai-agent:inspect', description: 'Prints one stored agent conversation, read-only')]
+#[AsCommand(name: 'app:agent:inspect', description: 'Prints one stored agent conversation, read-only')]
 class ApplicationInspectConversationCommand extends AgentInspectConversationCommand
 {
     protected function describeAgentSpaceRow(AIConversation $conversation): ConversationHeaderRow

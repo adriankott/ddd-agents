@@ -61,7 +61,8 @@ use Throwable;
  * {@see getDefaultReplyLanguageCode()}.
  */
 #[AsCommand(
-    name: 'app:ai-agent:decision-fixtures',
+    name: 'app:agent:decision-fixtures',
+    aliases: ['app:ai-agent:decision-fixtures'],
     description: 'Send synthetic sub-skill-preload cases from a JSON fixture to the decision model and score the picks against the expectations.'
 )]
 class AgentDecisionFixturesCommand extends AgentConsoleCommand

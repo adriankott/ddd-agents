@@ -20,11 +20,12 @@ use Throwable;
  * rows through the foreign-key cascade; this is the table's own age-based lifecycle, which also catches call events
  * never linked to a conversation. Run it daily from a cron:
  *
- *   php bin/console app:ai-agent:trace-events-purge
- *   php bin/console app:ai-agent:trace-events-purge --days=90 --batch=2000
+ *   php bin/console app:agent:trace-events-purge
+ *   php bin/console app:agent:trace-events-purge --days=90 --batch=2000
  */
 #[AsCommand(
-    name: 'app:ai-agent:trace-events-purge',
+    name: 'app:agent:trace-events-purge',
+    aliases: ['app:ai-agent:trace-events-purge'],
     description: 'Delete conversation trace events older than the retention (default 180 days) in batches'
 )]
 class AgentTraceEventsPurgeCommand extends AgentConsoleCommand

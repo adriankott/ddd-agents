@@ -16,7 +16,7 @@ use DDD\Domain\AI\Entities\Conversations\Messages\ToolCall;
 use DDD\Domain\AI\Entities\Conversations\Messages\ToolCallDecodedResult;
 use DDD\Domain\AI\Exceptions\Conversations\AgentRunClaimLostException;
 use DDD\Domain\AI\Exceptions\Conversations\MessageIndexLockUnavailableException;
-use DDD\Presentation\Mcp\Agent\AgentConsoleStream;
+use DDD\Presentation\Mcp\Agents\AgentConsoleStream;
 use DDD\Domain\AI\Services\Conversations\AIConversationsService;
 use DDD\Infrastructure\Services\DDDService;
 use DDD\Infrastructure\Services\Service;

@@ -37,17 +37,18 @@ use Throwable;
  *      (coveredUpTo) and the size of the raw tail after it. `--as-of-message=N` reconstructs the cover as it was when
  *      message N was produced (the tree is never rewritten, so a past cover can be rebuilt).
  *
- *   php bin/console app:ai-agent:compact 48                                    # run a round + show the tree/cover
- *   php bin/console app:ai-agent:compact 48 --segment-messages=2 --fan-in=2 --keep-messages=2 --ignore-budget
- *   php bin/console app:ai-agent:compact 48 --show-only                        # just render (no new compaction)
- *   php bin/console app:ai-agent:compact 48 --show-only --as-of-message=30     # the cover as of message 30
+ *   php bin/console app:agent:compact 48                                    # run a round + show the tree/cover
+ *   php bin/console app:agent:compact 48 --segment-messages=2 --fan-in=2 --keep-messages=2 --ignore-budget
+ *   php bin/console app:agent:compact 48 --show-only                        # just render (no new compaction)
+ *   php bin/console app:agent:compact 48 --show-only --as-of-message=30     # the cover as of message 30
  *
  * The compaction knobs are merged onto the conversation's stored settings for this run (a knob not passed keeps its
  * stored value); a value below a knob's minimum is refused. The run reads any account's conversation (rights lifted)
  * and makes its model calls as the conversation's account.
  */
 #[AsCommand(
-    name: 'app:ai-agent:compact',
+    name: 'app:agent:compact',
+    aliases: ['app:ai-agent:compact'],
     description: 'Run (sync) + visualize/evaluate the hierarchical compaction tree of a persisted agent conversation.',
 )]
 class AgentCompactConversationCommand extends AgentConsoleCommand

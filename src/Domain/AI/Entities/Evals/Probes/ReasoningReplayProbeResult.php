@@ -7,7 +7,7 @@ namespace DDD\Domain\AI\Entities\Evals\Probes;
 use DDD\Domain\Base\Entities\ValueObject;
 
 /**
- * The verdict of one scenario of `app:ai-agent:probe-reasoning-replay`: its calls and whether what happened is what
+ * The verdict of one scenario of `app:agent:probe-reasoning-replay`: its calls and whether what happened is what
  * the scenario expects (PASS), a fact the probe exists to find out (FINDING), or a failure of the probe's own path
  * (FAIL — the command then exits 1).
  */

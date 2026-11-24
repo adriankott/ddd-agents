@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace DDD\Tests\Agents\Domain\AI\Entities\WebSearch;
 
-use DDD\Domain\AI\Entities\WebSearch\PageScreenshots\PageScreenshotPart;
 use DDD\Domain\AI\Entities\WebSearch\WebFetchFailureReasons;
 use DDD\Domain\AI\Entities\WebSearch\WebPageMarkdown;
 use DDD\Tests\Agents\Support\UnitTestCase;
@@ -25,12 +24,8 @@ class WebFetchFailureReasonsTest extends UnitTestCase
             WebFetchFailureReasons::UNRESOLVABLE => ['screenshot' => 'check the spelling', 'page' => 'check the spelling'],
         ];
         foreach ($expectedFragmentsByReason as $reason => $expectedFragments) {
-            $pageScreenshotPart = new PageScreenshotPart();
-            $pageScreenshotPart->url = 'https://example.com/a';
-            $pageScreenshotPart->failureReason = $reason;
-            $screenshotText = $pageScreenshotPart->buildFailureText();
+            $screenshotText = (string)WebFetchFailureReasons::findSharedFailureSentence($reason, 'https://example.com/a', WebFetchFailureReasons::CAPABILITY_SCREENSHOT);
             self::assertStringContainsString($expectedFragments['screenshot'], $screenshotText, $reason);
-            self::assertStringNotContainsString('Could not capture a screenshot', $screenshotText, $reason);
 
             $pageText = WebPageMarkdown::fromRefusedUrl('https://example.com/a', $reason)->buildFailureExplanationForAgent();
             self::assertStringContainsString($expectedFragments['page'], $pageText, $reason);
@@ -40,10 +35,7 @@ class WebFetchFailureReasonsTest extends UnitTestCase
 
     public function testAnUnknownCodeKeepsTheGenericSentence(): void
     {
-        $pageScreenshotPart = new PageScreenshotPart();
-        $pageScreenshotPart->url = 'https://example.com/a';
-        $pageScreenshotPart->failureReason = 'SOMETHING_NEW';
-        self::assertStringContainsString('(SOMETHING_NEW)', $pageScreenshotPart->buildFailureText());
+        self::assertStringContainsString('(SOMETHING_NEW)', WebPageMarkdown::fromRefusedUrl('https://example.com/a', 'SOMETHING_NEW')->buildFailureExplanationForAgent());
         self::assertNull(WebFetchFailureReasons::findSharedFailureSentence('SOMETHING_NEW', 'x', WebFetchFailureReasons::CAPABILITY_PAGE_READ));
     }
 

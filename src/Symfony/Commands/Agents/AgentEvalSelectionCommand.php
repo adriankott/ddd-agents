@@ -41,10 +41,11 @@ use Throwable;
  * Override points of an application: {@see getDefaultFixturePath()}, {@see findFallbackScopeValueOfRow()},
  * {@see describeMissingScope()}.
  *
- *   php bin/console app:ai-agent:eval-selection [--agentSpaceId=…] [--fixture=…] [--case=…] [--json]
+ *   php bin/console app:agent:eval-selection [--agentSpaceId=…] [--fixture=…] [--case=…] [--json]
  */
 #[AsCommand(
-    name: 'app:ai-agent:eval-selection',
+    name: 'app:agent:eval-selection',
+    aliases: ['app:ai-agent:eval-selection'],
     description: 'Run the skill-selection eval set and report accuracy (live model calls).'
 )]
 class AgentEvalSelectionCommand extends AgentEvalConsoleCommand

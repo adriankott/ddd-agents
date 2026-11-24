@@ -22,11 +22,11 @@ class AgentMarkFinalizedConversationsCommandTest extends UnitTestCase
     {
         $asCommandAttributes = (new ReflectionClass(AgentMarkFinalizedConversationsCommand::class))->getAttributes(AsCommand::class);
         self::assertCount(1, $asCommandAttributes);
-        self::assertSame('app:ai-conversation:mark-finalized', $asCommandAttributes[0]->newInstance()->name);
+        self::assertSame('app:agent:mark-finalized-conversations', explode('|', $asCommandAttributes[0]->newInstance()->name)[0], 'the old name stays an alias');
 
         $agentMarkFinalizedConversationsCommand = new AgentMarkFinalizedConversationsCommand();
         self::assertInstanceOf(AgentConsoleCommand::class, $agentMarkFinalizedConversationsCommand);
-        self::assertSame('app:ai-conversation:mark-finalized', $agentMarkFinalizedConversationsCommand->getName());
+        self::assertSame('app:agent:mark-finalized-conversations', $agentMarkFinalizedConversationsCommand->getName());
         $commandDefinition = $agentMarkFinalizedConversationsCommand->getDefinition();
         self::assertSame((string)AgentMarkFinalizedConversationsCommand::DEFAULT_IDLE_MINUTES, $commandDefinition->getOption('idle-minutes')->getDefault());
         self::assertTrue($commandDefinition->hasOption('dry-run'));

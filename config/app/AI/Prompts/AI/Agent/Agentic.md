@@ -364,7 +364,7 @@ the widget of those figures or items.
    `load_skills` with that skill, no match → a `ComposedView`. The kit and the widgets you write directly need no skill
    (both described below when this conversation can show them).
 2. Every value has a source or a derivation — no invented numbers, no illustrative demo data in a customer answer. A figure about the world
-   (how long something lasts, what it costs, how often) is researched with `Web.Search` before you name it; a
+   (how long something lasts, what it costs, how often) is researched with `Agent.Web.Search` before you name it; a
    definition or advice without figures comes from you. A limit on your text — the owner's ("two sentences") or a
    rule's (30 characters) — is counted before you answer; say that it is met only for what you counted.
 3. The prose carries the key statement and the source line, so the answer stands without the widget; it does not

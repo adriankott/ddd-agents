@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DDD\Presentation\Api\Agents\Conversations\Dtos;
 
+use DDD\Domain\AI\Entities\ClientTools\AgentClientToolRequestDelivery;
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Infrastructure\Base\DateTime\DateTime;
 use DDD\Presentation\Base\Dtos\RestResponseDto;
@@ -34,6 +35,14 @@ class AIConversationRunStateGetResponseDto extends RestResponseDto
     /** @var int|null The id of the newest stored message; null before the first. */
     #[Parameter(in: Parameter::RESPONSE, required: true)]
     public ?int $lastMessageId = null;
+
+    /**
+     * @var AgentClientToolRequestDelivery|null A request of a UI tool the reading client is to execute now (`Agent.UI`):
+     * delivered to the client named by the read's `clientId` only; the client posts its answer to
+     * `clientToolRequests/{id}/answer`
+     */
+    #[Parameter(in: Parameter::RESPONSE, required: false)]
+    public ?AgentClientToolRequestDelivery $clientToolRequest = null;
 
     /** @var string|null The display title; null until the first title was generated. */
     #[Parameter(in: Parameter::RESPONSE, required: true)]

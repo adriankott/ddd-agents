@@ -14,7 +14,7 @@ use DDD\Domain\AI\Entities\Conversations\Messages\Delegation\DelegationSubAgentR
 use DDD\Domain\AI\Entities\Conversations\Messages\ToolCall;
 use DDD\Domain\AI\Entities\Conversations\Purposes\AIConversationPurpose;
 use DDD\Domain\AI\Entities\Conversations\Purposes\BackgroundMechanicalOperationPurpose;
-use DDD\Presentation\Mcp\Agent\AgentConsoleStream;
+use DDD\Presentation\Mcp\Agents\AgentConsoleStream;
 use DDD\Domain\AI\Services\Conversations\AIConversationMessagesService;
 use DDD\Domain\AI\Traits\Conversations\AITraceLogTrait;
 use DDD\Infrastructure\Services\DDDService;

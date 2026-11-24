@@ -15,5 +15,5 @@ Domain/AI/Repo/Argus/Conversations/ArgusAIAgentConversation.php 4
 Domain/AI/Services/Conversations/AIConversationMessagesService.php 3
 Domain/AI/Services/Conversations/Agent/AIConversationDelegationToolRunService.php 1
 Domain/AI/Services/Conversations/Agent/AgentToolCallDispatchService.php 1
-Presentation/Mcp/Agent/ConsoleMarkdownRenderer.php 2
+Presentation/Mcp/Agents/ConsoleMarkdownRenderer.php 2
 Presentation/Mcp/Services/MCPToolExecutorService.php 2

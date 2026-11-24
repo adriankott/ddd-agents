@@ -30,7 +30,7 @@ use DDD\Domain\AI\Services\Conversations\Memories\AgentMemoriesService;
 use DDD\Domain\AI\Services\Eval\AgentRecordedRunsService;
 use DDD\Infrastructure\Base\DateTime\DateTime;
 use DDD\Infrastructure\Services\DDDService;
-use DDD\Presentation\Mcp\Agent\ConversationHtmlTranscript;
+use DDD\Presentation\Mcp\Agents\ConversationHtmlTranscript;
 use DDD\Symfony\Commands\Agents\Chat\AgentConsoleChatRecordedRun;
 use DDD\Symfony\Commands\Agents\Chat\AgentConsoleChatRenderOptions;
 use DDD\Symfony\Commands\Agents\Chat\AgentConsoleChatRunOptions;
@@ -56,19 +56,19 @@ use Throwable;
  * produces (routing, tool calls, results, text; delegations indented under their child conversation), so routing and
  * answers can be tuned. A stored conversation is resumed by id, so a dialogue also works across separate calls.
  *
- *   php bin/console app:ai-agent:chat --agentSpaceId=7 -m "What changed this week?"
- *   php bin/console app:ai-agent:chat --conversationId=987 -m "And compared with last month?"
- *   php bin/console app:ai-agent:chat --accountId=123 -i                  # interactive
- *   php bin/console app:ai-agent:chat --agentSpaceId=7 --turns-file=turns.txt
- *   php bin/console app:ai-agent:chat --agentSpaceId=7 --turns-file=turns.txt --record-run-for-comparison=run.json
- *   php bin/console app:ai-agent:chat --agentSpaceId=7 --replay-run-and-compare=run.json
+ *   php bin/console app:agent:chat --agentSpaceId=7 -m "What changed this week?"
+ *   php bin/console app:agent:chat --conversationId=987 -m "And compared with last month?"
+ *   php bin/console app:agent:chat --accountId=123 -i                  # interactive
+ *   php bin/console app:agent:chat --agentSpaceId=7 --turns-file=turns.txt
+ *   php bin/console app:agent:chat --agentSpaceId=7 --turns-file=turns.txt --record-run-for-comparison=run.json
+ *   php bin/console app:agent:chat --agentSpaceId=7 --replay-run-and-compare=run.json
  *
  * The run works as the account of `--accountId`, else as the owner of the space the options name. A new conversation
  * is created in that space ({@see createConversationInAgentSpace()}). The console has no message consumer, so the side
  * work production runs in the background (the owner-message embedding, the memory curation, the compaction) runs inline
  * after a turn unless `--no-side-work` is passed.
  *
- * Override points of an application: the scope of the run, shared with `app:ai-agent:chat-tui` through
+ * Override points of an application: the scope of the run, shared with `app:agent:chat-tui` through
  * {@see AgentConsoleChatScopeTrait} ({@see resolveChatScope()}, {@see findAgentSpaceForNewConversation()},
  * {@see createConversationInAgentSpace()}, the words {@see describeAgentSpaceOptions()}; the trait also holds the
  * resume of `--conversationId` and the turn inside its envelope); {@see curateMemoryAfterTurn()}; the recorded-run
@@ -79,14 +79,18 @@ use Throwable;
  * {@see buildSlashCommandRegistry()}, and the words {@see getInteractiveChatTitle()}.
  */
 #[AsCommand(
-    name: 'app:ai-agent:chat',
+    name: 'app:agent:chat',
+    aliases: ['app:ai-agent:chat'],
     description: 'Drive the agent chat from the console (single-shot or interactive); debug routing and responses.',
 )]
 class AgentChatCommand extends AgentConsoleCommand
 {
     use AgentConsoleChatScopeTrait, ModelTierOptionTrait, ContextRetentionSettingsOptionsTrait;
 
-    /** The harness name a recording of this command carries (a replay refuses the recording of another harness). */
+    /**
+     * The harness name a recording of this command carries (a replay refuses the recording of another harness): the
+     * command's former name, kept so older recordings replay.
+     */
     public const string RECORDED_RUN_HARNESS = 'app:ai-agent:chat';
 
     /** The option that records a run of several turns for a later comparison. */

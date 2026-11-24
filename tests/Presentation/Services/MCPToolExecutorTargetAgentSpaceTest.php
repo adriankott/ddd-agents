@@ -13,7 +13,7 @@ use DDD\Domain\Common\Entities\Roles\Role;
 use DDD\Domain\Common\Entities\Roles\Roles;
 use DDD\Infrastructure\Exceptions\ForbiddenException;
 use DDD\Infrastructure\Services\AuthService;
-use DDD\Presentation\Mcp\Client\AI\AgentMandatesMCPPackage;
+use DDD\Presentation\Mcp\Client\Agents\AgentMandatesMCPPackage;
 use DDD\Tests\Agents\Presentation\Services\Probes\ProbeNoteMCPPackage;
 use DDD\Tests\Agents\Presentation\Services\Probes\TargetAgentSpaceObservingToolExecutor;
 use DDD\Tests\Agents\Support\UnitTestCase;

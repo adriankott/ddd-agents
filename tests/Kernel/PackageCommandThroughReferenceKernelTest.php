@@ -16,7 +16,7 @@ use Symfony\Component\Process\Process;
 class PackageCommandThroughReferenceKernelTest extends UnitTestCase
 {
     /** @var string The command of the module the reference host must start */
-    public const string MODULE_COMMAND_NAME = 'app:ai-conversation:mark-finalized';
+    public const string MODULE_COMMAND_NAME = 'app:agent:mark-finalized-conversations';
 
     public function testTheReferenceHostListsTheModuleCommand(): void
     {

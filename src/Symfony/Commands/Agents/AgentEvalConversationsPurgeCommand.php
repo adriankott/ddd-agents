@@ -26,16 +26,17 @@ use Throwable;
  * Runs as a cron. A ticker that kills its process after 360 s still lets a run finish: the budget is capped at
  * {@see AIConversationEvalPurgeSettings::MAXIMUM_SECONDS}; what is left is deleted by the next run:
  *
- *   php bin/console app:ai-agent:eval-conversations-purge --apply
+ *   php bin/console app:agent:eval-conversations-purge --apply
  *
  * An account that also holds the owner's own conversations gives up only its evaluation-marked trees — dry run first:
  *
- *   php bin/console app:ai-agent:eval-conversations-purge --accounts=<id>,<id> --evalOnly --older-than-hours=1
+ *   php bin/console app:agent:eval-conversations-purge --accounts=<id>,<id> --evalOnly --older-than-hours=1
  *
  * The command only parses its options, calls the service and renders the report's lines and table cells.
  */
 #[AsCommand(
-    name: 'app:ai-agent:eval-conversations-purge',
+    name: 'app:agent:eval-conversations-purge',
+    aliases: ['app:ai-agent:eval-conversations-purge'],
     description: 'Politely delete the eval-account conversations (and every dependent row) whose last activity is older than N hours'
 )]
 class AgentEvalConversationsPurgeCommand extends AgentConsoleCommand

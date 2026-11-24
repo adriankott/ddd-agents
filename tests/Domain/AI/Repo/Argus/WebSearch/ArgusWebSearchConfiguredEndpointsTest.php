@@ -6,14 +6,12 @@ namespace DDD\Tests\Agents\Domain\AI\Repo\Argus\WebSearch;
 
 use DDD\Domain\AI\Repo\Argus\WebSearch\ArgusWebPageMarkdown;
 use DDD\Domain\AI\Repo\Argus\WebSearch\ArgusWebSearchHitList;
-use DDD\Domain\AI\Repo\Argus\WebSearch\PageScreenshots\ArgusPageScreenshot;
 use DDD\Tests\Agents\Support\UnitTestCase;
 use DDD\Tests\Agents\Support\WebSearchTestConfiguration;
 
 /**
  * The repositories take their endpoint, cache lifetime and timeout from the application's configuration, per
- * instance; without an endpoint nothing is set. The cache keys: a page read keys on the canonical page, a screenshot
- * on url and viewport (height included).
+ * instance; without an endpoint nothing is set. The cache key of a page read is the canonical page.
  */
 class ArgusWebSearchConfiguredEndpointsTest extends UnitTestCase
 {
@@ -32,7 +30,6 @@ class ArgusWebSearchConfiguredEndpointsTest extends UnitTestCase
             self::assertNull((new ArgusWebSearchHitList())->getArgusSettings()->getLoadEndpoint(), 'set on the instance, never on the class');
 
             self::assertSame('POST:/web/urlToMarkdown', ArgusWebPageMarkdown::findConfiguredLoadEndpoint());
-            self::assertSame('POST:https://renderer.example/screenshot', ArgusPageScreenshot::findConfiguredLoadEndpoint());
         } finally {
             WebSearchTestConfiguration::restoreConfigValues($configValuesBefore);
         }
@@ -60,12 +57,5 @@ class ArgusWebSearchConfiguredEndpointsTest extends UnitTestCase
         $otherPage->url = 'https://example.com/contact';
         self::assertSame($firstSpelling->uniqueKey(), $secondSpelling->uniqueKey());
         self::assertNotSame($firstSpelling->uniqueKey(), $otherPage->uniqueKey());
-
-        $shortWindow = new ArgusPageScreenshot();
-        $shortWindow->url = 'https://example.com';
-        $tallWindow = new ArgusPageScreenshot();
-        $tallWindow->url = 'https://example.com';
-        $tallWindow->viewportHeight = 8000;
-        self::assertNotSame($shortWindow->uniqueKey(), $tallWindow->uniqueKey(), 'the tall-window retry is never answered by the short capture');
     }
 }

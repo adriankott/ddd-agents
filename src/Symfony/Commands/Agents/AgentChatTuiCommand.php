@@ -7,9 +7,9 @@ namespace DDD\Symfony\Commands\Agents;
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
 use DDD\Domain\AI\Entities\Environment\AgentApplicationNames;
-use DDD\Presentation\Mcp\Agent\ConversationHtmlTranscript;
-use DDD\Presentation\Mcp\Agent\Tui\ConsoleViewModel;
-use DDD\Presentation\Mcp\Agent\Tui\ConsoleViewModelBuilder;
+use DDD\Presentation\Mcp\Agents\ConversationHtmlTranscript;
+use DDD\Presentation\Mcp\Agents\Tui\ConsoleViewModel;
+use DDD\Presentation\Mcp\Agents\Tui\ConsoleViewModelBuilder;
 use DDD\Symfony\Commands\AI\ModelTierOptionTrait;
 use DDD\Symfony\Commands\Agents\Chat\AgentConsoleChatRenderOptions;
 use DDD\Symfony\Commands\Agents\Chat\AgentConsoleChatRunOptions;
@@ -37,7 +37,7 @@ use Throwable;
 
 /**
  * The agent chat on a full screen: a scrollable transcript with tool results that open and close on a click, a pinned
- * status line and an input line. The line-oriented `app:ai-agent:chat` is the one a script or an evaluation drives;
+ * status line and an input line. The line-oriented `app:agent:chat` is the one a script or an evaluation drives;
  * this one is for a person at a terminal. The transcript, the scrolling and the click hit-test live in the tested
  * {@see ConsoleViewModel}; this command is the terminal shell around it.
  *
@@ -51,13 +51,13 @@ use Throwable;
  * ({@see self::resolveChatScope()}, {@see self::findOrCreateConversation()},
  * {@see self::generateAgentReplyInsideTurnEnvelope()}).
  *
- *   php bin/console app:ai-agent:chat-tui --agentSpaceId=12 --ephemeral --ignore-budget
+ *   php bin/console app:agent:chat-tui --agentSpaceId=12 --ephemeral --ignore-budget
  *
  * Keys: type and Enter to send · a click on a `→ tool [...] ▸ N chars` line opens or closes its result · mouse wheel,
  * PgUp, PgDn and the arrows scroll · Esc quits. The interactive loop needs a real terminal (raw mode, mouse capture,
  * the alternate screen); everything it decides on is a method of its own.
  */
-#[AsCommand(name: 'app:ai-agent:chat-tui', description: 'Full-screen TUI for the agent chat (mouse, click-to-expand).')]
+#[AsCommand(name: 'app:agent:chat-tui', aliases: ['app:ai-agent:chat-tui'], description: 'Full-screen TUI for the agent chat (mouse, click-to-expand).')]
 class AgentChatTuiCommand extends AgentConsoleCommand
 {
     use AgentConsoleChatScopeTrait;
@@ -89,8 +89,8 @@ class AgentChatTuiCommand extends AgentConsoleCommand
             ->addOption(self::OPTION_CONVERSATION_ID, null, InputOption::VALUE_OPTIONAL, 'Resume an existing conversation by id (ignored with --ephemeral)')
             ->addOption('ephemeral', null, InputOption::VALUE_NONE, 'Do not persist the conversation')
             ->addOption('full', null, InputOption::VALUE_NONE, 'Start with tool results EXPANDED (otherwise collapsed; click to expand)')
-            ->addOption('collapse-threads', null, InputOption::VALUE_NONE, 'Accepted for parity with app:ai-agent:chat — the TUI already shows only the parent thread (delegations cross back as their verdict)')
-            ->addOption('debug', null, InputOption::VALUE_NONE, 'Accepted for parity with app:ai-agent:chat — request payloads are not block-rendered in the TUI yet')
+            ->addOption('collapse-threads', null, InputOption::VALUE_NONE, 'Accepted for parity with app:agent:chat — the TUI already shows only the parent thread (delegations cross back as their verdict)')
+            ->addOption('debug', null, InputOption::VALUE_NONE, 'Accepted for parity with app:agent:chat — request payloads are not block-rendered in the TUI yet')
             ->addOption('html', null, InputOption::VALUE_OPTIONAL, 'Also write a self-contained HTML transcript to this path, refreshed after every turn')
             ->addOption('model', null, InputOption::VALUE_OPTIONAL, 'Override the agent AIModel by name (e.g. OPENAI.GPT5_MINI); default = the conversation\'s configured model');
         $this->configureAgentSpaceOptions();

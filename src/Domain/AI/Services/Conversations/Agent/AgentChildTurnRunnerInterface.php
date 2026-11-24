@@ -7,7 +7,7 @@ namespace DDD\Domain\AI\Services\Conversations\Agent;
 use DDD\Domain\AI\Entities\Conversations\Agent\AgentRun;
 use DDD\Domain\AI\Entities\Conversations\Agent\Turns\AgentTransientMessageIds;
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
-use DDD\Presentation\Mcp\Agent\AgentConsoleStream;
+use DDD\Presentation\Mcp\Agents\AgentConsoleStream;
 
 /**
  * The upward port of an inline delegation child: the delegation spawn prepares a sync (CLI / eval)

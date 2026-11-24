@@ -287,6 +287,6 @@ unattended run's purpose: the seed message is the owner's mission only; the dire
 never administer a schedule; nobody is present); the delivery contract is chosen by the variant dimension
 `reportChannel` (`## [reportChannel=EMAIL]` and `## [reportChannel=CHAT]` sections, resolved by `ScheduleRunPurpose`);
 every tool that declares `MCPToolSendsMessageToOwner` is blocked (`ScheduleRunPurpose::getToolNamesBlockedByDeclaration()`),
-so the report has one delivery path; `Assistant.TaskRunReports` is
+so the report has one delivery path; `Agent.TaskRunReports` is
 preloaded; `ScheduleRunPurpose::shouldCloseConversationAfterSettledTurn()` closes the run once the report reached its
 channel. How a schedule fires and delivers belongs to `ddd-module-agents-autonomy-specialist`.

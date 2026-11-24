@@ -66,6 +66,7 @@ class AgentStateChangeDetection
                 is_array($currentValue) ? $currentValue : []
             ),
             AgentStateDelta::KIND_SITUATION => AgentStateDeltaTexts::buildSituationText($currentState->situationNote),
+            AgentStateDelta::KIND_UI => (string)$currentState->uiNote,
             default => '',
         };
         // a zone that went away (a build without a space) has nothing to say: nothing is delivered

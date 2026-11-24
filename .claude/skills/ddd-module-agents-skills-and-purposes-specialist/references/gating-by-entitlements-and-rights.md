@@ -12,7 +12,7 @@ is not authorization · what the model is told · purposes · traps
 | feature flags of the agent space (the plan) | `requiredFeatureFlags` (ALL), `anyOfRequiredFeatureFlags` (at least one) | `AIConversationEntitlementsService::findFeatureFlagsOfConversation()` → `AgentFeatureFlagsInterface` | an upgrade the owner can buy |
 | rights of the acting account | `requiredAccountRights` | `AIConversationEntitlementsService::findAccountRightsOfConversation()` → `AgentAccountRightsInterface` | a grant by the account's administrator |
 | billing access of the account | `requiresAccountBillingAccess` | `AIConversationEntitlementsService::findAccountBillingAccessOfConversation()` | nothing: the capability is not mentioned at all |
-| the budget policy | — (`Assistant.Budget` only) | `AIConversationEntitlementsService::isExactAIBudgetReportable()` | the skill is not offered |
+| the budget policy | — (`Agent.Budget` only) | `AIConversationEntitlementsService::isExactAIBudgetReportable()` | the skill is not offered |
 | the model can see | `requiresVisionCapabilities` | `AIModel::$hasVisionCapabilities` | a load refusal on a blind model |
 | purpose and initiator | `onlyUnderPurposeNames`, `notUnderPurposeNames`, `onlyOnInitiatorTypes` | the conversation | not offered, load refused |
 
@@ -21,11 +21,18 @@ the any-of flags. Flag and right names are opaque strings: only the host interpr
 
 ## Where the answers come from
 
-Every default of `AIConversationEntitlementsService` answers "ungated": no flags (null), no rights (null), billing
-unknown (null), budget reportable. Null on an axis means that axis does not restrict. A host gates by putting a
+The defaults of `AIConversationEntitlementsService`: no flags (null, ungated), billing unknown (null), budget
+reportable, and the account's rights by roles: `AgentRoleMappedAccountRights` reads the config `AI.accountRights`
+(right name → role names, `'*'` = every account); a right the mapping does not name is not held. Shipped mapping: the
+operator rights (`operatePlatform`, `manageTexts`, `useSandbox`, `useBrowser`) to `Role::SUPERADMIN`, the everyday
+rights (`scheduleAgentTasks`, `useAgentMemory`, `useWeb`, `useUI`, `useDrive`) to every account. A package declares its
+rights as constants (`AgentAccountRights` here, the drive's rights class in ddd-clouddrive), carries them on its package class
+(`#[MCPRequiresAccountRights]`) and names them in its skill's `requiredAccountRights`; a host maps them to its roles
+(its own `config/app/AI/accountRights.php`, replaced whole) or answers them with its own `AgentAccountRightsInterface`
+(`findAccountRightsOfConversation()`, `findAccountRightsOfCurrentAccount()`). Null on an axis means that axis does not restrict. A host gates by putting a
 same-path subclass of the service under its root namespace; how is the entry skill's (`ddd-module-agents-specialist`,
-override points). Consequences: without that subclass every gate in every skill file is inert, and
-`requiresAccountBillingAccess` drops a skill only when the host answers false, not when it answers null.
+override points). Consequences: without that subclass every flag gate is inert, a right gate follows the role mapping
+(a host right the mapping does not name is not held), and `requiresAccountBillingAccess` drops a skill only when the host answers false, not when it answers null.
 
 ## Skill level, package level, tool level
 
@@ -45,7 +52,7 @@ without editing a file:
 
 ```php
 return [
-    'Assistant.Mandates' => [
+    'Agent.Mandates' => [
         'requiredFeatureFlags' => ['AGENT.MANDATES'],
         'requiredAccountRights' => ['manageAgent'],
     ],

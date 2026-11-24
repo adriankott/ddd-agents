@@ -10,7 +10,7 @@ namespace DDD\Domain\AI\Entities\Conversations\Agent\StateDelivery;
  * the system content and the base-prompt placeholders render from it for the whole epoch), as the LAST-SEEN values
  * (the record with every recorded delta applied, {@see withDeltaApplied()}) and as the CURRENT values of a call (what a
  * per-call render would show now). The values only the volatile tail carried (the unconfirmed-zone note, the situation
- * provenance note, the task plan) are null in a record: nothing of them is in the system content, so the epoch's first
+ * provenance note, the UI note, the task plan) are null in a record: nothing of them is in the system content, so the epoch's first
  * call delivers them. Each delta kind ({@see AgentStateDelta}) reads and sets one value ({@see readValueOfKind()}). Pure.
  *
  * @phpstan-consistent-constructor
@@ -43,6 +43,9 @@ class AgentConversationState
 
     /** @var string|null The `[SIGNAL:situation]` provenance note the model saw; null = none. */
     public ?string $situationNote = null;
+
+    /** @var string|null The `[SIGNAL:ui]` note of the user's UI the model saw (`Agent.UI`); null = none. */
+    public ?string $uiNote = null;
 
     /**
      * @var string|null Who reads the call on which surface (the owner presence, the phone line, the kit): a change
@@ -91,6 +94,7 @@ class AgentConversationState
                 'restrictedCapabilities' => $this->restrictedCapabilities,
             ],
             AgentStateDelta::KIND_SITUATION => $this->situationNote,
+            AgentStateDelta::KIND_UI => $this->uiNote,
             default => null,
         };
     }
@@ -121,6 +125,9 @@ class AgentConversationState
             case AgentStateDelta::KIND_SITUATION:
                 $this->situationNote = is_string($value) ? $value : null;
                 break;
+            case AgentStateDelta::KIND_UI:
+                $this->uiNote = is_string($value) ? $value : null;
+                break;
         }
     }
 
@@ -142,6 +149,7 @@ class AgentConversationState
         $epochRecord = clone $this;
         $epochRecord->timezoneUnconfirmedNote = null;
         $epochRecord->situationNote = null;
+        $epochRecord->uiNote = null;
         $epochRecord->unknownKinds = array_values(array_intersect($this->unknownKinds, self::getKindsAnEpochRecordKeepsUnknown()));
         return $epochRecord;
     }
@@ -159,6 +167,7 @@ class AgentConversationState
             'aiBudgetAwareness' => $this->aiBudgetAwareness,
             'restrictedCapabilities' => $this->restrictedCapabilities,
             'situationNote' => $this->situationNote,
+            'uiNote' => $this->uiNote,
             'surfaceKey' => $this->surfaceKey,
             'unknownKinds' => $this->unknownKinds,
         ];
@@ -171,7 +180,7 @@ class AgentConversationState
     public static function fromArray(array $stateArray): static
     {
         $agentConversationState = new static();
-        foreach (['agentSpaceContext', 'ownerAddressing', 'timezoneIdentifier', 'timezoneUnconfirmedNote', 'memoryDirectives', 'productCapabilities', 'aiBudgetAwareness', 'restrictedCapabilities', 'situationNote', 'surfaceKey'] as $stringField) {
+        foreach (['agentSpaceContext', 'ownerAddressing', 'timezoneIdentifier', 'timezoneUnconfirmedNote', 'memoryDirectives', 'productCapabilities', 'aiBudgetAwareness', 'restrictedCapabilities', 'situationNote', 'uiNote', 'surfaceKey'] as $stringField) {
             $agentConversationState->{$stringField} = is_string($stateArray[$stringField] ?? null) ? $stateArray[$stringField] : null;
         }
         $contextTextUnderTheFormerKey = $stateArray[self::FORMER_SNAPSHOT_KEY_OF_AGENT_SPACE_CONTEXT] ?? null;

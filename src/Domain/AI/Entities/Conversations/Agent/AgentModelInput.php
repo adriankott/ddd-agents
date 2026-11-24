@@ -230,6 +230,16 @@ class AgentModelInput extends ValueObject
     public ?string $clientContextTailText = null;
 
     /**
+     * The `[SIGNAL:ui]` note of the user's UI (`Agent.UI`, {@see \DDD\Domain\AI\Services\ClientTools\AgentUIStateNotesService}):
+     * under a state delivery a note appended once when it changed, else a tail entry of every call. Resolved by the
+     * loop's build phase; null = none.
+     */
+    public ?string $uiStateNote = null;
+
+    /** Whether the UI note could not be read for this call (its value is then unknown and compared with nothing) */
+    public bool $uiStateNoteIsUnknown = false;
+
+    /**
      * @var string[] Headings of base prompt sections this call leaves out ({@see AgentModelInputOptions}, resolved by
      * the loop's build phase); empty = the base prompt as it is, byte for byte.
      */
@@ -1709,6 +1719,12 @@ class AgentModelInput extends ValueObject
         $clientContextTailHint = $this->clientContextTailHint();
         if ($clientContextTailHint !== null) {
             $agentModelInputTailEntry = AgentModelInputTailEntry::ofText(AgentModelInputTailEntry::KIND_CLIENT_CONTEXT, AgentContextSegmentType::SIGNAL, $clientContextTailHint);
+            $agentModelInputTailEntries->add($agentModelInputTailEntry);
+        }
+        // The user's UI (`Agent.UI`): under a state delivery it rides as a note instead.
+        $uiStateTailHint = $this->stateDelivery === null && $this->uiStateNote !== null && trim($this->uiStateNote) !== '' ? $this->uiStateNote : null;
+        if ($uiStateTailHint !== null) {
+            $agentModelInputTailEntry = AgentModelInputTailEntry::ofText(AgentModelInputTailEntry::KIND_UI_STATE, AgentContextSegmentType::SIGNAL, $uiStateTailHint);
             $agentModelInputTailEntries->add($agentModelInputTailEntry);
         }
         // Clock signal: the ONE captured "now" of this call in the space's zone — volatile by nature.

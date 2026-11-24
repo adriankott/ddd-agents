@@ -13,7 +13,7 @@ use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Tester\CommandTester;
 
 /**
- * The range of `app:ai-agent:tool-response-stats`: whole days from the first day's start to the last day's end, from
+ * The range of `app:agent:tool-response-stats`: whole days from the first day's start to the last day's end, from
  * `--from` / `--to` or the last `--days` days; an unreadable day or an inverted range ends the command before any read.
  */
 class AgentToolResponseStatsCommandRangeTest extends UnitTestCase

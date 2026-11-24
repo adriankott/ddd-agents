@@ -9,9 +9,11 @@ use DDD\Domain\AI\Entities\AgentSpaces\AgentSpace;
 use DDD\Domain\AI\Entities\Conversations\Agent\Context\AgentProductAwareness;
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Entities\Conversations\Entitlements\AgentAccountRightsInterface;
+use DDD\Domain\AI\Entities\Conversations\Entitlements\AgentRoleMappedAccountRights;
 use DDD\Domain\AI\Entities\Conversations\Entitlements\AgentFeatureFlagsInterface;
 use DDD\Infrastructure\Exceptions\BadRequestException;
 use DDD\Infrastructure\Exceptions\InternalErrorException;
+use DDD\Infrastructure\Services\AuthService;
 use DDD\Infrastructure\Services\Service;
 use Psr\Cache\InvalidArgumentException;
 use ReflectionException;
@@ -21,7 +23,8 @@ use ReflectionException;
  * rights of the acting account — and what the model is told about the product. The flag and right names are opaque
  * strings only the application interprets.
  *
- * Every default answers "ungated": no flags (null), no rights (null), an empty product awareness, texts unchanged. An
+ * The defaults: no flags (null, ungated), the account's rights by the role mapping `AI.accountRights`, an empty
+ * product awareness, texts unchanged. An
  * application puts a same-path subclass under its own root namespace; the core resolves this service only through
  * `DDDService::instance()->getService(AIConversationEntitlementsService::class)`.
  */
@@ -76,7 +79,9 @@ class AIConversationEntitlementsService extends Service
     }
 
     /**
-     * The rights of the account the conversation acts for. The default: null (ungated).
+     * The rights of the account the conversation acts for. The default: the rights the config `AI.accountRights` maps
+     * to the account's roles ({@see AgentRoleMappedAccountRights}); null (ungated) for a conversation without an
+     * account.
      *
      * @param AIConversation $conversation
      * @return AgentAccountRightsInterface|null
@@ -87,11 +92,25 @@ class AIConversationEntitlementsService extends Service
      */
     public function findAccountRightsOfConversation(AIConversation $conversation): ?AgentAccountRightsInterface
     {
-        return null;
+        $conversationAccountId = $conversation->accountId ?? null;
+        if ($conversationAccountId === null) {
+            return null;
+        }
+        // the conversation's account as loaded, else the signed-in account when it is the same one; read last
+        $account = isset($conversation->account) ? $conversation->account : null;
+        $currentAccount = AuthService::instance()->getAccount();
+        if ($account === null && $currentAccount !== null && (int)$currentAccount->id === (int)$conversationAccountId) {
+            $account = $currentAccount;
+        }
+        if ($account === null) {
+            $account = $conversation->account ?? null;
+        }
+        return $account instanceof Account ? AgentRoleMappedAccountRights::forAccount($account) : null;
     }
 
     /**
-     * The rights of the authenticated account of the current request. The default: null (ungated).
+     * The rights of the authenticated account of the current request. The default: the rights the config
+     * `AI.accountRights` maps to its roles ({@see AgentRoleMappedAccountRights}); null (ungated) without an account.
      *
      * @return AgentAccountRightsInterface|null
      * @throws BadRequestException
@@ -101,7 +120,8 @@ class AIConversationEntitlementsService extends Service
      */
     public function findAccountRightsOfCurrentAccount(): ?AgentAccountRightsInterface
     {
-        return null;
+        $account = AuthService::instance()->getAccount();
+        return $account !== null ? AgentRoleMappedAccountRights::forAccount($account) : null;
     }
 
     /**

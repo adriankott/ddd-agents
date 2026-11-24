@@ -18,7 +18,7 @@ use Symfony\Component\Yaml\Yaml;
 /**
  * Loads AISkills from their `.md` config — stringently mirrors AIPromptsService.
  *
- * `getAISkillByName('Assistant.Mandates')` → `Config::get('AI.Skills.Assistant.Mandates')` reads
+ * `getAISkillByName('Agent.Mandates')` → `Config::get('AI.Skills.Agent.Mandates')` reads
  * `config/app/AI/Skills/Assistant/Mandates.md` of the first config root holding it (the application's before a module's,
  * {@see AISkillSourcesService}); the skill name is the dotted path itself, YAML frontmatter →
  * {description} (the catalog selection signal), body → load-time instruction.
@@ -176,7 +176,7 @@ class AISkillsService extends Service
     /**
      * Returns an AISkill by its dotted name, loaded from its `.md` config via Config::get().
      *
-     * @param string $skillName e.g. 'Assistant.Mandates'
+     * @param string $skillName e.g. 'Agent.Mandates'
      * @return AISkill|null
      * @throws NotFoundException
      */

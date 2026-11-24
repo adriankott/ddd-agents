@@ -40,10 +40,10 @@ class DelegateToolArgumentsTaskShapeTest extends UnitTestCase
         self::assertSame(['url' => 'https://example.org'], $toolRunArguments->task->toolArguments);
         self::assertFalse($toolRunArguments->namesBothTaskShapes);
 
-        $agentTaskArguments = DelegateToolArguments::fromToolCallArguments(['task' => 'Read the site and profile it.', 'skill_names' => ['Web.Search']]);
+        $agentTaskArguments = DelegateToolArguments::fromToolCallArguments(['task' => 'Read the site and profile it.', 'skill_names' => ['Agent.Web.Search']]);
         self::assertInstanceOf(AgentDelegationAgentTask::class, $agentTaskArguments->task);
         self::assertSame('Read the site and profile it.', $agentTaskArguments->task->taskText);
-        self::assertSame(['Web.Search'], $agentTaskArguments->task->skillNames);
+        self::assertSame(['Agent.Web.Search'], $agentTaskArguments->task->skillNames);
         self::assertFalse($agentTaskArguments->namesBothTaskShapes);
     }
 

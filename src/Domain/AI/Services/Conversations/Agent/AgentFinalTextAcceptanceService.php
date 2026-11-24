@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace DDD\Domain\AI\Services\Conversations\Agent;
 
 use DDD\Domain\AI\Services\Conversations\AIConversationMessagesService;
-use DDD\Presentation\Mcp\Agent\AgentConsoleStream;
+use DDD\Presentation\Mcp\Agents\AgentConsoleStream;
 use DDD\Domain\AI\Entities\Conversations\Agent\Turns\AgentTransientMessageIds;
 use DDD\Domain\AI\Entities\Conversations\Agent\Decisions\AgentFinalTextAcceptance;
 use DDD\Domain\AI\Entities\Conversations\Agent\ModelResponse;

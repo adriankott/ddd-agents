@@ -77,7 +77,7 @@ class AISkillSourcesService extends Service
 
     /**
      * The dotted names of the `.md` files below one skill (or purpose) folder, sorted: `Assistant/Budget.md` →
-     * `Assistant.Budget`.
+     * `Agent.Budget`.
      *
      * @return string[]
      */

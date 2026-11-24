@@ -9,10 +9,13 @@ use DDD\Domain\AI\Entities\Conversations\AIConversationDriveScope;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
 use DDD\Domain\AI\Entities\Conversations\Usage\AgentAIUsageScope;
 use DDD\Domain\AI\Exceptions\Conversations\ConversationClosedException;
+use DDD\Domain\AI\Services\ClientTools\AgentClientToolRequestsService;
 use DDD\Domain\AI\Services\Conversations\AIConversationAgentService;
 use DDD\Domain\AI\Services\Conversations\AIConversationsService;
 use DDD\Domain\AI\Services\Conversations\Agent\AIConversationTurnSignalsService;
 use DDD\Infrastructure\Exceptions\BadRequestException;
+use DDD\Presentation\Api\Agents\Conversations\Dtos\AIConversationClientToolRequestAnswerPostRequestDto;
+use DDD\Presentation\Api\Agents\Conversations\Dtos\AIConversationClientToolRequestAnswerPostResponseDto;
 use DDD\Presentation\Api\Agents\Conversations\Dtos\AIConversationDeleteResponseDto;
 use DDD\Presentation\Api\Agents\Conversations\Dtos\AIConversationGetRequestDto;
 use DDD\Presentation\Api\Agents\Conversations\Dtos\AIConversationGetResponseDto;
@@ -77,6 +80,7 @@ trait AgentConversationWritesTrait
         AIConversationAgentService $aiConversationAgentService
     ): AIConversationGetResponseDto {
         $this->hideAgentForensicsUnlessImpersonating();
+        $this->stampUIClientOfConversationId($requestDto->aiConversationId ?? null, $requestDto->clientId ?? null, $requestDto->uiState ?? null);
         $responseDto = new AIConversationGetResponseDto();
         $responseDto->aiConversation = $aiConversationAgentService->driveConversation(
             AIConversationDriveScope::CUSTOMER,
@@ -91,6 +95,57 @@ trait AgentConversationWritesTrait
         );
         $this->afterMessagePosted($responseDto->aiConversation);
         $this->hideParentConversationAndLoadedCapabilitiesOnEmbeddedMessages($responseDto->aiConversation);
+        return $responseDto;
+    }
+
+    /**
+     * The answer of the user's client to a client tool request of `Agent.UI` (the request came with the run-state
+     * read). 404 when the request is not one of this conversation for this client, 409 when it no longer waits.
+     *
+     * @throws \DDD\Infrastructure\Exceptions\BadRequestException
+     * @throws \DDD\Infrastructure\Exceptions\ConflictException
+     * @throws \DDD\Infrastructure\Exceptions\InternalErrorException
+     * @throws \DDD\Infrastructure\Exceptions\NotFoundException
+     * @throws \Psr\Cache\InvalidArgumentException
+     * @throws \ReflectionException
+     */
+    #[Post('/{aiConversationId}/clientToolRequests/{requestId}/answer', requirements: ['aiConversationId' => '\d+', 'requestId' => '\d+'])]
+    #[Summary('AIConversation Client Tool Request Answer')]
+    public function answerClientToolRequest(
+        AIConversationClientToolRequestAnswerPostRequestDto $requestDto,
+        AgentClientToolRequestsService $agentClientToolRequestsService,
+        AIConversationsService $aiConversationsService
+    ): AIConversationClientToolRequestAnswerPostResponseDto {
+        $this->authorizeConversationAccess();
+        $requestDto = $this->resolveRequestDtoOfRoutedMethod(__FUNCTION__, $requestDto);
+        return $this->buildClientToolRequestAnsweredResponse($requestDto, $agentClientToolRequestsService, $aiConversationsService);
+    }
+
+    /**
+     * @throws \DDD\Infrastructure\Exceptions\BadRequestException
+     * @throws \DDD\Infrastructure\Exceptions\ConflictException
+     * @throws \DDD\Infrastructure\Exceptions\InternalErrorException
+     * @throws \DDD\Infrastructure\Exceptions\NotFoundException
+     * @throws \Psr\Cache\InvalidArgumentException
+     * @throws \ReflectionException
+     */
+    protected function buildClientToolRequestAnsweredResponse(
+        AIConversationClientToolRequestAnswerPostRequestDto $requestDto,
+        AgentClientToolRequestsService $agentClientToolRequestsService,
+        AIConversationsService $aiConversationsService
+    ): AIConversationClientToolRequestAnswerPostResponseDto {
+        $aiConversationsService->throwErrors = true;
+        $conversation = $this->findVisibleConversation($aiConversationsService, (int)$requestDto->aiConversationId);
+        $agentClientToolRequestsService->answerRequest(
+            (int)($conversation->rootConversationId ?? $conversation->id),
+            (int)$requestDto->requestId,
+            $requestDto->clientId,
+            $requestDto->outcome,
+            $requestDto->text ?? null,
+            $requestDto->detailsJson ?? null
+        );
+        $responseDto = new AIConversationClientToolRequestAnswerPostResponseDto();
+        $responseDto->requestId = (int)$requestDto->requestId;
         return $responseDto;
     }
 
@@ -149,6 +204,9 @@ trait AgentConversationWritesTrait
         }
         $signalSource = $requestDto->signalSource ?? AIConversationMessage::SIGNAL_SOURCE_FRONTEND_WIDGET_CLICK;
         $this->assertSignalSourceIsPostedByTheClient($signalSource);
+        if ($conversation instanceof AIConversation) {
+            $this->stampUIClientOfConversation($conversation, $requestDto->clientId ?? null, $requestDto->uiState ?? null, true);
+        }
         $aIConversationTurnSignalsService->injectSignal(
             $conversation,
             $requestDto->signalText,

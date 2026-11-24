@@ -216,7 +216,7 @@ class DelegationSubAgentRecord extends ValueObject
 
     /**
      * The record's head line for an operator's view (the CLI inspector): `#3 «Services page» · agent task "…" (skills:
-     * Web.Search) · child #812345 · requested by MODEL`. The task text is cut to `$taskTextMaxLength` characters.
+     * Agent.Web.Search) · child #812345 · requested by MODEL`. The task text is cut to `$taskTextMaxLength` characters.
      */
     public function buildOperatorHeadLine(int $taskTextMaxLength = 120): string
     {

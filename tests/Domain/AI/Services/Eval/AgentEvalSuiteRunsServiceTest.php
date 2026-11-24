@@ -23,7 +23,7 @@ class AgentEvalSuiteRunsServiceTest extends UnitTestCase
         $agentEvalSuiteRunsService = new AgentEvalSuiteRunsServiceWithoutDatabaseDouble();
         $agentEvalSuiteRunsService->insertFails = true;
         $recordedRun = $agentEvalSuiteRunsService->recordSuiteRun(
-            'app:ai-agent:eval-tools',
+            'app:agent:eval-tools',
             'all',
             1_761_658_758,
             AgentEvalStoredRunOptions::fromStoredDocument(['model' => 'VENDOR.MODEL_A']),
@@ -31,7 +31,7 @@ class AgentEvalSuiteRunsServiceTest extends UnitTestCase
             AgentEvalSuiteRunRecordTest::loadFixtureCaseRows()
         );
         self::assertNull($recordedRun);
-        self::assertSame("app:ai-agent:eval-tools|all|6|Table 'AgentEvalSuiteRuns' doesn't exist", $agentEvalSuiteRunsService->loggedFailure);
+        self::assertSame("app:agent:eval-tools|all|6|Table 'AgentEvalSuiteRuns' doesn't exist", $agentEvalSuiteRunsService->loggedFailure);
     }
 
     public function testAWrittenRunCarriesThisHostAndBothMomentsInUtc(): void
@@ -39,7 +39,7 @@ class AgentEvalSuiteRunsServiceTest extends UnitTestCase
         $agentEvalSuiteRunsService = new AgentEvalSuiteRunsServiceWithoutDatabaseDouble();
         $secondsBefore = time();
         $recordedRun = $agentEvalSuiteRunsService->recordSuiteRun(
-            'app:ai-agent:eval-tools',
+            'app:agent:eval-tools',
             'all',
             1_761_658_758,
             AgentEvalStoredRunOptions::forSingleModelRun('VENDOR.MODEL_A', 'call', []),

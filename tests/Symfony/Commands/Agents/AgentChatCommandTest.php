@@ -89,7 +89,7 @@ class AgentChatCommandTest extends UnitTestCase
     public function testTheCommandKeepsItsNameRunsOnTheBaseAndAcceptsEveryOption(): void
     {
         $asCommandAttributes = (new ReflectionClass(AgentChatCommand::class))->getAttributes(AsCommand::class);
-        self::assertSame('app:ai-agent:chat', $asCommandAttributes[0]->newInstance()->name);
+        self::assertSame('app:agent:chat', explode('|', $asCommandAttributes[0]->newInstance()->name)[0], 'the old name stays an alias');
         self::assertInstanceOf(AgentConsoleCommand::class, $this->probeCommand);
 
         $missingOptionNames = array_values(array_filter(
@@ -432,7 +432,7 @@ class AgentChatCommandTest extends UnitTestCase
         $storedRecording = json_decode((string)file_get_contents($recordingFile), true);
         self::assertSame(self::CHAT_RECORDING_KEYS, array_keys($storedRecording), 'the stored keys keep their order');
         self::assertSame(3, $storedRecording['version']);
-        self::assertSame('app:ai-agent:chat', $storedRecording['harness']);
+        self::assertSame('app:ai-agent:chat', $storedRecording['harness'], 'the harness stored in a recording keeps its name: older recordings replay');
         self::assertSame(7, $storedRecording['agentSpaceId']);
         self::assertSame(['First question', 'Second question'], $storedRecording['turns']);
         self::assertSame(['agentSpace' => 7, 'rootConversation' => AgentChatProbeCommand::STORED_CONVERSATION_ID], $storedRecording['scopeIds']);

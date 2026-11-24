@@ -37,7 +37,7 @@ use DDD\Domain\Base\Entities\LazyLoad\LazyLoadRepo;
 use DDD\Infrastructure\Base\DateTime\DateTime;
 use DDD\Infrastructure\Libs\Config;
 use DDD\Infrastructure\Services\DDDService;
-use DDD\Presentation\Mcp\Client\AI\AgentMandatesMCPPackage;
+use DDD\Presentation\Mcp\Client\Agents\AgentMandatesMCPPackage;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolReceivesCurrentConversationId;
 use DDD\Domain\AI\Entities\MCPPackages\ToolDefinition;
 use DDD\Tests\Agents\Domain\AI\Entities\MCPPackages\Probes\FixedOutputMCPSchema;
@@ -392,9 +392,9 @@ class ToolDeclarationsReadByTheLoopTest extends UnitTestCase
     {
         $ownerRow = $this->textMessage(0, AIConversationMessage::ROLE_USER, AIConversationMessage::AUTHOR_USER, 'allow the weekly post');
         $ownerRow->loadedCapabilities = LoadedCapabilities::fromCanonicalEntries([
-            'Assistant.Mandates' => ['name' => 'Assistant.Mandates', 'type' => LoadedCapability::TYPE_SKILL],
-            'grantMandate' => ['name' => 'grantMandate', 'type' => LoadedCapability::TYPE_TOOL, 'parentSkillNames' => ['Assistant.Mandates']],
-            'listMandates' => ['name' => 'listMandates', 'type' => LoadedCapability::TYPE_TOOL, 'parentSkillNames' => ['Assistant.Mandates']],
+            'Agent.Mandates' => ['name' => 'Agent.Mandates', 'type' => LoadedCapability::TYPE_SKILL],
+            'grantMandate' => ['name' => 'grantMandate', 'type' => LoadedCapability::TYPE_TOOL, 'parentSkillNames' => ['Agent.Mandates']],
+            'listMandates' => ['name' => 'listMandates', 'type' => LoadedCapability::TYPE_TOOL, 'parentSkillNames' => ['Agent.Mandates']],
         ]);
         $messages = new AIConversationMessages();
         $messages->add($ownerRow);

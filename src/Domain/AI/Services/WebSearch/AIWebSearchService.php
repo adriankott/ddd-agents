@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace DDD\Domain\AI\Services\WebSearch;
 
-use DDD\Domain\AI\Entities\WebSearch\PageScreenshots\PageScreenshot;
-use DDD\Domain\AI\Entities\WebSearch\PageScreenshots\PageScreenshotPart;
 use DDD\Domain\AI\Entities\WebSearch\WebPageExcerpt;
 use DDD\Domain\AI\Entities\WebSearch\WebPageExcerpts;
 use DDD\Domain\AI\Entities\WebSearch\WebPageExtract;
@@ -25,7 +23,6 @@ use DDD\Domain\AI\Repo\Argus\WebSearch\ArgusWebPageMarkdown;
 use DDD\Domain\AI\Repo\Argus\WebSearch\ArgusWebPageMarkdowns;
 use DDD\Domain\AI\Repo\Argus\WebSearch\ArgusWebSearchHitList;
 use DDD\Domain\AI\Repo\Argus\WebSearch\ArgusWebSearchHitLists;
-use DDD\Domain\AI\Repo\Argus\WebSearch\PageScreenshots\ArgusPageScreenshot;
 use DDD\Infrastructure\Http\PublicUrlGuard;
 use DDD\Infrastructure\Services\DDDService;
 use DDD\Infrastructure\Services\Service;
@@ -35,8 +32,8 @@ use Throwable;
 /**
  * The web research of the package: the page lists of a search engine ({@see findHitListsForQueries()}), the page
  * readings of a fast model ({@see findWebPageExtracts()}), the page reads as markdown ({@see getWebPageAsMarkdown()},
- * {@see getWebPagesAsMarkdown()}) and a page part as screenshots ({@see capturePagePartForModel()}). Behind the tools
- * of `WebSearchMCPPackage` and `WebPageScreenshotMCPPackage`, and open to an application's own consumers.
+ * {@see getWebPagesAsMarkdown()}). Behind the tools of `WebSearchMCPPackage`, and open to an application's own
+ * consumers. Page screenshots are the page tools of `mgamadeus/ddd-agent-browser`.
  *
  * Each capability calls the endpoint the application configures (`AI.webSearch.endpoints.*`); a capability without an
  * endpoint, switched off (`AI.webSearch.capabilities.*`) or with the whole research off (`AI.webSearch.enabled`) answers
@@ -49,9 +46,7 @@ class AIWebSearchService extends Service
 
     public const string CAPABILITY_URL_TO_MARKDOWN = 'urlToMarkdown';
 
-    public const string CAPABILITY_SCREENSHOT = 'screenshot';
-
-    public const array CAPABILITIES = [self::CAPABILITY_SEARCH, self::CAPABILITY_URL_TO_MARKDOWN, self::CAPABILITY_SCREENSHOT];
+    public const array CAPABILITIES = [self::CAPABILITY_SEARCH, self::CAPABILITY_URL_TO_MARKDOWN];
 
     /** The extraction task is cut to this length as the query of the excerpt search for unreadable pages. */
     public const int EXCERPT_SEARCH_QUERY_MAX_CHARS = 300;
@@ -77,7 +72,6 @@ class AIWebSearchService extends Service
         return match ($capability) {
             self::CAPABILITY_SEARCH => ArgusWebSearchHitList::findConfiguredLoadEndpoint() !== null,
             self::CAPABILITY_URL_TO_MARKDOWN => ArgusWebPageMarkdown::findConfiguredLoadEndpoint() !== null,
-            self::CAPABILITY_SCREENSHOT => ArgusPageScreenshot::findConfiguredLoadEndpoint() !== null,
             default => false,
         };
     }
@@ -484,27 +478,6 @@ class AIWebSearchService extends Service
     }
 
     /**
-     * Why `$url` is not rendered, decided before the render from its host: a host without a DNS record is
-     * {@see PageScreenshotPart::REASON_UNRESOLVABLE} (a typo, not a private address), a private or reserved address
-     * {@see PageScreenshotPart::REASON_NOT_PUBLIC}. When the resolver gives no answer the guard's own check decides.
-     * Null = render.
-     */
-    protected function findScreenshotRefusalReasonOfHost(string $url): ?string
-    {
-        $hostClass = $this->classifyHostMemoized($url);
-        if ($hostClass === PublicUrlGuard::HOST_UNRESOLVABLE) {
-            return PageScreenshotPart::REASON_UNRESOLVABLE;
-        }
-        if ($hostClass === PublicUrlGuard::HOST_PRIVATE) {
-            return PageScreenshotPart::REASON_NOT_PUBLIC;
-        }
-        if ($hostClass === PublicUrlGuard::HOST_UNKNOWN && !PublicUrlGuard::resolvedHostsAreAllPublic($url)) {
-            return PageScreenshotPart::REASON_NOT_PUBLIC;
-        }
-        return null;
-    }
-
-    /**
      * {@see PublicUrlGuard::classifyHost()} once per host and process: several pages of one site, and every later read
      * of the same site in a worker, ask the resolver once. A resolver failure (UNKNOWN) is not kept.
      */
@@ -522,92 +495,5 @@ class AIWebSearchService extends Service
             static::$hostClassByHost[$host] = $hostClass;
         }
         return $hostClass;
-    }
-
-    /**
-     * ONE capture of `$url` through the screenshot endpoint, on a viewport of `$viewportWidth` × `$viewportHeight`, the
-     * full page. `$bypassCache` renders afresh (neither the entity cache nor the call cache answers). An empty
-     * {@see PageScreenshot} when nothing was captured.
-     */
-    public function capturePageScreenshot(string $url, int $viewportWidth, int $viewportHeight, bool $isMobile, bool $bypassCache = false): PageScreenshot
-    {
-        $argusPageScreenshot = ArgusPageScreenshot::newInstance();
-        $argusPageScreenshot->url = $url;
-        $argusPageScreenshot->viewportWidth = $viewportWidth;
-        $argusPageScreenshot->viewportHeight = $viewportHeight;
-        $argusPageScreenshot->forceFullPage = true;
-        $argusPageScreenshot->isMobile = $isMobile;
-        if (!$argusPageScreenshot->applyConfiguredLoadSettings()) {
-            $pageScreenshot = PageScreenshot::newInstance();
-            $pageScreenshot->failureReason = PageScreenshotPart::REASON_CAPABILITY_OFF;
-            return $pageScreenshot;
-        }
-        $pageScreenshot = PageScreenshot::newInstance();
-        try {
-            $argusPageScreenshot->argusLoad(useArgusEntityCache: !$bypassCache, useApiACallCache: !$bypassCache);
-        } catch (AgentToolExecutionTimeoutException $agentToolExecutionTimeoutException) {
-            throw $agentToolExecutionTimeoutException;
-        } catch (Throwable $throwable) {
-            // a connection error or the client's own timeout is a failed render with its reason, not an internal error
-            $pageScreenshot->failureReason = ArgusPageScreenshot::findFailureReasonOfTransportError($throwable);
-            return $pageScreenshot;
-        }
-        $pageScreenshot->content = $argusPageScreenshot->content;
-        $pageScreenshot->failureReason = ($argusPageScreenshot->content ?? '') === '' ? $argusPageScreenshot->failureReason : null;
-        return $pageScreenshot;
-    }
-
-    /**
-     * ONE part of `$url` for a vision model: the page rendered full height on the device's viewport, then the window of
-     * part `$partNumber` cut into {@see PageScreenshotPart::SEGMENTS_PER_PART} slices of
-     * {@see PageScreenshotPart::SLICE_HEIGHT_PX} px, with the page height and part count of the coverage line. Every part
-     * of one page reuses the same cached capture unless `$bypassCache` asks for a fresh render.
-     *
-     * A full-page render exactly one window tall is either a short page (its bottom is empty background) or a page that
-     * blocks scrolling (its content runs to the window edge): only the second is rendered again in a
-     * {@see PageScreenshotPart::TALL_VIEWPORT_HEIGHT_PX} window, the empty bottom cut off, and kept when it is taller
-     * than one window. A URL that is not public, the capability off or nothing captured → page height 0 and the reason
-     * on {@see PageScreenshotPart::$failureReason}; a part past the last one comes back without images.
-     */
-    public function capturePagePartForModel(string $url, int $partNumber = 1, string $device = PageScreenshotPart::DEVICE_DESKTOP, bool $bypassCache = false): PageScreenshotPart
-    {
-        $isMobile = $device === PageScreenshotPart::DEVICE_MOBILE;
-        $pageScreenshotPart = PageScreenshotPart::newInstance();
-        $pageScreenshotPart->url = trim($url);
-        $pageScreenshotPart->device = $isMobile ? PageScreenshotPart::DEVICE_MOBILE : PageScreenshotPart::DEVICE_DESKTOP;
-        $pageScreenshotPart->partNumber = max(1, $partNumber);
-        if (!$this->isCapabilityAvailable(self::CAPABILITY_SCREENSHOT)) {
-            $pageScreenshotPart->failureReason = PageScreenshotPart::REASON_CAPABILITY_OFF;
-            return $pageScreenshotPart;
-        }
-        $refusalReason = $this->findScreenshotRefusalReasonOfHost($pageScreenshotPart->url);
-        if ($refusalReason !== null) {
-            $pageScreenshotPart->failureReason = $refusalReason;
-            return $pageScreenshotPart;
-        }
-        $viewportWidth = $isMobile ? PageScreenshotPart::MOBILE_VIEWPORT_WIDTH_PX : PageScreenshotPart::DESKTOP_VIEWPORT_WIDTH_PX;
-        $pageScreenshot = $this->capturePageScreenshot($pageScreenshotPart->url, $viewportWidth, PageScreenshotPart::DEFAULT_VIEWPORT_HEIGHT_PX, $isMobile, $bypassCache);
-        // without Imagick the bottom cannot be judged: the first render stays
-        if (PageScreenshot::isImagickAvailable() && $pageScreenshot->getPixelHeight() === PageScreenshotPart::DEFAULT_VIEWPORT_HEIGHT_PX && !$pageScreenshot->hasEmptyBottom()) {
-            $tallPageScreenshot = $this->capturePageScreenshot($pageScreenshotPart->url, $viewportWidth, PageScreenshotPart::TALL_VIEWPORT_HEIGHT_PX, $isMobile, $bypassCache)
-                ->withEmptyBottomCutOff();
-            if ($tallPageScreenshot->getPixelHeight() > PageScreenshotPart::DEFAULT_VIEWPORT_HEIGHT_PX) {
-                $pageScreenshot = $tallPageScreenshot;
-                $pageScreenshotPart->renderedInTallWindow = true;
-            }
-        }
-        $pageScreenshotPart->pageWidthPx = $pageScreenshot->getPixelWidth();
-        $pageScreenshotPart->pageHeightPx = $pageScreenshot->getPixelHeight();
-        if ($pageScreenshotPart->pageHeightPx <= 0) {
-            $pageScreenshotPart->failureReason = $pageScreenshot->failureReason;
-        }
-        if ($pageScreenshotPart->pageHeightPx > 0 && $pageScreenshotPart->partNumber <= $pageScreenshotPart->getPartCount()) {
-            $pageScreenshotPart->base64Images = $pageScreenshot->buildSegmentWindowBase64(
-                PageScreenshotPart::SLICE_HEIGHT_PX,
-                ($pageScreenshotPart->partNumber - 1) * PageScreenshotPart::SEGMENTS_PER_PART,
-                PageScreenshotPart::SEGMENTS_PER_PART
-            );
-        }
-        return $pageScreenshotPart;
     }
 }

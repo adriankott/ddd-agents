@@ -40,7 +40,7 @@ use DDD\Domain\AI\Entities\Conversations\Agent\AgentRun;
 use DDD\Domain\AI\Entities\Conversations\Agent\Turns\AgentTransientMessageIds;
 use DDD\Domain\AI\Entities\Conversations\Agent\Decisions\AgentPlanDynamicsDecision;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
-use DDD\Presentation\Mcp\Agent\AgentConsoleStream;
+use DDD\Presentation\Mcp\Agents\AgentConsoleStream;
 use DDD\Domain\AI\Services\Conversations\AIConversationsService;
 use DDD\Domain\AI\Services\Conversations\AIConversationRunClaimsService;
 

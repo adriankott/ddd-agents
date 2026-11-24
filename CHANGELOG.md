@@ -1,5 +1,97 @@
 # Changelog
 
+## 0.3.0
+
+One release for the module cut: what moved to its own package leaves, the agent's skills get their final names, and
+three framework features arrive (`Agent.UI`, the `System.*` tools, rights by package). Requires `mgamadeus/ddd` ^3.41.0.
+
+**Removed (no alias):**
+
+- The sandbox administration (`Sandboxes/*`: entities, `AgentSandboxAdministration`, `AgentSandboxesAdminService`,
+  `AgentSandboxesControllerTrait`, the audit table `AgentSandboxActionLogEntries`). Its home is `mgamadeus/ddd-agent-sandbox`.
+  Kept: `MCPToolEffect::WORKSPACE`, `AgentEvalWorkspaceParticipant`, `AgentDriveStore`, `showDriveFiles`, the
+  `DriveFiles` widget, and the conversation queries of an admin screen: `AIConversationsService::countRootConversationsPerAgentSpaceId()`,
+  `findAgentSpaceIdsWithALiveTurn()` and `findNewestRootConversationsOfAgentSpaceId()` (returns
+  `AgentSpaceRootConversations`; the former `findNewestRootConversationsOfAgentSpaceIdForSandbox()` delegates to it,
+  deprecated).
+- The page tools: skill `Web.PageView`, `WebPageScreenshotMCPPackage` (`getWebPageAsScreenshot`), `PageScreenshots/*`,
+  `ArgusPageScreenshot`, `AIWebSearchService::capturePagePartForModel()` / `capturePageScreenshot()`, the `screenshot`
+  capability of `AI.webSearch`. Their home is `mgamadeus/ddd-agent-browser` (`Agent.Web.Pages`, `agent.web.pages`).
+  `getWebPageAsMarkdown` stays here.
+
+**Renamed:**
+
+| Before | Now |
+|---|---|
+| `Assistant.Mandates`, `.Tasks`, `.TaskRunReports` | `Agent.Mandates`, `Agent.Tasks`, `Agent.TaskRunReports` (files `Skills/Agent/*.md`) |
+| `Memory.Management` | `Agent.Memory` (`Skills/Agent/Memory.md`) |
+| `Web.Search` | `Agent.Web.Search` (`Skills/Agent/Web/Search.md`, names no sub-skill) |
+| ids `agent.taskSchedules`, `agent.memories`, `agent.webSearch` | `agent.tasks`, `agent.memory`, `agent.web.search` |
+| constants `AISkill::ASSISTANT_*`, `MEMORY_MANAGEMENT`, `WEB_SEARCH`, `WEB_IMAGES`, `COMMUNICATION_*`, `WEB_PAGE_VIEW` | `AISkill::AGENT_MANDATES`, `AGENT_TASKS`, `AGENT_TASK_RUN_REPORTS`, `AGENT_MEMORY`, `AGENT_WEB_SEARCH`, `AGENT_UI`, `AGENT_SETTINGS`, `AGENT_BUDGET`, `AGENT_WEB_IMAGES`, `AGENT_COMMUNICATION_MESSAGES`, `AGENT_COMMUNICATION_VOICE_CALLS`; `WEB_PAGE_VIEW` gone |
+| `DDD\Presentation\Mcp\Client\AI\…`, `DDD\Presentation\Mcp\Agent\…` | `DDD\Presentation\Mcp\Client\Agents\…`, `DDD\Presentation\Mcp\Agents\…` (class names unchanged) |
+| console `app:ai-agent:*`, `app:ai-conversation:*`, `app:ai-schedule:*`, `app:ai:*` | `app:agent:*` (`mark-finalized-conversations`, `compact-finalized-conversations`, `backfill-conversation-environment`, `conversation-scorecards`, `conversation-search-inspect`, `close-schedules-for-inactive-agent-spaces`, `export-composed-view-node-schema`, the rest keep their last part); every old name stays a Symfony alias. The harness stored in a chat recording stays `app:ai-agent:chat` |
+
+The default `skillPackages.php` binds by class. A stored conversation that loaded an old skill name skips it; the model
+loads the skill under its new name.
+
+**New:**
+
+- **Rights by package.** `AgentAccountRights` (`operatePlatform`, `scheduleAgentTasks`, `useAgentMemory`, `useWeb`,
+  `useUI`; names the other packages' `manageTexts`, `useSandbox`, `useBrowser`). The packages carry them
+  (`#[MCPRequiresAccountRights]`), the skills name them. The default rights of `AIConversationEntitlementsService` are
+  now `AgentRoleMappedAccountRights` over the config `AI.accountRights` (shipped: the operator rights to
+  `Role::SUPERADMIN`, the everyday rights to every account); an unmapped right is not held. Before, the default
+  answered null (ungated).
+- **`Agent.UI`** (`agent.ui`, `AgentUIMCPPackage`): `getCurrentScreen`, `listScreens`, `openScreen`,
+  `highlightOnScreen` over a client tool request channel (`AgentClientToolRequest`, `AgentClientAttachment`, tables
+  `AgentClientToolRequests`, `AgentClientAttachments`; answer route `POST /{aiConversationId}/clientToolRequests/{requestId}/answer`
+  in `AgentConversationWritesTrait`; the request is delivered as `clientToolRequest` of the run-state read); the
+  `[SIGNAL:ui]` state note (state delivery kind `ui`, a tail entry without state delivery) from the UI state the client
+  sends (`clientId`, `uiState` on start, message and signal; `clientId`, `uiStateJson` on the run-state read); the screen
+  catalog port `AgentUIScreenCatalogService`; `app:agent:purge-client-tool-requests`; the scripted client of the
+  evaluations `AgentScriptedUIClientService`. Without the tables the chat keeps working (stamping skipped and logged).
+- **`System.*`** for the platform operators (right `operatePlatform` and `#[MCPRequiresAdminWithAccessToAllResources]`):
+  `System.Health` (`ddd.system.health`, sections port `SystemHealthSectionProvider`), `System.Issues`
+  (`ddd.system.issues`), `System.Workers` (`ddd.system.workers`), `System.Crons` (`ddd.system.crons`), over Core's
+  `WorkersOverviewService`, `CronsManagementService`, `IssueGroupsService`, `IssuesOverviewService`. With them
+  `LlmTextRendering`, `LlmSecretRedaction`, `LlmLineRenderable` (`Entities/MCPPackages/LlmRendering/`) and the admin
+  tool result DTOs (`DDD\Presentation\Mcp\Admin\Common\…`).
+- **Naming lint:** `AISkillFilesLintService::findSkillNamingProblems()` and `findBindingNamingProblems()`: skill names
+  (parts, case, repeated topic, `And`), no skill file beside a folder of the same name, package id form and provider
+  (`AI.packageIdProvider`), a package one skill binds carries its words, the binding names classes, a skill's right is
+  on each of its packages; older names go into `AI.skillLintAllowList`, a list that only shrinks.
+- `AgentsModule::getOwnedNamespaces()` for Core's `ModuleNamespacesTestCase` (also run by the package suite).
+- Web: the entry `@mgamadeus/ddd-agents/ui` (`ClientToolRequestRunner`, the adapter contracts `ScreenTargetSource`,
+  `ScreenNavigator`, `ScreenReader`, `ScreenHighlighter`, the Markdown writer, `ScreenReferenceRegistry`,
+  `DomScreenReader`, `DomScreenHighlighter`, `AgentUIState`, `AgentUIClient`, `useAgentUIClient`); the HTTP binding
+  takes `uiClient` and offers `answerClientToolRequest`.
+
+**What a host must do:**
+
+1. Composer: `mgamadeus/ddd-agents` ^0.3.0 (with `mgamadeus/ddd` ^3.41.0); for screenshots
+   `mgamadeus/ddd-agent-browser` ^0.2.0, for the sandbox `mgamadeus/ddd-agent-sandbox` ^0.1.0.
+2. `skillPackages.php`: the new constants and classes; drop `Web.PageView` (bind `Agent.Web.Pages` of the browser
+   package and name it in `subSkillNames` of your copy of `Agent/Web/Search.md`); move same-path skill overrides to
+   `Skills/Agent/…`; rename eval fixtures with their skill.
+3. Imports `DDD\Presentation\Mcp\Client\AI\` → `…\Client\Agents\`, `DDD\Presentation\Mcp\Agent\` → `…\Mcp\Agents\`;
+   same-path overrides move with them (`App\Presentation\Mcp\Client\Agents\…`).
+4. Rights: map yours in `config/app/AI/accountRights.php` (replaces the package's whole) or keep answering them with
+   your own `AgentAccountRightsInterface`; a host subclass of a package class repeats its `#[MCPRequiresAccountRights]`
+   (class attributes are not inherited). Run the naming lint in your suite.
+5. `Agent.UI`: create the two tables, implement `AgentUIScreenCatalogService`, mount the client adapters
+   (`@mgamadeus/ddd-agents/ui`, `@mgamadeus/ddd-admin-ui`), add the hourly purge cron. Remove an own copy of the client
+   tool classes (an application class at the same path that does not extend the package's is not used).
+6. `System.*`: delete own tools over Core's issues, workers and crons; add your health sections as
+   `SystemHealthSectionProvider` services; map `operatePlatform`.
+7. Console names: crons and scripts may keep the old names (aliases); an application subclass of a package command
+   repeats the new name.
+8. Regenerate the Doctrine models (`AgentClientToolRequests`, `AgentClientAttachments`; the sandbox audit model is gone).
+
+**Next (not in this release):** durable pictures for the workspace image tool: a picture the agent viewed is kept as a
+drive file reference with its rendition instead of base64 on the call row, so it survives the turn end and the picture
+cap (the frozen history then keeps its bytes). Belongs here by the rulebook (the tool layer and the picture budget are
+the agent's); the sandbox and the drive provide the bytes.
+
 ## 0.2.1
 
 Messages API, found on the first live runs:

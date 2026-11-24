@@ -15,14 +15,14 @@ does not read is kept unchanged and is the application's (read with `getApplicat
 
 | Command | Reads | Default source |
 |---|---|---|
-| `app:ai-agent:eval-tools`, `app:ai-agent:eval-tiers` | tools fixtures (one file or a folder of `*.json`) | `AI.evalSuite.fixturePaths.tools` |
-| `app:ai-agent:eval-selection` | one selection fixture file | `AI.evalSuite.fixturePaths.selection` |
-| `app:ai-agent:eval-recall` | recall fixtures | `AI.evalSuite.fixturePaths.recall` |
-| `app:ai-agent:eval-eviction` | one eviction fixture | `AI.evalSuite.fixturePaths.eviction` |
-| `app:ai-agent:eval-guard` | guard fixtures | `AI.evalSuite.fixturePaths.guard` |
-| `app:ai-agent:eval-suite` | every `*.json` of each suite's `folder` | `AI.evalSuite.suites` |
-| `app:ai-agent:eval-compaction-tree` | one case file | `--case-file` |
-| `app:ai-agent:decision-fixtures`, `app:ai-agent:jev-probe` | one fixture | the command's argument |
+| `app:agent:eval-tools`, `app:agent:eval-tiers` | tools fixtures (one file or a folder of `*.json`) | `AI.evalSuite.fixturePaths.tools` |
+| `app:agent:eval-selection` | one selection fixture file | `AI.evalSuite.fixturePaths.selection` |
+| `app:agent:eval-recall` | recall fixtures | `AI.evalSuite.fixturePaths.recall` |
+| `app:agent:eval-eviction` | one eviction fixture | `AI.evalSuite.fixturePaths.eviction` |
+| `app:agent:eval-guard` | guard fixtures | `AI.evalSuite.fixturePaths.guard` |
+| `app:agent:eval-suite` | every `*.json` of each suite's `folder` | `AI.evalSuite.suites` |
+| `app:agent:eval-compaction-tree` | one case file | `--case-file` |
+| `app:agent:decision-fixtures`, `app:agent:jev-probe` | one fixture | the command's argument |
 
 A suite folder keeps only the files that decode to an object with a `cases` list
 (`AgentEvalSuitePlanService::findFixturesInFolder()`); a single file named by `--fixture` is any JSON object or list
@@ -345,7 +345,7 @@ transient conversation — `cleanUpWorkspaceOfCase(key, reporter)`. Both default
 workspaces implements them. A module that keeps state per workspace (e.g. a drive whose own space is the workspace)
 implements `AgentEvalWorkspaceParticipant` (tag `ai.agent_eval_workspace_participant`): the runner calls every
 participant beside the two hooks (`AgentEvalWorkspaceParticipantsService`), so no application repeats that code.
-`app:ai-agent:eval-tools --keepWorkspace` keeps every case's workspace and the participants' state after the run (the
+`app:agent:eval-tools --keepWorkspace` keeps every case's workspace and the participants' state after the run (the
 report names the key), for debugging. Report lines start with `workspace: `. A case whose expected tools are only READ and
 WORKSPACE tools is a read case: it runs in parallel lanes and passes the read-only gate.
 

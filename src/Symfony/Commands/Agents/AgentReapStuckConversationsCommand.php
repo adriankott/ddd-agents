@@ -42,12 +42,13 @@ use Throwable;
  * acts as that account around each dispatch ({@see actAsAccount()}) and skips a conversation whose account it cannot
  * resolve — it never dispatches under the account of the step before. The lookups run with the entity rights lifted.
  *
- *   php bin/console app:ai-agent:reap
- *   php bin/console app:ai-agent:reap --hung-after=600 --revive-max-age=3600
- *   php bin/console app:ai-agent:reap --settle-only=<conversationId>   (settle pass for ONE purposed conversation)
+ *   php bin/console app:agent:reap
+ *   php bin/console app:agent:reap --hung-after=600 --revive-max-age=3600
+ *   php bin/console app:agent:reap --settle-only=<conversationId>   (settle pass for ONE purposed conversation)
  */
 #[AsCommand(
-    name: 'app:ai-agent:reap',
+    name: 'app:agent:reap',
+    aliases: ['app:ai-agent:reap'],
     description: 'Reaper: wake agent conversations stuck non-terminal past the hung threshold (crashed worker / dropped resume).',
 )]
 class AgentReapStuckConversationsCommand extends AgentConsoleCommand

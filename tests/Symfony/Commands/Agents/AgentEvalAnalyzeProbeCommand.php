@@ -13,7 +13,7 @@ use DDD\Symfony\Commands\Agents\AgentEvalAnalyzeCommand;
 class AgentEvalAnalyzeProbeCommand extends AgentEvalAnalyzeCommand
 {
     /** @var string The name the command runs under (a probe class carries no command attribute of its own) */
-    public const string PROBE_COMMAND_NAME = 'app:ai-agent:eval-analyze';
+    public const string PROBE_COMMAND_NAME = 'app:agent:eval-analyze';
 
     public AgentEvalResultFilesServiceInFolderDouble $resultFilesServiceDouble;
 

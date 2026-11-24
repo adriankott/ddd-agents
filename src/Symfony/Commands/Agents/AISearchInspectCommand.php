@@ -47,14 +47,15 @@ use Throwable;
  *      falls back to plain vector order, which hides a bad reranker. The grouped call runs inside the search envelope,
  *      and {@see ArgusSearchRerank} is probed directly so its raw verdict can be read.
  *
- *   php bin/console app:ai-conversation:search-inspect 3994 "invoice reminder"
- *   php bin/console app:ai-conversation:search-inspect 3994 "invoice reminder" --account=2857925 --embed
+ *   php bin/console app:agent:conversation-search-inspect 3994 "invoice reminder"
+ *   php bin/console app:agent:conversation-search-inspect 3994 "invoice reminder" --account=2857925 --embed
  *
  * Read-only by default; `--embed` embeds the conversation's missing text messages synchronously first (to rule out a
  * coverage gap). It only calls public service and repository methods; it never re-implements the search.
  */
 #[AsCommand(
-    name: 'app:ai-conversation:search-inspect',
+    name: 'app:agent:conversation-search-inspect',
+    aliases: ['app:ai-conversation:search-inspect'],
     description: 'Diagnose conversation-recall search stage-by-stage (vector → rerank → grouped), rights off/on + envelope on.'
 )]
 class AISearchInspectCommand extends AgentConsoleCommand

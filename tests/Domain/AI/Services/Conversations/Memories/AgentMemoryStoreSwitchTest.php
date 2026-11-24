@@ -12,9 +12,9 @@ use DDD\Domain\AI\Services\Conversations\Memories\AgentMemoryStoreService;
 use DDD\Domain\Base\Entities\LazyLoad\LazyLoadRepo;
 use DDD\Infrastructure\Exceptions\BadRequestException;
 use DDD\Infrastructure\Libs\Config;
-use DDD\Presentation\Mcp\Client\AI\AgentMemoriesMCPPackage;
-use DDD\Presentation\Mcp\Client\AI\AgentTaskSchedulesMCPPackage;
-use DDD\Presentation\Mcp\Client\AI\Dtos\AgentMemorySearchRequestDto;
+use DDD\Presentation\Mcp\Client\Agents\AgentMemoriesMCPPackage;
+use DDD\Presentation\Mcp\Client\Agents\AgentTaskSchedulesMCPPackage;
+use DDD\Presentation\Mcp\Client\Agents\Dtos\AgentMemorySearchRequestDto;
 use DDD\Tests\Agents\Support\UnitTestCase;
 
 /**
@@ -55,14 +55,14 @@ class AgentMemoryStoreSwitchTest extends UnitTestCase
     public function testSwitchedOffTheMemorySkillLeavesTheBindingAndOtherSkillsStay(): void
     {
         $filteredBinding = AISkill::withoutUnavailablePackages([
-            AISkill::MEMORY_MANAGEMENT => [AgentMemoriesMCPPackage::class],
-            AISkill::ASSISTANT_TASKS => [AgentTaskSchedulesMCPPackage::class],
+            AISkill::AGENT_MEMORY => [AgentMemoriesMCPPackage::class],
+            AISkill::AGENT_TASKS => [AgentTaskSchedulesMCPPackage::class],
             'Host.Mixed' => [AgentMemoriesMCPPackage::class, AgentTaskSchedulesMCPPackage::class],
             'Host.WithoutPackages' => [],
         ]);
 
-        self::assertArrayNotHasKey(AISkill::MEMORY_MANAGEMENT, $filteredBinding);
-        self::assertSame([AgentTaskSchedulesMCPPackage::class], $filteredBinding[AISkill::ASSISTANT_TASKS]);
+        self::assertArrayNotHasKey(AISkill::AGENT_MEMORY, $filteredBinding);
+        self::assertSame([AgentTaskSchedulesMCPPackage::class], $filteredBinding[AISkill::AGENT_TASKS]);
         self::assertSame([AgentTaskSchedulesMCPPackage::class], $filteredBinding['Host.Mixed']);
         self::assertSame([], $filteredBinding['Host.WithoutPackages']);
     }

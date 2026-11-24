@@ -91,10 +91,10 @@ Trap: the message context window (section 5) loads the anchor message by id unde
 - **Repair** (`AIConversationEmbeddingsRepairService::repairZeroEmbeddings()` with `AIConversationEmbeddingsRepairSettings`):
   re-embeds zero vectors of message rows, compaction nodes and the host's memory tables
   (`AgentMemoriesService::getEmbeddingRepairTargets()`), in bounded id windows with pauses, a dry run by default.
-  The package's command `app:ai-conversation:repair-zero-embeddings` runs it (dry run unless `--apply`); on a schedule
+  The package's command `app:agent:repair-zero-embeddings` runs it (dry run unless `--apply`); on a schedule
   it needs a cron line of the host that ends inside the cron ticker's limit, for example
   `--apply --newestRowsOnly=50000 --limit=200 --maxSeconds=200`. Messages that have no embedding row at all are
-  embedded by `app:ai-conversation:backfill-message-embeddings`.
+  embedded by `app:agent:backfill-message-embeddings`.
 
 ## 5. Endpoints and recall tools
 
@@ -146,7 +146,7 @@ What keeps the reads small:
 | A compacted topic is not found | node embeddings are zero vectors (provider outage at creation): run the repair |
 | Another account's conversation appears | a host query that relied on the read rights instead of an account filter |
 
-`app:ai-conversation:search-inspect <conversationId> <query>` prints the hit count at each stage (embedding rows of the
+`app:agent:conversation-search-inspect <conversationId> <query>` prints the hit count at each stage (embedding rows of the
 conversation, the vector query with the rights lifted and with the account's rights, the fused and reranked result,
 the grouped result) inside the search envelope, so a rights problem, missing embeddings and a reranker that drops
 everything look different. It is read-only unless `--embed` embeds the conversation's missing messages first.

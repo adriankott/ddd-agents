@@ -48,7 +48,7 @@ class AgentEvalCompactionTreeCommandTest extends UnitTestCase
     public function testTheCommandKeepsItsNameAndOptions(): void
     {
         $asCommandAttributes = (new ReflectionClass(AgentEvalCompactionTreeCommand::class))->getAttributes(AsCommand::class);
-        self::assertSame('app:ai-agent:eval-compaction-tree', $asCommandAttributes[0]->newInstance()->name);
+        self::assertSame('app:agent:eval-compaction-tree', explode('|', $asCommandAttributes[0]->newInstance()->name)[0], 'the old name stays an alias');
 
         $probeCommand = $this->buildProbeCommand();
         self::assertInstanceOf(AgentEvalConsoleCommand::class, $probeCommand);

@@ -46,7 +46,7 @@ Not here: the conversation tree, run claims and the release of a child's run (lo
    its own row. Its answer is final at the spawn; the result arrives later as exactly one signal row per run end
    (`SIGNAL_SOURCE_SUB_AGENT_RUN_ENDED`). A child never delegates.
 3. **The package ships the fire, sweep, reaper and owed-work commands, not their cron lines.** Without the host's cron
-   line for `app:ai-conversation:fire-due-schedules` no schedule fires; without the cron lines of the sweep, the
+   line for `app:agent:fire-due-schedules` no schedule fires; without the cron lines of the sweep, the
    reaper and the owed-work command no deadline times out, no lost notification is re-sent and no owed report is
    delivered late.
 4. **Eligibility is its own gate, never the budget.** Every default says "eligible"; a host with account states

@@ -1538,7 +1538,7 @@ class MCPToolExecutorService extends Service
             return MCPToolResponse::gateRefusal(
                 "Tool '{$toolName}' was NOT executed: it requires a STANDING mandate for {$actionClass} "
                 . "({$actionClassDescription}) — the action runs on later without the customer. When the customer "
-                . 'asked for it, load the `Assistant.Mandates` skill and call `grantMandate` with the scope their words '
+                . 'asked for it, load the `Agent.Mandates` skill and call `grantMandate` with the scope their words '
                 . 'name (for a period → TIME_WINDOW, from now on → UNLIMITED), then retry; otherwise ask them plainly '
                 . 'whether they want it and for how long.',
                 MCPToolResponse::REFUSAL_MANDATE_REQUIRED
@@ -1576,7 +1576,7 @@ class MCPToolExecutorService extends Service
                 . 'plainly whether you should do it; when they asked to see it first, show it and wait for their yes. '
                 . 'Their yes is checked by the platform on your next call of this tool — do not call `grantMandate` '
                 . 'for it. Only a STANDING permission (from now on, or for a period) is granted with `grantMandate` '
-                . '(skill `Assistant.Mandates`), and only when the customer asked for one.',
+                . '(skill `Agent.Mandates`), and only when the customer asked for one.',
                 MCPToolResponse::REFUSAL_MANDATE_REQUIRED
             );
         } catch (InternalErrorException) {

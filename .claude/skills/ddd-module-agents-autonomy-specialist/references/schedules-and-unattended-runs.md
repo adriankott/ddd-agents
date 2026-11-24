@@ -40,7 +40,7 @@ keeps a one-time one that ran. `AIConversationScheduleOneTimeMoment::resolveFor(
 
 ## The fire contract
 
-The package's command `app:ai-conversation:fire-due-schedules` (`AgentFireDueSchedulesCommand`) runs these steps, one
+The package's command `app:agent:fire-due-schedules` (`AgentFireDueSchedulesCommand`) runs these steps, one
 pass at a time (a process lock; the claim alone already prevents a double fire). It runs only from the host's cron
 line, every minute to every five minutes (the entry skill's host duties). A host that replaces it keeps the steps:
 
@@ -89,7 +89,7 @@ with the schedule's `reportChannel`.
 - **The purpose** `ScheduleRunPurpose` carries the role ("you are the run that executes the mission, never schedule
   anything"), nobody present (no question to the owner), and the delivery contract per report channel
   (`ScheduleRunPurpose::DIMENSION_REPORT_CHANNEL`, one section for EMAIL and one for CHAT). It preloads
-  `Assistant.TaskRunReports` and blocks the owner-messaging send tools of the host for the run and its sub-agents, so
+  `Agent.TaskRunReports` and blocks the owner-messaging send tools of the host for the run and its sub-agents, so
   the report has one delivery path. How a purpose file declares preloads, blocked tools and variant sections belongs to
   the skills-and-purposes skill `ddd-module-agents-skills-and-purposes-specialist`.
 - **Tools a run blocks, and tool names in the package's purpose file.** A run blocks every tool that declares
@@ -187,11 +187,11 @@ model belongs to the context skill `ddd-module-agents-context-specialist`.
 
 ## The package's schedule tools
 
-`DDD\Presentation\Mcp\Client\AI\AgentTaskSchedulesMCPPackage` (id `agent.taskSchedules`, skill `Assistant.Tasks`,
-skill file `config/app/AI/Skills/Assistant/Tasks.md`) is the agent's surface over the schedules: `startBackgroundTask`,
+`DDD\Presentation\Mcp\Client\Agents\AgentTaskSchedulesMCPPackage` (id `agent.tasks`, skill `Agent.Tasks`,
+skill file `config/app/AI/Skills/Agent/Tasks.md`) is the agent's surface over the schedules: `startBackgroundTask`,
 `scheduleOneTimeTask`, `createRecurringTaskSchedule`, `getTaskSchedules`, `getTaskRuns`, `getTaskRunReport`,
 `pauseTaskSchedule`, `resumeTaskSchedule`, `deleteTaskSchedule`, `updateTaskSchedule`. A host lists
-`AISkill::ASSISTANT_TASKS => ['agent.taskSchedules']` in its `skillPackages.php` to offer them.
+`AISkill::AGENT_TASKS => [AgentTaskSchedulesMCPPackage::class]` in its `skillPackages.php` to offer them.
 
 | Point | What the package does |
 |---|---|
@@ -292,8 +292,8 @@ its send tools.
 Full class names of what a host extends or calls here: `DDD\Domain\AI\Services\Conversations\AIConversationSchedulesService`, `DDD\Domain\AI\Services\Conversations\Schedules\ScheduleBudgetPotsService`, `DDD\Domain\AI\Entities\Conversations\Schedules\AIConversationSchedule`.
 
 - The cron lines of the package's fire command and its state-sweep command
-  (`app:ai-schedule:close-for-inactive-agent-spaces`) — cadence in the entry skill's host duties.
-- The binding of `Assistant.Tasks` to `agent.taskSchedules` — or its own tools that create, list, change, pause,
+  (`app:agent:close-schedules-for-inactive-agent-spaces`) — cadence in the entry skill's host duties.
+- The binding of `Agent.Tasks` to `agent.tasks` — or its own tools that create, list, change, pause,
   resume and delete schedules, with the provenance guard above.
 - Optionally: the budget pot (`ScheduleBudgetPotsService`), eligibility (`AgentAutomationEligibilityService`), the
   sweep filter, the report mail (owner reports reference).

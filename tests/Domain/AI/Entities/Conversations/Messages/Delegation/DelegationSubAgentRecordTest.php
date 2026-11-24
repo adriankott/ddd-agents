@@ -96,7 +96,7 @@ class DelegationSubAgentRecordTest extends UnitTestCase
         $delegationSubAgentRecord = DelegationSubAgentRecord::fromStoredArray([
             'number' => 5,
             'label' => 'Prices page',
-            'task' => ['kind' => 'agent', 'taskText' => 'Read the prices page.', 'skillNames' => ['Web.Search']],
+            'task' => ['kind' => 'agent', 'taskText' => 'Read the prices page.', 'skillNames' => ['Agent.Web.Search']],
             'childConversationId' => 812347,
             'requestedBy' => 'MODEL',
             'currentRunNumber' => 2,
@@ -117,7 +117,7 @@ class DelegationSubAgentRecordTest extends UnitTestCase
         $storedRecord = [
             'number' => 7,
             'label' => 'getWebPageAsMarkdown https://example.org',
-            'task' => ['kind' => 'toolRun', 'toolName' => 'getWebPageAsMarkdown', 'toolArguments' => ['url' => 'https://example.org', 'noCache' => true], 'seedSkillNames' => ['Web.Search']],
+            'task' => ['kind' => 'toolRun', 'toolName' => 'getWebPageAsMarkdown', 'toolArguments' => ['url' => 'https://example.org', 'noCache' => true], 'seedSkillNames' => ['Agent.Web.Search']],
             'childConversationId' => 812350,
             'requestedBy' => 'TOOL_RESULT',
             'requestedByToolCallId' => 'call_abc',
@@ -188,7 +188,7 @@ class DelegationSubAgentRecordTest extends UnitTestCase
         $agentSubAgentRequest = AgentSubAgentRequest::forModelCall(DelegateToolArguments::fromToolCallArguments([
             'label' => $label,
             'task' => 'Read the ' . $label . ' of the website.',
-            'skill_names' => ['Web.Search'],
+            'skill_names' => ['Agent.Web.Search'],
         ]));
         self::assertNotNull($agentSubAgentRequest);
         return $agentSubAgentRequest;

@@ -35,13 +35,14 @@ use Throwable;
  * file's `agentSpaceId`; the scope options name the space of a case file without one (as in every evaluation
  * command, the case's own space wins).
  *
- *   php bin/console app:ai-agent:eval-compaction-tree --case-file=<case.json> --agentSpaceId=<id> --ignore-budget
- *   php bin/console app:ai-agent:eval-compaction-tree --case-file=<case.json> --max-turns=16 --fan-in=2 --json
+ *   php bin/console app:agent:eval-compaction-tree --case-file=<case.json> --agentSpaceId=<id> --ignore-budget
+ *   php bin/console app:agent:eval-compaction-tree --case-file=<case.json> --max-turns=16 --fan-in=2 --json
  *
  * Exit code: success only when the verdict is PASS and — with `--persist` — the stored build validates.
  */
 #[AsCommand(
-    name: 'app:ai-agent:eval-compaction-tree',
+    name: 'app:agent:eval-compaction-tree',
+    aliases: ['app:ai-agent:eval-compaction-tree'],
     description: 'LIVE: drive a long sim with frequent compaction + judge the compaction TREE structure (per turn + final).'
 )]
 class AgentEvalCompactionTreeCommand extends AgentEvalConsoleCommand
@@ -71,7 +72,7 @@ class AgentEvalCompactionTreeCommand extends AgentEvalConsoleCommand
             ->addOption('trigger-tokens', null, InputOption::VALUE_OPTIONAL, 'Absolute compaction trigger (low = fires every turn)', '200');
         $this->configureBudgetOption();
         $this
-            ->addOption('persist', null, InputOption::VALUE_NONE, 'PERSIST the conversation (non-ephemeral) so the run exercises the stored cover/frontier/tail load paths; prints the id for `app:ai-agent:compact <id> --validate`. Compaction still runs inline (no workers).')
+            ->addOption('persist', null, InputOption::VALUE_NONE, 'PERSIST the conversation (non-ephemeral) so the run exercises the stored cover/frontier/tail load paths; prints the id for `app:agent:compact <id> --validate`. Compaction still runs inline (no workers).')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Emit the raw verdict + snapshots as JSON');
     }
 
@@ -288,7 +289,7 @@ class AgentEvalCompactionTreeCommand extends AgentEvalConsoleCommand
                 $output->writeln("  <error>FAIL</error> {$compactionConsistencyCheck->getCheckName()}");
             }
         }
-        $output->writeln("  re-inspect: php bin/console app:ai-agent:compact {$persistedConversation->id} --show-only --validate --ignore-budget");
+        $output->writeln("  re-inspect: php bin/console app:agent:compact {$persistedConversation->id} --show-only --validate --ignore-budget");
         return $storedBuildValid;
     }
 

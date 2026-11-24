@@ -488,6 +488,9 @@ trait AgentConversationReadsTrait
         $aiConversation = $this->findVisibleConversation($aiConversationsService, (int)$requestDto->aiConversationId);
         $aiConversationsService->recoverIfStuck($aiConversation);
         $aiConversation->lastMessageId = $aiConversationMessagesService->findHighestMessageId($aiConversation);
-        return AIConversationRunStateGetResponseDto::fromConversation($aiConversation);
+        $this->stampUIClientOfConversation($aiConversation, $requestDto->clientId ?? null, $requestDto->findUIState(), false);
+        $responseDto = AIConversationRunStateGetResponseDto::fromConversation($aiConversation);
+        $responseDto->clientToolRequest = $this->findClientToolRequestDeliveryOfClient($aiConversation, $requestDto->clientId ?? null);
+        return $responseDto;
     }
 }

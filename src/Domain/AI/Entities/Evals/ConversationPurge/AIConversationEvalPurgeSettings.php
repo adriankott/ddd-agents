@@ -7,7 +7,7 @@ namespace DDD\Domain\AI\Entities\Evals\ConversationPurge;
 use DDD\Domain\Base\Entities\ValueObject;
 
 /**
- * The knobs of one run of the evaluation purge (`app:ai-agent:eval-conversations-purge`). The defaults fit a cron run
+ * The knobs of one run of the evaluation purge (`app:agent:eval-conversations-purge`). The defaults fit a cron run
  * under a ticker that kills its process after 360 seconds: a budget capped at {@see MAXIMUM_SECONDS}, small
  * statements, a pause after every write that doubles while writes are slow, a wait while the server is busy. A dry run
  * is the default; `$dryRun = false` writes.

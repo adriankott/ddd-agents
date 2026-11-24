@@ -6,12 +6,16 @@ namespace DDD\Tests\Agents\Domain\AI\Services\Skills;
 
 use DDD\Domain\AI\Entities\Skills\AISkill;
 use DDD\Domain\AI\Services\Skills\MCPPackageIdsService;
-use DDD\Presentation\Mcp\Client\AI\AgentMandatesMCPPackage;
-use DDD\Presentation\Mcp\Client\AI\AgentMemoriesMCPPackage;
-use DDD\Presentation\Mcp\Client\AI\AgentTaskRunReportsMCPPackage;
-use DDD\Presentation\Mcp\Client\AI\AgentTaskSchedulesMCPPackage;
-use DDD\Presentation\Mcp\Client\AI\WebPageScreenshotMCPPackage;
-use DDD\Presentation\Mcp\Client\AI\WebSearchMCPPackage;
+use DDD\Presentation\Mcp\Client\Agents\AgentMandatesMCPPackage;
+use DDD\Presentation\Mcp\Client\Agents\AgentMemoriesMCPPackage;
+use DDD\Presentation\Mcp\Client\Agents\AgentTaskRunReportsMCPPackage;
+use DDD\Presentation\Mcp\Client\Agents\AgentTaskSchedulesMCPPackage;
+use DDD\Presentation\Mcp\Client\Agents\AgentUIMCPPackage;
+use DDD\Presentation\Mcp\Admin\System\SystemCronsMCPPackage;
+use DDD\Presentation\Mcp\Admin\System\SystemHealthMCPPackage;
+use DDD\Presentation\Mcp\Admin\System\SystemIssuesMCPPackage;
+use DDD\Presentation\Mcp\Admin\System\SystemWorkersMCPPackage;
+use DDD\Presentation\Mcp\Client\Agents\WebSearchMCPPackage;
 use LogicException;
 use PHPUnit\Framework\TestCase;
 
@@ -42,8 +46,8 @@ class MCPPackageIdsServiceTest extends TestCase
     public function testABindingResolvesIdsAndKeepsClassNames(): void
     {
         self::assertSame(
-            ['Assistant.Mandates' => [AgentMandatesMCPPackage::class], 'Mixed' => ['Some\\Class\\NotLoaded', AgentTaskRunReportsMCPPackage::class], 'Empty' => []],
-            AISkill::resolvePackageIdsOfBinding(['Assistant.Mandates' => ['agent.mandates'], 'Mixed' => ['Some\\Class\\NotLoaded', 'agent.taskRunReports'], 'Empty' => []])
+            ['Agent.Mandates' => [AgentMandatesMCPPackage::class], 'Mixed' => ['Some\\Class\\NotLoaded', AgentTaskRunReportsMCPPackage::class], 'Empty' => []],
+            AISkill::resolvePackageIdsOfBinding(['Agent.Mandates' => ['agent.mandates'], 'Mixed' => ['Some\\Class\\NotLoaded', 'agent.taskRunReports'], 'Empty' => []])
         );
     }
 
@@ -51,20 +55,24 @@ class MCPPackageIdsServiceTest extends TestCase
     {
         $this->expectException(LogicException::class);
         $this->expectExceptionMessage("'agent.noSuchPackage'");
-        AISkill::resolvePackageIdsOfBinding(['Assistant.Mandates' => ['agent.noSuchPackage']]);
+        AISkill::resolvePackageIdsOfBinding(['Agent.Mandates' => ['agent.noSuchPackage']]);
     }
 
-    public function testThePackagesDefaultBindingNamesItsPackagesById(): void
+    public function testThePackagesDefaultBindingNamesItsPackagesByClass(): void
     {
         $defaultBinding = require dirname(__DIR__, 5) . '/config/app/AI/skillPackages.php';
         self::assertSame(
             [
-                AISkill::ASSISTANT_MANDATES => [AgentMandatesMCPPackage::class],
-                AISkill::ASSISTANT_TASKS => [AgentTaskSchedulesMCPPackage::class],
-                AISkill::ASSISTANT_TASK_RUN_REPORTS => [AgentTaskRunReportsMCPPackage::class],
-                AISkill::MEMORY_MANAGEMENT => [AgentMemoriesMCPPackage::class],
-                AISkill::WEB_SEARCH => [WebSearchMCPPackage::class],
-                AISkill::WEB_PAGE_VIEW => [WebPageScreenshotMCPPackage::class],
+                AISkill::AGENT_MANDATES => [AgentMandatesMCPPackage::class],
+                AISkill::AGENT_TASKS => [AgentTaskSchedulesMCPPackage::class],
+                AISkill::AGENT_TASK_RUN_REPORTS => [AgentTaskRunReportsMCPPackage::class],
+                AISkill::AGENT_MEMORY => [AgentMemoriesMCPPackage::class],
+                AISkill::AGENT_WEB_SEARCH => [WebSearchMCPPackage::class],
+                AISkill::AGENT_UI => [AgentUIMCPPackage::class],
+                AISkill::SYSTEM_HEALTH => [SystemHealthMCPPackage::class],
+                AISkill::SYSTEM_ISSUES => [SystemIssuesMCPPackage::class],
+                AISkill::SYSTEM_WORKERS => [SystemWorkersMCPPackage::class],
+                AISkill::SYSTEM_CRONS => [SystemCronsMCPPackage::class],
             ],
             AISkill::resolvePackageIdsOfBinding($defaultBinding)
         );

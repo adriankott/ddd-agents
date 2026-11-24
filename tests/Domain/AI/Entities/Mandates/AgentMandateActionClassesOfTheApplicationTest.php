@@ -7,7 +7,7 @@ namespace DDD\Tests\Agents\Domain\AI\Entities\Mandates;
 use DDD\Domain\AI\Entities\Mandates\AgentMandate;
 use DDD\Domain\Base\Entities\StaticRegistry;
 use DDD\Infrastructure\Validation\Constraints\Choice;
-use DDD\Presentation\Mcp\Client\AI\Dtos\MandateGrantRequestDto;
+use DDD\Presentation\Mcp\Client\Agents\Dtos\MandateGrantRequestDto;
 use DDD\Tests\Agents\Support\UnitTestCase;
 use ReflectionProperty;
 

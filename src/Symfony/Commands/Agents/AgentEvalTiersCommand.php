@@ -36,10 +36,11 @@ use Throwable;
  *
  * Override point of an application: {@see getDefaultFixturePaths()}.
  *
- *   php bin/console app:ai-agent:eval-tiers [--tiers=CHEAP,STANDARD,PREMIUM] [--vendor=…] [--agentSpaceId=…] [--full]
+ *   php bin/console app:agent:eval-tiers [--tiers=CHEAP,STANDARD,PREMIUM] [--vendor=…] [--agentSpaceId=…] [--full]
  */
 #[AsCommand(
-    name: 'app:ai-agent:eval-tiers',
+    name: 'app:agent:eval-tiers',
+    aliases: ['app:ai-agent:eval-tiers'],
     description: 'Run the tool-eval suite per AIModelsService tier (CHEAP/STANDARD/PREMIUM) and report success rate (live).'
 )]
 class AgentEvalTiersCommand extends AgentEvalConsoleCommand

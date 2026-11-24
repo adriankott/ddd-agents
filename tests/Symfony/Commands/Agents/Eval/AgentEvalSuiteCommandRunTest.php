@@ -88,7 +88,7 @@ class AgentEvalSuiteCommandRunTest extends AgentEvalResultFilesTestCase
 
         $storedRun = $this->suiteRunsServiceDouble->insertedAgentEvalSuiteRun;
         self::assertNotNull($storedRun);
-        self::assertSame('app:ai-agent:eval-suite', $storedRun->command);
+        self::assertSame('app:agent:eval-suite', $storedRun->command);
         self::assertSame(basename($suiteDirectory), $storedRun->logDirectoryName);
         self::assertSame(
             ['models' => ['default'], 'flavors' => ['call', 'judge'], 'suites' => ['tools'], 'arms' => [], 'persistedConversations' => true, 'stopped' => false, 'verdict' => ['correctness' => 'FAILED', 'performance' => 'NOT_COMPARED'], 'baseline' => null],
@@ -97,7 +97,7 @@ class AgentEvalSuiteCommandRunTest extends AgentEvalResultFilesTestCase
 
         $childArguments = json_decode((string)file_get_contents($runDirectory . '/.result-tools-catalog.pass.json.arguments.json'), true);
         self::assertSame(
-            ['app:ai-agent:eval-tools', '--case=catalog.pass', '--fixture=' . self::SUITE_RUN_FIXTURE_DIRECTORY . '/Catalog/Catalog.json', '--result-file=' . $runDirectory . '/.result-tools-catalog.pass.json', '--ignore-budget', '--json', '--persist-conversations', '--no-save', '--no-prune'],
+            ['app:agent:eval-tools', '--case=catalog.pass', '--fixture=' . self::SUITE_RUN_FIXTURE_DIRECTORY . '/Catalog/Catalog.json', '--result-file=' . $runDirectory . '/.result-tools-catalog.pass.json', '--ignore-budget', '--json', '--persist-conversations', '--no-save', '--no-prune'],
             $childArguments
         );
     }
@@ -177,7 +177,7 @@ class AgentEvalSuiteCommandRunTest extends AgentEvalResultFilesTestCase
     protected function buildProbeCommand(): AgentEvalSuiteProbeCommand
     {
         $this->applySuiteConfiguration();
-        $probeCommand = new AgentEvalSuiteProbeCommand('app:ai-agent:eval-suite');
+        $probeCommand = new AgentEvalSuiteProbeCommand('app:agent:eval-suite');
         $probeCommand->childScriptPath = self::SUITE_RUN_FIXTURE_DIRECTORY . '/fake-child.php';
         return $probeCommand;
     }

@@ -29,7 +29,7 @@ class AgentInspectConversationCommandTest extends UnitTestCase
     public function testTheCommandKeepsItsNameAndLiftsTheRights(): void
     {
         $asCommandAttributes = (new ReflectionClass(AgentInspectConversationCommand::class))->getAttributes(AsCommand::class);
-        self::assertSame('app:ai-agent:inspect', $asCommandAttributes[0]->newInstance()->name);
+        self::assertSame('app:agent:inspect', explode('|', $asCommandAttributes[0]->newInstance()->name)[0], 'the old name stays an alias');
 
         $inspectCommand = $this->buildCommand(AgentInspectConversationCommand::class);
         self::assertInstanceOf(AgentConsoleCommand::class, $inspectCommand);

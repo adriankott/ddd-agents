@@ -21,7 +21,7 @@ class AgentDecisionStatsCommandTest extends UnitTestCase
     public function testTheCommandKeepsItsNameAndOptions(): void
     {
         $asCommandAttributes = (new ReflectionClass(AgentDecisionStatsCommand::class))->getAttributes(AsCommand::class);
-        self::assertSame('app:ai-agent:decision-stats', $asCommandAttributes[0]->newInstance()->name);
+        self::assertSame('app:agent:decision-stats', explode('|', $asCommandAttributes[0]->newInstance()->name)[0], 'the old name stays an alias');
 
         $agentDecisionStatsCommand = new AgentDecisionStatsCommand();
         self::assertInstanceOf(AgentConsoleCommand::class, $agentDecisionStatsCommand);

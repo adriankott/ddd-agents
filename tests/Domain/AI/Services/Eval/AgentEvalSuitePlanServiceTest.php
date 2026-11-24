@@ -66,7 +66,7 @@ class AgentEvalSuitePlanServiceTest extends IntegrationTestCase
         self::assertSame('profileAndListings', $planService->resolveResourceKeyOfCase(AgentEvalCase::fromArray(['id' => 'a']), 'Notes.Profile'));
         self::assertSame(AgentEvalSuiteTask::ACCESS_WRITE, $planService->resolveAccessOfCase(AgentEvalCase::fromArray(['id' => 'a', 'expect' => ['stateAfterRun' => ['readTool' => 'x']]]), 'Notes.Posts'));
         self::assertSame(AgentEvalSuiteTask::ACCESS_WRITE, $planService->resolveAccessOfCase(AgentEvalCase::fromArray(['id' => 'a', 'sequential' => true]), 'Pages.Edit'));
-        self::assertSame(AgentEvalSuiteTask::ACCESS_EXCLUSIVE, $planService->resolveAccessOfCase(AgentEvalCase::fromArray(['id' => 'a', 'turns' => ['one', 'two']]), 'Memory.Management'));
+        self::assertSame(AgentEvalSuiteTask::ACCESS_EXCLUSIVE, $planService->resolveAccessOfCase(AgentEvalCase::fromArray(['id' => 'a', 'turns' => ['one', 'two']]), 'Agent.Memory'));
         self::assertSame(AgentEvalSuiteTask::ACCESS_EXCLUSIVE, $planService->resolveAccessOfCase(AgentEvalCase::fromArray(['id' => 'a', 'restore' => []]), 'Assistant.Grants'), 'an empty restore block is a restore block');
         self::assertSame(AgentEvalSuiteTask::ACCESS_EXCLUSIVE, $planService->resolveAccessOfCase(AgentEvalCase::fromArray(['id' => 'a', 'restore' => [], 'exclusive' => true]), 'Notes.Profile'));
         self::assertSame(AgentEvalSuiteTask::ACCESS_READ, $planService->resolveAccessOfCase(AgentEvalCase::fromArray(['id' => 'a']), 'Assistant.Grants'), 'a read of an exclusive fixture stays a read');
@@ -79,7 +79,7 @@ class AgentEvalSuitePlanServiceTest extends IntegrationTestCase
         self::assertSame(AgentEvalSuiteTask::ACCESS_READ, $planService->resolveAccessOfCase(AgentEvalCase::fromArray(['expect' => ['tool' => ['getNotes', 'searchImages'], 'requiredTools' => 'listReplies']]), 'Notes.Posts'));
         self::assertSame(AgentEvalSuiteTask::ACCESS_READ, $planService->resolveAccessOfCase(AgentEvalCase::fromArray(['expect' => ['tool' => 'update_task_plan', 'requiredTools' => ['set_task_status', 'load_skills']]]), 'PlanCreation'), 'the loop\'s own tools change the conversation, not the agent space');
         self::assertSame(AgentEvalSuiteTask::ACCESS_WRITE, $planService->resolveAccessOfCase(AgentEvalCase::fromArray(['expect' => ['tool' => ['getNotes', 'pinNote']]]), 'Notes.Posts'));
-        self::assertSame(AgentEvalSuiteTask::ACCESS_WRITE, $planService->resolveAccessOfCase(AgentEvalCase::fromArray(['expect' => ['tool' => 'getTaskRuns', 'requiredTools' => ['createRecurringTaskSchedule']]]), 'Assistant.Tasks'));
+        self::assertSame(AgentEvalSuiteTask::ACCESS_WRITE, $planService->resolveAccessOfCase(AgentEvalCase::fromArray(['expect' => ['tool' => 'getTaskRuns', 'requiredTools' => ['createRecurringTaskSchedule']]]), 'Agent.Tasks'));
         self::assertSame(AgentEvalSuiteTask::ACCESS_EXCLUSIVE, $planService->resolveAccessOfCase(AgentEvalCase::fromArray(['expect' => ['tool' => 'grantMandate']]), 'Assistant.Grants'));
         self::assertSame(AgentEvalSuiteTask::ACCESS_WRITE, $planService->resolveAccessOfCase(AgentEvalCase::fromArray(['expect' => ['tool' => 'aToolNoCatalogKnows']]), 'Notes.Posts'), 'a tool that does not declare itself read-only may change something');
         self::assertSame(AgentEvalSuiteTask::ACCESS_READ, $planService->resolveAccessOfCase(AgentEvalCase::fromArray(['expect' => ['tool' => '']]), 'Notes.Posts'), 'an empty name expects nothing');

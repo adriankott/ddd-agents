@@ -12,7 +12,7 @@ use DDD\Domain\AI\Entities\Conversations\Agent\Turns\AgentTransientMessageIds;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessages;
 use DDD\Domain\AI\Entities\Conversations\Messages\LoadedCapabilityOrigin;
-use DDD\Presentation\Mcp\Agent\AgentConsoleStream;
+use DDD\Presentation\Mcp\Agents\AgentConsoleStream;
 use DDD\Domain\AI\Services\Conversations\AIConversationMessagesService;
 use DDD\Infrastructure\Services\DDDService;
 use DDD\Infrastructure\Services\Service;

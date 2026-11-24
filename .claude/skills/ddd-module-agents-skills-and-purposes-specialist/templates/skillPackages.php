@@ -1,21 +1,24 @@
 <?php
-// placeholder {{SKILL_NAME}} sample: Demo.Notes
-// placeholder {{PACKAGE_FQCN}} sample: AgentsReference\Presentation\Mcp\Demo\DemoNotesMCPPackage
+// placeholder {{SKILL_NAME}} sample: Notes.Entries
+// placeholder {{PACKAGE_FQCN}} sample: App\Presentation\Mcp\Notes\NotesEntriesMCPPackage
 
 declare(strict_types=1);
 
 use DDD\Domain\AI\Entities\Skills\AISkill;
+use DDD\Presentation\Mcp\Client\Agents\AgentMandatesMCPPackage;
+use DDD\Presentation\Mcp\Client\Agents\AgentMemoriesMCPPackage;
+use DDD\Presentation\Mcp\Client\Agents\AgentTaskRunReportsMCPPackage;
+use DDD\Presentation\Mcp\Client\Agents\AgentTaskSchedulesMCPPackage;
 
 /**
  * The host's skill → MCP package binding (config `AI.skillPackages`). It REPLACES the package's file whole: list every
- * skill the host offers, the package's own three included. A package is named by class or by its package id
- * (`MCPPackage::$name`); an id resolves only for a package the source-root scan finds (the application's src/ under
- * the root namespace `App\` and the modules); a host with another root namespace binds its own packages by class.
+ * skill the host offers, the package's own included. Packages are bound by class; the id (`MCPPackage::$name`,
+ * `<provider>.<topic>.<feature>`) stays the public name in call rows and logs. The lint refuses an id in the binding.
  */
 return [
-    AISkill::ASSISTANT_MANDATES => ['agent.mandates'],
-    AISkill::ASSISTANT_TASKS => ['agent.taskSchedules'],
-    AISkill::ASSISTANT_TASK_RUN_REPORTS => ['agent.taskRunReports'],
-    AISkill::MEMORY_MANAGEMENT => ['agent.memories'], // offered only while AI.agentMemory.enabled is on
-    '{{SKILL_NAME}}' => [\{{PACKAGE_FQCN}}::class],
+    AISkill::AGENT_MANDATES => [AgentMandatesMCPPackage::class],
+    AISkill::AGENT_TASKS => [AgentTaskSchedulesMCPPackage::class],
+    AISkill::AGENT_TASK_RUN_REPORTS => [AgentTaskRunReportsMCPPackage::class],
+    AISkill::AGENT_MEMORY => [AgentMemoriesMCPPackage::class], // offered only while AI.agentMemory.enabled is on
+    '{{SKILL_NAME}}' => [{{PACKAGE_FQCN}}::class],
 ];

@@ -21,10 +21,11 @@ use Symfony\Component\Console\Output\OutputInterface;
  * their anchor, no reload of an admitted skill in the same turn, final tool calls, unique tool-call ids, contiguous
  * indexes. Read-only, rights lifted; exits 1 on any violation.
  *
- *   php bin/console app:ai-agent:validate-conversation 631846 631850
+ *   php bin/console app:agent:validate-conversation 631846 631850
  */
 #[AsCommand(
-    name: 'app:ai-agent:validate-conversation',
+    name: 'app:agent:validate-conversation',
+    aliases: ['app:ai-agent:validate-conversation'],
     description: 'Validate persisted agent conversations (preloads on their anchor, no same-turn reload, final tool calls, unique ids, contiguous indexes); exit 1 on a violation.',
 )]
 class AgentValidateConversationCommand extends AgentConsoleCommand

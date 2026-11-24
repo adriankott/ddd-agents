@@ -48,7 +48,8 @@ use Throwable;
  * {@see describeEvalAccountsSource()}, {@see describeRequiredOptions()}).
  */
 #[AsCommand(
-    name: 'app:ai-agent:eval-schedule-runs',
+    name: 'app:agent:eval-schedule-runs',
+    aliases: ['app:ai-agent:eval-schedule-runs'],
     description: 'Fire one eval task schedule N times in a row and compare the structure of its reports.',
 )]
 class AgentEvalScheduleRunsCommand extends AgentEvalConsoleCommand

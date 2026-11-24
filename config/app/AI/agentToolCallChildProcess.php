@@ -7,7 +7,7 @@ use DDD\Domain\AI\Services\Conversations\AgentToolCallForkJoinService;
 /**
  * The console command that executes ONE persisted tool call in a process of its own — read as
  * `Config::get('AI.agentToolCallChildProcess')` by {@see AgentToolCallForkJoinService}. The module ships the command
- * ({@see \DDD\Symfony\Commands\Agents\AgentExecuteToolCallCommand}, `app:ai-agent:execute-tool-call`); what the
+ * ({@see \DDD\Symfony\Commands\Agents\AgentExecuteToolCallCommand}, `app:agent:execute-tool-call`); what the
  * application declares is its console script. An application that wants the parallel-safe tool calls of one model
  * response to run concurrently replaces this file whole with its own `config/app/AI/agentToolCallChildProcess.php`
  * (keys are never merged) that names its `consoleScript`. Without a console script every call runs inline.

@@ -25,10 +25,10 @@ use Symfony\Component\Console\Output\OutputInterface;
  * cause. Every call's slim request snapshot carries the segment and tool hashes; the wire-message column needs the
  * stored debug payload (a conversation with `storeRequestSnapshot` on). Read-only, rights lifted.
  *
- *   php bin/console app:ai-agent:cache-diff 116798
- *   php bin/console app:ai-agent:cache-diff 116798 --json
+ *   php bin/console app:agent:cache-diff 116798
+ *   php bin/console app:agent:cache-diff 116798 --json
  */
-#[AsCommand(name: 'app:ai-agent:cache-diff', description: 'Prompt-cache diff of a conversation: where each model call first differs from the previous one (tools, system segment, wire message), its cache credit and the cause class.')]
+#[AsCommand(name: 'app:agent:cache-diff', aliases: ['app:ai-agent:cache-diff'], description: 'Prompt-cache diff of a conversation: where each model call first differs from the previous one (tools, system segment, wire message), its cache credit and the cause class.')]
 class AgentCacheDiffCommand extends AgentConsoleCommand
 {
     protected function configure(): void
@@ -137,7 +137,7 @@ class AgentCacheDiffCommand extends AgentConsoleCommand
         ));
         if ($promptCacheDiffReport->droppedThinkingBlocks > 0) {
             $output->writeln(sprintf(
-                '<fg=red>thinking blocks dropped by the provider: %d</> (a change before the block; `app:ai-agent:inspect --snapshots` names the place and the reason)',
+                '<fg=red>thinking blocks dropped by the provider: %d</> (a change before the block; `app:agent:inspect --snapshots` names the place and the reason)',
                 $promptCacheDiffReport->droppedThinkingBlocks
             ));
         }

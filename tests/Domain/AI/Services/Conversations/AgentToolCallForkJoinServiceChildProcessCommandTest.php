@@ -15,7 +15,7 @@ use LogicException;
 use ReflectionProperty;
 
 /**
- * The module ships the command a child runs (`app:ai-agent:execute-tool-call`): a tool call runs in a process of its
+ * The module ships the command a child runs (`app:agent:execute-tool-call`): a tool call runs in a process of its
  * own once the application declared its console script in `config/app/AI/agentToolCallChildProcess.php`; a file that
  * names no command gets the module's. An application's file replaces the module's file whole, so the tests that are
  * about such a file register a real application config root holding it (searched before the module's root).
@@ -64,7 +64,7 @@ class AgentToolCallForkJoinServiceChildProcessCommandTest extends UnitTestCase
         $conversation = self::instantiateWithoutConstructor(AIConversation::class);
 
         self::assertNull($agentToolCallForkJoinService->getChildProcessConsoleScript());
-        self::assertSame('app:ai-agent:execute-tool-call', $agentToolCallForkJoinService->getChildProcessCommandName());
+        self::assertSame('app:agent:execute-tool-call', $agentToolCallForkJoinService->getChildProcessCommandName());
         self::assertFalse($agentToolCallForkJoinService->isChildProcessCommandDeclared());
         self::assertSame([], $agentToolCallForkJoinService->selectForkableToolCalls([new ToolCall(), new ToolCall()], $conversation));
     }

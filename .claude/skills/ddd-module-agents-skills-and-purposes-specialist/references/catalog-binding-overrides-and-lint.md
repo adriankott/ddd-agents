@@ -14,8 +14,9 @@ file `config/app/AI/skillPackages.php`): skill name → list of MCP packages. It
 is skipped by `AISkillsService::getCatalog()` and reported by the lint. A skill without tools is bound to an empty
 list.
 
-A value names a package by class (it holds a backslash and is kept as it stands) or by package id (anything else,
-resolved through `MCPPackageIdsService::findPackageClassForId()`). A missing or empty binding and an id no package
+A value names a package by class (it holds a backslash and is kept as it stands); an id (anything else, resolved
+through `MCPPackageIdsService::findPackageClassForId()`) still resolves, but the naming lint refuses it: the binding
+names classes, a typo then fails at load. A missing or empty binding and an id no package
 names both throw `LogicException` on first use: the agent does not run on a broken binding.
 
 The reference kernel's binding is the smallest complete one:
@@ -28,10 +29,22 @@ return [
 ];
 ```
 
-## Package ids
+## Names: skills and package ids
+
+| Rule | Right | Wrong |
+|---|---|---|
+| A skill is <Topic>.<Feature>, three parts at most, upper camel case; the topic is a functional subject, never an audience or a persona | Reputation.Reviews, Agent.Web.Search | Admin.Reviews, Assistant.Tasks, Agent.Sandbox.Documents.Pptx |
+| Agent.* is the agent's own tools and organs (memory, tasks, mandates, settings, budget, web, sandbox, the user's UI); every other topic is the world it works on | Agent.Memory, Agent.UI, CloudDrive.Files | Memory.Management, Agent.Campaigns |
+| The feature names what is done or read, never the topic again, never two subjects | System.Workers, System.Crons | Accounts.Accounts, System.WorkersAndCrons |
+| No skill file beside a folder of the same name (the config reads the file, never the folder) | Website/Builder.md and Website/Build/*.md | Website/Build.md and Website/Build/ |
+| A package id is <provider>.<topic>.<feature> in the skill's words; where provider and topic are one word it is written once | rb.challenges.campaigns, ddd.system.health, agent.memory | admin.challenges.campaigns, agent.memories |
+| The provider is the host's prefix (AI.packageIdProvider), ddd for a feature of Core, or a module's word; never an audience (admin, client, public, partner, batch) and never derived from a folder | | |
+| A package several skills bind keeps a feature of its own | rb.admin.finder, agent.drive | |
+| The binding names classes; a rename is code and config, no alias (an old name in a stored conversation is skipped) | | |
 
 Every MCP package names itself with its static `MCPPackage::$name` (the package's own: `agent.mandates`,
-`agent.taskSchedules`, `agent.taskRunReports`, `agent.memories`; the kernel's: `demo.notes`). `MCPPackageIdsService` finds the packages by scanning the
+`agent.tasks`, `agent.taskRunReports`, `agent.memory`, `agent.web.search`, `agent.ui`, `ddd.system.health`,
+`ddd.system.issues`, `ddd.system.workers`, `ddd.system.crons`; the kernel's: `demo.notes`). `MCPPackageIdsService` finds the packages by scanning the
 source roots of `AgentSourceRootsService` (the application's `src/` under the root namespace `App\` first, then every
 DDD module's `src/`), below `Presentation/Mcp`, file names ending in `MCPPackage.php`, abstract classes skipped. The
 first class holding an id wins; a host class that EXTENDS the package's class of the same id is the intended
@@ -42,8 +55,8 @@ Trap: a package id resolves only for a package the source-root scan finds, and t
 `AgentsReference\`) binds its own packages by class; the scan and the way to widen it belong to
 `ddd-module-agents-specialist` (discovery, override points).
 
-Use ids in a module's default binding (its classes may be replaced by a host) and in a host binding that names
-module packages; classes are fine for the host's own packages.
+Bind by class everywhere: a host's same-path subclass of a module package is found through the container, and the id
+stays the public name in call rows and logs.
 
 ## Config roots of skill and purpose files and same-path overrides
 
@@ -63,7 +76,7 @@ The config reader takes the application's file instead of the module's, key by k
 
 | Config | Package default | What a host's file must do |
 |---|---|---|
-| `AI.skillPackages` | binds `Assistant.Mandates` → `agent.mandates`, `Assistant.Tasks` → `agent.taskSchedules`, `Assistant.TaskRunReports` → `agent.taskRunReports`, `Memory.Management` → `agent.memories` | list EVERY skill the host offers, the package's four included (`Memory.Management` only while the memory store is on: an unavailable package, `MCPPackage::isAvailable()`, is left out of the binding and a skill bound to it alone disappears). Without `Assistant.TaskRunReports` the purpose `Schedule.Run` preloads a skill that has no tools |
+| `AI.skillPackages` | binds `Agent.Mandates` → `agent.mandates`, `Agent.Tasks` → `agent.tasks`, `Agent.TaskRunReports` → `agent.taskRunReports`, `Agent.Memory` → `agent.memory` | list EVERY skill the host offers, the package's four included (`Agent.Memory` only while the memory store is on: an unavailable package, `MCPPackage::isAvailable()`, is left out of the binding and a skill bound to it alone disappears). Without `Agent.TaskRunReports` the purpose `Schedule.Run` preloads a skill that has no tools |
 | `AI.skillRequirements` | empty | the gates the host puts on any skill, its own or a module's (reference [gating-by-entitlements-and-rights.md](gating-by-entitlements-and-rights.md)) |
 | `AI.purposeRequirements` | empty | the flags a purpose needs before a customer may start it |
 | `AI.skillNamespaceGroups` | one group, `Agent` | the groups of the admin catalog view (below) |
@@ -86,12 +99,12 @@ test can pin the host's intended overrides.
 
 ## Skill name constants
 
-`AISkill` carries constants for the names the package knows (for example `AISkill::ASSISTANT_MANDATES`,
-`AISkill::WEB_SEARCH`). Only three of them ship a file and a package: `Assistant.Mandates`,
-`Assistant.Tasks` and `Assistant.TaskRunReports`. The others (`Assistant.Settings`, `Assistant.Budget`,
-`Memory.Management`, `Money.CurrencyConversion`, `Web.Search`, `Web.Images`, `Web.PageView`,
-`Communication.VoiceCalls`, `Communication.Messages`) are names a host may implement itself; package code reads only
-`AISkill::ASSISTANT_BUDGET` (the offer drops it under a hide-usage budget policy). A host names its own skills in a
+`AISkill` carries constants for the names the package knows. With a file and a package: `Agent.Mandates`,
+`Agent.Tasks`, `Agent.TaskRunReports`, `Agent.Memory`, `Agent.Web.Search`, `Agent.UI`, `System.Health`,
+`System.Issues`, `System.Workers`, `System.Crons`. Names a host fills with its own file and package:
+`Agent.Settings`, `Agent.Budget`, `Agent.Web.Images`, `Agent.Communication.Messages`,
+`Agent.Communication.VoiceCalls`, `Money.CurrencyConversion`; package code reads only
+`AISkill::AGENT_BUDGET` (the offer drops it under a hide-usage budget policy). A host names its own skills in a
 same-path subclass of `AISkill` if it wants constants; the binding keys are the registry either way.
 
 ## The lint in a host's suite
@@ -103,6 +116,11 @@ same-path subclass of `AISkill` if it wants constants; the binding keys are the 
 | `findSkillFileProblems()` | frontmatter present and valid YAML (after the persona step), a description, only known keys, lists of strings, sub-skills that resolve, no case-insensitive collision |
 | `findPurposeFileProblems()` | frontmatter valid, a `purposeClass` that names an existing subclass of `AIConversationPurpose`, no collision |
 | `findBindingProblems()` | the binding resolves, every key has a file, every bound class is an MCP package, no tool name is provided by two packages |
+| `findSkillNamingProblems()` | the names of the table above: parts, case, repeated topic, `And`; no skill file beside a folder of the same name in any root |
+| `findBindingNamingProblems()` | the binding names classes; every package id has the form and provider of the table above; a package one skill binds carries that skill's words; every right a skill requires is required by each package it binds (`#[MCPRequiresAccountRights]` on the class) |
+
+A host with older names lists them (skill names, package ids) in `AI.skillLintAllowList`: their naming problems are
+not reported, and an entry without a problem is reported itself, so the list only shrinks.
 
 The package runs it over its own root. A host runs it over every root, a module's included (a module's file still
 ships and loads in another application):
@@ -124,7 +142,9 @@ class AgentSkillFilesTest extends TestCase
         $problems = array_merge(
             $aISkillFilesLintService->findSkillFileProblems($aISkillSourcesService->getSkillRootDirectories()),
             $aISkillFilesLintService->findPurposeFileProblems($aISkillSourcesService->getPurposeRootDirectories()),
-            $aISkillFilesLintService->findBindingProblems()
+            $aISkillFilesLintService->findBindingProblems(),
+            $aISkillFilesLintService->findSkillNamingProblems($aISkillSourcesService->getSkillRootDirectories()),
+            $aISkillFilesLintService->findBindingNamingProblems()
         );
         self::assertSame([], $problems, implode("\n", $problems));
     }
@@ -132,8 +152,7 @@ class AgentSkillFilesTest extends TestCase
 ```
 
 The test needs a booted kernel (the binding resolves ids through the container). It does not check purpose frontmatter
-keys (a misspelt purpose key is silently ignored), sub-skill cycles, or that every right a skill declares is also
-declared on its packages: a host that gates by rights adds that check itself.
+keys (a misspelt purpose key is silently ignored) or sub-skill cycles.
 
 ## The admin catalog and its namespace groups
 

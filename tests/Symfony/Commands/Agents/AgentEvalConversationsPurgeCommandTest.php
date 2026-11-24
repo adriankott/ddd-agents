@@ -65,7 +65,7 @@ class AgentEvalConversationsPurgeCommandTest extends UnitTestCase
     {
         $asCommandAttributes = (new ReflectionClass(AgentEvalConversationsPurgeCommand::class))->getAttributes(AsCommand::class);
         self::assertCount(1, $asCommandAttributes);
-        self::assertSame('app:ai-agent:eval-conversations-purge', $asCommandAttributes[0]->newInstance()->name);
+        self::assertSame('app:agent:eval-conversations-purge', explode('|', $asCommandAttributes[0]->newInstance()->name)[0], 'the old name stays an alias');
 
         $agentEvalConversationsPurgeCommand = new AgentEvalConversationsPurgeCommand();
         self::assertInstanceOf(AgentConsoleCommand::class, $agentEvalConversationsPurgeCommand);

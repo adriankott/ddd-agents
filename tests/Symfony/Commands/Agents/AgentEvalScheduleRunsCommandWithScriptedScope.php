@@ -17,7 +17,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  */
 class AgentEvalScheduleRunsCommandWithScriptedScope extends AgentEvalScheduleRunsCommand
 {
-    public const string COMMAND_NAME = 'app:ai-agent:eval-schedule-runs';
+    public const string COMMAND_NAME = 'app:agent:eval-schedule-runs';
 
     public const int AGENT_SPACE_ID = 9;
 

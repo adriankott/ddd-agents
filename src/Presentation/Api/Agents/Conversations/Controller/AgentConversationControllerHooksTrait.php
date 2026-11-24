@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace DDD\Presentation\Api\Agents\Conversations\Controller;
 
 use DDD\Domain\AI\Entities\AgentSpaces\AgentSpace;
+use DDD\Domain\AI\Entities\ClientTools\AgentClientToolRequestDelivery;
+use DDD\Domain\AI\Entities\ClientTools\AgentUIState;
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessages;
@@ -14,6 +16,8 @@ use DDD\Domain\AI\Entities\Conversations\SignalSources\ConversationSignalSources
 use DDD\Domain\AI\Entities\Conversations\Usage\AgentAIUsageScope;
 use DDD\Domain\AI\Entities\UsageLogs\AIUsageEnvelopeContext;
 use DDD\Domain\AI\Services\AgentSpaces\AgentSpacesService;
+use DDD\Domain\AI\Services\ClientTools\AgentClientAttachmentsService;
+use DDD\Domain\AI\Services\ClientTools\AgentClientToolRequestsService;
 use DDD\Domain\AI\Services\AIUsageEnvelopesService;
 use DDD\Domain\AI\Services\Conversations\AIConversationsService;
 use DDD\Domain\AI\Services\SystemPrompts\AgentBaseSystemPromptCacheService;
@@ -27,6 +31,7 @@ use DDD\Presentation\Api\Agents\Conversations\Dtos\AIConversationInjectSignalPos
 use DDD\Presentation\Api\Agents\Conversations\Dtos\AIConversationPostMessagePostRequestDto;
 use DDD\Presentation\Api\Agents\Conversations\Dtos\AIConversationStartWithMessagePostRequestDto;
 use DDD\Presentation\Base\Dtos\RequestDto;
+use Throwable;
 
 /**
  * The override points of the agent conversation controller traits ({@see AgentConversationReadsTrait},
@@ -159,7 +164,7 @@ trait AgentConversationControllerHooksTrait
 
     /**
      * Override point: whether a conversation the start request creates stores the full sent payload and the raw model
-     * response of every model call (`RunSettings::$storeRequestSnapshot`; read with `app:ai-agent:inspect --snapshots`).
+     * response of every model call (`RunSettings::$storeRequestSnapshot`; read with `app:agent:inspect --snapshots`).
      * The default: the request's `storeRequestSnapshot`, honoured only in an admin session ({@see self::isAdminSession()}).
      * An application that records a debug session of its own answers true for it.
      */
@@ -339,5 +344,67 @@ trait AgentConversationControllerHooksTrait
         /** @var AIUsageEnvelopesService $aIUsageEnvelopesService */
         $aIUsageEnvelopesService = DDDService::instance()->getService(AIUsageEnvelopesService::class);
         $aIUsageEnvelopesService->closeEnvelope($aIUsageEnvelopeContext);
+    }
+
+    /**
+     * Stamps the client that reads or sends (`Agent.UI`): its UI state for the `[SIGNAL:ui]` note and its presence for
+     * the client tool requests. Never fails the request it rides on: a missing table, a refused write or a bad value
+     * is logged and skipped.
+     */
+    protected function stampUIClientOfConversation(AIConversation $conversation, ?string $clientId, ?AgentUIState $agentUIState, bool $isOwnerSend): void
+    {
+        if ($clientId === null || $clientId === '' || !isset($conversation->id)) {
+            return;
+        }
+        try {
+            /** @var AgentClientAttachmentsService $agentClientAttachmentsService */
+            $agentClientAttachmentsService = DDDService::instance()->getService(AgentClientAttachmentsService::class);
+            $agentClientAttachmentsService->stampClient(
+                (int)($conversation->rootConversationId ?? $conversation->id),
+                (int)($conversation->accountId ?? 0),
+                $clientId,
+                $agentUIState,
+                $isOwnerSend
+            );
+        } catch (Throwable $throwable) {
+            DDDService::instance()->getLogger()->warning('[AgentUI] client stamp skipped', ['conversationId' => $conversation->id, 'reason' => $throwable->getMessage()]);
+        }
+    }
+
+    /**
+     * The client tool request the reading client is to execute now (`Agent.UI`); null without one. Never fails the
+     * run-state read: an error is logged and answers null.
+     */
+    protected function findClientToolRequestDeliveryOfClient(AIConversation $conversation, ?string $clientId): ?AgentClientToolRequestDelivery
+    {
+        if ($clientId === null || $clientId === '' || !isset($conversation->id)) {
+            return null;
+        }
+        try {
+            /** @var AgentClientToolRequestsService $agentClientToolRequestsService */
+            $agentClientToolRequestsService = DDDService::instance()->getService(AgentClientToolRequestsService::class);
+            return $agentClientToolRequestsService->findDeliveryForClient((int)($conversation->rootConversationId ?? $conversation->id), $clientId);
+        } catch (Throwable $throwable) {
+            DDDService::instance()->getLogger()->warning('[AgentUI] client tool request delivery skipped', ['conversationId' => $conversation->id, 'reason' => $throwable->getMessage()]);
+            return null;
+        }
+    }
+
+    /** {@see stampUIClientOfConversation()} for a send that names its conversation by id, read under the caller's rights */
+    protected function stampUIClientOfConversationId(?int $conversationId, ?string $clientId, ?AgentUIState $agentUIState): void
+    {
+        if ($conversationId === null || $clientId === null || $clientId === '') {
+            return;
+        }
+        try {
+            /** @var AIConversationsService $aIConversationsService */
+            $aIConversationsService = DDDService::instance()->getService(AIConversationsService::class);
+            $conversation = $aIConversationsService->find($conversationId);
+        } catch (Throwable $throwable) {
+            return;
+        }
+        if ($conversation instanceof AIConversation) {
+            $this->stampUIClientOfConversation($conversation, $clientId, $agentUIState, true);
+        }
     }
 }

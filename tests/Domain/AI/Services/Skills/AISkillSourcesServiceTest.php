@@ -52,7 +52,7 @@ class AISkillSourcesServiceTest extends TestCase
         $purposeRootDirectories = array_map('realpath', $aISkillSourcesService->getPurposeRootDirectories());
         self::assertContains($packageConfigDirectory . '/AI/Skills', $skillRootDirectories);
         self::assertContains($packageConfigDirectory . '/AI/Purposes', $purposeRootDirectories);
-        self::assertContains('Assistant.Mandates', $aISkillSourcesService->findDottedNamesInFolder($packageConfigDirectory . '/AI/Skills'));
+        self::assertContains('Agent.Mandates', $aISkillSourcesService->findDottedNamesInFolder($packageConfigDirectory . '/AI/Skills'));
         self::assertSame($aISkillSourcesService->getConfigRootDirectories(), array_values(array_unique($aISkillSourcesService->getConfigRootDirectories())));
     }
 

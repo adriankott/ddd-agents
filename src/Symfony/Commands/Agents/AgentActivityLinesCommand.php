@@ -32,11 +32,12 @@ use Throwable;
  * (`--models=VENDOR.MODEL_A,VENDOR.MODEL_B`) and read the lines, the latency and the tokens side by side. Read-only on
  * the conversation; the narrator calls are booked under the activity envelope of the conversation's account.
  *
- *   php bin/console app:ai-agent:activity-lines --conversation=123
- *   php bin/console app:ai-agent:activity-lines --conversation=123 --endpoint
+ *   php bin/console app:agent:activity-lines --conversation=123
+ *   php bin/console app:agent:activity-lines --conversation=123 --endpoint
  */
 #[AsCommand(
-    name: 'app:ai-agent:activity-lines',
+    name: 'app:agent:activity-lines',
+    aliases: ['app:ai-agent:activity-lines'],
     description: 'Replay a conversation\'s tool calls through the activity narrator and print the owner-facing lines per model, with latency and tokens.'
 )]
 class AgentActivityLinesCommand extends AgentConsoleCommand

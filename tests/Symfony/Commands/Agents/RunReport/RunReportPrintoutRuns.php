@@ -7,7 +7,7 @@ namespace DDD\Tests\Agents\Symfony\Commands\Agents\RunReport;
 use DDD\Domain\AI\Entities\Conversations\Agent\TaskPlan;
 
 /**
- * The runs of the printout fixture of `app:ai-agent:run-report`: their message rows as the metrics read returns them,
+ * The runs of the printout fixture of `app:agent:run-report`: their message rows as the metrics read returns them,
  * the plan snapshots their messages stamped, the decision model's cost a usage log books for them, the evaluation logs
  * that state their verdicts, and the option sets the printout was taken with.
  *

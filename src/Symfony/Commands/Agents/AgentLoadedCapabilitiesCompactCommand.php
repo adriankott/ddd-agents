@@ -24,11 +24,12 @@ use Throwable;
  * Run it only once every process that reads these rows can read the chain format: a reader without it takes a change
  * row for a row without a set. As a nightly cron:
  *
- *   php bin/console app:ai-agent:loaded-capabilities-compact
- *   php bin/console app:ai-agent:loaded-capabilities-compact --conversationId=123 --dryRun --verify
+ *   php bin/console app:agent:loaded-capabilities-compact
+ *   php bin/console app:agent:loaded-capabilities-compact --conversationId=123 --dryRun --verify
  */
 #[AsCommand(
-    name: 'app:ai-agent:loaded-capabilities-compact',
+    name: 'app:agent:loaded-capabilities-compact',
+    aliases: ['app:ai-agent:loaded-capabilities-compact'],
     description: 'Rewrite legacy loaded-capability rows into turn checkpoints plus per-row changes, in small pauses'
 )]
 class AgentLoadedCapabilitiesCompactCommand extends AgentConsoleCommand

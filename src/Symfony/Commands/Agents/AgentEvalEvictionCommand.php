@@ -25,7 +25,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Throwable;
 
 /**
- * The live eviction evaluation, the real-data counterpart of `app:ai-agent:context-eviction-sim`. Each trajectory of
+ * The live eviction evaluation, the real-data counterpart of `app:agent:context-eviction-sim`. Each trajectory of
  * the fixture is a list of varied multi-skill prompts driven through the real agent loop on ONE continuing
  * conversation ({@see AgentEvalRunnerService::runEvictionTrajectory()}): the loaded-capability set grows turn by turn,
  * the eviction sweep runs on the real telemetry, and after every turn the snapshot of the loaded capabilities and what
@@ -42,11 +42,12 @@ use Throwable;
  *
  * Live: real model and tool calls.
  *
- *   php bin/console app:ai-agent:eval-eviction --agentSpaceId=12 --ignore-budget
- *   php bin/console app:ai-agent:eval-eviction --agentSpaceId=12 --defaults --unload-granularity=tool
+ *   php bin/console app:agent:eval-eviction --agentSpaceId=12 --ignore-budget
+ *   php bin/console app:agent:eval-eviction --agentSpaceId=12 --defaults --unload-granularity=tool
  */
 #[AsCommand(
-    name: 'app:ai-agent:eval-eviction',
+    name: 'app:agent:eval-eviction',
+    aliases: ['app:ai-agent:eval-eviction'],
     description: 'Drive multi-skill trajectories live and observe capability eviction on real data (load curve + deltas).',
 )]
 class AgentEvalEvictionCommand extends AgentEvalConsoleCommand

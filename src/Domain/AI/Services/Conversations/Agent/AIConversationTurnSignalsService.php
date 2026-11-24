@@ -36,7 +36,7 @@ use DDD\Domain\AI\Entities\Conversations\SignalSources\ConversationSignalSource;
 use DDD\Domain\AI\Entities\Conversations\SignalSources\ConversationSignalSources;
 use DDD\Domain\AI\Services\Conversations\AIConversationRunClaimsService;
 use DDD\Domain\AI\Services\Conversations\AIConversationsService;
-use DDD\Presentation\Mcp\Agent\AgentConsoleStream;
+use DDD\Presentation\Mcp\Agents\AgentConsoleStream;
 use DDD\Domain\AI\Traits\Conversations\AITraceLogTrait;
 use DDD\Domain\AI\Entities\Conversations\Purposes\AIConversationPurposeTurnOpenWidget;
 use DDD\Infrastructure\Services\DDDService;

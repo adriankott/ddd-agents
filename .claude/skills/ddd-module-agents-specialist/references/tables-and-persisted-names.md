@@ -21,7 +21,6 @@ an Argus load.
 | `AIConversationDelegationBatch` (`AIConversationDelegationBatches`) | one fan-out to sub-agents and its deadline | `ddd-module-agents-autonomy-specialist` |
 | `AIConversationSchedule` (`AIConversationSchedules`) | one schedule of unattended runs | `ddd-module-agents-autonomy-specialist` |
 | `AgentMandate` (`AgentMandates`) | one standing permission | `ddd-module-agents-autonomy-specialist` |
-| `AgentSandboxActionLogEntry` (`AgentSandboxActionLogEntries`) | the audit of one admin action on an agent workspace | `ddd-module-agents-specialist` ([sandbox-administration.md](sandbox-administration.md)) |
 | `AgentMemory` (`AgentMemories`) | one durable memory of the owner (the package's memory store; written only while `AI.agentMemory.enabled` is on) | `ddd-module-agents-context-specialist` |
 | `AIConversationTaskPushNotificationConfig` (`AIConversationTaskPushNotificationConfigs`) | the push target of an external agent | `ddd-module-agents-widgets-specialist` |
 | `AIConversationTraceEvent` (`AIConversationTraceEvents`) | one trace event of a run | `ddd-module-agents-observability-specialist` |

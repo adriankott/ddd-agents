@@ -32,7 +32,7 @@ class AIConversationScorecardsCommandTest extends UnitTestCase
     public function testTheCommandKeepsItsNameAndItsOptionsAndRunsOnTheBase(): void
     {
         $asCommandAttributes = (new ReflectionClass(AIConversationScorecardsCommand::class))->getAttributes(AsCommand::class);
-        self::assertSame('app:ai-conversation:scorecards', $asCommandAttributes[0]->newInstance()->name);
+        self::assertSame('app:agent:conversation-scorecards', explode('|', $asCommandAttributes[0]->newInstance()->name)[0], 'the old name stays an alias');
 
         $aIConversationScorecardsCommand = new AIConversationScorecardsCommand();
         self::assertInstanceOf(AgentConsoleCommand::class, $aIConversationScorecardsCommand);

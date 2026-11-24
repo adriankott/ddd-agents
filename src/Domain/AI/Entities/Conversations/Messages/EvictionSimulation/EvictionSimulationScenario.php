@@ -178,7 +178,7 @@ class EvictionSimulationScenario extends ValueObject
         $steps->addStep(EvictionSimulationStep::forTurn(2, 3500, 'getTicketSummary', 'load Tickets + use', ['Tickets.Overview']));
         $steps->addStep(EvictionSimulationStep::forTurn(3, 4500, 'getEvents', 'load Calendar + use', ['Calendar.Events']));
         $steps->addStep(EvictionSimulationStep::forTurn(4, 5500, 'getNotes', 'load Notes + use', ['Notes.Drafts']));
-        $steps->addStep(EvictionSimulationStep::forTurn(5, 6500, 'getSettings', 'load Assistant + use (5 skills!)', ['Assistant.Settings']));
+        $steps->addStep(EvictionSimulationStep::forTurn(5, 6500, 'getSettings', 'load Assistant + use (5 skills!)', ['Agent.Settings']));
         for ($turnIndex = 6; $turnIndex <= 16; $turnIndex++) {
             $usedToolName = $turnIndex % 3 === 0 ? 'updateSettings' : 'getSettings';
             $steps->addStep(EvictionSimulationStep::forTurn($turnIndex, 6500 + ($turnIndex - 5) * 1000, $usedToolName, 'settle on Assistant'));

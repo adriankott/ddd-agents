@@ -139,7 +139,7 @@ delegation sub-task) so the summary is anchored in it; the prompt is `AgentAIPro
   the turn's loop returned, never for a delegation child. A failure is logged and never breaks the reply.
 - `async: true` dispatches `AIConversationCompactionMessage` on the compaction transport
   (`AIConversationCompactionHandler`); `async: false` runs the round inline (a console or test caller).
-  `app:ai-agent:compact <conversationId>` runs one round inline and prints the tree and the cover the model would
+  `app:agent:compact <conversationId>` runs one round inline and prints the tree and the cover the model would
   receive (`--show-only` prints without a round, `--as-of-message` the cover as of one message).
 - One round (`runCompactionTreeRound()`): load the exposed frontier and the rows after the edge, plan all ready leaf
   ranges in one pass, summarize and persist each leaf, then cascade the roll-ups bottom-up. An empty summarizer answer
@@ -157,8 +157,8 @@ delegation sub-task) so the summary is anchored in it; the prompt is `AgentAIPro
   `finalizedAt` back to null), so a resumed conversation is finalized and completion-compacted again after its next
   idle window. `findFinalizedConversationIdsOwingCompletionCompaction($batchSize)` selects the ids whose `finalizedAt`
   is set and newer than `finalizeCompactedAt` (or that have none), oldest first; one `AIConversationFinalizeMessage`
-  per id goes on the compaction transport. The package's commands `app:ai-conversation:mark-finalized` and
-  `app:ai-conversation:compact-finalized` call the two methods; the host registers their cron lines (the entry skill
+  per id goes on the compaction transport. The package's commands `app:agent:mark-finalized-conversations` and
+  `app:agent:compact-finalized-conversations` call the two methods; the host registers their cron lines (the entry skill
   `ddd-module-agents-specialist`, host duties).
 - After a node landed, the display summary refresh runs, staleness-gated (it skips when the summary already covers
   the newest row).

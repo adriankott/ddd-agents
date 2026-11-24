@@ -27,13 +27,14 @@ use Symfony\Component\Console\Output\OutputInterface;
  * Override point of an application: {@see buildReproduceArguments()} (the options its reproduce command needs).
  */
 #[AsCommand(
-    name: 'app:ai-agent:eval-analyze',
+    name: 'app:agent:eval-analyze',
+    aliases: ['app:ai-agent:eval-analyze'],
     description: 'Classify the failures of a stored eval run (in the results folder) and print reproduce commands.'
 )]
 class AgentEvalAnalyzeCommand extends AgentEvalConsoleCommand
 {
     /** @var string The command a reproduce line runs: the single-case run of the tool evaluation */
-    public const string REPRODUCE_COMMAND_NAME = 'app:ai-agent:eval-tools';
+    public const string REPRODUCE_COMMAND_NAME = 'app:agent:eval-tools';
 
     /** @var int The characters of a tool call's arguments in a block */
     public const int PRINTED_ARGUMENTS_LENGTH = 60;

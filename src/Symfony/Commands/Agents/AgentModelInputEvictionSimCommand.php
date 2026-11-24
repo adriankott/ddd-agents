@@ -40,12 +40,13 @@ use Symfony\Component\Console\Output\OutputInterface;
  *     minimum residency leaves. Capabilities within their minimum residency stay, so the working set itself can sit
  *     above the ceiling for a while (printed as such).
  *
- *   php bin/console app:ai-agent:context-eviction-sim                       # all scenarios, load curves
- *   php bin/console app:ai-agent:context-eviction-sim --scenario=switch -v  # one scenario + per-turn score tables
- *   php bin/console app:ai-agent:context-eviction-sim --soft=6000 --hard=10000
+ *   php bin/console app:agent:context-eviction-sim                       # all scenarios, load curves
+ *   php bin/console app:agent:context-eviction-sim --scenario=switch -v  # one scenario + per-turn score tables
+ *   php bin/console app:agent:context-eviction-sim --soft=6000 --hard=10000
  */
 #[AsCommand(
-    name: 'app:ai-agent:context-eviction-sim',
+    name: 'app:agent:context-eviction-sim',
+    aliases: ['app:ai-agent:context-eviction-sim'],
     description: 'Simulate the agent\'s per-tool eviction pass (unloadGranularity: tool): carried load under a ceiling, gradual decay.'
 )]
 class AgentModelInputEvictionSimCommand extends AgentConsoleCommand

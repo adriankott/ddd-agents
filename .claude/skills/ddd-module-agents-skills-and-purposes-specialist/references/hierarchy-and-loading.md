@@ -47,7 +47,7 @@ each recording what it dropped in `OfferedSkillCatalog::$rejectedSkillNamesBySte
 
 1. the general catalog plus the sub-skills of the loaded skills;
 2. `featureFlags` — the flag gate (only when the host answers flags);
-3. `budgetPolicy` — `Assistant.Budget` is dropped when the exact AI budget may not be reported;
+3. `budgetPolicy` — `Agent.Budget` is dropped when the exact AI budget may not be reported;
 4. `accountRights` — the rights gate (only when the host answers rights);
 5. `billingAccess` — only when the host answers that the account has NO billing access;
 6. `purposeBinding` — `onlyUnderPurposeNames` and `notUnderPurposeNames`;

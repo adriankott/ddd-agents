@@ -46,7 +46,8 @@ use Throwable;
  * ({@see executeInsideToolCallEnvelope()}).
  */
 #[AsCommand(
-    name: 'app:ai-agent:execute-tool-call',
+    name: 'app:agent:execute-tool-call',
+    aliases: ['app:ai-agent:execute-tool-call'],
     description: 'Fork-join child: execute ONE persisted tool call and write its outcome into the call row (started by the turn worker).',
     hidden: true,
 )]

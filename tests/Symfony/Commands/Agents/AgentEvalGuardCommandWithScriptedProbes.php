@@ -23,7 +23,7 @@ class AgentEvalGuardCommandWithScriptedProbes extends AgentEvalGuardCommand
 {
     public const int OWNER_ACCOUNT_ID = 5;
 
-    public const string COMMAND_NAME = 'app:ai-agent:eval-guard';
+    public const string COMMAND_NAME = 'app:agent:eval-guard';
 
     /** @var string[] The fixture files of the run */
     public array $fixturePaths = [];

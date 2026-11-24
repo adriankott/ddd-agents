@@ -51,7 +51,7 @@ class AgentMarkFinalizedConversationsCommandDatabaseTest extends DatabaseTestCas
     protected function runSweep(array $commandInput): CommandTester
     {
         $application = new Application(static::bootTestKernel());
-        $commandTester = new CommandTester($application->find('app:ai-conversation:mark-finalized'));
+        $commandTester = new CommandTester($application->find('app:agent:mark-finalized-conversations'));
         $commandTester->execute($commandInput);
         return $commandTester;
     }

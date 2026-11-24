@@ -27,11 +27,12 @@ use Throwable;
  * Idempotent and resumable: the pages advance by message id, a re-run only embeds what is still missing. The run reads
  * every account's messages: the rights are lifted for the run.
  *
- *   php bin/console app:ai-conversation:backfill-message-embeddings
- *   php bin/console app:ai-conversation:backfill-message-embeddings --async --batch=500
+ *   php bin/console app:agent:backfill-message-embeddings
+ *   php bin/console app:agent:backfill-message-embeddings --async --batch=500
  */
 #[AsCommand(
-    name: 'app:ai-conversation:backfill-message-embeddings',
+    name: 'app:agent:backfill-message-embeddings',
+    aliases: ['app:ai-conversation:backfill-message-embeddings'],
     description: 'Embed conversation messages still missing their recall vector.'
 )]
 class AIConversationBackfillEmbeddingsCommand extends AgentConsoleCommand

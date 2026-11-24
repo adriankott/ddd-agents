@@ -39,7 +39,8 @@ use Throwable;
  * expectMentions: [...]}`. Override point of an application: {@see getDefaultFixturePaths()}.
  */
 #[AsCommand(
-    name: 'app:ai-agent:eval-recall',
+    name: 'app:agent:eval-recall',
+    aliases: ['app:ai-agent:eval-recall'],
     description: 'LIVE conversation-retrieval eval: seed past conversations, test the agent recalls them, then tear them down.'
 )]
 class AgentEvalRecallCommand extends AgentEvalConsoleCommand
@@ -67,7 +68,7 @@ class AgentEvalRecallCommand extends AgentEvalConsoleCommand
             ->addOption('fixture', null, InputOption::VALUE_OPTIONAL, 'A single recall fixture JSON (default: the configured recall fixtures)')
             ->addOption('case', null, InputOption::VALUE_OPTIONAL, 'Run only this case id')
             ->addOption('model', null, InputOption::VALUE_OPTIONAL, 'Override the agent model by its catalog name')
-            ->addOption('keep-seed', null, InputOption::VALUE_NONE, 'Do NOT tear down the seeded conversations: they survive the run so you can verify they persisted and are searchable (e.g. app:ai-conversation:search-inspect <seededId>). Default: hard-deleted afterwards.')
+            ->addOption('keep-seed', null, InputOption::VALUE_NONE, 'Do NOT tear down the seeded conversations: they survive the run so you can verify they persisted and are searchable (e.g. app:agent:conversation-search-inspect <seededId>). Default: hard-deleted afterwards.')
             ->addOption('full', null, InputOption::VALUE_NONE, 'Show the final answer text for every case')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Machine-readable JSON output')
             ->addOption('result-file', null, InputOption::VALUE_OPTIONAL, 'Also write the result JSON to this file (what a parent process reads instead of parsing the output).');

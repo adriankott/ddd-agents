@@ -1,3 +1,4 @@
+import type { ClientToolAnswer } from "../ui/client-tools";
 import type {
   AgentsConversation,
   ChangedConversationMessages,
@@ -41,6 +42,12 @@ export interface AgentsConversationClient {
    * when the binding has it.
    */
   getConversationRunState?: (conversationId: number) => Promise<ConversationRunStateRead>;
+
+  /**
+   * The answer of the UI client to a client tool request of `Agent.UI` (delivered with the run-state read). Optional:
+   * a binding without it runs no UI tools.
+   */
+  answerClientToolRequest?: (conversationId: number, requestId: number, answer: ClientToolAnswer) => Promise<void>;
 
   /** The newest page, each message with its delegated children's `{ id, runState }`. */
   getNewestMessagesPage: (conversationId: number, pageSize: number) => Promise<ConversationMessagesPage>;

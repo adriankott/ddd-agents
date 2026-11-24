@@ -152,7 +152,7 @@ standing permission; a later moment allows a TIME_WINDOW ending at it; never rej
 
 ## The tools
 
-Package `AgentMandatesMCPPackage` (skill `Assistant.Mandates`): `grantMandate` (class, scope, `validUntil`,
+Package `AgentMandatesMCPPackage` (skill `Agent.Mandates`): `grantMandate` (class, scope, `validUntil`,
 constraints, space or account-wide), `listMandates`, `revokeMandate`. Their logic is `AgentMandateToolCallsMCPPackage`.
 The skill teaches: never grant on the agent's own initiative; match the scope to the owner's words; revoke on any
 utterance that takes a permission back.

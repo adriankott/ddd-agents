@@ -30,7 +30,7 @@ class AgentExecuteToolCallCommandBudgetBypassTest extends UnitTestCase
     {
         $agentExecuteToolCallCommand = new AgentExecuteToolCallCommand();
 
-        self::assertSame('app:ai-agent:execute-tool-call', $agentExecuteToolCallCommand->getName());
+        self::assertSame('app:agent:execute-tool-call', $agentExecuteToolCallCommand->getName());
         self::assertTrue($agentExecuteToolCallCommand->isHidden());
     }
 

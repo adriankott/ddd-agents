@@ -180,8 +180,8 @@ by `rearmRunForRetry()`.
 
 ## 8. Recovery: what the host's passes call
 
-The package ships the finders, the re-drive and the commands that run them (`app:ai-agent:reap`,
-`app:ai-conversation:deliver-owed-reports-and-resume-owed-turns`; cron lines: `ddd-module-agents-specialist`). What
+The package ships the finders, the re-drive and the commands that run them (`app:agent:reap`,
+`app:agent:deliver-owed-reports-and-resume-owed-turns`; cron lines: `ddd-module-agents-specialist`). What
 follows is what those passes do, built only from package calls. Each pass impersonates the conversation's account around a dispatch and skips a conversation without
 one. Every finder is scoped to the current environment. The owed-report, owed-turn and lost-resume finders also skip
 evaluation runs; the two reaper finders (`findStuckConversationIds()`, `expireStuckConversationsPastMaxAge()`) do not,

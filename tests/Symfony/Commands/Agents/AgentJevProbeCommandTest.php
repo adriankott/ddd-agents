@@ -56,7 +56,7 @@ class AgentJevProbeCommandTest extends UnitTestCase
     public function testTheCommandKeepsItsNameArgumentAndOptions(): void
     {
         $asCommandAttributes = (new ReflectionClass(AgentJevProbeCommand::class))->getAttributes(AsCommand::class);
-        self::assertSame('app:ai-agent:jev-probe', $asCommandAttributes[0]->newInstance()->name);
+        self::assertSame('app:agent:jev-probe', explode('|', $asCommandAttributes[0]->newInstance()->name)[0], 'the old name stays an alias');
 
         $agentJevProbeCommand = new AgentJevProbeCommand();
         self::assertInstanceOf(AgentConsoleCommand::class, $agentJevProbeCommand);

@@ -12,7 +12,7 @@ use DDD\Domain\AI\Entities\Conversations\Messages\ToolCall;
 use DDD\Domain\AI\Entities\Environment\AgentApplicationNames;
 use DDD\Domain\Base\Entities\ChildrenSet;
 use DDD\Infrastructure\Traits\AfterConstruct\Attributes\AfterConstruct;
-use DDD\Presentation\Mcp\Agent\AgentConsolePrinter;
+use DDD\Presentation\Mcp\Agents\AgentConsolePrinter;
 use DDD\Symfony\Commands\Agents\Chat\CopySlashCommand;
 use DDD\Symfony\Commands\Agents\Chat\HelpSlashCommand;
 use DDD\Symfony\Commands\Agents\Chat\SlashCommandContext;

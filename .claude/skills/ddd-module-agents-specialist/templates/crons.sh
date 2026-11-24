@@ -14,47 +14,51 @@ set -e
 
 {{CONSOLE}} app:crons:upsert --name=agent-schedules-fire \
   --description="Fire the due agent schedules: claim each occurrence once and spawn its run" \
-  --schedule="* * * * *" --command="app:ai-conversation:fire-due-schedules"
+  --schedule="* * * * *" --command="app:agent:fire-due-schedules"
 
 {{CONSOLE}} app:crons:upsert --name=agent-schedules-state-sweep \
   --description="Close, pause or re-arm agent schedules whose space or account changed its state" \
-  --schedule="17 * * * *" --command="app:ai-schedule:close-for-inactive-agent-spaces"
+  --schedule="17 * * * *" --command="app:agent:close-schedules-for-inactive-agent-spaces"
 
 {{CONSOLE}} app:crons:upsert --name=agent-runs-recover-owed-work \
   --description="Deliver owed agent run reports and resume agent turns that are still owed" \
-  --schedule="*/5 * * * *" --command="app:ai-conversation:deliver-owed-reports-and-resume-owed-turns"
+  --schedule="*/5 * * * *" --command="app:agent:deliver-owed-reports-and-resume-owed-turns"
 
 {{CONSOLE}} app:crons:upsert --name=agent-runs-reap \
   --description="Wake or expire agent runs whose worker died, time out stale delegation batches" \
-  --schedule="*/5 * * * *" --command="app:ai-agent:reap"
+  --schedule="*/5 * * * *" --command="app:agent:reap"
+
+{{CONSOLE}} app:crons:upsert --name=agent-client-tool-requests-purge \
+  --description="Expire overdue Agent.UI tool requests, delete old requests and client attachments (only with Agent.UI)" \
+  --schedule="23 * * * *" --command="app:agent:purge-client-tool-requests"
 
 {{CONSOLE}} app:crons:upsert --name=agent-conversations-mark-finalized \
   --description="Mark agent conversations idle past the window as finalized" \
-  --schedule="*/5 * * * *" --command="app:ai-conversation:mark-finalized"
+  --schedule="*/5 * * * *" --command="app:agent:mark-finalized-conversations"
 
 {{CONSOLE}} app:crons:upsert --name=agent-conversations-compact-finalized \
   --description="Dispatch the completion compaction of finalized agent conversations" \
-  --schedule="*/5 * * * *" --command="app:ai-conversation:compact-finalized"
+  --schedule="*/5 * * * *" --command="app:agent:compact-finalized-conversations"
 
 {{CONSOLE}} app:crons:upsert --name=agent-trace-events-purge \
   --description="Purge agent trace events past their retention" \
-  --schedule="43 3 * * *" --command="app:ai-agent:trace-events-purge"
+  --schedule="43 3 * * *" --command="app:agent:trace-events-purge"
 
 {{CONSOLE}} app:crons:upsert --name=agent-turn-events-purge \
   --description="Purge agent turn events past their retention, then the unreferenced snapshots" \
-  --schedule="53 3 * * *" --command="app:ai-agent:turn-events-purge"
+  --schedule="53 3 * * *" --command="app:agent:turn-events-purge"
 
 # Optional maintenance: remove the leading "# " of the rows the host wants.
 #
 # {{CONSOLE}} app:crons:upsert --name=agent-request-snapshots-strip \
 #   --description="Remove the debug payloads from old agent request snapshots" \
-#   --schedule="13 2 * * *" --command="app:ai-agent:request-snapshot-debug-payloads-strip --maxSeconds=300"
+#   --schedule="13 2 * * *" --command="app:agent:request-snapshot-debug-payloads-strip --maxSeconds=300"
 #
 # Only once every process that reads loaded-capability rows reads the chain format:
 # {{CONSOLE}} app:crons:upsert --name=agent-loaded-capabilities-compact \
 #   --description="Rewrite legacy loaded-capability rows into checkpoints and change records" \
-#   --schedule="23 2 * * *" --command="app:ai-agent:loaded-capabilities-compact --maxSeconds=300"
+#   --schedule="23 2 * * *" --command="app:agent:loaded-capabilities-compact --maxSeconds=300"
 #
 # {{CONSOLE}} app:crons:upsert --name=agent-embeddings-repair \
 #   --description="Re-embed agent embeddings that hold the zero vector" \
-#   --schedule="33 2 * * *" --command="app:ai-conversation:repair-zero-embeddings --apply --newestRowsOnly=50000 --limit=200 --maxSeconds=200"
+#   --schedule="33 2 * * *" --command="app:agent:repair-zero-embeddings --apply --newestRowsOnly=50000 --limit=200 --maxSeconds=200"

@@ -126,14 +126,44 @@ In the agent loop: a READ or WORKSPACE tool returns untrusted content unless it 
 waits for the owner's consent (or is refused, `config/app/AI/untrustedContent.php`), and a fetch of an unseen
 model-built URL is refused (skill `ddd-module-agents-decisions-and-guards-specialist`, injection defence).
 
-## Sandbox administration
+## Names, rights and what belongs where
 
-The admin screen for agent workspaces: the host implements `AgentSandboxAdministration` (tag
-`ai.agent_sandbox_administration`; the runner and the workspaces stay the host's), mounts
-`AgentSandboxesControllerTrait` on an operator-only controller (`throwForbiddenUnlessSandboxesAccessAllowed()`) and
-creates the table `AgentSandboxActionLogEntries` (schema diff). The package adds the conversations of a workspace's
-space, the 409 guard while a turn runs (force with a reason), the reset confirmation, the audit of every action and
-the file delivery under the untrusted-content rules (skill `ddd-module-agents-specialist`, sandbox administration).
+- **Skills** are `<Topic>.<Feature>` (three parts at most, upper camel case). `Agent.*` is the agent's own tools and
+  organs (`Agent.Memory`, `Agent.Tasks`, `Agent.Mandates`, `Agent.TaskRunReports`, `Agent.Web.Search`, `Agent.UI`);
+  Core's features are `System.*`; every other topic is the world the agent works on. No skill file beside a folder of
+  the same name. A rename is code and config, without an alias.
+- **Package ids** are `<provider>.<topic>.<feature>` in the skill's words (`agent.web.search`, `ddd.system.health`,
+  a host's `rb.challenges.campaigns`); the provider is the host's prefix (`AI.packageIdProvider`), `ddd` or a
+  module's word, never an audience. `skillPackages.php` binds classes.
+- **Rights** are declared by the package that needs them (`AgentAccountRights`: `operatePlatform`,
+  `scheduleAgentTasks`, `useAgentMemory`, `useWeb`, `useUI`), carried by its package class
+  (`#[MCPRequiresAccountRights]`) and named in its skill. A host maps them to its roles (`AI.accountRights`, the
+  default `AgentRoleMappedAccountRights`) or answers them itself; an unmapped right is not held. The platform skills
+  are for the operators: right plus `#[MCPRequiresAdminWithAccessToAllResources]`.
+- **Package or host:** tools and skills for a feature of the framework ship with the package that owns the feature
+  (Core's issues, workers, crons and health ship here as `System.*`); the host builds its domain topics, adapters and
+  ports (the screen catalog of `Agent.UI`, health sections, record descriptions), never a second tool over a package's
+  table or service.
+- The lint (`AISkillFilesLintService`: `findSkillNamingProblems()`, `findBindingNamingProblems()`) checks the names,
+  the binding and the rights; Core's `ModuleNamespacesTestCase` checks that no two packages ship one class and that
+  this package's classes stay in `AgentsModule::OWNED_NAMESPACES` (`tests/Contract/ModuleNamespacesTest.php`).
+
+## Agent.UI and System
+
+`Agent.UI` reads the user's screen, opens screens and points at elements: a `[SIGNAL:ui]` state note from the UI state
+the client reports, the client tool request channel (tables `AgentClientToolRequests`, `AgentClientAttachments`), the
+tools of `AgentUIMCPPackage`, the screen catalog port `AgentUIScreenCatalogService`, the hourly
+`app:agent:purge-client-tool-requests`, and the client side in the npm entry `@mgamadeus/ddd-agents/ui`. `System.*`
+reads Core's workers, crons and issues registry and changes an issue group's status; the host adds health sections
+through `SystemHealthSectionProvider`. Details: skill `ddd-module-agents-tools-specialist`.
+
+## Workspaces and sandboxes
+
+The sandbox runner, its workspaces and their admin screen are the package `mgamadeus/ddd-agent-sandbox`. This package
+keeps what an agent workspace needs from the agent: the tool effect `MCPToolEffect::WORKSPACE`, the drive store port
+(`AgentDriveStore`), the drive tools and the root conversations of a space for an admin screen
+(`AIConversationsService::findNewestRootConversationsOfAgentSpaceId()`, `countRootConversationsPerAgentSpaceId()`,
+`findAgentSpaceIdsWithALiveTurn()`).
 
 ## Messenger
 

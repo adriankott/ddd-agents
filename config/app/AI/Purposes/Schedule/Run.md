@@ -4,7 +4,7 @@ description: One firing of a task schedule — the unattended run that executes 
 startableViaApi: false
 # The earlier reports of this run's own task: the run reads them itself, so its
 # report keeps the structure of the earlier ones and states what changed.
-preloadSkillNames: [Assistant.TaskRunReports]
+preloadSkillNames: [Agent.TaskRunReports]
 # One delivery path per run: the platform carries the report over the schedule's report channel. A tool that sends
 # the owner a message itself is a second path: the report then goes out twice. The purpose class blocks every tool
 # that declares

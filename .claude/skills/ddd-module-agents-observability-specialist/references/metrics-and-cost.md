@@ -66,8 +66,8 @@ explained in `ddd-module-agents-loop-specialist` (usage scopes and cost summarie
 
 ## The scorecard worker
 
-The chain: the package's command `app:ai-conversation:mark-finalized` marks idle conversations finalized
-(`AIConversationsService::markIdleConversationsFinalized()`) and `app:ai-conversation:compact-finalized` dispatches an
+The chain: the package's command `app:agent:mark-finalized-conversations` marks idle conversations finalized
+(`AIConversationsService::markIdleConversationsFinalized()`) and `app:agent:compact-finalized-conversations` dispatches an
 `AIConversationFinalizeMessage` per conversation (the mark and the completion compaction:
 `ddd-module-agents-context-specialist`); `AIConversationFinalizeHandler` runs the completion compaction and, in a
 `finally` — whether the compaction succeeded or not — dispatches an `AIConversationScorecardMessage` for a root

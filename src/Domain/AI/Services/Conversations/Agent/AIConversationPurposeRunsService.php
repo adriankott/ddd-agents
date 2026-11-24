@@ -29,7 +29,7 @@ use DDD\Domain\AI\Services\Conversations\AIConversationMessagesService;
 use DDD\Domain\AI\Services\Conversations\AIConversationRealtimeSignalService;
 use DDD\Domain\AI\Services\Conversations\AIConversationRunClaimsService;
 use DDD\Domain\AI\Services\Conversations\AIConversationsService;
-use DDD\Presentation\Mcp\Agent\AgentConsoleStream;
+use DDD\Presentation\Mcp\Agents\AgentConsoleStream;
 use DDD\Domain\AI\Services\Conversations\Purposes\AIConversationPurposesService;
 use DDD\Domain\AI\Traits\Conversations\AITraceLogTrait;
 use DDD\Domain\AI\Services\Conversations\Entitlements\AIConversationEntitlementsService;

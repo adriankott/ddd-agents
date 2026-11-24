@@ -316,7 +316,7 @@ are honoured only on the asynchronous path and never from inside a sub-agent.
 Full class names of what a host extends or calls here: `DDD\Domain\AI\Services\Conversations\Agent\AgentBackgroundOperationsService`, `DDD\Domain\AI\Services\Conversations\AIConversationDelegationBatchesService`, `DDD\Domain\AI\Services\Conversations\Agent\AIConversationDelegationNotificationsService`, `DDD\Domain\AI\Services\Conversations\AIConversationRunClaimsService`.
 
 - Workers for the turn transport — a sub-agent runs as its own turn (entry skill).
-- The cron line of the package's reaper (`app:ai-agent:reap`), which times out deadlines, re-sends lost notifications and re-fires parents of old-style groups.
+- The cron line of the package's reaper (`app:agent:reap`), which times out deadlines, re-sends lost notifications and re-fires parents of old-style groups.
 - Its cancel endpoint, if the owner may stop a running tree (`cancelLiveRun()`).
 - Optionally the background operations of its own (`AgentBackgroundOperationsService` subclass at the same path).
 - Optionally tools that request sub-agents through the structured-result keys above.

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace DDD\Domain\AI\Services\Conversations;
 
-use DDD\Presentation\Mcp\Agent\AgentConsoleStream;
+use DDD\Presentation\Mcp\Agents\AgentConsoleStream;
 use DDD\Domain\AI\Entities\Conversations\SignalSources\ConversationSignalSources;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Driver\Exception as DBALDriverException;

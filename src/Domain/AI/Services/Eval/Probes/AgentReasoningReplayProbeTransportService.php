@@ -14,7 +14,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Throwable;
 
 /**
- * Sends the requests of `app:ai-agent:probe-reasoning-replay` to OpenRouter with the agent's own credential: the
+ * Sends the requests of `app:agent:probe-reasoning-replay` to OpenRouter with the agent's own credential: the
  * key named by `AI.modelCalls.openRouterApiKeyEnvName` as the `Authorization: Bearer` header, as the agent's direct
  * egress does. Only the two fixed OpenRouter endpoints are called; a refused request is returned, never thrown.
  * Tests replace {@see createHttpClient()}.

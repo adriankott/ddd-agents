@@ -76,7 +76,7 @@ or a wire message — with the provider's cached tokens and a cause (`CAUSE_*`: 
 `toolsAppended`, `resultStub`, `ownerMessageRewrite`, …). `hitPercent()`, `$callsByCause` and `$cachedByCause` sum it
 up. The tools and system causes work on every call (they compare hashes); the wire-message causes need the full
 payload, so measure with full snapshots on. What busts the cache and how to keep the prefix stable:
-`ddd-module-agents-context-specialist`. `app:ai-agent:cache-diff <conversationId>` prints this report per call with a
+`ddd-module-agents-context-specialist`. `app:agent:cache-diff <conversationId>` prints this report per call with a
 summary by cause (`--json` for the report as JSON).
 
 ## Tool timings
@@ -101,7 +101,7 @@ The conversation metrics sum durations per tool ([metrics-and-cost](metrics-and-
 | `CHECK_UNIQUE_TOOL_CALL_IDS` | a tool-call id appears twice |
 | `CHECK_CONTIGUOUS_INDEXES` | a message index is missing |
 
-`hasViolations()` decides the exit code: `app:ai-agent:validate-conversation` checks one or more conversations, prints
+`hasViolations()` decides the exit code: `app:agent:validate-conversation` checks one or more conversations, prints
 every violation and exits 1 on any.
 
 ## The delegation tree
@@ -135,7 +135,7 @@ short write transactions, pauses while the database is busy, stops after `$maxSe
 cursor on the next run. It returns an `AIConversationRequestSnapshotDebugPayloadRemovalReport`
 (`toReportFields()` for the command output); `$dryRun` counts without writing; an
 `AIConversationProgressReporterInterface` gets one line per window. The package's command
-`app:ai-agent:request-snapshot-debug-payloads-strip` runs it; on a schedule it needs a nightly cron line of the host
+`app:agent:request-snapshot-debug-payloads-strip` runs it; on a schedule it needs a nightly cron line of the host
 with `--maxSeconds` below the cron ticker's limit of 360 s (the default is 1500 s).
 
 ## Full class names

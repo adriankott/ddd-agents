@@ -69,7 +69,7 @@ class OfferedSkillCatalog extends ValueObject
             $skillCatalog = $offeredSkillCatalog->recordStep('featureFlags', $skillCatalog, $entitlement->filterSkillsByFeatureFlags($skillCatalog));
             // the exact AI-budget skill is not offered under a fair-use / hide-usage policy (a setting, not a flag)
             if ($entitlement->hidesExactAIBudget()) {
-                $skillCatalog = $offeredSkillCatalog->recordStep('budgetPolicy', $skillCatalog, $skillCatalog->without(AISkill::ASSISTANT_BUDGET));
+                $skillCatalog = $offeredSkillCatalog->recordStep('budgetPolicy', $skillCatalog, $skillCatalog->without(AISkill::AGENT_BUDGET));
             }
         }
         if ($entitlement->accountRights !== null) {

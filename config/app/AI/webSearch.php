@@ -3,8 +3,7 @@
 declare(strict_types=1);
 
 /**
- * The web research of the package (`WebSearchMCPPackage`, `WebPageScreenshotMCPPackage`, skills `Web.Search` and
- * `Web.PageView`), read as `Config::get('AI.webSearch')` by {@see \DDD\Domain\AI\Services\WebSearch\AIWebSearchService}.
+ * The web research of the package (`WebSearchMCPPackage`, skill `Agent.Web.Search`), read as `Config::get('AI.webSearch')` by {@see \DDD\Domain\AI\Services\WebSearch\AIWebSearchService}.
  * An application ships its own file at this path, which REPLACES this one whole: copy it, then change it.
  *
  * - `enabled`: the whole research; off by default. While it is off (or a capability has no endpoint) the packages are
@@ -17,18 +16,11 @@ declare(strict_types=1);
  *                    date?, last_updated?}]}}
  *     urlToMarkdown: request {url}; answer {data: {page: {url, ok, title?, markdown?, reason?}}} with reason BLOCKED,
  *                    TIMEOUT, FETCH_FAILED or NO_CONTENT
- *     screenshot:    request {url, responseType: base64, viewport_width, viewport_height, width, height, density, type,
- *                    javascript_enabled, redirect_enabled, dom_timeout, min_wait, is_mobile, force_full_page,
- *                    emulate_full_page, wait_until, omit_background, addPoweredByHeader}; answer {status: success,
- *                    content: <base64 png>} (further fields are ignored); a failure may name `reason` (at the top,
- *                    under data or error: BOT_CHALLENGE, TIMEOUT, BLOCKED, UNRESOLVABLE, FETCH_FAILED or its own code),
- *                    which the model reads with the next move
  *     urlToMarkdown reasons also: BOT_CHALLENGE, UNRESOLVABLE, UNSUPPORTED_TYPE (an unknown code is named as is)
  * - `cacheTtlSeconds` / `timeoutSeconds`: replace the per-capability defaults (search and page read: one hour and
- *   15 s; screenshot: ten minutes and the endpoint's own render time). The tools' own limit is 45 s.
+ *   15 s). The tools' own limit is 45 s. Page screenshots are the page tools of `mgamadeus/ddd-agent-browser`.
  * - `cacheInDatabase`: per capability, true adds the database cache beside the memory cache, false keeps memory only;
- *   unset keeps the class default (search and page read: memory and database). A screenshot is cached in memory only
- *   (megabytes of base64; the endpoint usually caches it itself) unless `screenshot: true`.
+ *   unset keeps the class default (memory and database).
  * - `hits`: the search. `feeUsdPerRequestByMode` is what one real request costs; it is handed to the application's
  *   booking hook (a cache hit or a failure books nothing). `providerName` goes into the references widget.
  *   `renderBudgetChars` caps what the model receives from one call, `snippetCharCapPerHit` one page's excerpts.
@@ -43,18 +35,14 @@ return [
     'capabilities' => [
         'search' => true,
         'urlToMarkdown' => true,
-        'screenshot' => true,
     ],
     'endpoints' => [
         'search' => null,
         'urlToMarkdown' => null,
-        'screenshot' => null,
     ],
     'cacheTtlSeconds' => [],
     'timeoutSeconds' => [],
-    'cacheInDatabase' => [
-        'screenshot' => false,
-    ],
+    'cacheInDatabase' => [],
     'hits' => [
         'defaultMode' => 'fast',
         'feeUsdPerRequestByMode' => ['fast' => 0.001, 'web' => 0.005],

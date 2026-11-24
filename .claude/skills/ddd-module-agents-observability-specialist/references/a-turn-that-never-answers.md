@@ -7,15 +7,15 @@ Contents: first look · the stored state to read · the symptom table · what th
 The owner sent a message and nothing came back, or a run sits in one state forever. This reference maps what you
 find in the stored conversation to the cause and to the service that repairs it. Why the states exist — the run
 claim, the release, the failed-turn rule, the recovery passes — is explained by `ddd-module-agents-loop-specialist`;
-the recovery commands are the package's (`app:ai-agent:reap`,
-`app:ai-conversation:deliver-owed-reports-and-resume-owed-turns`; options in [console-commands](console-commands.md),
+the recovery commands are the package's (`app:agent:reap`,
+`app:agent:deliver-owed-reports-and-resume-owed-turns`; options in [console-commands](console-commands.md),
 their cron lines in `ddd-module-agents-specialist`).
 
 ## First look
 
-1. Run `app:ai-agent:diagnose <conversationId>` (the resume diagnosis) and
-   `app:ai-agent:validate-conversation <conversationId>` (the integrity report), both read-only without options, and
-   `app:ai-agent:inspect <conversationId>` (header, message table, transcript, delegation children and sub-agents).
+1. Run `app:agent:diagnose <conversationId>` (the resume diagnosis) and
+   `app:agent:validate-conversation <conversationId>` (the integrity report), both read-only without options, and
+   `app:agent:inspect <conversationId>` (header, message table, transcript, delegation children and sub-agents).
 2. Read the stored state columns of the conversation (below) and the newest rows of its tail.
 3. Read the turn events of the newest owner message (`AIConversationTurnEventsService::findForConversation()` with
    its index): a `turnEnd` event with its outcome says how the last turn ended; no event at all means no worker ever

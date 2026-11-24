@@ -63,7 +63,7 @@ class AgentReapStuckConversationsCommandTest extends UnitTestCase
     public function testTheCommandKeepsItsNameOptionsAndDefaults(): void
     {
         $asCommandAttributes = (new ReflectionClass(AgentReapStuckConversationsCommand::class))->getAttributes(AsCommand::class);
-        self::assertSame('app:ai-agent:reap', $asCommandAttributes[0]->newInstance()->name);
+        self::assertSame('app:agent:reap', explode('|', $asCommandAttributes[0]->newInstance()->name)[0], 'the old name stays an alias');
 
         $agentReapStuckConversationsCommand = new AgentReapStuckConversationsCommand();
         self::assertInstanceOf(AgentConsoleCommand::class, $agentReapStuckConversationsCommand);

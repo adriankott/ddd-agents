@@ -170,6 +170,8 @@ export interface WireConversationRunStateResponse {
   titleManuallyEdited?: boolean | null;
   summary?: string | null;
   updated?: string | null;
+  /** A request of `Agent.UI` for the reading client (`AgentClientToolRequestDelivery`) */
+  clientToolRequest?: { id: number; requestType: string; argumentsJson: string; secondsLeft: number } | null;
 }
 
 /** `AIConversationActivityGetResponseDto`. */

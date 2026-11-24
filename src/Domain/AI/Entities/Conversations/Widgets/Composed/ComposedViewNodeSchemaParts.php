@@ -26,7 +26,7 @@ use stdClass;
 class ComposedViewNodeSchemaParts
 {
     /** @var string The note the application's part carries in place of the schema's `generatedBy` */
-    public const string APPLICATION_SCHEMA_PART_GENERATED_BY = 'The application\'s part of the ComposedView node schema (its node types, widgets, data sources and entity types), written by app:ai:composed-view:export-node-schema from the application\'s classes — never edit by hand';
+    public const string APPLICATION_SCHEMA_PART_GENERATED_BY = 'The application\'s part of the ComposedView node schema (its node types, widgets, data sources and entity types), written by app:agent:export-composed-view-node-schema from the application\'s classes — never edit by hand';
 
     /**
      * The module's schema: the full schema, restricted to the types the module declares.

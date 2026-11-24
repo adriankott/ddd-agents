@@ -46,6 +46,56 @@ class AISkillFilesLintServiceTest extends TestCase
         self::assertSame([], $aISkillFilesLintService->findPurposeFileProblems([$packageConfigDirectory . '/Purposes']));
     }
 
+    public function testThePackagesOwnSkillNamesFollowTheNamingRules(): void
+    {
+        $packageConfigDirectory = dirname(__DIR__, 5) . '/config/app/AI';
+        self::assertSame([], (new AISkillFilesLintService())->findSkillNamingProblems([$packageConfigDirectory . '/Skills']));
+    }
+
+    public function testASkillNameIsTopicAndFeatureInUpperCamelCaseWithoutARepeatedTopicOrAnAnd(): void
+    {
+        self::assertSame([], AISkillFilesLintService::findSkillNameProblems('Agent.Web.Search'));
+        self::assertSame([], AISkillFilesLintService::findSkillNameProblems('Agent.UI'));
+        self::assertNotSame([], AISkillFilesLintService::findSkillNameProblems('Agent.Web.Search.Deep'));
+        self::assertNotSame([], AISkillFilesLintService::findSkillNameProblems('Accounts.Accounts'));
+        self::assertNotSame([], AISkillFilesLintService::findSkillNameProblems('System.WorkersAndCrons'));
+        self::assertNotSame([], AISkillFilesLintService::findSkillNameProblems('admin.screen'));
+        self::assertSame([], AISkillFilesLintService::findSkillNameProblems('Devices.Android'));
+    }
+
+    public function testAPackageIdCarriesItsProviderAndTheWordsOfItsOnlySkill(): void
+    {
+        self::assertSame([], AISkillFilesLintService::findPackageIdProblems('agent.web.search', null, 'Agent.Web.Search'));
+        self::assertSame([], AISkillFilesLintService::findPackageIdProblems('agent.ui', null, 'Agent.UI'));
+        self::assertSame([], AISkillFilesLintService::findPackageIdProblems('ddd.system.health', null, 'System.Health'));
+        self::assertSame([], AISkillFilesLintService::findPackageIdProblems('rb.challenges.campaigns', 'rb', 'Challenges.Campaigns'));
+        self::assertSame([], AISkillFilesLintService::findPackageIdProblems('agent.tasks', null, 'Agent.Tasks'));
+        self::assertNotSame([], AISkillFilesLintService::findPackageIdProblems('admin.challenges.campaigns', null, null));
+        self::assertNotSame([], AISkillFilesLintService::findPackageIdProblems('rc.challenges.campaigns', 'rb', null));
+        self::assertNotSame([], AISkillFilesLintService::findPackageIdProblems('agent.memories', null, 'Agent.Memory'));
+        self::assertNotSame([], AISkillFilesLintService::findPackageIdProblems('Agent.Memory', null, null));
+    }
+
+    public function testASkillFileBesideAFolderOfTheSameNameIsReported(): void
+    {
+        mkdir($this->temporaryDirectory . '/NamingSkills/Website/Build', 0777, true);
+        file_put_contents($this->temporaryDirectory . '/NamingSkills/Website/Build.md', "---\ndescription: x\n---\nBody\n");
+        file_put_contents($this->temporaryDirectory . '/NamingSkills/Website/Build/Orchestrate.md', "---\ndescription: x\n---\nBody\n");
+        $problems = (new AISkillFilesLintService())->findSkillNamingProblems([$this->temporaryDirectory . '/NamingSkills']);
+        @unlink($this->temporaryDirectory . '/NamingSkills/Website/Build/Orchestrate.md');
+        @unlink($this->temporaryDirectory . '/NamingSkills/Website/Build.md');
+        @rmdir($this->temporaryDirectory . '/NamingSkills/Website/Build');
+        @rmdir($this->temporaryDirectory . '/NamingSkills/Website');
+        @rmdir($this->temporaryDirectory . '/NamingSkills');
+        $besideFolderProblems = [];
+        foreach ($problems as $problem) {
+            if (str_contains($problem, 'lies beside the folder')) {
+                $besideFolderProblems[] = $problem;
+            }
+        }
+        self::assertCount(1, $besideFolderProblems);
+    }
+
     public function testABrokenSkillFileIsReportedWithItsCause(): void
     {
         $problems = (new AISkillFilesLintService())->findSkillFileProblems([$this->temporaryDirectory . '/Skills']);

@@ -129,6 +129,7 @@ use DDD\Infrastructure\Exceptions\InternalErrorException;
 use Psr\Cache\InvalidArgumentException;
 use ReflectionException;
 use DDD\Domain\AI\Entities\Conversations\Agent\Tools\LoadToolTool;
+use DDD\Domain\AI\Services\ClientTools\AgentUIStateNotesService;
 use DDD\Domain\AI\Services\Conversations\Agent\AgentClientContextService;
 use DDD\Domain\AI\Entities\Conversations\Agent\AgentModelInputOptions;
 use DDD\Domain\AI\Entities\Conversations\Widgets\Catalog\ConversationWidgetCatalog;
@@ -2483,6 +2484,7 @@ class AIConversation extends Entity
         $this->putHistoryIntoContext($agentContext, $agentModelInputHistory);
         $this->putOwnerPresenceAndVariantsIntoContext($agentContext);
         $this->putClientContextIntoContext($agentContext);
+        $this->putUIStateNoteIntoContext($agentContext);
         $this->putModelInputOptionsIntoContext($agentContext);
         // The owner messages the injection check blocked — the egress shows the model a notice instead.
         $agentContext->securityFilteredOwnerMessageIndexes = $this->getAgentWorkingState()->securityFilteredOwnerMessageIndexes ?? [];
@@ -2726,6 +2728,10 @@ class AIConversation extends Entity
         $agentConversationState->aiBudgetAwareness = $agentContext->aiBudgetAwareness;
         $agentConversationState->restrictedCapabilities = $agentContext->restrictedCapabilities;
         $agentConversationState->situationNote = $agentContext->situationTailHint();
+        $agentConversationState->uiNote = $agentContext->uiStateNote;
+        if ($agentContext->uiStateNoteIsUnknown) {
+            $agentConversationState->unknownKinds[] = AgentStateDelta::KIND_UI;
+        }
         // no situation line renders (no loaded skill is cut — the swap unloaded the last cut
         // one): the line's provenance is not known for this call, never "every value is confirmed"
         if (!$agentContext->rendersSituationLine()) {
@@ -3066,6 +3072,26 @@ class AIConversation extends Entity
         /** @var AgentClientContextService $agentClientContextService */
         $agentClientContextService = DDDService::instance()->getService(AgentClientContextService::class);
         $agentContext->clientContextTailText = $agentClientContextService->findClientContextTailText($this, $agentClientContext);
+    }
+
+    /**
+     * The `[SIGNAL:ui]` note of the user's UI (`Agent.UI`, {@see AgentUIStateNotesService}). Roots only (a delegation
+     * child works on a task, not on the user's screen). A failed read leaves the value unknown: it is compared with
+     * nothing and rendered nowhere, never a failed call.
+     */
+    protected function putUIStateNoteIntoContext(AgentModelInput $agentContext): void
+    {
+        if ($agentContext->isDelegation) {
+            return;
+        }
+        try {
+            /** @var AgentUIStateNotesService $agentUIStateNotesService */
+            $agentUIStateNotesService = DDDService::instance()->getService(AgentUIStateNotesService::class);
+            $agentContext->uiStateNote = $agentUIStateNotesService->buildUINoteOfConversation($this);
+        } catch (Throwable $throwable) {
+            $agentContext->uiStateNote = null;
+            $agentContext->uiStateNoteIsUnknown = true;
+        }
     }
 
     /**

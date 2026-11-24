@@ -10,7 +10,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 /**
  * Domain port for live-streaming an agent message to a console as the loop produces it. The agent loop depends only
- * on this interface; the concrete renderer ({@see \DDD\Presentation\Mcp\Agent\AgentConsolePrinter}) lives in
+ * on this interface; the concrete renderer ({@see \DDD\Presentation\Mcp\Agents\AgentConsolePrinter}) lives in
  * Presentation. Dependency direction stays inward: Presentation implements the Domain port. (The loop already takes a
  * Symfony `OutputInterface` for its `--output` streaming, so the console coupling is pre-existing, not new.)
  *
@@ -19,7 +19,7 @@ use Symfony\Component\Console\Output\OutputInterface;
  * `delegatedFromMessage`). Null = render without delegation context (legacy callers).
  *
  * Fetched by this interface name (`getService(AgentMessagePrinterInterface::class)`): the id is a public alias of its
- * one implementation, {@see \DDD\Presentation\Mcp\Agent\AgentConsolePrinter} (`#[AsAlias(public: true)]` there). An
+ * one implementation, {@see \DDD\Presentation\Mcp\Agents\AgentConsolePrinter} (`#[AsAlias(public: true)]` there). An
  * application replaces the printer by aliasing this id to its own implementation; a second implementation without
  * that alias leaves the id on the package's printer.
  */

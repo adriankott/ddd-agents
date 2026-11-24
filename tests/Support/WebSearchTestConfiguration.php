@@ -46,7 +46,6 @@ class WebSearchTestConfiguration
         $webSearchConfiguration['endpoints'] = [
             'search' => '/web/search',
             'urlToMarkdown' => 'POST:/web/urlToMarkdown',
-            'screenshot' => 'https://renderer.example/screenshot',
         ];
         return $webSearchConfiguration;
     }

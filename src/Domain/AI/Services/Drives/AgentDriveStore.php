@@ -18,7 +18,7 @@ use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 /**
  * A file store the agent reaches through mounts: the agent space's own drive and further spaces below
  * `drivespaces/<name>/`. A module implements it as a service (registered by this tag, autoconfigured); the agent's
- * drive tools ({@see \DDD\Presentation\Mcp\Client\AI\AgentDriveMCPPackage}) and the file card call every store through
+ * drive tools ({@see \DDD\Presentation\Mcp\Client\Agents\AgentDriveMCPPackage}) and the file card call every store through
  * {@see AgentDriveStoresService} and import none of them.
  *
  * Every method answers under the rights of the account the call acts for: a file the caller may not read is "not

@@ -14,7 +14,7 @@ use Symfony\Component\Console\Attribute\AsCommand;
  * attribute, and prints the scope of a schedule in its own words.
  */
 #[AsCommand(
-    name: 'app:ai-schedule:close-for-inactive-agent-spaces|app:ai-schedule:close-for-inactive-shops',
+    name: 'app:agent:close-schedules-for-inactive-agent-spaces|app:ai-schedule:close-for-inactive-shops',
     description: 'Close the AI schedules of closed shops and accounts.',
 )]
 class ApplicationCloseSchedulesUnderBothNamesCommandDouble extends AgentCloseSchedulesForInactiveAgentSpacesCommand

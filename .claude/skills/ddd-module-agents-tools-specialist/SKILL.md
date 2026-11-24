@@ -1,6 +1,6 @@
 ---
 name: ddd-module-agents-tools-specialist
-description: "Writes MCP tools of mgamadeus/ddd-agents for the agent and MCP clients. Covers MCPPackage, MCPBundle, the MCPController mount, the skill binding, request and response DTOs and the generated schema, MCPToolExecutorService, markdown results, failure texts, images, result and schema size, the call context AgentToolCallProvenance and agentSpaceId defaults, time limits, parallel calls in child processes, loop-control fields, tools that write a widget, askOwner, the meta-tool contract, every tool attribute (MCPToolEffect, MCPToolSummary, MCPToolExecutionTimeout, MCPToolParallelSafe, MCPToolRequiresOwnerConfirmation, MCPToolRequiresMandate, MCPToolReturnsTrustedContent), and the web research tools (searchTheWeb, getWebPageAsMarkdown, readings, screenshots; AI.webSearch, WebSearchHostService). Use when adding or changing an MCP tool, a tool times out, a read may run in parallel, a result or schema is too large, a tool is not found or ambiguous, switching on web search, or testing a tool."
+description: "Writes MCP tools of mgamadeus/ddd-agents for the agent and MCP clients. Covers MCPPackage, MCPBundle, the MCPController mount, binding by class and package ids, request and response DTOs and the generated schema, MCPToolExecutorService, markdown results, failure texts, images, result and schema size, AgentToolCallProvenance, time limits, parallel calls in child processes, loop-control fields, askOwner, every tool attribute (MCPToolEffect, MCPToolExecutionTimeout, MCPToolParallelSafe, MCPToolRequiresOwnerConfirmation, MCPRequiresAccountRights), the web research tools (AI.webSearch), the Agent.UI tools with their client channel, [SIGNAL:ui] note and screen catalog port, and the System.* tools (health sections port, issues, workers, crons). Use when adding or changing an MCP tool, a tool times out, a read may run in parallel, a result or schema is too large, a tool is not found, switching on web search, wiring Agent.UI or the System tools, or testing a tool."
 metadata:
   author: mgamadeus
   version: "0.1.0"
@@ -23,7 +23,7 @@ host adds its first tool.
 | The executor | `MCPToolExecutorService`, `ToolResult`, `ToolResultImage`, `ToolCallImageStore`, `ToolResultUntrustedSegments` |
 | Dispatch and execution in the loop | `AgentToolCallDispatchService`, `AgentToolCallExecutionService`, `AgentToolCallProvenance`, `AgentRepeatedToolCallCheck`, `ToolCall`, `AIConversationToolCallHistory`, `AgentCompletedToolCallFollowUpsService`, `AgentToolResultFactsService` |
 | Parallel calls | `AgentToolCallForkJoinService`, `AgentToolCallFork`, `AIConversationToolCallBatch`, `agentToolCallChildProcess.php` |
-| The web research (search, page read, reading, screenshot) | `WebSearchMCPPackage`, `WebPageScreenshotMCPPackage`, `ToolBatchAdoptionNote`, `AIWebSearchService`, `WebSearchHostService`, everything in `Entities/WebSearch/` and `Repo/Argus/WebSearch/` |
+| The web research (search, page read, reading) | `WebSearchMCPPackage`, `ToolBatchAdoptionNote`, `AIWebSearchService`, `WebSearchHostService`, everything in `Entities/WebSearch/` and `Repo/Argus/WebSearch/` |
 | The meta-tool contract and the owner question | `AgentMetaTool`, `AgentMetaTools`, `AgentMetaToolCallAnswer`, `AgentAfterStepRequest`, `AskOwnerTool`, `AskOwnerQuestionCatalogue` |
 
 Not here, one sentence each: owner consent before an outward action is `ddd-module-agents-decisions-and-guards-specialist`
@@ -171,7 +171,8 @@ A host or purpose takes groups of them off the offer to save tokens (`offersDele
 | The schema of loaded tools is too large; write the description; phone-line variants | [definition size and descriptions](references/definition-size-and-descriptions.md) |
 | A tool times out; run reads of one response in parallel; the child-process command and the console script | [time limits and parallel calls](references/time-limits-and-parallel-calls.md) |
 | Ask the owner a closed question; read the pick in a tool; add a catalogue question | [asking the owner a closed question](references/asking-the-owner-a-closed-question.md) |
-| Switch on the package's web research (search, page read, screenshot); its endpoints, payer, fee booking, country; a web tool is not offered | [web research](references/web-research.md) |
+| Wire Agent.UI (the user's screen: awareness note, client channel, tools, screen catalog port) or the System tools (health sections port, issues, workers, crons) | [Agent.UI and System](references/agent-ui-and-system-tools.md) |
+| Switch on the package's web research (search, page read); its endpoints, payer, fee booking, country; a web tool is not offered | [web research](references/web-research.md) |
 | Grant a flow more steps; start sub-agents from a result; write a widget or a line into the chat | [loop-control fields and tool-written messages](references/loop-control-fields-and-tool-written-messages.md) |
 | Assert the schema, call the tool in a test, call it over HTTP, read a failure | [testing a tool in a host](references/testing-a-tool-in-a-host.md) |
 | Before building: what bites | [traps](references/traps.md) |

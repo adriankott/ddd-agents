@@ -58,7 +58,7 @@ use DDD\Domain\AI\Exceptions\Conversations\AgentRunClaimLostException;
 use DDD\Domain\AI\Exceptions\Conversations\AgentToolExecutionTimeoutException;
 use DDD\Domain\AI\Exceptions\Conversations\MessageIndexLockUnavailableException;
 use DDD\Domain\AI\Services\Conversations\AIConversationAgentService;
-use DDD\Presentation\Mcp\Agent\AgentConsoleStream;
+use DDD\Presentation\Mcp\Agents\AgentConsoleStream;
 use DDD\Domain\AI\Services\Conversations\AgentToolCallForkJoinService;
 use DDD\Domain\AI\Traits\Conversations\AITraceLogTrait;
 use DDD\Infrastructure\Services\DDDService;

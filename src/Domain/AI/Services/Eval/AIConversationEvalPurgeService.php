@@ -43,7 +43,7 @@ use Throwable;
 /**
  * Deletes the conversations of the evaluation accounts whose last activity is older than an age limit, together with
  * every row that depends on them — politely, on a database the turn workers write all the time
- * (`app:ai-agent:eval-conversations-purge`).
+ * (`app:agent:eval-conversations-purge`).
  *
  * The unit is a conversation TREE ({@see AIConversationEvalTree}): the root, its delegation children and the supervisor
  * tandems. A tree goes only when no conversation of it has a run in flight, a fresh heartbeat or activity younger than

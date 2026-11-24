@@ -3,23 +3,39 @@
 declare(strict_types=1);
 
 use DDD\Domain\AI\Entities\Skills\AISkill;
+use DDD\Presentation\Mcp\Client\Agents\AgentMandatesMCPPackage;
+use DDD\Presentation\Mcp\Client\Agents\AgentMemoriesMCPPackage;
+use DDD\Presentation\Mcp\Client\Agents\AgentTaskRunReportsMCPPackage;
+use DDD\Presentation\Mcp\Client\Agents\AgentTaskSchedulesMCPPackage;
+use DDD\Presentation\Mcp\Client\Agents\AgentUIMCPPackage;
+use DDD\Presentation\Mcp\Client\Agents\WebSearchMCPPackage;
+use DDD\Presentation\Mcp\Admin\System\SystemCronsMCPPackage;
+use DDD\Presentation\Mcp\Admin\System\SystemHealthMCPPackage;
+use DDD\Presentation\Mcp\Admin\System\SystemIssuesMCPPackage;
+use DDD\Presentation\Mcp\Admin\System\SystemWorkersMCPPackage;
 
 /**
  * The package's default skill → MCP-package binding, read as `Config::get('AI.skillPackages')` by
  * {@see AISkill::getPackageClassesBySkillName()}. It lists only the skills whose MCP packages ship with this package,
- * by package id ({@see \DDD\Domain\AI\Services\Skills\MCPPackageIdsService}); their skill files ship in
- * `config/app/AI/Skills/`.
+ * bound by class; their skill files ship in `config/app/AI/Skills/Agent/` and `config/app/AI/Skills/System/`.
  *
  * An application ships its own `config/app/AI/skillPackages.php`, which REPLACES this file whole (application config
- * roots are searched first): it must list these skills itself when it wants them offered (by class or by id).
+ * roots are searched first): it must list these skills itself when it wants them offered.
  */
 return [
-    AISkill::ASSISTANT_MANDATES => ['agent.mandates'],
-    AISkill::ASSISTANT_TASKS => ['agent.taskSchedules'],
-    AISkill::ASSISTANT_TASK_RUN_REPORTS => ['agent.taskRunReports'],
+    AISkill::AGENT_MANDATES => [AgentMandatesMCPPackage::class],
+    AISkill::AGENT_TASKS => [AgentTaskSchedulesMCPPackage::class],
+    AISkill::AGENT_TASK_RUN_REPORTS => [AgentTaskRunReportsMCPPackage::class],
     // offered only while the memory store is switched on (AI.agentMemory.enabled): the package is unavailable otherwise
-    AISkill::MEMORY_MANAGEMENT => ['agent.memories'],
+    AISkill::AGENT_MEMORY => [AgentMemoriesMCPPackage::class],
     // offered only while the web research is switched on (AI.webSearch) and its capability has an endpoint
-    AISkill::WEB_SEARCH => ['agent.webSearch'],
-    AISkill::WEB_PAGE_VIEW => ['agent.webPageScreenshot'],
+    AISkill::AGENT_WEB_SEARCH => [WebSearchMCPPackage::class],
+    // offered only to a conversation whose client executes client tool requests (AgentUIMCPPackage::isAvailable())
+    AISkill::AGENT_UI => [AgentUIMCPPackage::class],
+    // Core's features for the platform operators: offered and callable only with the right operatePlatform
+    // (AI.accountRights maps it to the superadmins) and an account with access to every resource
+    AISkill::SYSTEM_HEALTH => [SystemHealthMCPPackage::class],
+    AISkill::SYSTEM_ISSUES => [SystemIssuesMCPPackage::class],
+    AISkill::SYSTEM_WORKERS => [SystemWorkersMCPPackage::class],
+    AISkill::SYSTEM_CRONS => [SystemCronsMCPPackage::class],
 ];

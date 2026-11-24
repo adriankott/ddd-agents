@@ -20,7 +20,7 @@ use Symfony\Component\Console\Tester\CommandTester;
  * The expected lines are the analysis's line formats applied to the test's run (`Fail analysis — <file>`,
  * `model=<model> · <n> cases · <p> pass · <f> fail`, `[<class>] <case>`, `  want: <tool>  |  got: [<tools>]`,
  * `  error: <error>`, `  ✗ <failure>`, `  → <tool>(<arguments>) [<status>]`, `  finalText: <text>|<empty>`,
- * `  repro: php bin/console app:ai-agent:eval-tools --case=<case>[ --model=<model>] --full`, `── Summary ──`,
+ * `  repro: php bin/console app:agent:eval-tools --case=<case>[ --model=<model>] --full`, `── Summary ──`,
  * `  %-20s %d`, `  (no failures 🎉)`, `Run not found: <path>`, `No runs directory: <folder>`, `No runs found under
  * <folder>`); the run folder is laid out as a tools run writes it (`_summary.json` without traces, `<caseId>.json`
  * with the trace).
@@ -79,20 +79,20 @@ class AgentEvalAnalyzeCommandTest extends IntegrationTestCase
             . "  ✗ status FAILED, expected COMPLETED\n"
             . "  → listItems({\"top\": 5}) [FAILED]\n"
             . "  finalText: Sorry, the list failed.\n"
-            . "  repro: php bin/console app:ai-agent:eval-tools --case=analyze.bad-args --model=VENDOR.MODEL --full\n"
+            . "  repro: php bin/console app:agent:eval-tools --case=analyze.bad-args --model=VENDOR.MODEL --full\n"
             . "\n"
             . "[STALL] analyze.stall\n"
             . "  want: listItems  |  got: [load_skills]\n"
             . "  ✗ tool not called\n"
             . "  → load_skills({\"skill_names\":[\"Catalog.Items\"]}) [COMPLETED]\n"
             . '  finalText: ' . mb_substr($stallFinalText, 0, 100) . " …\n"
-            . "  repro: php bin/console app:ai-agent:eval-tools --case=analyze.stall --model=VENDOR.MODEL --full\n"
+            . "  repro: php bin/console app:agent:eval-tools --case=analyze.stall --model=VENDOR.MODEL --full\n"
             . "\n"
             . "[ERROR] analyze.error\n"
             . "  want: ?  |  got: []\n"
             . "  error: the child crashed\n"
             . "  finalText: <empty>\n"
-            . "  repro: php bin/console app:ai-agent:eval-tools --case=analyze.error --model=VENDOR.MODEL --full\n"
+            . "  repro: php bin/console app:agent:eval-tools --case=analyze.error --model=VENDOR.MODEL --full\n"
             . "\n"
             . "── Summary ──\n"
             . sprintf('  %-20s %d', 'BAD_ARGS', 1) . "\n"

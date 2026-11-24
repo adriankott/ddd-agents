@@ -6,6 +6,7 @@ namespace DDD\Domain\AI\Entities\MCPPackages;
 
 use DDD\Domain\Base\Entities\ValueObject;
 use DDD\Infrastructure\Cache\Cache;
+use ReflectionClass;
 
 /**
  * Static registry describing a single MCP package — a group of #[MCPTool] methods.
@@ -56,6 +57,22 @@ class MCPPackage extends ValueObject
         $cache->set($cacheKey, $documentation, Cache::CACHE_TTL_ONE_DAY);
 
         return $documentation;
+    }
+
+    /**
+     * The account rights the package class itself requires (`#[MCPRequiresAccountRights]` on the class, never on a
+     * tool). Class attributes are not inherited: a subclass that replaces a package repeats them.
+     *
+     * @param class-string<MCPPackage> $packageClass
+     * @return string[]
+     */
+    public static function findRequiredAccountRightNamesOfClass(string $packageClass): array
+    {
+        $requiredRightNames = [];
+        foreach ((new ReflectionClass($packageClass))->getAttributes(MCPRequiresAccountRights::class) as $accountRightsAttribute) {
+            $requiredRightNames = array_merge($requiredRightNames, $accountRightsAttribute->newInstance()->accountRightNames);
+        }
+        return array_values(array_unique($requiredRightNames));
     }
 
     /**

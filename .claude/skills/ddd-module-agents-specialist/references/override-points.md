@@ -118,7 +118,7 @@ Each is a public service with a working default. The owning topic skill explains
 | `DDD\Domain\AI\Services\Conversations\AIConversationAgentService` | the drive appends the owner's rows and dispatches the turn | write the host's own data onto the conversation between its creation and the turn's dispatch (`beforeTurnOfDriveIsDispatched()`, with the drive request and its client context) | `ddd-module-agents-loop-specialist` |
 
 The console printer is fetched by its interface `DDD\Domain\AI\Services\Conversations\AgentMessagePrinterInterface`, a public alias of
-`DDD\Presentation\Mcp\Agent\AgentConsolePrinter`; a host aliases the id to its own printer (`ddd-module-agents-observability-specialist`).
+`DDD\Presentation\Mcp\Agents\AgentConsolePrinter`; a host aliases the id to its own printer (`ddd-module-agents-observability-specialist`).
 
 ## The host interfaces
 

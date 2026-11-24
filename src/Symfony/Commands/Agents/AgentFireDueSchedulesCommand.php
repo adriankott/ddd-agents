@@ -35,11 +35,12 @@ use Throwable;
  * ({@see AIConversationSchedulesService::isSkipReasonOfMissingAgentSpace()} and its siblings): an application's
  * service may answer with values of its own, so the command compares against no constant.
  *
- *   php bin/console app:ai-conversation:fire-due-schedules
- *   php bin/console app:ai-conversation:fire-due-schedules --batch=20 --dry-run
+ *   php bin/console app:agent:fire-due-schedules
+ *   php bin/console app:agent:fire-due-schedules --batch=20 --dry-run
  */
 #[AsCommand(
-    name: 'app:ai-conversation:fire-due-schedules',
+    name: 'app:agent:fire-due-schedules',
+    aliases: ['app:ai-conversation:fire-due-schedules'],
     description: 'Fire every due AI conversation schedule: claim its occurrence and spawn the run conversation.',
 )]
 class AgentFireDueSchedulesCommand extends AgentConsoleCommand

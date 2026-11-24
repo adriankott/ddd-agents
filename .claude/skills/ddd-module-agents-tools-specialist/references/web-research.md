@@ -1,11 +1,13 @@
-# Web research: the package's search, page-read and screenshot tools
+# Web research: the package's search and page-read tools
 
 **Reader:** host developer
 
 Contents: what ships · switching it on · the host hooks · degrading · testing in a host.
 
-The package ships the agent's live web research: four tools in two packages, the skills `Web.Search` and
-`Web.PageView`, the reading prompt and the configuration. A host switches it on, names its endpoints and, where it
+The package ships the agent's live web research: three tools in one package, the skill `Agent.Web.Search`, the reading
+prompt and the configuration. Page screenshots are the sibling skill `Agent.Web.Pages` of the package mgamadeus/ddd-agent-browser
+(tool `getWebPageAsScreenshot`): a host with that package names `Agent.Web.Pages` in `subSkillNames` of its own copy of
+`Agent/Web/Search.md` and binds it (the package's file names no skill of a package it does not require). A host switches it on, names its endpoints and, where it
 needs to, decides payer, spend check, fee booking and the default country. It is off by default: nothing is offered and
 no request is made until the host's `config/app/AI/webSearch.php` switches it on.
 
@@ -13,19 +15,18 @@ no request is made until the host's `config/app/AI/webSearch.php` switches it on
 
 | Piece | Where |
 |---|---|
-| `agent.webSearch` (`WebSearchMCPPackage`): `searchTheWeb`, `extractInformationFromWebPagesWithFastLLM`, `getWebPageAsMarkdown` | `src/Presentation/Mcp/Client/AI/` |
-| `agent.webPageScreenshot` (`WebPageScreenshotMCPPackage`): `getWebPageAsScreenshot` | `src/Presentation/Mcp/Client/AI/` |
+| `agent.web.search` (`WebSearchMCPPackage`): `searchTheWeb`, `extractInformationFromWebPagesWithFastLLM`, `getWebPageAsMarkdown` | `src/Presentation/Mcp/Client/Agents/` |
 | The service `AIWebSearchService` and the host hooks `WebSearchHostService` | `src/Domain/AI/Services/WebSearch/` |
-| Hit lists, merged hits (round robin over the queries) and their renderer, page markdown, readings with checked quotes, excerpts, payer, screenshot parts | `src/Domain/AI/Entities/WebSearch/` |
+| Hit lists, merged hits (round robin over the queries) and their renderer, page markdown, readings with checked quotes, excerpts, payer | `src/Domain/AI/Entities/WebSearch/` |
 | The Argus repositories (endpoint, cache lifetime, timeout from the configuration) | `src/Domain/AI/Repo/Argus/WebSearch/` |
-| Skills `Web.Search`, `Web.PageView` (sub-skill, needs vision) | `config/app/AI/Skills/Web/` |
+| Skill `Agent.Web.Search` (right `useWeb`) | `config/app/AI/Skills/Agent/Web/Search.md` |
 | The reading prompt `AI.WebSearch.PageExtract` | `config/app/AI/Prompts/AI/WebSearch/PageExtract.md` |
 | The configuration `AI.webSearch` | `config/app/AI/webSearch.php` |
-| An evaluation template | `templates/web-search/Web.Search.json` of this skill |
+| An evaluation template | `templates/web-search/Agent.Web.Search.json` of this skill |
 
-Tool attributes: every tool reads untrusted content (`MCPToolReturnsUntrustedContent`; the screenshot marks only its URL,
-the pictures are not screened), the three research results are never stubbed by the budget, every tool has 45 s, the
-screenshot refreshes state. The search, the page read and the reading may run in parallel.
+Tool attributes: every tool reads untrusted content (`MCPToolReturnsUntrustedContent`), the three research results are
+never stubbed by the budget, every tool has 45 s; the package requires the right `AgentAccountRights::USE_WEB`. The
+search, the page read and the reading may run in parallel.
 
 What the tools fix themselves instead of trusting the wording:
 
@@ -43,14 +44,13 @@ What the tools fix themselves instead of trusting the wording:
    'endpoints' => [
        'search' => 'POST:/web/search',               // relative = through the Argus gateway
        'urlToMarkdown' => 'POST:/web/urlToMarkdown',
-       'screenshot' => null,                          // no renderer: Web.PageView is not offered
    ],
    ```
-   A capability can also be switched off with an endpoint (`capabilities.screenshot => false`). The wire shapes of the
-   three endpoints are in the file's docblock; they are the request and answer shapes of a Perplexity-style search API,
-   a url-to-markdown crawler and a headless-browser screenshot service.
+   A capability can also be switched off with an endpoint (`capabilities.urlToMarkdown => false`). The wire shapes of
+   the two endpoints are in the file's docblock; they are the request and answer shapes of a Perplexity-style search
+   API and a url-to-markdown crawler.
 2. Bind the skills in the host's `config/app/AI/skillPackages.php` (it replaces the package's):
-   `AISkill::WEB_SEARCH => ['agent.webSearch']`, `AISkill::WEB_PAGE_VIEW => ['agent.webPageScreenshot']`. A package
+   `AISkill::AGENT_WEB_SEARCH => [WebSearchMCPPackage::class]`. A package
    whose capabilities are unavailable is left out of the binding (`MCPPackage::isAvailable()`).
 3. Gate the skill as any other (`AI.skillRequirements`: rights, flags), e.g. only for administrators.
 4. Restart the workers (the binding and the configuration are read once per process).
@@ -84,43 +84,20 @@ account no page is read by a model (the reading fails with "no account to bill t
 The reading model is `reading.modelName` (default: the package's fast model without reasoning). Every limit of the tools
 is in the configuration: queries per search (5), pages per read (5), pages per reading (10), the render budget
 (48,000 characters), cache lifetimes and timeouts per capability (`cacheTtlSeconds`, `timeoutSeconds`), and whether a
-capability's answers are cached in the database too (`cacheInDatabase`; a screenshot is cached in memory only unless
-`screenshot: true` — megabytes of base64 per capture).
+capability's answers are cached in the database too (`cacheInDatabase`).
 
 ## Degrading
 
 - Off, or a capability without an endpoint: the packages are not offered; a direct call is refused with a sentence the
   model reads; the service answers failures on the returned objects (an unanswered hit list, a page with reason
-  `CAPABILITY_OFF`, a screenshot part of height 0), never an exception.
+  `CAPABILITY_OFF`), never an exception.
 - A page read refuses before any crawl: a search engine's results page, a host without a DNS record, a private address
-  (`PublicUrlGuard`); a screenshot is rendered only when every resolved address of the host is public. Both use
-  `PublicUrlGuard::classifyHost()`: a host without a DNS record is `UNRESOLVABLE` ("cannot be resolved (check the
+  (`PublicUrlGuard`); it uses `PublicUrlGuard::classifyHost()`: a host without a DNS record is `UNRESOLVABLE` ("cannot be resolved (check the
   spelling)"), only a private or reserved address is `NOT_PUBLIC` (page read: `BLOCKED`).
-- Without Imagick a screenshot is neither trimmed nor cut: the first part is the whole capture as one picture.
-- A failed render keeps its reason (`reason` of the answer, at the top, under `data` or `error`; a rejected call:
-  `TIMEOUT` or `FETCH_FAILED`; the package's own `NOT_PUBLIC` and `CAPABILITY_OFF`) and the model reads one sentence per
-  reason with the next move (`BOT_CHALLENGE` → the text with `getWebPageAsMarkdown`; `TIMEOUT` → one retry; `BLOCKED`,
-  `UNRESOLVABLE` → no retry); an unknown code is named in the generic sentence. A failed render is never cached. The
-  reasons a page read and a screenshot share have ONE sentence each in `WebFetchFailureReasons` (`UNRESOLVABLE`,
-  `UNSUPPORTED_TYPE` → for a screenshot `getWebPageAsMarkdown`, `TOO_LARGE` → retrying is pointless, `NO_CONTENT`,
-  `TOO_MANY_REDIRECTS` → no retry); add a shared code there, a capability's own code in its entity.
-- The screenshot line names the parts of the same page and device already shown in the turn
-  (`WebPageScreenshotPartsOfTheCurrentTurn`: every earlier call of the turn that did not fail, the calling row left out
-  by its tool call id); reopening one gets a note, never a refusal (its pictures may have left the model's view).
-- The line names the conversation's picture budget (`maxToolCallImagesOnWire` of the context retention settings,
-  default 2): a part is two pictures, so with the default the pictures of a part are gone once the next part is open,
-  and the model is told to describe each part before it opens the next. While the budget holds less than two parts,
-  a screenshot is refused ("describe part N of … first") as long as no assistant text (a status line does not count)
-  followed the previous screenshot of the turn that did not fail
-  (`WebPageScreenshotPartsOfTheCurrentTurn::findUndescribedScreenshotCallOfTurn()`); nothing is rendered. The line of
-  every part but the last says so up front (`PageScreenshotPart::buildDescribeBeforeNextPartText()`: the next message
-  first writes what the part shows and may then open the next one), so the refusal stays a safety net. A
-  `{preCallMessage}` line with at least 120 characters beyond the marker counts as a description. The line of the
-  last part names the earlier parts shown in the turn: their descriptions are the record the summary is built from. A connection
-  error or the client's own timeout (`timeoutSeconds.screenshot`) is a failed render with `TIMEOUT` ("retry once") or
-  `FETCH_FAILED`, never an internal error (`ArgusPageScreenshot::findFailureReasonOfTransportError()`). A host whose
-  page reviews need the previous part beside the current one raises `maxToolCallImagesOnWire` to 4, which also lifts
-  the refusal (each picture is input tokens on every later model call of the turn).
+- The reasons a page read shares with the screenshot of the package mgamadeus/ddd-agent-browser have ONE sentence each in
+  `WebFetchFailureReasons` (`UNRESOLVABLE`, `UNSUPPORTED_TYPE`, `TOO_LARGE` → retrying is pointless, `NO_CONTENT`,
+  `TOO_MANY_REDIRECTS` → no retry); an unknown code is named in the generic sentence. Add a shared code there, a
+  capability's own code in its entity.
 - A query that names an unambiguous time window without `recency` is searched with that window, and the note says
   so: `today`, `this week`, `this month`, "past N days" in English, German, French, Spanish and Italian
   (`WebSearchCallQueries::RECENCY_WINDOWS_BY_PHRASE`, `PAST_DAYS_PATTERNS`), and the name of the current month in the

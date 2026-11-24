@@ -8,8 +8,8 @@ use DDD\Domain\AI\Entities\Conversations\Agent\AgentToolCallProvenance;
 use DDD\Domain\AI\Entities\MCPPackages\MCPTool;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolEffect;
 use DDD\Domain\AI\Services\Mandates\AgentMandatesService;
-use DDD\Presentation\Mcp\Client\AI\AgentMandateToolCallsMCPPackage;
-use DDD\Presentation\Mcp\Client\AI\Dtos\AgentMandatesMcpResponseDto;
+use DDD\Presentation\Mcp\Client\Agents\AgentMandateToolCallsMCPPackage;
+use DDD\Presentation\Mcp\Client\Agents\Dtos\AgentMandatesMcpResponseDto;
 
 /**
  * The mandate tools of an application: its own package id, its own request class, its own argument for the space

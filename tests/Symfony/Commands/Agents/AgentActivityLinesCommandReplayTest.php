@@ -19,7 +19,7 @@ use DDD\Tests\Agents\Support\IntegrationTestCase;
 use Symfony\Component\Console\Tester\CommandTester;
 
 /**
- * The replay of `app:ai-agent:activity-lines` over a scripted narrator: per model the lines of the started and the
+ * The replay of `app:agent:activity-lines` over a scripted narrator: per model the lines of the started and the
  * finished moment of every tool call of a turn, the calls per moment (pending elements ÷ batch size, rounded up), the
  * summed figures, lines against missing lines, and the `--json` printout with a key only for the moments the narrator
  * was asked for. Two owner turns (@0, @5) and a third (@8) without tool calls; #31 sits behind the start of turn @8.

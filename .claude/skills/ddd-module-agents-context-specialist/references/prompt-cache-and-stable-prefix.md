@@ -268,7 +268,7 @@ that is not durable leaves at the end of its worker invocation (a turn end, a wo
 next invocation sends the "no longer on the wire" marker in its place. Seen live: a page picture viewed in turn 1,
 turn 2's first call lost the cache from that result on and three thinking blocks after it. One drop per picture that
 leaves; the cache before the picture and the thinking before it stay. A tool whose pictures should survive a turn end
-returns durable references (`ToolCallImageStore`). `app:ai-agent:cache-diff` shows each drop.
+returns durable references (`ToolCallImageStore`). `app:agent:cache-diff` shows each drop.
 
 **Notes of a call.** The volatile tail (signals, the plan, the time) goes out as ONE `role: "system"` message with
 `clear_at: next_user_message` after the whole history: the model sees it on this call, later calls send it again at the
@@ -355,7 +355,7 @@ On both paths:
 | An older `update_task_plan` call's arguments stubbed (`{"superseded":true}`) | the history from that call | only calls of earlier turns, once at the turn boundary; the running turn's plan calls keep their arguments |
 | Carried reasoning items dropped by the `capped` cut | the history from the first dropped item | the cap (4000) well above the two kept steps; `all` drops none |
 | Messages API: the frozen floor moves up at a turn start (`currentTurn`) or the thinking floor moves (`capped`) | the history from the first step that returns to the plain rendering or loses its thinking | `all` and `capped` keep the recorded frozen floor across turns |
-| Messages API: an edit inside the frozen part (a picture leaving under the picture cap or at the end of its worker invocation; anything else should not happen) | the history from the edit on, once; the provider drops the thinking after it and reports it, and those steps go on without thinking | the frozen rendering; durable pictures; `app:ai-agent:cache-diff` and `inspect --snapshots` name the drop |
+| Messages API: an edit inside the frozen part (a picture leaving under the picture cap or at the end of its worker invocation; anything else should not happen) | the history from the edit on, once; the provider drops the thinking after it and reports it, and those steps go on without thinking | the frozen rendering; durable pictures; `app:agent:cache-diff` and `inspect --snapshots` name the drop |
 | A picture leaving the image cap | that result | the cap keeps the newest pictures |
 
 ## 8. Host checklist

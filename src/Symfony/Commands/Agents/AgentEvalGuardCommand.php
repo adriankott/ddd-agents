@@ -52,7 +52,8 @@ use Throwable;
  * Live: real model calls. `--ignore-budget` lifts the budget cap, also for the children.
  */
 #[AsCommand(
-    name: 'app:ai-agent:eval-guard',
+    name: 'app:agent:eval-guard',
+    aliases: ['app:ai-agent:eval-guard'],
     description: 'Sentinel-Canary guard probe — fail-closed injection-detection eval (guard-prompt variants × attack vectors), per model, parallel.',
 )]
 class AgentEvalGuardCommand extends AgentEvalConsoleCommand

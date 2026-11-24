@@ -84,10 +84,11 @@ use Throwable;
  * ({@see runCaseOfOwnShape()}), the scope of its plan options ({@see buildPlanOptionsOfRun()}), and the words of its
  * output (the `*_LABEL` and `*_SKIP_REASON` constants).
  *
- *   php bin/console app:ai-agent:eval-tools [--skill=<skill>] [--case=<case id>] [--judge] [--repeat=3] [--json] [--full]
+ *   php bin/console app:agent:eval-tools [--skill=<skill>] [--case=<case id>] [--judge] [--repeat=3] [--json] [--full]
  */
 #[AsCommand(
-    name: 'app:ai-agent:eval-tools',
+    name: 'app:agent:eval-tools',
+    aliases: ['app:ai-agent:eval-tools'],
     description: 'Run the per-tool eval set (skill + tool routing + status + arg checks); report pass rates (live).',
 )]
 class AgentEvalToolsCommand extends AgentEvalConsoleCommand

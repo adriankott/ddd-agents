@@ -7,7 +7,7 @@ namespace DDD\Symfony\Commands\Agents\Inspect;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
 /**
- * One row of the header `app:ai-agent:inspect` prints about a conversation: what the row shows and its value as printed.
+ * One row of the header `app:agent:inspect` prints about a conversation: what the row shows and its value as printed.
  *
  * A plain object of one printout; no container service.
  */

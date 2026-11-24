@@ -25,7 +25,7 @@ use Symfony\Component\Process\Process;
 class AgentEvalToolsProbeCommand extends AgentEvalToolsCommand
 {
     /** @var string The name of the command (the attribute of the module's class is not inherited) */
-    public const string COMMAND_NAME = 'app:ai-agent:eval-tools';
+    public const string COMMAND_NAME = 'app:agent:eval-tools';
 
     /** @var string The prefix of the ids of the cases the probe runs as its own shape */
     public const string OWN_SHAPE_CASE_PREFIX = 'own.';

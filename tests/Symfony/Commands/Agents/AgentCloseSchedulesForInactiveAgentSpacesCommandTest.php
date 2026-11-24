@@ -32,7 +32,7 @@ use Symfony\Component\Lock\Store\SemaphoreStore;
  */
 class AgentCloseSchedulesForInactiveAgentSpacesCommandTest extends UnitTestCase
 {
-    public const string MODULE_COMMAND_NAME = 'app:ai-schedule:close-for-inactive-agent-spaces';
+    public const string MODULE_COMMAND_NAME = 'app:agent:close-schedules-for-inactive-agent-spaces';
 
     protected StateSweepSchedulesServiceDouble $schedulesServiceDouble;
 
@@ -54,7 +54,7 @@ class AgentCloseSchedulesForInactiveAgentSpacesCommandTest extends UnitTestCase
     public function testTheCommandHasTheNeutralNameItsOptionsAndDefaults(): void
     {
         $asCommandAttributes = (new ReflectionClass(AgentCloseSchedulesForInactiveAgentSpacesCommand::class))->getAttributes(AsCommand::class);
-        self::assertSame(self::MODULE_COMMAND_NAME, $asCommandAttributes[0]->newInstance()->name);
+        self::assertSame(self::MODULE_COMMAND_NAME, explode('|', $asCommandAttributes[0]->newInstance()->name)[0], 'the old name stays an alias');
 
         $closeSchedulesCommand = new AgentCloseSchedulesForInactiveAgentSpacesCommand();
         self::assertInstanceOf(AgentConsoleCommand::class, $closeSchedulesCommand);

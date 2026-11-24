@@ -23,6 +23,9 @@ import {
   type SelectableModel,
   type StartedConversation,
 } from "../../contract/conversation";
+import type { AgentUIState } from "../../ui/agent-ui-state";
+import type { AgentUIClientBinding } from "../../ui/AgentUIClient";
+import type { ClientToolAnswer } from "../../ui/client-tools";
 import { composeAttachmentMessageText } from "../compose-attachment-message-text";
 import type { PollingConversationChangeSubscriptionOptions } from "../polling/createPollingConversationChangeSubscription";
 import { withPollingChangeSubscription } from "../polling/withPollingChangeSubscription";
@@ -91,6 +94,12 @@ export interface AgentsHttpConversationClientOptions extends AgentsConversationC
    * line beside the owner's newest message. A field over its cap is left out, never cut. Default: none.
    */
   clientContext?: (operation: AgentsClientContextOperation) => AgentsClientContext | null | undefined;
+  /**
+   * The UI side of `Agent.UI` (`AgentUIClient` of `@mgamadeus/ddd-agents/ui`): its client id and UI state ride on every
+   * write and every run-state read; a client tool request the run-state read delivers goes to it, and the binding
+   * posts its answer (`POST /{conversationId}/clientToolRequests/{requestId}/answer`). Default: none.
+   */
+  uiClient?: AgentUIClientBinding;
 }
 
 /** The writes that carry the client context. */
@@ -137,12 +146,35 @@ class AgentsHttpConversationClient implements AgentsConversationClient {
   };
 
   getConversationRunState = async (conversationId: number): Promise<ConversationRunStateRead> => {
+    const uiClient = this.options.uiClient;
+    const uiState = uiClient?.readUIState() ?? null;
     const response = await this.request<WireConversationRunStateResponse>({
       operation: "getConversationRunState",
       method: "GET",
       path: `/${conversationId}/runState`,
+      query: uiClient ? { clientId: uiClient.clientId, uiStateJson: uiState ? JSON.stringify(uiState) : undefined } : undefined,
     });
+    if (uiClient && response.clientToolRequest) {
+      uiClient.acceptClientToolRequest(conversationId, response.clientToolRequest, (requestId, answer) =>
+        this.answerClientToolRequest(conversationId, requestId, answer),
+      );
+    }
     return mapWireConversationRunState(response);
+  };
+
+  /** Posts the answer of the UI client to a client tool request (`Agent.UI`); a refused answer is the server's word. */
+  answerClientToolRequest = async (conversationId: number, requestId: number, answer: ClientToolAnswer): Promise<void> => {
+    await this.request<unknown>({
+      operation: "answerClientToolRequest",
+      method: "POST",
+      path: `/${conversationId}/clientToolRequests/${requestId}/answer`,
+      body: {
+        clientId: this.options.uiClient?.clientId ?? "",
+        outcome: answer.outcome,
+        text: answer.text,
+        detailsJson: JSON.stringify(answer.details ?? {}),
+      },
+    });
   };
 
   getNewestMessagesPage = (conversationId: number, pageSize: number): Promise<ConversationMessagesPage> =>
@@ -332,9 +364,19 @@ class AgentsHttpConversationClient implements AgentsConversationClient {
   }
 
   /** The body field `clientContext` of a write, from the host's option; nothing when it gives none. */
-  protected readClientContextBody(operation: AgentsClientContextOperation): { clientContext?: ReturnType<typeof mapClientContextToWire> } {
+  protected readClientContextBody(operation: AgentsClientContextOperation): {
+    clientContext?: ReturnType<typeof mapClientContextToWire>;
+    clientId?: string;
+    uiState?: AgentUIState;
+  } {
     const wireClientContext = mapClientContextToWire(this.options.clientContext?.(operation));
-    return wireClientContext ? { clientContext: wireClientContext } : {};
+    const uiClient = this.options.uiClient;
+    const uiState = uiClient?.readUIState() ?? null;
+    return {
+      ...(wireClientContext ? { clientContext: wireClientContext } : {}),
+      ...(uiClient ? { clientId: uiClient.clientId } : {}),
+      ...(uiState ? { uiState } : {}),
+    };
   }
 
   /** The URL of a route: the base, the path, the binding's query parameters with the host's extra ones over them. */

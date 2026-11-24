@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace DDD\Tests\Agents\Domain\AI\Services\WebSearch;
 
-use DDD\Domain\AI\Entities\WebSearch\PageScreenshots\PageScreenshotPart;
 use DDD\Domain\AI\Entities\WebSearch\WebPageExcerpts;
 use DDD\Domain\AI\Entities\WebSearch\WebPageExtract;
 use DDD\Domain\AI\Entities\WebSearch\WebPageMarkdown;
@@ -14,8 +13,7 @@ use DDD\Domain\AI\Services\WebSearch\AIWebSearchService;
 use DDD\Domain\AI\Services\WebSearch\WebSearchHostService;
 use DDD\Domain\AI\Entities\Conversations\Agent\AgentToolCallProvenance;
 use DDD\Domain\AI\Entities\WebSearch\WebPageMarkdowns;
-use DDD\Presentation\Mcp\Client\AI\WebPageScreenshotMCPPackage;
-use DDD\Presentation\Mcp\Client\AI\WebSearchMCPPackage;
+use DDD\Presentation\Mcp\Client\Agents\WebSearchMCPPackage;
 use DDD\Tests\Agents\Support\UnitTestCase;
 use DDD\Tests\Agents\Support\WebSearchTestConfiguration;
 
@@ -38,7 +36,6 @@ class AIWebSearchServiceConfigurationTest extends UnitTestCase
                 self::assertFalse($aiWebSearchService->isCapabilityAvailable($capability), $capability);
             }
             self::assertFalse(WebSearchMCPPackage::isAvailable());
-            self::assertFalse(WebPageScreenshotMCPPackage::isAvailable());
 
             $webSearchHitLists = $aiWebSearchService->findHitListsForQueries(['a', ' ', 'b'], new WebSearchHitListFilters(), WebSearchPayer::forAccount(null));
             self::assertSame(2, $webSearchHitLists->count());
@@ -51,8 +48,6 @@ class AIWebSearchServiceConfigurationTest extends UnitTestCase
             foreach ($webPageMarkdowns->getElements() as $webPageMarkdown) {
                 self::assertSame(WebPageMarkdown::REASON_CAPABILITY_OFF, $webPageMarkdown->reason);
             }
-
-            self::assertSame(0, $aiWebSearchService->capturePagePartForModel('https://example.com')->pageHeightPx);
         } finally {
             WebSearchTestConfiguration::restoreConfigValues($configValuesBefore);
         }
@@ -61,16 +56,14 @@ class AIWebSearchServiceConfigurationTest extends UnitTestCase
     public function testWithEndpointsTheCapabilitiesAreAvailableAndOneCanBeSwitchedOff(): void
     {
         $webSearchConfiguration = WebSearchTestConfiguration::buildEnabledConfiguration();
-        $webSearchConfiguration['capabilities']['screenshot'] = false;
+        $webSearchConfiguration['capabilities']['urlToMarkdown'] = false;
         $webSearchConfiguration['hits']['maxQueriesPerCall'] = 3;
         $configValuesBefore = WebSearchTestConfiguration::declareWebSearchConfiguration($webSearchConfiguration);
         try {
             $aiWebSearchService = new AIWebSearchService();
             self::assertTrue($aiWebSearchService->isCapabilityAvailable(AIWebSearchService::CAPABILITY_SEARCH));
-            self::assertTrue($aiWebSearchService->isCapabilityAvailable(AIWebSearchService::CAPABILITY_URL_TO_MARKDOWN));
-            self::assertFalse($aiWebSearchService->isCapabilityAvailable(AIWebSearchService::CAPABILITY_SCREENSHOT), 'switched off although it has an endpoint');
+            self::assertFalse($aiWebSearchService->isCapabilityAvailable(AIWebSearchService::CAPABILITY_URL_TO_MARKDOWN), 'switched off although it has an endpoint');
             self::assertTrue(WebSearchMCPPackage::isAvailable());
-            self::assertFalse(WebPageScreenshotMCPPackage::isAvailable());
             self::assertSame(3, $aiWebSearchService->getConfiguredLimit('hits.maxQueriesPerCall', 5));
             self::assertSame(10, $aiWebSearchService->getConfiguredLimit('extraction.maxPagesPerCall', 99), 'the package default file');
             self::assertSame(7, $aiWebSearchService->getConfiguredLimit('no.such.limit', 7));
@@ -116,6 +109,5 @@ class AIWebSearchServiceConfigurationTest extends UnitTestCase
         self::assertNull($webSearchHostService->buildNoteAfterWebPagesRead(new WebPageMarkdowns(), $callProvenance));
         $webSearchHostService->throwIfWebSearchSpendingIsRefused(WebSearchPayer::forAccount(null));
         $webSearchHostService->bookWebSearchRequests(WebSearchPayer::forAccount(null), new WebSearchHitListFilters(), 2, 0.002);
-        self::assertSame(PageScreenshotPart::DEVICE_DESKTOP, (new PageScreenshotPart())->device);
     }
 }

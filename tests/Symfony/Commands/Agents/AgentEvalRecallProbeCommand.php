@@ -14,7 +14,7 @@ class AgentEvalRecallProbeCommand extends AgentEvalRecallCommand
     use AgentEvalCaseCommandServicesTrait;
 
     /** @var string The name the command runs under (a probe class carries no command attribute of its own) */
-    public const string PROBE_COMMAND_NAME = 'app:ai-agent:eval-recall';
+    public const string PROBE_COMMAND_NAME = 'app:agent:eval-recall';
 
     public function __construct()
     {

@@ -9,14 +9,14 @@ use DDD\Domain\AI\Entities\MCPPackages\MCPToolWritesAgentMemoryOnly;
 use DDD\Domain\AI\Entities\Skills\AISkill;
 use DDD\Domain\Base\Entities\LazyLoad\LazyLoadRepo;
 use DDD\Infrastructure\Libs\Config;
-use DDD\Presentation\Mcp\Client\AI\AgentMemoriesMCPPackage;
+use DDD\Presentation\Mcp\Client\Agents\AgentMemoriesMCPPackage;
 use DDD\Tests\Agents\Support\UnitTestCase;
 use ReflectionMethod;
 
 /**
  * The memory tools' schema builds, the package exposes the five tool names (the same names as earlier application
  * memory packages, so a host can switch to it), every tool is described, the three writes refresh the standing
- * directives within a run, and the package's default binding offers it under `Memory.Management`.
+ * directives within a run, and the package's default binding offers it under `Agent.Memory`.
  */
 class AgentMemoriesMCPPackageSchemaTest extends UnitTestCase
 {
@@ -45,7 +45,7 @@ class AgentMemoriesMCPPackageSchemaTest extends UnitTestCase
         $expectedToolNames = self::TOOL_NAMES;
         sort($expectedToolNames);
         self::assertSame($expectedToolNames, $toolNames);
-        self::assertSame('agent.memories', $packageDocumentation->name);
+        self::assertSame('agent.memory', $packageDocumentation->name);
     }
 
     public function testTheSchemaCarriesNoUnparsedGenericArrayType(): void
@@ -64,11 +64,11 @@ class AgentMemoriesMCPPackageSchemaTest extends UnitTestCase
         }
     }
 
-    public function testThePackagesBindingOffersTheToolsUnderMemoryManagement(): void
+    public function testThePackagesBindingOffersTheToolsUnderAgentMemory(): void
     {
         $packageBinding = require dirname(__DIR__, 4) . '/config/app/AI/skillPackages.php';
 
-        self::assertSame(['agent.memories'], $packageBinding[AISkill::MEMORY_MANAGEMENT] ?? null);
-        self::assertFileExists(dirname(__DIR__, 4) . '/config/app/AI/Skills/Memory/Management.md');
+        self::assertSame([AgentMemoriesMCPPackage::class], $packageBinding[AISkill::AGENT_MEMORY] ?? null);
+        self::assertFileExists(dirname(__DIR__, 4) . '/config/app/AI/Skills/Agent/Memory.md');
     }
 }

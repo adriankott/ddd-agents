@@ -49,12 +49,13 @@ use Throwable;
  * nothing, `--missing` finds nothing, and `--print` prints the metrics with the purpose, the entry point, the
  * initiator type, the eval marker and the run state of each conversation. Idempotent.
  *
- *   php bin/console app:ai-conversation:scorecards --print --since=2026-01-01
- *   php bin/console app:ai-conversation:scorecards --conversation=123 --inline
- *   php bin/console app:ai-conversation:scorecards --missing --limit=50
+ *   php bin/console app:agent:conversation-scorecards --print --since=2026-01-01
+ *   php bin/console app:agent:conversation-scorecards --conversation=123 --inline
+ *   php bin/console app:agent:conversation-scorecards --missing --limit=50
  */
 #[AsCommand(
-    name: 'app:ai-conversation:scorecards',
+    name: 'app:agent:conversation-scorecards',
+    aliases: ['app:ai-conversation:scorecards'],
     description: 'Backfill, reconcile (--missing) or print (--print) the conversation scorecards from the persisted messages.'
 )]
 class AIConversationScorecardsCommand extends AgentConsoleCommand

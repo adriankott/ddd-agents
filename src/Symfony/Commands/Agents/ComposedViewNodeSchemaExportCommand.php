@@ -22,10 +22,10 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  * either file differs. Run after a node, widget, data source or entity reference class of the application was added
  * or changed. Where the files lie: {@see getSchemaFilePaths()}.
  *
- *   php bin/console app:ai:composed-view:export-node-schema
- *   php bin/console app:ai:composed-view:export-node-schema --check
+ *   php bin/console app:agent:export-composed-view-node-schema
+ *   php bin/console app:agent:export-composed-view-node-schema --check
  */
-#[AsCommand(name: 'app:ai:composed-view:export-node-schema', description: 'Writes the application\'s part of the ComposedView node schema from the registered classes and compares the installed package\'s composed-node-schema.json; --check only compares.')]
+#[AsCommand(name: 'app:agent:export-composed-view-node-schema', aliases: ['app:ai:composed-view:export-node-schema'], description: 'Writes the application\'s part of the ComposedView node schema from the registered classes and compares the installed package\'s composed-node-schema.json; --check only compares.')]
 class ComposedViewNodeSchemaExportCommand extends AgentConsoleCommand
 {
     protected function configure(): void

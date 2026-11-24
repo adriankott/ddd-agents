@@ -31,14 +31,15 @@ use Throwable;
  * ({@see AIConversationSchedulesService::applyAutomationStateSweepToSchedule()}).
  *
  * An application whose cron rows call the sweep by another name declares that name beside this one in its subclass's
- * `#[AsCommand]` (`name: 'app:ai-schedule:close-for-inactive-agent-spaces|<its name>'`), so the framework removes this
+ * `#[AsCommand]` (`name: 'app:agent:close-schedules-for-inactive-agent-spaces|<its name>'`), so the framework removes this
  * command's service and both names run the application's class.
  *
- *   php bin/console app:ai-schedule:close-for-inactive-agent-spaces
- *   php bin/console app:ai-schedule:close-for-inactive-agent-spaces --batch=500 --dry-run
+ *   php bin/console app:agent:close-schedules-for-inactive-agent-spaces
+ *   php bin/console app:agent:close-schedules-for-inactive-agent-spaces --batch=500 --dry-run
  */
 #[AsCommand(
-    name: 'app:ai-schedule:close-for-inactive-agent-spaces',
+    name: 'app:agent:close-schedules-for-inactive-agent-spaces',
+    aliases: ['app:ai-schedule:close-for-inactive-agent-spaces'],
     description: 'Close the AI schedules of ended or suspended agent spaces and accounts; re-arm platform-paused ones whose state cleared.',
 )]
 class AgentCloseSchedulesForInactiveAgentSpacesCommand extends AgentConsoleCommand

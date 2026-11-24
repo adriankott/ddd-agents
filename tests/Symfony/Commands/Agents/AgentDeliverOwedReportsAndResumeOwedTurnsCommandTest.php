@@ -68,7 +68,7 @@ class AgentDeliverOwedReportsAndResumeOwedTurnsCommandTest extends UnitTestCase
     public function testTheCommandKeepsItsNameOptionsAndDefaults(): void
     {
         $asCommandAttributes = (new ReflectionClass(AgentDeliverOwedReportsAndResumeOwedTurnsCommand::class))->getAttributes(AsCommand::class);
-        self::assertSame('app:ai-conversation:deliver-owed-reports-and-resume-owed-turns', $asCommandAttributes[0]->newInstance()->name);
+        self::assertSame('app:agent:deliver-owed-reports-and-resume-owed-turns', explode('|', $asCommandAttributes[0]->newInstance()->name)[0], 'the old name stays an alias');
 
         $deliverOwedCommand = new AgentDeliverOwedReportsAndResumeOwedTurnsCommand();
         self::assertInstanceOf(AgentConsoleCommand::class, $deliverOwedCommand);

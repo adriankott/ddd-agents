@@ -52,11 +52,12 @@ use Throwable;
  * ({@see actAsAccount()}), so the worker restores the right rights context. Two runs never overlap: a run that finds
  * the previous one still active ends at once.
  *
- *   php bin/console app:ai-conversation:deliver-owed-reports-and-resume-owed-turns
- *   php bin/console app:ai-conversation:deliver-owed-reports-and-resume-owed-turns --quiet-seconds=600 --batch=20 --dry-run
+ *   php bin/console app:agent:deliver-owed-reports-and-resume-owed-turns
+ *   php bin/console app:agent:deliver-owed-reports-and-resume-owed-turns --quiet-seconds=600 --batch=20 --dry-run
  */
 #[AsCommand(
-    name: 'app:ai-conversation:deliver-owed-reports-and-resume-owed-turns',
+    name: 'app:agent:deliver-owed-reports-and-resume-owed-turns',
+    aliases: ['app:ai-conversation:deliver-owed-reports-and-resume-owed-turns'],
     description: 'Deliver run reports still owed to the owner and resume runs that still owe a turn — both self-clearing.',
 )]
 class AgentDeliverOwedReportsAndResumeOwedTurnsCommand extends AgentConsoleCommand

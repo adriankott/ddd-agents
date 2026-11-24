@@ -60,7 +60,7 @@ class AgentDecisionFixturesCommandTest extends UnitTestCase
     public function testTheCommandKeepsItsNameArgumentAndOptions(): void
     {
         $asCommandAttributes = (new ReflectionClass(AgentDecisionFixturesCommand::class))->getAttributes(AsCommand::class);
-        self::assertSame('app:ai-agent:decision-fixtures', $asCommandAttributes[0]->newInstance()->name);
+        self::assertSame('app:agent:decision-fixtures', explode('|', $asCommandAttributes[0]->newInstance()->name)[0], 'the old name stays an alias');
 
         $agentDecisionFixturesCommand = new AgentDecisionFixturesCommand();
         self::assertInstanceOf(AgentConsoleCommand::class, $agentDecisionFixturesCommand);

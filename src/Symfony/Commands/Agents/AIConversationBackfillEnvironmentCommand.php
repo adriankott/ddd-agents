@@ -23,11 +23,12 @@ use Throwable;
  *
  * Batched writes through the service, no entity load, no rights (the rows belong to every account).
  *
- *   php bin/console app:ai-conversation:backfill-environment --dryRun
- *   php bin/console app:ai-conversation:backfill-environment --environment=prod
+ *   php bin/console app:agent:backfill-conversation-environment --dryRun
+ *   php bin/console app:agent:backfill-conversation-environment --environment=prod
  */
 #[AsCommand(
-    name: 'app:ai-conversation:backfill-environment',
+    name: 'app:agent:backfill-conversation-environment',
+    aliases: ['app:ai-conversation:backfill-environment'],
     description: 'Stamp every conversation without an environment with the given one (default prod).',
 )]
 class AIConversationBackfillEnvironmentCommand extends AgentConsoleCommand

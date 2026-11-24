@@ -8,12 +8,12 @@ model sees once the skill is loaded · YAML traps · checking a file
 ## Where the file lives
 
 One agent skill is one markdown file below `config/app/AI/Skills/` of a config root. Its dotted name is its path:
-`Assistant/Mandates.md` is the skill `Assistant.Mandates`. There is no id besides the name. The name is the key of
+`Agent/Mandates.md` is the skill `Agent.Mandates`. There is no id besides the name. The name is the key of
 `AISkillsService::getAISkillByName()`, which reads it as the config value `AI.Skills.<name>` from the FIRST config
 root that holds the file (the application's roots before a module's). A file alone is not offered: the skill also
 needs its entry in the binding `AI.skillPackages` (reference [catalog-binding-overrides-and-lint.md](catalog-binding-overrides-and-lint.md)).
 
-The package ships three skill files, `Assistant.Mandates`, `Assistant.Tasks` and `Assistant.TaskRunReports`; the reference kernel ships
+The package ships three skill files, `Agent.Mandates`, `Agent.Tasks` and `Agent.TaskRunReports`; the reference kernel ships
 `Demo.Notes`. Read `Demo.Notes` first: it is the smallest complete skill.
 
 ## The shape of the file
@@ -68,7 +68,7 @@ Every gate key is also settable without editing the file, through the overlay `A
 `AISkillsService::substitutePersonaPlaceholders()` replaces `{%AGENT_NAME%}` and `{%PRODUCT_NAME%}` in the WHOLE raw
 file before the frontmatter is parsed, from the config `AI.agentPersona` (`agentName`, `productName`; defaults
 `AISkillsService::DEFAULT_AGENT_NAME` and `AISkillsService::DEFAULT_PRODUCT_NAME`). A skill of a module therefore
-never names an agent or a product: `Assistant.Mandates` writes `{%AGENT_NAME%}` in its description. Purpose files go
+never names an agent or a product: `Agent.Mandates` writes `{%AGENT_NAME%}` in its description. Purpose files go
 through the same step.
 
 ## What the model sees once the skill is loaded
@@ -76,7 +76,7 @@ through the same step.
 `AISkill::getInstructionBlock()` renders:
 
 ```
-## Assistant.Mandates
+## Agent.Mandates
 Tools from this skill (already available): grantMandate, listMandates, revokeMandate
 <one sentence per entitlement exclusion, if any>
 <the SUB_SKILLS_HEADER line and one line per offered sub-skill, if the skill lists sub-skills>

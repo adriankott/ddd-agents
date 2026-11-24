@@ -374,7 +374,7 @@
         "-d",
         "memory_limit=2G",
         "/kernel-root/bin/console",
-        "app:ai-agent:eval-guard",
+        "app:agent:eval-guard",
         "--json",
         "--no-save",
         "--parallel=1",

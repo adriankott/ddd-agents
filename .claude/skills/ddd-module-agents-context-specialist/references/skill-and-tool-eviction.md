@@ -31,7 +31,7 @@ conversation with a run in progress or a message younger than `$quietMinutes`, w
 transaction that locks the rows and compares their stored sets first, pauses between writes, backs off while the
 database is busy and stops at its time budget; dry run and verification are options
 (`compactLoadedCapabilitiesOfConversation()` for one conversation, report `AIConversationLoadedCapabilitiesRewriteReport`).
-The package's command `app:ai-agent:loaded-capabilities-compact` runs it as an optional maintenance job. A host that
+The package's command `app:agent:loaded-capabilities-compact` runs it as an optional maintenance job. A host that
 wants it adds a nightly cron line with `--maxSeconds` below the cron ticker's limit of 360 s (the default is 1500 s),
 until the cursor has passed every conversation, and runs it only once every process that reads these rows reads the
 chain format. No other code of the package calls it.
@@ -93,7 +93,7 @@ unload when turnsSinceLastUse ≥ minResidencyTurns and staleness × sizeFactor 
 - An unused speculative preload leaves first, then the sweep re-runs (`AgentColdCapabilityUnloading`).
 
 Because a single cooled tool can leave at any step, this mode changes the tools array more often; it stays available
-for comparison. `app:ai-agent:context-eviction-sim` plays scripted scenarios through `computeEviction()` and prints the
+for comparison. `app:agent:context-eviction-sim` plays scripted scenarios through `computeEviction()` and prints the
 load per turn against both ceilings (every knob is an option, for example `--soft` and `--hard`); it needs no
 database and makes no model call. It does not simulate the skill granularity.
 

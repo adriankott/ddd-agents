@@ -33,7 +33,7 @@ class DelegateCallWithParallelTasksStartsOneSubAgentPerItemTest extends UnitTest
         $delegateToolArguments = DelegateToolArguments::fromToolCallArguments([
             'task' => 'top-level task',
             DelegateToolArguments::PARALLEL_TASKS_ARGUMENT => [
-                ['label' => 'Site A', 'task' => 'Research site A', 'skill_names' => ['Web.Search']],
+                ['label' => 'Site A', 'task' => 'Research site A', 'skill_names' => ['Agent.Web.Search']],
                 ['toolName' => 'readPage', 'toolArguments' => '{"url": "https://example.com"}'],
                 'not an object',
             ],

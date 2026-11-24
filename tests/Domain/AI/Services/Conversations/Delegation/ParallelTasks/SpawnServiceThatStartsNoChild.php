@@ -16,7 +16,7 @@ use DDD\Domain\AI\Entities\Conversations\Messages\ToolCall;
 use DDD\Domain\AI\Services\Conversations\Agent\AgentChildTurnRunnerInterface;
 use DDD\Domain\AI\Services\Conversations\Agent\AIConversationDelegationSpawnService;
 use DDD\Infrastructure\Base\DateTime\DateTime;
-use DDD\Presentation\Mcp\Agent\AgentConsoleStream;
+use DDD\Presentation\Mcp\Agents\AgentConsoleStream;
 
 /**
  * The spawn service that starts no child: a spawned sub-agent gets its queued record on its row and the answer names

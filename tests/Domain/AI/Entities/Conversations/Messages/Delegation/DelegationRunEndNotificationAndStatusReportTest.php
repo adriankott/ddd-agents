@@ -220,7 +220,7 @@ class DelegationRunEndNotificationAndStatusReportTest extends UnitTestCase
         $delegationSubAgentRecord = DelegationSubAgentRecord::fromStoredArray([
             'number' => 5,
             'label' => 'Prices page',
-            'task' => ['kind' => 'agent', 'taskText' => 'Read the prices page.', 'skillNames' => ['Web.Search']],
+            'task' => ['kind' => 'agent', 'taskText' => 'Read the prices page.', 'skillNames' => ['Agent.Web.Search']],
             'childConversationId' => 812347,
             'currentRunNumber' => 2,
             'runs' => [
@@ -270,7 +270,7 @@ class DelegationRunEndNotificationAndStatusReportTest extends UnitTestCase
         $agentSubAgentRequest = AgentSubAgentRequest::forModelCall(DelegateToolArguments::fromToolCallArguments([
             'label' => $label,
             'task' => 'Read the ' . $label . ' of the website.',
-            'skill_names' => ['Web.Search'],
+            'skill_names' => ['Agent.Web.Search'],
         ]));
         self::assertNotNull($agentSubAgentRequest);
         return $agentSubAgentRequest;

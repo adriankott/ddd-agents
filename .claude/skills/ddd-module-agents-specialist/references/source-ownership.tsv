@@ -20,6 +20,7 @@ src/Domain/AI/**/TraceEvents/**	observability
 src/Domain/AI/**/TurnEvents/**	observability
 src/Domain/AI/**/Evals/**	observability
 src/Domain/AI/**/RecordedRuns/**	observability
+src/Domain/AI/Services/Eval/AgentScriptedUIClientService.php	tools
 src/Domain/AI/Services/Eval/**	observability
 config/app/AI/Prompts/AI/Agent/Evaluation/**	observability
 src/Domain/AI/Services/Conversations/Quality/**	observability
@@ -29,7 +30,8 @@ src/Domain/AI/Services/Conversations/AgentMessagePrinterInterface.php	observabil
 src/Domain/AI/MessageHandlers/AIConversationScorecard*	observability
 src/Domain/AI/Interfaces/AIConversationProgressReporterInterface.php	observability
 src/Domain/AI/Traits/**	observability
-src/Presentation/Mcp/Agent/**	observability
+src/Presentation/Mcp/Agents/**	observability
+src/Symfony/Commands/Agents/AgentClientToolsPurgeCommand.php	tools
 src/Symfony/Commands/Agents/**	observability
 src/Presentation/Api/Agents/Conversations/Dtos/AIConversationMessageSentPayload*	observability
 config/app/AI/evalOutboundRecipients.php	observability
@@ -57,19 +59,30 @@ config/app/AI/untrustedContent.php	decisions-and-guards
 config/untrusted-sinks-allowlist.php	decisions-and-guards
 config/app/AI/Prompts/AI/Agent/*Decision.md	decisions-and-guards
 config/app/AI/Prompts/AI/Agent/OwnerMessageInjectionGateRules.md	decisions-and-guards
-# web research (ddd-module-agents-tools-specialist): pierces the autonomy folders config/app/AI/Skills/** and src/Presentation/Mcp/Client/AI/**
+# Agent.UI and System.* (ddd-module-agents-tools-specialist): the UI tools with their client channel, the platform tools
+src/Domain/AI/**/ClientTools/**	tools
+src/Presentation/Mcp/Client/Agents/AgentUIMCPPackage.php	tools
+src/Presentation/Mcp/Client/Agents/Dtos/AgentUIToolResponseDto.php	tools
+src/Presentation/Mcp/Client/Agents/Dtos/*Screen*	tools
+src/Presentation/Api/Agents/Conversations/Dtos/AIConversationClientToolRequestAnswer*	tools
+config/app/AI/Skills/Agent/UI.md	tools
+src/Domain/AI/**/SystemHealth/**	tools
+src/Presentation/Mcp/Admin/**	tools
+config/app/AI/Skills/System/**	tools
+src/Domain/AI/Entities/MCPPackages/LlmRendering/**	tools
+config/app/AI/accountRights.php	entry
+# web research (ddd-module-agents-tools-specialist): pierces the autonomy folders config/app/AI/Skills/** and src/Presentation/Mcp/Client/Agents/**
 src/Domain/AI/**/WebSearch/**	tools
-src/Presentation/Mcp/Client/AI/WebSearchMCPPackage.php	tools
+src/Presentation/Mcp/Client/Agents/WebSearchMCPPackage.php	tools
 src/Domain/AI/**/Drives/**	tools
-src/Presentation/Mcp/Client/AI/AgentDriveMCPPackage.php	tools
-src/Presentation/Mcp/Client/AI/Dtos/AgentDrive*	tools
-src/Presentation/Mcp/Client/AI/WebPageScreenshotMCPPackage.php	tools
-src/Presentation/Mcp/Client/AI/ToolBatchAdoptionNote.php	tools
-src/Presentation/Mcp/Client/AI/Dtos/SearchTheWebRequestDto.php	tools
-src/Presentation/Mcp/Client/AI/Dtos/ExtractInformationFromWebPagesRequestDto.php	tools
-src/Presentation/Mcp/Client/AI/Dtos/WebPage*	tools
-src/Presentation/Mcp/Client/AI/Dtos/WebSearch*	tools
-config/app/AI/Skills/Web/**	tools
+src/Presentation/Mcp/Client/Agents/AgentDriveMCPPackage.php	tools
+src/Presentation/Mcp/Client/Agents/Dtos/AgentDrive*	tools
+src/Presentation/Mcp/Client/Agents/ToolBatchAdoptionNote.php	tools
+src/Presentation/Mcp/Client/Agents/Dtos/SearchTheWebRequestDto.php	tools
+src/Presentation/Mcp/Client/Agents/Dtos/ExtractInformationFromWebPagesRequestDto.php	tools
+src/Presentation/Mcp/Client/Agents/Dtos/WebPage*	tools
+src/Presentation/Mcp/Client/Agents/Dtos/WebSearch*	tools
+config/app/AI/Skills/Agent/Web/**	tools
 config/app/AI/Prompts/AI/WebSearch/**	tools
 config/app/AI/webSearch.php	tools
 # autonomy (ddd-module-agents-autonomy-specialist): delegation, schedules, eligibility, mandates, supervisor, owner reports, background operations
@@ -106,7 +119,7 @@ config/app/AI/supervisor.php	autonomy
 config/app/AI/Prompts/AI/Agent/SubAgentDirective.md	autonomy
 config/app/AI/Purposes/**	autonomy
 config/app/AI/Skills/**	autonomy
-src/Presentation/Mcp/Client/AI/**	autonomy
+src/Presentation/Mcp/Client/Agents/**	autonomy
 # widgets (ddd-module-agents-widgets-specialist): widgets, composed views, signal sources, activity lines, realtime signal, external agents
 src/Domain/AI/Entities/Conversations/Widgets/**	widgets
 src/Domain/AI/Entities/Conversations/SignalSources/**	widgets
@@ -208,7 +221,6 @@ config/app/AI/agentToolCallChildProcess.php	tools
 src/Modules/**	entry
 src/Domain/AI/**/AgentSpaces/**	entry
 src/Domain/AI/**/Discovery/**	entry
-src/Domain/AI/**/Sandboxes/**	entry
 src/Domain/AI/**/Entitlements/**	entry
 src/Domain/AI/**/Channels/**	entry
 src/Domain/AI/Entities/Environment/**	entry

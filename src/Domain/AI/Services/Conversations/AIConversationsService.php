@@ -24,6 +24,8 @@ use DDD\Domain\AI\Entities\Conversations\EntryPoints\AIConversationEntryPointSta
 use DDD\Domain\AI\Exceptions\Conversations\ConversationClosedException;
 use DDD\Domain\Common\Entities\Accounts\Account;
 use DDD\Domain\AI\Entities\Conversations\AIConversations;
+use DDD\Domain\AI\Entities\Conversations\AgentSpaces\AgentSpaceRootConversation;
+use DDD\Domain\AI\Entities\Conversations\AgentSpaces\AgentSpaceRootConversations;
 use DDD\Domain\AI\Entities\Conversations\CostSummaries\AIConversationCostRow;
 use DDD\Domain\AI\Entities\Conversations\CostSummaries\AIConversationCostRows;
 use DDD\Domain\AI\Entities\Conversations\CostSummaries\AIConversationToolCallTraceEntries;
@@ -69,8 +71,6 @@ use DDD\Domain\Base\Repo\DatabaseRepoEntity;
 use DDD\Domain\Base\Services\EntitiesService;
 use DDD\Domain\Common\Entities\Charts\DateValueSequence;
 use DDD\Infrastructure\Base\DateTime\Date;
-use DDD\Domain\AI\Entities\Sandboxes\AgentSandboxConversation;
-use DDD\Domain\AI\Entities\Sandboxes\AgentSandboxConversations;
 use DDD\Infrastructure\Base\DateTime\DateTime;
 use DDD\Infrastructure\Exceptions\BadRequestException;
 use DDD\Infrastructure\Exceptions\ForbiddenException;
@@ -708,7 +708,7 @@ class AIConversationsService extends EntitiesService
     }
 
     /**
-     * The number of root conversations per agent space (the sandbox screen's workspace list), in this environment. A
+     * The number of root conversations per agent space (an admin screen's list of spaces), in this environment. A
      * space without conversations is missing from the answer.
      *
      * @param int[] $agentSpaceIds
@@ -760,14 +760,23 @@ class AIConversationsService extends EntitiesService
     }
 
     /**
-     * The newest root conversations of one agent space (the sandbox screen's links), newest change first, in this
-     * environment. Read for an admin: no rights condition.
+     * @deprecated since 0.3.0: {@see findNewestRootConversationsOfAgentSpaceId()} (same rows and fields; the name of
+     *             the sandbox screen it served first). Kept for ddd-agent-sandbox 0.1.x.
+     */
+    public function findNewestRootConversationsOfAgentSpaceIdForSandbox(int $agentSpaceId, int $limit): AgentSpaceRootConversations
+    {
+        return $this->findNewestRootConversationsOfAgentSpaceId($agentSpaceId, $limit);
+    }
+
+    /**
+     * The newest root conversations of one agent space (an admin screen's links), newest change first, at most 200, in
+     * this environment. Read for an admin: no rights condition.
      *
      * @param int $agentSpaceId
      * @param int $limit
-     * @return AgentSandboxConversations
+     * @return AgentSpaceRootConversations
      */
-    public function findNewestRootConversationsOfAgentSpaceIdForSandbox(int $agentSpaceId, int $limit): AgentSandboxConversations
+    public function findNewestRootConversationsOfAgentSpaceId(int $agentSpaceId, int $limit): AgentSpaceRootConversations
     {
         $tableName = DBAIConversationModel::getTableName();
         $rows = EntityManagerFactory::getInstance()->getConnection()->fetchAllAssociative(
@@ -777,18 +786,18 @@ class AIConversationsService extends EntitiesService
             . ' ORDER BY `updated` DESC, `id` DESC LIMIT ' . max(1, min($limit, 200)),
             ['agentSpaceId' => $agentSpaceId, 'environment' => self::currentEnvironment()]
         );
-        $agentSandboxConversations = new AgentSandboxConversations();
+        $agentSpaceRootConversations = new AgentSpaceRootConversations();
         foreach ($rows as $row) {
-            $agentSandboxConversation = new AgentSandboxConversation();
-            $agentSandboxConversation->conversationId = (int)$row['id'];
-            $agentSandboxConversation->accountId = $row['accountId'] !== null ? (int)$row['accountId'] : null;
-            $agentSandboxConversation->runState = $row['runState'] !== null ? (string)$row['runState'] : null;
-            $agentSandboxConversation->purposeName = $row['purposeName'] !== null ? (string)$row['purposeName'] : null;
-            $agentSandboxConversation->createdAt = $row['created'] !== null ? DateTime::fromString((string)$row['created']) : null;
-            $agentSandboxConversation->updatedAt = $row['updated'] !== null ? DateTime::fromString((string)$row['updated']) : null;
-            $agentSandboxConversations->add($agentSandboxConversation);
+            $agentSpaceRootConversation = new AgentSpaceRootConversation();
+            $agentSpaceRootConversation->conversationId = (int)$row['id'];
+            $agentSpaceRootConversation->accountId = $row['accountId'] !== null ? (int)$row['accountId'] : null;
+            $agentSpaceRootConversation->runState = $row['runState'] !== null ? (string)$row['runState'] : null;
+            $agentSpaceRootConversation->purposeName = $row['purposeName'] !== null ? (string)$row['purposeName'] : null;
+            $agentSpaceRootConversation->createdAt = $row['created'] !== null ? DateTime::fromString((string)$row['created']) : null;
+            $agentSpaceRootConversation->updatedAt = $row['updated'] !== null ? DateTime::fromString((string)$row['updated']) : null;
+            $agentSpaceRootConversations->add($agentSpaceRootConversation);
         }
-        return $agentSandboxConversations;
+        return $agentSpaceRootConversations;
     }
 
     /**

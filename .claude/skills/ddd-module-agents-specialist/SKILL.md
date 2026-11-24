@@ -1,6 +1,6 @@
 ---
 name: ddd-module-agents-specialist
-description: "Installs, wires and runs the agent of mgamadeus/ddd-agents in a DDD host and routes to the eight agent topic skills. Covers the installation checklist, chat controller traits, the agent space (agentSpaceId, account level, its host entity), same-path overrides, entitlements, listeners, the 19 config files, host wording, persona and egress, the six Messenger transports, the usage envelope middleware, workers and stop grace, the package's console commands (schedules, purges, diagnosis, chat replay, evaluation), the sandbox admin screen (AgentSandboxAdministration, workspaces, offload, reset, audit), host duties, the cron list, table names, persisted class names, the package suite, source ownership. Use when adding the agent to an application, wiring agent transports or workers, schedules never fire, a crashed turn never answers, agent event tables grow, overriding an agent service, building a sandbox or workspace admin screen, naming agent tables, or asking which agent skill explains a file."
+description: "Installs, wires and runs the agent of mgamadeus/ddd-agents in a DDD host and routes to the eight agent topic skills. Covers the installation checklist, chat controller traits, the agent space (agentSpaceId, account level, its host entity), same-path overrides, entitlements, listeners, the 19 config files, host wording, persona and egress, the six Messenger transports, the usage envelope middleware, workers and stop grace, the package's console commands (schedules, purges, diagnosis, chat replay, evaluation), host duties, the cron list, table names, persisted class names, the package suite, source ownership. Use when adding the agent to an application, wiring agent transports or workers, schedules never fire, a crashed turn never answers, agent event tables grow, overriding an agent service, naming agent tables, or asking which agent skill explains a file."
 metadata:
   author: mgamadeus
   version: "0.2.0"
@@ -165,7 +165,6 @@ the recovery commands).
 | Adapt a package command by its override points; register the cron list | [host-duties.md](references/host-duties.md), `templates/crons.sh` |
 | Model "what the agent works for": spaces, account level, starting a conversation for a space, tools that name a space | [agent-space.md](references/agent-space.md) |
 | Missing agent tables, wrong table names, a table prefix, a renamed persisted class | [tables-and-persisted-names.md](references/tables-and-persisted-names.md) |
-| Mount the sandbox admin screen: agent workspaces, sessions, files, commands, offload / kill / reset with audit; implement `AgentSandboxAdministration` | [sandbox-administration.md](references/sandbox-administration.md) |
 | Build the first tool, skill, purpose and widget | [first-capability-end-to-end.md](references/first-capability-end-to-end.md) |
 | Start a purposed conversation, with or without an agent space | [first-capability-end-to-end.md](references/first-capability-end-to-end.md) |
 
@@ -186,51 +185,52 @@ with the same name.
 
 | Command | What it does | On a schedule | Writes |
 |---|---|---|---|
-| `app:ai-conversation:fire-due-schedules` | expires, claims and spawns the due schedules; counts each skip reason | every minute to every five minutes | yes |
-| `app:ai-conversation:mark-finalized` | sets `finalizedAt` on conversations idle past the window (`--idle-minutes`, default 60), one UPDATE | every five minutes | yes |
-| `app:ai-conversation:compact-finalized` | dispatches one finalize job per finalized conversation that owes its completion compaction (`--batch`, default 50); `--inline` runs the chain of one conversation in the console | every five minutes | yes (`--inline` makes model calls) |
-| `app:ai-agent:trace-events-purge` | deletes trace events older than `--days` (default 180) in batches | daily | yes |
-| `app:ai-agent:turn-events-purge` | deletes turn events older than `--days` (default 180), then the snapshots no event references | daily | yes |
-| `app:ai-schedule:close-for-inactive-agent-spaces` | the schedule state sweep: closes, pauses or re-arms schedules whose space or account changed its automation state | hourly | yes |
-| `app:ai-conversation:deliver-owed-reports-and-resume-owed-turns` | delivers owed reports late, resumes owed turns and inbound messages left idle; override points for the host's own passes | every five minutes | yes |
-| `app:ai-agent:reap` | wakes or expires runs whose worker died, times out sub-agent groups, wakes parents of settled groups, settles purposed conversations closed without an owner turn, re-sends lost run-end notifications | every five minutes | yes |
-| `app:ai-agent:chat` | the console chat with the agent (ephemeral or stored, `--conversationId` resumes, turns file, slash commands); `--record-run-for-comparison` / `--replay-run-and-compare` record a run and compare a replay with it (observability skill, console-commands reference) | no | yes (makes model calls) |
-| `app:ai-agent:chat-tui` | the full-screen chat (suggested `php-tui/php-tui`; without it one line names the library) | no | yes (makes model calls) |
-| `app:ai-agent:inspect` | prints one conversation: header, summary, transcript, request snapshots | no | no |
-| `app:ai-agent:jev-probe` | runs the decision probe over a fixture, one evaluation envelope per case | no | no (makes model calls) |
-| `app:ai-conversation:scorecards` | selects conversations and dispatches (or runs `--inline`) their quality scorecards; `--print` the metrics | no | yes |
+| `app:agent:fire-due-schedules` | expires, claims and spawns the due schedules; counts each skip reason | every minute to every five minutes | yes |
+| `app:agent:mark-finalized-conversations` | sets `finalizedAt` on conversations idle past the window (`--idle-minutes`, default 60), one UPDATE | every five minutes | yes |
+| `app:agent:compact-finalized-conversations` | dispatches one finalize job per finalized conversation that owes its completion compaction (`--batch`, default 50); `--inline` runs the chain of one conversation in the console | every five minutes | yes (`--inline` makes model calls) |
+| `app:agent:trace-events-purge` | deletes trace events older than `--days` (default 180) in batches | daily | yes |
+| `app:agent:turn-events-purge` | deletes turn events older than `--days` (default 180), then the snapshots no event references | daily | yes |
+| `app:agent:close-schedules-for-inactive-agent-spaces` | the schedule state sweep: closes, pauses or re-arms schedules whose space or account changed its automation state | hourly | yes |
+| `app:agent:deliver-owed-reports-and-resume-owed-turns` | delivers owed reports late, resumes owed turns and inbound messages left idle; override points for the host's own passes | every five minutes | yes |
+| `app:agent:reap` | wakes or expires runs whose worker died, times out sub-agent groups, wakes parents of settled groups, settles purposed conversations closed without an owner turn, re-sends lost run-end notifications | every five minutes | yes |
+| `app:agent:chat` | the console chat with the agent (ephemeral or stored, `--conversationId` resumes, turns file, slash commands); `--record-run-for-comparison` / `--replay-run-and-compare` record a run and compare a replay with it (observability skill, console-commands reference) | no | yes (makes model calls) |
+| `app:agent:chat-tui` | the full-screen chat (suggested `php-tui/php-tui`; without it one line names the library) | no | yes (makes model calls) |
+| `app:agent:purge-client-tool-requests` | expires overdue `Agent.UI` tool requests, deletes requests after 30 days and client attachments after a day | hourly, with `Agent.UI` | yes |
+| `app:agent:inspect` | prints one conversation: header, summary, transcript, request snapshots | no | no |
+| `app:agent:jev-probe` | runs the decision probe over a fixture, one evaluation envelope per case | no | no (makes model calls) |
+| `app:agent:conversation-scorecards` | selects conversations and dispatches (or runs `--inline`) their quality scorecards; `--print` the metrics | no | yes |
 | `app:mcp:documentation` | prints the MCP documentation of a bundle or package; `--call` runs one tool for a space | no | only with `--call` |
 | `app:mcp:clear-cache` | clears the cached MCP documentation of the bundles and skill packages, then the container cache | no | no |
-| `app:ai:composed-view:export-node-schema` | writes or checks the composed-view node schema file (`--check`) | no | yes, unless checking |
-| `app:ai-agent:request-snapshot-debug-payloads-strip` | removes the full request and raw response from request snapshots older than `--olderThanDays` (default 2); resumes from a cursor | optional, nightly, `--maxSeconds` below 360 | yes |
-| `app:ai-agent:loaded-capabilities-compact` | rewrites loaded-capability rows that carry their complete set into checkpoints and change records; resumes from a cursor | optional, nightly, `--maxSeconds` below 360; only once every reader reads the chain format | yes |
-| `app:ai-conversation:repair-zero-embeddings` | re-embeds (or deletes) embeddings that hold the zero vector: messages, compaction nodes, the host's memory tables | optional; no interval in the code | dry run unless `--apply` |
-| `app:ai-conversation:backfill-message-embeddings` | embeds the messages that have no embedding row; `--async` dispatches them to the embedding worker | no (on demand) | yes |
-| `app:ai-conversation:backfill-environment` | stamps conversations without an environment with one (`--environment`) | no (once) | yes (`--dryRun` counts) |
-| `app:ai-agent:execute-tool-call` | hidden: executes one persisted tool call in a child process and writes its outcome into the call row | no; the turn worker starts it when the host declares `consoleScript` | yes |
-| `app:ai-agent:diagnose` | reconstructs the resume decision of one conversation; `--drive` drives one turn in the console, `--retry` retries a FAILED run | no | no (`--drive`, `--retry` write) |
-| `app:ai-agent:validate-conversation` | checks the integrity of stored conversations; exit 1 on a violation | no | no |
-| `app:ai-agent:cache-diff` | per model call: where the request first differs from the previous one, the cache credit, the cause | no | no |
-| `app:ai-agent:activity-lines` | replays the tool calls of a conversation through the activity narrator and prints the lines per model | no | no (makes model calls) |
-| `app:ai-agent:tool-response-stats` | ranks tools by stored result size; the largest results of one tool; one call's payload | no | no |
-| `app:ai-agent:skill-token-map` | the per-turn token size of every agent skill, by package and tool, on the wire schema | no | no (no database) |
-| `app:ai-agent:context-eviction-sim` | simulates the per-tool eviction pass (`unloadGranularity = tool`) over scripted scenarios; not the skill-granular default | no | no (no database, no model call) |
-| `app:ai-agent:run-report` | the per-run report of stored conversations: judge verdict and findings from the evaluation logs (`--log-dir`), wall and agent seconds, model and tool calls, the time split with the parallel gain, the slowest tools, the variants timeline, the plan size, the suite total | no | no |
-| `app:ai-agent:compact` | runs one compaction round of a conversation in the console and prints the tree and the cover; `--show-only` renders only | no | yes, unless `--show-only` (makes model calls) |
-| `app:ai-conversation:search-inspect` | runs the conversation search stage by stage, rights off and on, inside the search envelope | no | no (makes model calls; `--embed` writes embeddings) |
-| `app:ai-agent:eval-tools` | runs the tools cases of the host's fixtures, deterministic or `--judge`; in this process or in child processes; result files and a stored run (observability skill, console-commands reference) | no | yes (makes model calls) |
-| `app:ai-agent:eval-suite` | every configured suite on every model and flavor, one child process per case, lanes per space and resource; correctness and performance against a baseline; stops on a `STOP` file (observability skill, console-commands reference) | no | yes (its children make model calls) |
-| `app:ai-agent:eval-selection` | whether the expected skill was loaded; accuracy (observability skill, console-commands reference) | no | yes (makes model calls) |
-| `app:ai-agent:eval-recall` | seeds past conversations, asks on a fresh one, checks the recall tool and the facts; deletes the seed (observability skill, console-commands reference) | no | yes (makes model calls) |
-| `app:ai-agent:eval-tiers` | the tools cases under the model of each tier (observability skill, console-commands reference) | no | yes (makes model calls) |
-| `app:ai-agent:eval-analyze` | classifies the failed cases of a stored run offline and prints reproduce lines (observability skill, console-commands reference) | no | no |
-| `app:ai-agent:eval-eviction` | multi-skill trajectories on one transient conversation; the load curve (observability skill, console-commands reference) | no | no (makes model calls) |
-| `app:ai-agent:eval-guard` | the injection guard probe: variants × inputs × runs; false-block and bypass rate (observability skill, console-commands reference) | no | a run file (makes model calls) |
-| `app:ai-agent:eval-schedule-runs` | fires one evaluation schedule several times and compares its reports; needs the workers (observability skill, console-commands reference) | no | yes |
-| `app:ai-agent:eval-compaction-tree` | a judged long run with frequent compaction from a case file (`--case-file`); judges the compaction tree per turn and at the end (observability skill, console-commands reference) | no | yes (makes model calls; stores the conversation only with `--persist`) |
-| `app:ai-agent:eval-conversations-purge` | deletes the conversation trees of the configured evaluation accounts older than `--older-than-hours` (default 48) with every dependent row, in bounded chunks under a time budget below 360 s; any other account only with `--evalOnly` and the host's allowance (observability skill, console-commands reference) | optional, e.g. hourly | only with `--apply` (dry run counts) |
-| `app:ai-agent:decision-fixtures` | sends the cases of a JSON decision fixture to the decision model and scores the picks (observability skill, console-commands reference) | no | no (makes model calls) |
-| `app:ai-agent:decision-stats` | decision statistics over the turn events: per site, mode, arm, day; shadow agreement (observability skill, console-commands reference) | no | no |
+| `app:agent:export-composed-view-node-schema` | writes or checks the composed-view node schema file (`--check`) | no | yes, unless checking |
+| `app:agent:request-snapshot-debug-payloads-strip` | removes the full request and raw response from request snapshots older than `--olderThanDays` (default 2); resumes from a cursor | optional, nightly, `--maxSeconds` below 360 | yes |
+| `app:agent:loaded-capabilities-compact` | rewrites loaded-capability rows that carry their complete set into checkpoints and change records; resumes from a cursor | optional, nightly, `--maxSeconds` below 360; only once every reader reads the chain format | yes |
+| `app:agent:repair-zero-embeddings` | re-embeds (or deletes) embeddings that hold the zero vector: messages, compaction nodes, the host's memory tables | optional; no interval in the code | dry run unless `--apply` |
+| `app:agent:backfill-message-embeddings` | embeds the messages that have no embedding row; `--async` dispatches them to the embedding worker | no (on demand) | yes |
+| `app:agent:backfill-conversation-environment` | stamps conversations without an environment with one (`--environment`) | no (once) | yes (`--dryRun` counts) |
+| `app:agent:execute-tool-call` | hidden: executes one persisted tool call in a child process and writes its outcome into the call row | no; the turn worker starts it when the host declares `consoleScript` | yes |
+| `app:agent:diagnose` | reconstructs the resume decision of one conversation; `--drive` drives one turn in the console, `--retry` retries a FAILED run | no | no (`--drive`, `--retry` write) |
+| `app:agent:validate-conversation` | checks the integrity of stored conversations; exit 1 on a violation | no | no |
+| `app:agent:cache-diff` | per model call: where the request first differs from the previous one, the cache credit, the cause | no | no |
+| `app:agent:activity-lines` | replays the tool calls of a conversation through the activity narrator and prints the lines per model | no | no (makes model calls) |
+| `app:agent:tool-response-stats` | ranks tools by stored result size; the largest results of one tool; one call's payload | no | no |
+| `app:agent:skill-token-map` | the per-turn token size of every agent skill, by package and tool, on the wire schema | no | no (no database) |
+| `app:agent:context-eviction-sim` | simulates the per-tool eviction pass (`unloadGranularity = tool`) over scripted scenarios; not the skill-granular default | no | no (no database, no model call) |
+| `app:agent:run-report` | the per-run report of stored conversations: judge verdict and findings from the evaluation logs (`--log-dir`), wall and agent seconds, model and tool calls, the time split with the parallel gain, the slowest tools, the variants timeline, the plan size, the suite total | no | no |
+| `app:agent:compact` | runs one compaction round of a conversation in the console and prints the tree and the cover; `--show-only` renders only | no | yes, unless `--show-only` (makes model calls) |
+| `app:agent:conversation-search-inspect` | runs the conversation search stage by stage, rights off and on, inside the search envelope | no | no (makes model calls; `--embed` writes embeddings) |
+| `app:agent:eval-tools` | runs the tools cases of the host's fixtures, deterministic or `--judge`; in this process or in child processes; result files and a stored run (observability skill, console-commands reference) | no | yes (makes model calls) |
+| `app:agent:eval-suite` | every configured suite on every model and flavor, one child process per case, lanes per space and resource; correctness and performance against a baseline; stops on a `STOP` file (observability skill, console-commands reference) | no | yes (its children make model calls) |
+| `app:agent:eval-selection` | whether the expected skill was loaded; accuracy (observability skill, console-commands reference) | no | yes (makes model calls) |
+| `app:agent:eval-recall` | seeds past conversations, asks on a fresh one, checks the recall tool and the facts; deletes the seed (observability skill, console-commands reference) | no | yes (makes model calls) |
+| `app:agent:eval-tiers` | the tools cases under the model of each tier (observability skill, console-commands reference) | no | yes (makes model calls) |
+| `app:agent:eval-analyze` | classifies the failed cases of a stored run offline and prints reproduce lines (observability skill, console-commands reference) | no | no |
+| `app:agent:eval-eviction` | multi-skill trajectories on one transient conversation; the load curve (observability skill, console-commands reference) | no | no (makes model calls) |
+| `app:agent:eval-guard` | the injection guard probe: variants × inputs × runs; false-block and bypass rate (observability skill, console-commands reference) | no | a run file (makes model calls) |
+| `app:agent:eval-schedule-runs` | fires one evaluation schedule several times and compares its reports; needs the workers (observability skill, console-commands reference) | no | yes |
+| `app:agent:eval-compaction-tree` | a judged long run with frequent compaction from a case file (`--case-file`); judges the compaction tree per turn and at the end (observability skill, console-commands reference) | no | yes (makes model calls; stores the conversation only with `--persist`) |
+| `app:agent:eval-conversations-purge` | deletes the conversation trees of the configured evaluation accounts older than `--older-than-hours` (default 48) with every dependent row, in bounded chunks under a time budget below 360 s; any other account only with `--evalOnly` and the host's allowance (observability skill, console-commands reference) | optional, e.g. hourly | only with `--apply` (dry run counts) |
+| `app:agent:decision-fixtures` | sends the cases of a JSON decision fixture to the decision model and scores the picks (observability skill, console-commands reference) | no | no (makes model calls) |
+| `app:agent:decision-stats` | decision statistics over the turn events: per site, mode, arm, day; shadow agreement (observability skill, console-commands reference) | no | no |
 | `AgentDecisionReplayCommand` (abstract, no name) | the base of a host's replay of stored tool calls against one decision (observability skill, console-commands reference) | no | a result file (makes model calls) |
 | `app:mcp:compare-tool-calls` | runs an MCP package's comparison script in-process: `--record` writes the recording, `--replay-and-compare` lists every difference against it (exit 1) (observability skill, console-commands reference) | no | the recording files; the tools write as in a conversation |
 

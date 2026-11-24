@@ -53,7 +53,7 @@ class AgentEvalSuiteRunRecordTest extends UnitTestCase
         self::assertSame(1, $agentEvalSuiteRun->casesNotApplicable);
         self::assertSame(1, $agentEvalSuiteRun->casesFailedAsExpected);
         self::assertSame(5, $agentEvalSuiteRun->getCountedCases());
-        self::assertSame('app:ai-agent:eval-suite', $agentEvalSuiteRun->command);
+        self::assertSame('app:agent:eval-suite', $agentEvalSuiteRun->command);
         self::assertSame('run-folder-default', $agentEvalSuiteRun->logDirectoryName);
         self::assertSame(gmdate('Y-m-d H:i:s', self::STARTED_AT_TIMESTAMP), $agentEvalSuiteRun->startedAt->format('Y-m-d H:i:s'));
         self::assertSame(['models' => ['VENDOR.MODEL_A'], 'model' => 'VENDOR.MODEL_A', 'flavor' => 'judge', 'arms' => []], $agentEvalSuiteRun->getRunOptions()->toArray());
@@ -211,7 +211,7 @@ class AgentEvalSuiteRunRecordTest extends UnitTestCase
     public function testTheRunHeaderNamesHostFolderAndOptions(): void
     {
         $markdown = $this->buildRunFromFixture()->toLlmMarkdown();
-        self::assertStringStartsWith('Eval run #? app:ai-agent:eval-suite "default-suite" · started ', $markdown);
+        self::assertStringStartsWith('Eval run #? app:agent:eval-suite "default-suite" · started ', $markdown);
         self::assertStringContainsString("\nHost: eval-host · traces under var/agent-evals/run-folder-default on that host\n", $markdown);
         self::assertStringEndsWith('Options: {"models":["VENDOR.MODEL_A"],"model":"VENDOR.MODEL_A","flavor":"judge","arms":[]}', $markdown);
     }
@@ -223,7 +223,7 @@ class AgentEvalSuiteRunRecordTest extends UnitTestCase
         $agentEvalSuiteRuns = AgentEvalSuiteRuns::newInstance();
         $agentEvalSuiteRun = $this->buildRunFromFixture();
         $agentEvalSuiteRuns->add($agentEvalSuiteRun);
-        self::assertStringStartsWith('- #? app:ai-agent:eval-suite "default-suite"', $agentEvalSuiteRuns->toLlmMarkdown());
+        self::assertStringStartsWith('- #? app:agent:eval-suite "default-suite"', $agentEvalSuiteRuns->toLlmMarkdown());
     }
 
     protected function buildRunFromFixture(): AgentEvalSuiteRun
@@ -233,7 +233,7 @@ class AgentEvalSuiteRunRecordTest extends UnitTestCase
         $finishedAt = DateTime::fromTimestamp(self::STARTED_AT_TIMESTAMP + 3_725);
         $finishedAt->setTimezone(new DateTimeZone('UTC'));
         return AgentEvalSuiteRun::forFinishedRun(
-            'app:ai-agent:eval-suite',
+            'app:agent:eval-suite',
             'default-suite',
             'eval-host',
             $startedAt,

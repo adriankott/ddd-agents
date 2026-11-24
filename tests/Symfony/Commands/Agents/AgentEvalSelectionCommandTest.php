@@ -128,7 +128,7 @@ class AgentEvalSelectionCommandTest extends IntegrationTestCase
 
         $storedRun = $probeCommand->suiteRunsServiceDouble->insertedAgentEvalSuiteRun;
         self::assertNotNull($storedRun);
-        self::assertSame('app:ai-agent:eval-selection', $storedRun->command);
+        self::assertSame('app:agent:eval-selection', $storedRun->command);
         self::assertSame('catalog', $storedRun->suiteLabel, 'the label is the fixture name');
         self::assertSame(['model' => null, 'flavor' => 'call', 'arms' => [], 'case' => 'selection.hit'], $storedRun->getRunOptions()->toArray());
         self::assertSame(1, $storedRun->casesPassed);

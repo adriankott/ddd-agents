@@ -23,9 +23,9 @@ use Throwable;
  * and memory embeddings — in small pauses and resumable; see {@see AIConversationEmbeddingsRepairService}. Dry run by
  * default (counts and classifies), `--apply` writes:
  *
- *   php bin/console app:ai-conversation:repair-zero-embeddings                     # dry run, every table
- *   php bin/console app:ai-conversation:repair-zero-embeddings --apply --limit=50  # a first small writing round
- *   php bin/console app:ai-conversation:repair-zero-embeddings --apply --target=nodes --batchSize=10 --sleepMs=2000
+ *   php bin/console app:agent:repair-zero-embeddings                     # dry run, every table
+ *   php bin/console app:agent:repair-zero-embeddings --apply --limit=50  # a first small writing round
+ *   php bin/console app:agent:repair-zero-embeddings --apply --target=nodes --batchSize=10 --sleepMs=2000
  *
  * A run that stops early (limit, time budget, failure) prints the options it resumes with (`--afterMessageEmbeddingId`,
  * `--afterCompactionNodeId`, `--afterMemoryId`); starting from scratch works too, a repaired row no longer holds the
@@ -33,7 +33,8 @@ use Throwable;
  * timeout, e.g. `--apply --newestRowsOnly=50000 --limit=200 --maxSeconds=200`.
  */
 #[AsCommand(
-    name: 'app:ai-conversation:repair-zero-embeddings',
+    name: 'app:agent:repair-zero-embeddings',
+    aliases: ['app:ai-conversation:repair-zero-embeddings'],
     description: 'Re-embed (or delete) the recall embeddings that hold the zero vector (messages, compaction nodes, memories) — dry run unless --apply'
 )]
 class AIConversationEmbeddingsRepairCommand extends AgentConsoleCommand

@@ -156,6 +156,15 @@ class AIConversationRealtimeSignalService extends Service
     {
     }
 
+    /**
+     * Signal that a client tool request of `Agent.UI` waits for the user's client of the conversation, so the client
+     * reads its run state at once instead of at its next read. Best effort. The core has no realtime transport:
+     * nothing is written; the client then receives the request with its next run-state read.
+     */
+    public function publishClientToolRequestSignal(int $rootConversationId): void
+    {
+    }
+
     protected function messagesService(): AIConversationMessagesService
     {
         /** @var AIConversationMessagesService $aIConversationMessagesService */

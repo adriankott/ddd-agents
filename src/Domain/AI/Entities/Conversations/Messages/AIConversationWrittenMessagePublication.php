@@ -7,7 +7,7 @@ namespace DDD\Domain\AI\Entities\Conversations\Messages;
 use DDD\Domain\AI\Entities\Conversations\Agent\AgentRun;
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Services\Conversations\Agent\AIConversationMessagePublicationService;
-use DDD\Presentation\Mcp\Agent\AgentConsoleStream;
+use DDD\Presentation\Mcp\Agents\AgentConsoleStream;
 use DDD\Domain\AI\Services\Conversations\AIConversationMessagesService;
 use DDD\Domain\AI\Services\Conversations\AIConversationRealtimeSignalService;
 

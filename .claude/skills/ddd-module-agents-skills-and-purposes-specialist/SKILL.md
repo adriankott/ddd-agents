@@ -36,7 +36,7 @@ seeded plan, done criteria and variants.
 What runs where: the reference kernel (`examples/reference-kernel`) runs one skill, `Demo.Notes`, bound to
 `DemoNotesMCPPackage`. It has no purpose of its own: the purpose, criterion and registry files of `templates/` exist as
 templates only (the kernel declares no purpose registry; see "Same-path classes" below). The package
-ships the skills `Assistant.Mandates`, `Assistant.Tasks` and `Assistant.TaskRunReports` and the purposes `Schedule.Run`,
+ships the skills `Agent.Mandates`, `Agent.Tasks` and `Agent.TaskRunReports` and the purposes `Schedule.Run`,
 `Supervisor.Checkpoint` and `Background.MechanicalOperation`.
 
 ## Same-path classes
@@ -51,7 +51,7 @@ same-path lookup: under `App\` at the mirrored path with no configuration, under
    only when its catalog line covers the request. A tool behind a description that does not name its intent is never
    called.
 2. **The binding is the registry.** A skill file without a key in `AI.skillPackages` is never offered. The host's
-   [skillPackages.php](templates/skillPackages.php) replaces the package's whole: it re-lists `Assistant.Mandates`, `Assistant.Tasks` and `Assistant.TaskRunReports`
+   [skillPackages.php](templates/skillPackages.php) replaces the package's whole: it re-lists `Agent.Mandates`, `Agent.Tasks` and `Agent.TaskRunReports`
    when it wants them (`Schedule.Run` preloads the second).
 3. **Application files replace module files, never merge.** A skill or purpose file at a module's path replaces the
    module's; the five config files `AI.skillPackages`, `AI.skillRequirements`, `AI.purposeRequirements`,
@@ -60,8 +60,9 @@ same-path lookup: under `App\` at the mirrored path with no configuration, under
    purpose it names: its gates are added to the file's own gates.
 4. **Gates on a skill filter the offer; they are not authorization.** A right on a skill must also sit on its
    packages as `MCPRequiresAccountRights`; every tool runs with the account's own rights.
-5. **Every gate is inert until the host answers it.** The default `AIConversationEntitlementsService` answers no
-   flags, no rights and unknown billing: every gate passes.
+5. **Flags and billing are inert until the host answers them; rights follow the role mapping.** The default
+   `AIConversationEntitlementsService` answers no flags and unknown billing, and the account's rights by the config
+   `AI.accountRights` (a right it does not name is not held).
 6. **The catalog holds the top level only.** A sub-skill appears in its loaded root's block; tools of a skill that is
    not loaded are visible nowhere.
 7. **A purpose needs its file, its class and its registered name.** No `purposeClass` (or an invalid one) = the
@@ -115,12 +116,16 @@ The binding, `config/app/AI/skillPackages.php`:
 ```php
 use AgentsReference\Presentation\Mcp\Demo\DemoNotesMCPPackage;
 use DDD\Domain\AI\Entities\Skills\AISkill;
+use DDD\Presentation\Mcp\Client\Agents\AgentMandatesMCPPackage;
+use DDD\Presentation\Mcp\Client\Agents\AgentMemoriesMCPPackage;
+use DDD\Presentation\Mcp\Client\Agents\AgentTaskRunReportsMCPPackage;
+use DDD\Presentation\Mcp\Client\Agents\AgentTaskSchedulesMCPPackage;
 
 return [
-    AISkill::ASSISTANT_MANDATES => ['agent.mandates'],
-    AISkill::ASSISTANT_TASKS => ['agent.taskSchedules'],
-    AISkill::ASSISTANT_TASK_RUN_REPORTS => ['agent.taskRunReports'],
-    AISkill::MEMORY_MANAGEMENT => ['agent.memories'], // offered only while AI.agentMemory.enabled is on
+    AISkill::AGENT_MANDATES => [AgentMandatesMCPPackage::class],
+    AISkill::AGENT_TASKS => [AgentTaskSchedulesMCPPackage::class],
+    AISkill::AGENT_TASK_RUN_REPORTS => [AgentTaskRunReportsMCPPackage::class],
+    AISkill::AGENT_MEMORY => [AgentMemoriesMCPPackage::class], // offered only while AI.agentMemory.enabled is on
     'Demo.Notes' => [DemoNotesMCPPackage::class],
 ];
 ```

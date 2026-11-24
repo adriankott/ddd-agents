@@ -27,15 +27,16 @@ use Symfony\Component\Console\Output\OutputInterface;
  * heaviest tools and instruction blocks. Read-only (reflection and the skill `.md` files, no database) — no account
  * needed.
  *
- *   php bin/console app:ai-agent:skill-token-map                         # full tree, heaviest-first, + rankings
- *   php bin/console app:ai-agent:skill-token-map --json                  # machine-readable (feed the register / a diff)
- *   php bin/console app:ai-agent:skill-token-map --tool=getOrders        # one tool + component breakdown
- *   php bin/console app:ai-agent:skill-token-map --tool=getOrders --doc        # + the EXACT wire schema the model receives
- *   php bin/console app:ai-agent:skill-token-map --shared-blocks         # the two once-per-turn shared system blocks
- *   php bin/console app:ai-agent:skill-token-map --top=15                # how many entries in the ranking sections
+ *   php bin/console app:agent:skill-token-map                         # full tree, heaviest-first, + rankings
+ *   php bin/console app:agent:skill-token-map --json                  # machine-readable (feed the register / a diff)
+ *   php bin/console app:agent:skill-token-map --tool=getOrders        # one tool + component breakdown
+ *   php bin/console app:agent:skill-token-map --tool=getOrders --doc        # + the EXACT wire schema the model receives
+ *   php bin/console app:agent:skill-token-map --shared-blocks         # the two once-per-turn shared system blocks
+ *   php bin/console app:agent:skill-token-map --top=15                # how many entries in the ranking sections
  */
 #[AsCommand(
-    name: 'app:ai-agent:skill-token-map',
+    name: 'app:agent:skill-token-map',
+    aliases: ['app:ai-agent:skill-token-map'],
     description: 'Map the per-turn token size of every agent skill, decomposed by package then by function (tool).'
 )]
 class SkillTokenMapCommand extends AgentConsoleCommand

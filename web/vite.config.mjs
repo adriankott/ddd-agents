@@ -26,6 +26,7 @@ const ENTRIES = {
   preview: "entries/preview.ts",
   "image-render": "entries/image-render.ts",
   provider: "entries/provider.ts",
+  ui: "entries/ui.ts",
 };
 
 /**

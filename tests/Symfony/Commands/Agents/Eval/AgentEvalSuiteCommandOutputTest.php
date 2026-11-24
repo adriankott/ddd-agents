@@ -159,7 +159,7 @@ class AgentEvalSuiteCommandOutputTest extends IntegrationTestCase
 
     protected function buildProbeCommand(): AgentEvalSuiteProbeCommand
     {
-        return new AgentEvalSuiteProbeCommand('app:ai-agent:eval-suite');
+        return new AgentEvalSuiteProbeCommand('app:agent:eval-suite');
     }
 
     protected function buildTask(string $kind, string $flavor, string $suite, ?string $modelName): AgentEvalSuiteTask

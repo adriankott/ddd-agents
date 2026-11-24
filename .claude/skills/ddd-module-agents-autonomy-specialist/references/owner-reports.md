@@ -88,7 +88,7 @@ never calls a global function that neither the framework nor the module defines 
 ## Late delivery
 
 A run that died before it delivered still owes. The package command
-`app:ai-conversation:deliver-owed-reports-and-resume-owed-turns` (host duty "deliver owed reports" in the entry skill
+`app:agent:deliver-owed-reports-and-resume-owed-turns` (host duty "deliver owed reports" in the entry skill
 `ddd-module-agents-specialist`; the host adds its cron line) runs every few minutes:
 
 1. `AIConversationsService::findConversationIdsOwingReports()` — owed, not delivered, in no live run state (not
@@ -121,7 +121,7 @@ the marked report, else the final text, else the template — `BODY_SOURCE_*`).
 
 ## Earlier reports of a task
 
-`AgentTaskRunReportsMCPPackage` (skill `Assistant.TaskRunReports`, only under `Schedule.Run`, preloaded by it):
+`AgentTaskRunReportsMCPPackage` (skill `Agent.TaskRunReports`, only under `Schedule.Run`, preloaded by it):
 `getPreviousTaskRunReports` returns the reports the earlier runs of the same schedule wrote — model-written ones only
 (`findModelWrittenOwnerReportOfRun()`), newest first, each with its widget blocks and whether the task changed since
 (`AIConversationEarlierRunReport`; the comparison of the run's seed with the current task is

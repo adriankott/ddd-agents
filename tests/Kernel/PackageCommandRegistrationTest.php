@@ -19,7 +19,7 @@ class PackageCommandRegistrationTest extends IntegrationTestCase
     public function testThePackageKernelRegistersTheModuleCommand(): void
     {
         $application = new Application(static::bootTestKernel());
-        $command = $application->find('app:ai-conversation:mark-finalized');
+        $command = $application->find('app:agent:mark-finalized-conversations');
         // the console loads a command lazily: the wrapper hands out the command it stands for
         if ($command instanceof LazyCommand) {
             $command = $command->getCommand();

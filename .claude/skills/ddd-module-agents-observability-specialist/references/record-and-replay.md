@@ -94,8 +94,8 @@ created-id read reports of both runs and, for a live-tools replay, the played-an
 
 ## The chat's options
 
-`app:ai-agent:chat --turns-file=<file> --record-run-for-comparison=<run.json>` drives the lines on a new conversation
-and writes the recording (`harness` = `app:ai-agent:chat`, the settings of `buildRecordedRunSettingsPassedByCaller()`,
+`app:agent:chat --turns-file=<file> --record-run-for-comparison=<run.json>` drives the lines on a new conversation
+and writes the recording (`harness` = `app:agent:chat`, the settings of `buildRecordedRunSettingsPassedByCaller()`,
 `async`, `turns`, the wire settings of `buildWireRecordingKeys()`); `--replay-run-and-compare=<run.json>` drives the
 recorded turns and prints `recorded-run comparison IDENTICAL: …` (exit 0) or `… DIFFERS …` with one line per
 difference (exit 1); a refused replay exits with `Command::INVALID`. A host adapts the chat through three hooks:

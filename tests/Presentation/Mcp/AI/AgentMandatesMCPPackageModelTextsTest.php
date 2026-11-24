@@ -6,8 +6,8 @@ namespace DDD\Tests\Agents\Presentation\Mcp\AI;
 
 use DDD\Domain\AI\Entities\Mandates\AgentMandate;
 use DDD\Domain\AI\Entities\Mandates\AgentMandateGrantOutcome;
-use DDD\Presentation\Mcp\Client\AI\Dtos\AgentMandateMcpResponseDto;
-use DDD\Presentation\Mcp\Client\AI\Dtos\MandateGrantRequestDto;
+use DDD\Presentation\Mcp\Client\Agents\Dtos\AgentMandateMcpResponseDto;
+use DDD\Presentation\Mcp\Client\Agents\Dtos\MandateGrantRequestDto;
 use DDD\Tests\Agents\Support\UnitTestCase;
 use DDD\Infrastructure\Base\DateTime\DateTime;
 

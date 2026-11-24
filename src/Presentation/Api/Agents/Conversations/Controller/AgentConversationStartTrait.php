@@ -105,6 +105,8 @@ trait AgentConversationStartTrait
                 clientContext: $requestDto->clientContext ?? null
             );
         }
+        // the turn of a new conversation usually runs on a worker: the client's run-state reads stamp it again
+        $this->stampUIClientOfConversation($responseDto->aiConversation, $requestDto->clientId ?? null, $requestDto->uiState ?? null, true);
         $this->hideParentConversationAndLoadedCapabilitiesOnEmbeddedMessages($responseDto->aiConversation);
         return $responseDto;
     }

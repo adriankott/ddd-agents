@@ -8,7 +8,7 @@ use DDD\Domain\AI\Entities\Conversations\Agent\AgentRun;
 use DDD\Domain\AI\Entities\Conversations\Agent\Turns\AIConversationTurnOptions;
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
-use DDD\Presentation\Mcp\Agent\AgentConsoleStream;
+use DDD\Presentation\Mcp\Agents\AgentConsoleStream;
 use DDD\Domain\AI\Services\Conversations\AIConversationMessagesService;
 use DDD\Domain\AI\Services\Conversations\AIConversationRealtimeSignalService;
 use DDD\Infrastructure\Services\Service;

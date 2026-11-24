@@ -47,7 +47,7 @@ class ComposedViewNodeSchemaExportCommandTest extends UnitTestCase
     public function testTheCommandKeepsItsNameOptionAndRunsOnTheBase(): void
     {
         $asCommandAttributes = (new ReflectionClass(ComposedViewNodeSchemaExportCommand::class))->getAttributes(AsCommand::class);
-        self::assertSame('app:ai:composed-view:export-node-schema', $asCommandAttributes[0]->newInstance()->name);
+        self::assertSame('app:agent:export-composed-view-node-schema', explode('|', $asCommandAttributes[0]->newInstance()->name)[0], 'the old name stays an alias');
         $composedViewNodeSchemaExportCommand = new ComposedViewNodeSchemaExportCommand();
         self::assertInstanceOf(AgentConsoleCommand::class, $composedViewNodeSchemaExportCommand);
         self::assertTrue($composedViewNodeSchemaExportCommand->getDefinition()->hasOption('check'));
@@ -78,7 +78,7 @@ class ComposedViewNodeSchemaExportCommandTest extends UnitTestCase
         $commandTester = new CommandTester(new ComposedViewNodeSchemaExportProbeCommand($this->buildFilePaths()));
 
         self::assertSame(Command::FAILURE, $commandTester->execute(['--check' => true]));
-        self::assertStringContainsString('application/part/composed-node-schema.json is stale — run app:ai:composed-view:export-node-schema.', $this->findDisplayOnOneLine($commandTester));
+        self::assertStringContainsString('application/part/composed-node-schema.json is stale — run app:agent:export-composed-view-node-schema.', $this->findDisplayOnOneLine($commandTester));
         self::assertSame("{}\n", file_get_contents($this->getApplicationPartFilePath()));
     }
 

@@ -12,7 +12,7 @@ class ComposedViewNodeSchemaExportProbeCommand extends ComposedViewNodeSchemaExp
 {
     public function __construct(protected ComposedViewNodeSchemaFilePaths $composedViewNodeSchemaFilePaths)
     {
-        parent::__construct('app:ai:composed-view:export-node-schema');
+        parent::__construct('app:agent:export-composed-view-node-schema');
     }
 
     protected function getSchemaFilePaths(): ComposedViewNodeSchemaFilePaths

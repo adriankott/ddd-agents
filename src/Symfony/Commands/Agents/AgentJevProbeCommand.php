@@ -35,7 +35,8 @@ use Throwable;
  * of its own overrides {@see getFixtureAgentSpaceKey()} and {@see findAgentSpaceOfFixture()}.
  */
 #[AsCommand(
-    name: 'app:ai-agent:jev-probe',
+    name: 'app:agent:jev-probe',
+    aliases: ['app:ai-agent:jev-probe'],
     description: 'Send labelled cases of a fixture to the decision model (Jev) and score the answers per question.'
 )]
 class AgentJevProbeCommand extends AgentConsoleCommand

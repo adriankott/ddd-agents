@@ -24,6 +24,8 @@ class AgentStateDelta
     public const string KIND_STANDING_INSTRUCTIONS = 'standing-instructions';
     public const string KIND_PLAN_OF_THE_PRODUCT = 'plan-of-the-product';
     public const string KIND_SITUATION = 'situation';
+    /** The user's UI as the client reports it (`Agent.UI`, {@see \DDD\Domain\AI\Services\ClientTools\AgentUIStateNotesService}) */
+    public const string KIND_UI = 'ui';
 
     /** One of the KIND_* constants. */
     public string $kind = '';
@@ -56,6 +58,7 @@ class AgentStateDelta
             self::KIND_STANDING_INSTRUCTIONS,
             self::KIND_PLAN_OF_THE_PRODUCT,
             self::KIND_SITUATION,
+            self::KIND_UI,
         ];
     }
 

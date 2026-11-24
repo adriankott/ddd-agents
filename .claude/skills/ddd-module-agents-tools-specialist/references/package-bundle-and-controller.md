@@ -74,7 +74,7 @@ class DemoNotesMCPPackage extends MCPPackage
 
 A tool reaches the agent only through a loaded skill. The host's `config/app/AI/skillPackages.php` maps each skill
 name to its packages, by class or by package id; it **replaces the package's file whole**, so a host that wants the
-package's own skills (`Assistant.Mandates`, `Assistant.Tasks`, `Assistant.TaskRunReports`) lists them itself.
+package's own skills (`Agent.Mandates`, `Agent.Tasks`, `Agent.TaskRunReports`) lists them itself.
 `AISkill::getPackageClassesBySkillName()` reads the binding once per process. A package id resolves only for a package
 the source-root scan finds (`MCPPackageIdsService`); the rules of the scan are the skills-and-purposes skill's, and the
 way out for a host under another root namespace — bind by class, as the reference kernel does — is the entry

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace DDD\Tests\Agents\Presentation\Mcp\AI\Probes;
 
-use DDD\Presentation\Mcp\Client\AI\AgentMandatesMCPPackage;
+use DDD\Presentation\Mcp\Client\Agents\AgentMandatesMCPPackage;
 
 /** The package's own mandate tools, with the space of a call answered by the test. */
 class AgentSpaceLookupRecordingAgentMandatesMCPPackage extends AgentMandatesMCPPackage

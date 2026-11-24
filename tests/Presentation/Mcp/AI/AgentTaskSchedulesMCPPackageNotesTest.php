@@ -12,8 +12,8 @@ use DDD\Domain\Common\Entities\Accounts\Account;
 use DDD\Infrastructure\Base\DateTime\DateTime;
 use DDD\Infrastructure\Exceptions\BadRequestException;
 use DDD\Infrastructure\Libs\Config;
-use DDD\Presentation\Mcp\Client\AI\AgentTaskSchedulesMCPPackage;
-use DDD\Presentation\Mcp\Client\AI\Dtos\TaskScheduleDeleteMcpResponseDto;
+use DDD\Presentation\Mcp\Client\Agents\AgentTaskSchedulesMCPPackage;
+use DDD\Presentation\Mcp\Client\Agents\Dtos\TaskScheduleDeleteMcpResponseDto;
 use DDD\Tests\Agents\Support\UnitTestCase;
 
 /**

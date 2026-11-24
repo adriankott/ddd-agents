@@ -18,6 +18,19 @@ supervisor, run claims, the decision layer, the message handlers of the loop and
 | `examples/` | `reference-kernel/` (a minimal host without an application) and `workers.yaml` (one consumer per transport) |
 | `.claude/skills/` | the developer skills: the entry skill `ddd-module-agents-specialist` and eight topic skills |
 
+## Words per layer
+
+| Layer | Name |
+|---|---|
+| Composer, npm, repository | `mgamadeus/ddd-agents`, `@mgamadeus/ddd-agents`, `ddd-framework/ddd-agents` |
+| Module class | `DDD\Modules\Agents\AgentsModule` (owned namespaces: `AgentsModule::OWNED_NAMESPACES`) |
+| PHP | `DDD\Domain\AI\…` (feature folders), `DDD\Presentation\Api\Agents\`, `DDD\Presentation\Mcp\Client\Agents\`, `DDD\Presentation\Mcp\Admin\System\`, `DDD\Symfony\Commands\Agents\` |
+| Config | `config/app/AI/…` (`AI.skillPackages`, `AI.accountRights`, …), skills in `config/app/AI/Skills/Agent/` and `…/System/` |
+| Skills ↔ package ids | `Agent.Mandates` ↔ `agent.mandates`, `Agent.Tasks` ↔ `agent.tasks`, `Agent.TaskRunReports` ↔ `agent.taskRunReports`, `Agent.Memory` ↔ `agent.memory`, `Agent.Web.Search` ↔ `agent.web.search`, `Agent.UI` ↔ `agent.ui`, `System.Health` / `.Issues` / `.Workers` / `.Crons` ↔ `ddd.system.*` |
+| Rights | `AgentAccountRights`: `operatePlatform`, `scheduleAgentTasks`, `useAgentMemory`, `useWeb`, `useUI` |
+| Console | `app:agent:…` (the former `app:ai-agent:`, `app:ai-conversation:`, `app:ai-schedule:`, `app:ai:` names stay as aliases), `app:mcp:…` |
+| npm entries | `.`, `./renderer`, `./kit`, `./widgets`, `./contract`, `./client`, `./client/testing`, `./chat`, `./preview`, `./image-render`, `./provider`, `./ui` |
+
 ## Developer skills
 
 Start with `.claude/skills/ddd-module-agents-specialist/SKILL.md`: install, wiring, the duties a host takes over

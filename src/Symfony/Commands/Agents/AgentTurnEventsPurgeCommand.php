@@ -20,11 +20,12 @@ use Throwable;
  * references any more. This is the table's own age-based lifecycle, independent of any erasure of an account. Run it
  * daily from a cron:
  *
- *   php bin/console app:ai-agent:turn-events-purge
- *   php bin/console app:ai-agent:turn-events-purge --days=90 --dryRun
+ *   php bin/console app:agent:turn-events-purge
+ *   php bin/console app:agent:turn-events-purge --days=90 --dryRun
  */
 #[AsCommand(
-    name: 'app:ai-agent:turn-events-purge',
+    name: 'app:agent:turn-events-purge',
+    aliases: ['app:ai-agent:turn-events-purge'],
     description: 'Delete agent turn events older than the retention (default 180 days) in batches, then the unreferenced catalog snapshots'
 )]
 class AgentTurnEventsPurgeCommand extends AgentConsoleCommand

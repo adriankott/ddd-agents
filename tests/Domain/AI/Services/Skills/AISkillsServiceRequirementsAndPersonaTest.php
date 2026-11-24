@@ -34,10 +34,10 @@ class AISkillsServiceRequirementsAndPersonaTest extends TestCase
 
     public function testASkillWithoutAnOverlayEntryKeepsItsFrontmatter(): void
     {
-        $aISkillsService = new AISkillsServiceWithFixedConfig(['Assistant.Budget' => ['requiredFeatureFlags' => ['BUDGET']]], []);
+        $aISkillsService = new AISkillsServiceWithFixedConfig(['Agent.Budget' => ['requiredFeatureFlags' => ['BUDGET']]], []);
         $frontmatter = ['description' => 'd'];
-        self::assertSame($frontmatter, $aISkillsService->applySkillRequirementOverlay('Assistant.Mandates', $frontmatter));
-        self::assertSame(['description' => 'd', 'requiredFeatureFlags' => ['BUDGET']], $aISkillsService->applySkillRequirementOverlay('Assistant.Budget', $frontmatter));
+        self::assertSame($frontmatter, $aISkillsService->applySkillRequirementOverlay('Agent.Mandates', $frontmatter));
+        self::assertSame(['description' => 'd', 'requiredFeatureFlags' => ['BUDGET']], $aISkillsService->applySkillRequirementOverlay('Agent.Budget', $frontmatter));
     }
 
     public function testThePersonaPlaceholdersAreReplacedAndTheDefaultsApplyWithoutAPersona(): void
@@ -58,7 +58,7 @@ class AISkillsServiceRequirementsAndPersonaTest extends TestCase
     {
         $skillsDirectory = dirname(__DIR__, 5) . '/config/app/AI/Skills';
         $aISkillsService = new AISkillsServiceWithFixedConfig([], ['agentName' => 'Ava', 'productName' => 'Shopline']);
-        foreach (['Assistant/Mandates.md', 'Assistant/Tasks.md', 'Assistant/TaskRunReports.md'] as $skillFile) {
+        foreach (['Agent/Mandates.md', 'Agent/Tasks.md', 'Agent/TaskRunReports.md', 'Agent/Memory.md', 'Agent/UI.md', 'Agent/Web/Search.md'] as $skillFile) {
             $substitutedText = $aISkillsService->substitutePersonaPlaceholders((string)file_get_contents($skillsDirectory . '/' . $skillFile));
             self::assertStringNotContainsString('{%', $substitutedText, $skillFile);
             $frontmatter = AISkillsService::splitFrontmatter($substitutedText)->frontmatter;

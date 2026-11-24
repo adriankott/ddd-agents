@@ -48,7 +48,7 @@ class AgentEvalSuiteRunsDatabaseTest extends DatabaseTestCase
 
         $storedRunRow = $this->findStoredRow(DBAgentEvalSuiteRunModel::getTableName(), (int)$agentEvalSuiteRun->id);
         self::assertNotNull($storedRunRow);
-        self::assertSame('app:ai-agent:eval-suite', $storedRunRow['command']);
+        self::assertSame('app:agent:eval-suite', $storedRunRow['command']);
         self::assertSame('default-suite', $storedRunRow['suiteLabel']);
         self::assertSame('run-folder-default', $storedRunRow['logDirectoryName']);
         self::assertSame(6, (int)$storedRunRow['casesTotal']);
@@ -142,7 +142,7 @@ class AgentEvalSuiteRunsDatabaseTest extends DatabaseTestCase
     protected function recordFixtureRun(): AgentEvalSuiteRun
     {
         $agentEvalSuiteRun = $this->getAgentEvalSuiteRunsService()->recordSuiteRun(
-            'app:ai-agent:eval-suite',
+            'app:agent:eval-suite',
             'default-suite',
             1_761_658_758,
             AgentEvalStoredRunOptions::fromStoredDocument(['model' => 'VENDOR.MODEL_A', 'flavor' => 'judge']),

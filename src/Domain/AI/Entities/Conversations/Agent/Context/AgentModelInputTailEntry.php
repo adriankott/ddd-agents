@@ -50,6 +50,9 @@ class AgentModelInputTailEntry extends ValueObject
     /** The `[SIGNAL:client-context]` line: what the owner's client showed with the newest owner input. */
     public const string KIND_CLIENT_CONTEXT = 'CLIENT_CONTEXT';
 
+    /** The `[SIGNAL:ui]` note of the user's UI (`Agent.UI`) when no state delivery carries it */
+    public const string KIND_UI_STATE = 'UI_STATE';
+
     /** The `[SIGNAL:clock]` line: the captured "now" of this model call. */
     public const string KIND_CLOCK = 'CLOCK';
 

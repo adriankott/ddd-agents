@@ -15,16 +15,16 @@ ships 47 commands (46 listed, plus the hidden tool-call child) on the base `Agen
 lifted rights, the budget option, the usage envelope, the progress reporter `AgentConsoleProgressReporter`, the space
 options) and, for evaluation, `AgentEvalConsoleCommand` (scope fallback, child processes, stop signals), with the
 option traits `ContextRetentionSettingsOptionsTrait` and `AgentEvalArmOptionsTrait` and the arms object
-`AgentEvalArms`: the console chat (`app:ai-agent:chat`, `app:ai-agent:chat-tui`) with the record and replay of a run
+`AgentEvalArms`: the console chat (`app:agent:chat`, `app:agent:chat-tui`) with the record and replay of a run
 (`--record-run-for-comparison` / `--replay-run-and-compare` on `AgentRecordedRunsService` and the per-run
 `AgentRecordedRunSession` behind the contract `AgentRecordedRunSessionInterface`), inspection and diagnosis
-(`app:ai-agent:inspect`, `app:ai-agent:diagnose`, `app:ai-agent:validate-conversation`, `app:ai-agent:cache-diff`,
-`app:ai-agent:run-report`, …), the ten evaluation commands (`app:ai-agent:eval-tools`, `app:ai-agent:eval-suite` and
+(`app:agent:inspect`, `app:agent:diagnose`, `app:agent:validate-conversation`, `app:agent:cache-diff`,
+`app:agent:run-report`, …), the ten evaluation commands (`app:agent:eval-tools`, `app:agent:eval-suite` and
 siblings), the tool-call comparison of one MCP package (`app:mcp:compare-tool-calls`), the evaluation purge
-(`app:ai-agent:eval-conversations-purge` on `AIConversationEvalPurgeService`), the seed-account lease and clean start
+(`app:agent:eval-conversations-purge` on `AIConversationEvalPurgeService`), the seed-account lease and clean start
 (`AgentEvalSeedAccountLeasesService`, `AgentEvalSeedAccountResetService`), the decision commands
-(`app:ai-agent:decision-fixtures`, `app:ai-agent:decision-stats`, the abstract replay base `AgentDecisionReplayCommand`),
-the live reasoning-replay probe (`app:ai-agent:probe-reasoning-replay` on `AgentReasoningReplayProbeService`),
+(`app:agent:decision-fixtures`, `app:agent:decision-stats`, the abstract replay base `AgentDecisionReplayCommand`),
+the live reasoning-replay probe (`app:agent:probe-reasoning-replay` on `AgentReasoningReplayProbeService`),
 the scheduled maintenance and the line editor a console chat reads its input with (`src/Symfony/Commands/Agents/Chat/`).
 Every command, option, default and exit code: [console-commands](references/console-commands.md); the fixtures the
 evaluation commands read: [evaluation-fixtures](references/evaluation-fixtures.md). The fixtures and the comparison
@@ -51,12 +51,12 @@ scripts are the application's.
 
 ## Rules that always hold
 
-1. **Diagnose read-only first.** `app:ai-agent:diagnose <id>` (without options) replays the resume's two loads and says
+1. **Diagnose read-only first.** `app:agent:diagnose <id>` (without options) replays the resume's two loads and says
    whether a resume would drive a turn — without driving one (`AIConversationResumeDiagnosis::buildFor()`). Run it (and
    read the stored state columns) before you dispatch, retry or edit anything.
 2. **A repair is a recovery pass, never a hand-edited row.** The package repairs every stuck state through a service
    method (`findStuckConversationIds()`, `findConversationIdsWithInboundLeftIdle()`, `retryUnansweredTurn()`, …);
-   `app:ai-agent:reap` and `app:ai-conversation:deliver-owed-reports-and-resume-owed-turns` call them. Writing
+   `app:agent:reap` and `app:agent:deliver-owed-reports-and-resume-owed-turns` call them. Writing
    `runState` or `resumeAttempts` by SQL skips the claim fence.
 3. **The slim request snapshot is not the payload.** A request snapshot stores model, effort, times, hashes and
    timings. The full sent payload and raw response exist only when `storeRequestSnapshot` was on for that
@@ -68,10 +68,10 @@ scripts are the application's.
    not grouped under the turn and a budget lift granted on the envelope does nothing; the envelope middleware of the
    workers is a host duty of `ddd-module-agents-specialist`.
 5. **The synchronous console path never drives a conversation a worker may hold.** `generateAgentReply()` takes no run
-   claim. Drive only an IDLE conversation from the console (`app:ai-agent:chat` inline, `app:ai-agent:diagnose --drive`);
-   otherwise dispatch (`app:ai-agent:chat --async`, `app:ai-agent:diagnose --retry`) and inspect afterwards.
+   claim. Drive only an IDLE conversation from the console (`app:agent:chat` inline, `app:agent:diagnose --drive`);
+   otherwise dispatch (`app:agent:chat --async`, `app:agent:diagnose --retry`) and inspect afterwards.
 6. **`--ignore-budget` lifts the cap for this process only.** The spend is still booked; a child process gets the
-   option handed on by the evaluation base; `app:ai-agent:eval-suite` lifts by default and keeps the cap with
+   option handed on by the evaluation base; `app:agent:eval-suite` lifts by default and keeps the cap with
    `--enforce-budget`. A command without the option runs under the application's budget gate.
 7. **An eval run is marked before its first drive.** `RunSettings::$evalRun` decides the tool block, the outbound
    guard's eval context, the report-mail skip and the statistics exclusion. A conversation stamped later has already
@@ -106,8 +106,8 @@ scripts are the application's.
 - `--agentSpaceId` with an empty value is refused, never read as account level; together with one of the application's
   own space options it is refused too.
 - An evaluation command prints its progress on the error output; read the standard output for its `--json` document.
-- `app:ai-agent:eval-tools` runs a case once more after an infrastructure error (a model transport failure, a deadlock — `AgentEvalSuiteCommand::RETRIED_INFRASTRUCTURE_ERRORS`), as `eval-suite` does; the row keeps its first attempt.
-- `app:ai-agent:eval-tools --case=<id>` runs in this process even with `--parallel`; only `--repeat` > 1 forces child
+- `app:agent:eval-tools` runs a case once more after an infrastructure error (a model transport failure, a deadlock — `AgentEvalSuiteCommand::RETRIED_INFRASTRUCTURE_ERRORS`), as `eval-suite` does; the row keeps its first attempt.
+- `app:agent:eval-tools --case=<id>` runs in this process even with `--parallel`; only `--repeat` > 1 forces child
   processes for one case.
 - A judged verdict `ERROR` with `judge call failed: <model>: <reason>` is the provider refusing the judge's call, not
   the agent failing; a `--judge-model` / `--driver-model` the catalog does not know exits `2` before anything runs.
@@ -124,7 +124,7 @@ scripts are the application's.
 
 ## Minimal template: an application's subclass of a package command
 
-The package's `app:ai-agent:inspect` prints the space of a conversation by its id. An application that knows its space
+The package's `app:agent:inspect` prints the space of a conversation by its id. An application that knows its space
 by something more telling replaces the command under the same name and overrides one point; everything else (options,
 rights lifted, exit codes) stays the package's.
 
@@ -141,7 +141,7 @@ use DDD\Symfony\Commands\Agents\AgentInspectConversationCommand;
 use DDD\Symfony\Commands\Agents\Inspect\ConversationHeaderRow;
 use Symfony\Component\Console\Attribute\AsCommand;
 
-#[AsCommand(name: 'app:ai-agent:inspect', description: 'Prints one stored agent conversation, read-only')]
+#[AsCommand(name: 'app:agent:inspect', description: 'Prints one stored agent conversation, read-only')]
 class ApplicationInspectConversationCommand extends AgentInspectConversationCommand
 {
     protected function describeAgentSpaceRow(AIConversation $conversation): ConversationHeaderRow
@@ -166,18 +166,18 @@ The override points of every command and how a new command is added:
 
 | Question | Command |
 |---|---|
-| Talk to the agent, watch every tool call | `app:ai-agent:chat --agentSpaceId=<id> -m "…"` (`--debug`, `--full`, `-i`) |
-| Why did this conversation not answer? | `app:ai-agent:diagnose <id>`, then `app:ai-agent:validate-conversation <id>` |
-| What is in this conversation? | `app:ai-agent:inspect <id>` (`--snapshots --full` for the sent payloads) |
-| Why did the prompt cache miss? | `app:ai-agent:cache-diff <id>` |
-| Which tool result is too large? Which skill costs most tokens? | `app:ai-agent:tool-response-stats`, `app:ai-agent:skill-token-map` |
-| Did a refactor of the loop change a run? | `app:ai-agent:chat --turns-file=<f> --record-run-for-comparison=<run.json>` before, `--replay-run-and-compare=<run.json>` after |
+| Talk to the agent, watch every tool call | `app:agent:chat --agentSpaceId=<id> -m "…"` (`--debug`, `--full`, `-i`) |
+| Why did this conversation not answer? | `app:agent:diagnose <id>`, then `app:agent:validate-conversation <id>` |
+| What is in this conversation? | `app:agent:inspect <id>` (`--snapshots --full` for the sent payloads) |
+| Why did the prompt cache miss? | `app:agent:cache-diff <id>` |
+| Which tool result is too large? Which skill costs most tokens? | `app:agent:tool-response-stats`, `app:agent:skill-token-map` |
+| Did a refactor of the loop change a run? | `app:agent:chat --turns-file=<f> --record-run-for-comparison=<run.json>` before, `--replay-run-and-compare=<run.json>` after |
 | Did a change of an MCP package change what the model receives? | `app:mcp:compare-tool-calls --script=<Package> --record=<file>` before, `--replay-and-compare=<file>` after |
-| Run the evaluation | `app:ai-agent:eval-suite --dry-run`, then without it; one area: `app:ai-agent:eval-tools --skill=<skill>` |
-| Analyse a failed run | `app:ai-agent:eval-analyze [<run>]`, `app:ai-agent:run-report <ids> --log-dir=<folder>` |
-| Does a model accept its reasoning back, a forced tool choice, append-only loading on Responses or Messages? | `app:ai-agent:probe-reasoning-replay --model=<name> --scenario=all [--wire=responses\|messages] [--switch-model=<name>]` (real calls, nothing persisted) |
-| Did the provider drop thinking blocks of a Messages call; what did thinking cost per call? | `app:ai-agent:cache-diff <id>` (column `thinking`), `app:ai-agent:inspect <id> --snapshots` (the `messages wire:` line), `app:ai-agent:run-report <ids> --usage` |
-| Clean up evaluation conversations | `app:ai-agent:eval-conversations-purge` (dry run), then `--apply` |
+| Run the evaluation | `app:agent:eval-suite --dry-run`, then without it; one area: `app:agent:eval-tools --skill=<skill>` |
+| Analyse a failed run | `app:agent:eval-analyze [<run>]`, `app:agent:run-report <ids> --log-dir=<folder>` |
+| Does a model accept its reasoning back, a forced tool choice, append-only loading on Responses or Messages? | `app:agent:probe-reasoning-replay --model=<name> --scenario=all [--wire=responses\|messages] [--switch-model=<name>]` (real calls, nothing persisted) |
+| Did the provider drop thinking blocks of a Messages call; what did thinking cost per call? | `app:agent:cache-diff <id>` (column `thinking`), `app:agent:inspect <id> --snapshots` (the `messages wire:` line), `app:agent:run-report <ids> --usage` |
+| Clean up evaluation conversations | `app:agent:eval-conversations-purge` (dry run), then `--apply` |
 
 ## Task or symptom → reference
 

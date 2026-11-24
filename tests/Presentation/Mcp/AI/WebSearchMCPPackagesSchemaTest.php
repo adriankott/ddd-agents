@@ -10,22 +10,20 @@ use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessages;
 use DDD\Domain\AI\Entities\Conversations\Messages\ToolCall;
 use DDD\Domain\AI\Entities\MCPPackages\MCPPackageDocumentation;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolExecutionTimeout;
-use DDD\Domain\AI\Entities\MCPPackages\MCPToolRefreshesState;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolResultIsNeverStubbedByTheBudget;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolReturnsUntrustedContent;
 use DDD\Domain\AI\Entities\Skills\AISkill;
 use DDD\Domain\Base\Entities\LazyLoad\LazyLoadRepo;
 use DDD\Infrastructure\Libs\Config;
-use DDD\Presentation\Mcp\Client\AI\Dtos\WebSearchHitsMcpResponseDto;
-use DDD\Presentation\Mcp\Client\AI\WebPageScreenshotMCPPackage;
-use DDD\Presentation\Mcp\Client\AI\WebSearchMCPPackage;
+use DDD\Presentation\Mcp\Client\Agents\Dtos\WebSearchHitsMcpResponseDto;
+use DDD\Presentation\Mcp\Client\Agents\WebSearchMCPPackage;
 use DDD\Tests\Agents\Support\UnitTestCase;
 use ReflectionMethod;
 
 /**
  * The web research tools: the schemas build with the four tool names, every tool reads untrusted content, the
  * research results are never stubbed by the budget, every tool has its time limit, the screenshot refreshes state;
- * the package binding offers them under Web.Search and Web.PageView; the answer instruction dictates the references
+ * the package binding offers them under Agent.Web.Search and Web.PageView; the answer instruction dictates the references
  * widget; an earlier search's excerpts are read back for a page.
  */
 class WebSearchMCPPackagesSchemaTest extends UnitTestCase
@@ -50,16 +48,8 @@ class WebSearchMCPPackagesSchemaTest extends UnitTestCase
         }
         sort($toolNames);
         self::assertSame(self::SEARCH_TOOL_NAMES, $toolNames);
-        self::assertSame('agent.webSearch', $searchDocumentation->name);
-
-        $screenshotDocumentation = MCPPackageDocumentation::createFromClassName(WebPageScreenshotMCPPackage::class);
-        self::assertSame('agent.webPageScreenshot', $screenshotDocumentation->name);
-        self::assertCount(1, $screenshotDocumentation->functions);
-
-        foreach ([$searchDocumentation, $screenshotDocumentation] as $packageDocumentation) {
-            $serializedDocumentation = (string)json_encode($packageDocumentation->toObject(forPersistence: false));
-            self::assertStringNotContainsString('array<', $serializedDocumentation);
-        }
+        self::assertSame('agent.web.search', $searchDocumentation->name);
+        self::assertStringNotContainsString('array<', (string)json_encode($searchDocumentation->toObject(forPersistence: false)));
     }
 
     public function testEveryToolDeclaresItsAttributes(): void
@@ -70,19 +60,14 @@ class WebSearchMCPPackagesSchemaTest extends UnitTestCase
             self::assertCount(1, $reflectionMethod->getAttributes(MCPToolResultIsNeverStubbedByTheBudget::class), $toolName);
             self::assertSame(45, $reflectionMethod->getAttributes(MCPToolExecutionTimeout::class)[0]->newInstance()->seconds, $toolName);
         }
-        $screenshotMethod = new ReflectionMethod(WebPageScreenshotMCPPackage::class, 'getWebPageAsScreenshot');
-        self::assertCount(1, $screenshotMethod->getAttributes(MCPToolReturnsUntrustedContent::class));
-        self::assertCount(1, $screenshotMethod->getAttributes(MCPToolRefreshesState::class));
     }
 
     public function testThePackagesBindingOffersTheTools(): void
     {
         $packageBinding = require dirname(__DIR__, 4) . '/config/app/AI/skillPackages.php';
 
-        self::assertSame(['agent.webSearch'], $packageBinding[AISkill::WEB_SEARCH] ?? null);
-        self::assertSame(['agent.webPageScreenshot'], $packageBinding[AISkill::WEB_PAGE_VIEW] ?? null);
-        self::assertFileExists(dirname(__DIR__, 4) . '/config/app/AI/Skills/Web/Search.md');
-        self::assertFileExists(dirname(__DIR__, 4) . '/config/app/AI/Skills/Web/PageView.md');
+        self::assertSame([WebSearchMCPPackage::class], $packageBinding[AISkill::AGENT_WEB_SEARCH] ?? null);
+        self::assertFileExists(dirname(__DIR__, 4) . '/config/app/AI/Skills/Agent/Web/Search.md');
         self::assertFileExists(dirname(__DIR__, 4) . '/config/app/AI/Prompts/AI/WebSearch/PageExtract.md');
     }
 

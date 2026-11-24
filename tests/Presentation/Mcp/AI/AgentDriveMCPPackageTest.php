@@ -12,13 +12,13 @@ use DDD\Domain\AI\Services\Drives\AgentDriveStoresService;
 use DDD\Domain\Base\Entities\LazyLoad\LazyLoadRepo;
 use DDD\Infrastructure\Exceptions\ForbiddenException;
 use DDD\Infrastructure\Libs\Config;
-use DDD\Presentation\Mcp\Client\AI\AgentDriveMCPPackage;
-use DDD\Presentation\Mcp\Client\AI\Dtos\AgentDriveFileSaveRequestDto;
-use DDD\Presentation\Mcp\Client\AI\Dtos\AgentDriveFilesShowRequestDto;
+use DDD\Presentation\Mcp\Client\Agents\AgentDriveMCPPackage;
+use DDD\Presentation\Mcp\Client\Agents\Dtos\AgentDriveFileSaveRequestDto;
+use DDD\Presentation\Mcp\Client\Agents\Dtos\AgentDriveFilesShowRequestDto;
 use DDD\Domain\AI\Entities\Conversations\Widgets\ConversationWidgetDelivery;
 use DDD\Domain\AI\Entities\Conversations\Widgets\DriveFilesConversationWidget;
 use DDD\Domain\AI\Services\Conversations\AIConversationMessagesService;
-use DDD\Presentation\Mcp\Client\AI\Dtos\AgentDriveFilesListRequestDto;
+use DDD\Presentation\Mcp\Client\Agents\Dtos\AgentDriveFilesListRequestDto;
 use DDD\Tests\Agents\Domain\AI\Services\Drives\Fixtures\InMemoryAgentDriveStore;
 use DDD\Tests\Agents\Support\UnitTestCase;
 

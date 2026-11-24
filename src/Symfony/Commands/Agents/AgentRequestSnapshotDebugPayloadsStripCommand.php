@@ -25,11 +25,12 @@ use Throwable;
  * As a nightly cron, pass a time budget below the cron ticker's process timeout; the cursor carries the rest to the
  * next night:
  *
- *   php bin/console app:ai-agent:request-snapshot-debug-payloads-strip --maxSeconds=300
- *   php bin/console app:ai-agent:request-snapshot-debug-payloads-strip --olderThanDays=7 --dryRun
+ *   php bin/console app:agent:request-snapshot-debug-payloads-strip --maxSeconds=300
+ *   php bin/console app:agent:request-snapshot-debug-payloads-strip --olderThanDays=7 --dryRun
  */
 #[AsCommand(
-    name: 'app:ai-agent:request-snapshot-debug-payloads-strip',
+    name: 'app:agent:request-snapshot-debug-payloads-strip',
+    aliases: ['app:ai-agent:request-snapshot-debug-payloads-strip'],
     description: 'Remove the debug request/response payloads from request snapshots older than N days, in small pauses'
 )]
 class AgentRequestSnapshotDebugPayloadsStripCommand extends AgentConsoleCommand

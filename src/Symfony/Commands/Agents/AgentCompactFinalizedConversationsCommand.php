@@ -30,12 +30,13 @@ use Throwable;
  *
  * The mark half is {@see AgentMarkFinalizedConversationsCommand}.
  *
- *   php bin/console app:ai-conversation:compact-finalized
- *   php bin/console app:ai-conversation:compact-finalized --batch=100 --dry-run
- *   php bin/console app:ai-conversation:compact-finalized --inline=123 --ignore-budget
+ *   php bin/console app:agent:compact-finalized-conversations
+ *   php bin/console app:agent:compact-finalized-conversations --batch=100 --dry-run
+ *   php bin/console app:agent:compact-finalized-conversations --inline=123 --ignore-budget
  */
 #[AsCommand(
-    name: 'app:ai-conversation:compact-finalized',
+    name: 'app:agent:compact-finalized-conversations',
+    aliases: ['app:ai-conversation:compact-finalized'],
     description: 'Idle-finalize work sweep: dispatch completion compactions for finalized conversations (one indexed SELECT + ids-only dispatches).',
 )]
 class AgentCompactFinalizedConversationsCommand extends AgentConsoleCommand

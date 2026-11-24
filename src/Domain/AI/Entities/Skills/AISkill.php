@@ -27,7 +27,7 @@ use DDD\Infrastructure\Services\DDDService;
  * {@see \DDD\Domain\AI\Services\Skills\AISkillSourcesService}) + one entry in `config/app/AI/skillPackages.php` (the
  * package wiring, {@see getPackageClassesBySkillName()}). Loaded via {@see \DDD\Domain\AI\Services\Skills\AISkillsService}.
  *
- * A skill is identified by its dotted **name** (e.g. `Assistant.Mandates`) — there is no separate id. It is a domain
+ * A skill is identified by its dotted **name** (e.g. `Agent.Mandates`) — there is no separate id. It is a domain
  * concept (the abstract capability the agent loads), so it lives in the AI domain next to AIPrompt/AIModel.
  * The concrete MCP packages are named in that config file — by class or by package id
  * ({@see \DDD\Domain\AI\Services\Skills\MCPPackageIdsService}) — so the AI core holds no reference to Presentation.
@@ -40,94 +40,84 @@ use DDD\Infrastructure\Services\DDDService;
  */
 class AISkill extends Entity
 {
-    // The skill names the package itself knows: the agent's own governance skills, whose skill files (where the package
-    // ships them) and MCP packages live in this package, and the optional cross-cutting components an application may
-    // bind. An application's own skill names live in the application's same-path subclass of this class.
+    // The skill names the package knows. Naming: `<Topic>.<Feature>`, three parts at most; `Agent.*` holds the agent's
+    // own tools and organs, every other topic is the world it works on. The package id of a skill's MCP package is the
+    // skill name in lower case (`agent.web.search`); bound by class in `skillPackages.php`. An application's own skill
+    // names live in the application's same-path subclass of this class. There are no aliases: an old name stored in a
+    // conversation is skipped until the model loads the skill under its new name.
 
-    // ===== Assistant =====
-    // How the AI assistant works OUTWARD, on the owner's behalf — the STANDING / automatic way it writes the
-    // content it PUBLISHES to third parties (replies and public texts): automatic-reply behaviour,
-    // standing rules for what it publishes, writing tone + creativity, target audience. Deliberately its OWN skill,
-    // NOT merged into a domain skill: "set my writing style / always reply informally / my audience is 30-55 / always
-    // add #X to what you publish" is a settings intent the model never reliably maps to a domain-titled skill (the
-    // constant load_skills=[] miss). Sharply distinct from Memory.Management — that is how the AI treats the USER in
-    // chat (inward, the chat relationship); THIS changes how the AI acts toward CUSTOMERS / the public (outward).
-    public const string ASSISTANT_SETTINGS = 'Assistant.Settings';
+    // ===== Shipped with this package (skill file + MCP package) =====
 
-    // ===== Memory =====
-    // The assistant's two long-term-memory subsystems, folded into ONE loadable skill (fold related packages so the
-    // agent disambiguates at the reliable tool layer, not at lossy routing):
-    //   • SEMANTIC: durable facts/directives/solutions — search/remember/update/forget.
-    //   • EPISODIC: recall what was SAID — this chat or any past one.
-    // Loadable so the tools surface only when memory work is intended; the always-on DIRECTIVE injection
-    // is separate and not gated on this.
-    public const string MEMORY_MANAGEMENT = 'Memory.Management';
+    // MANDATES: the customer's standing authorizations for consequential outward actions — grant from the customer's
+    // own server-verified statement, list, revoke. The executor's mandate-gate refusal points the model here by name.
+    public const string AGENT_MANDATES = 'Agent.Mandates';
 
-    // ===== Money =====
+    // SCHEDULED & BACKGROUND TASKS: one-off now, one-time at a moment on the space's clock, recurring on a cron, list +
+    // archive-policy delete. Delivery (EMAIL/CHAT) is a property OF a task; the report obligation itself is the loop
+    // meta-tool `send_owner_report`. A TIMED phone call is a task here whose text says to call.
+    public const string AGENT_TASKS = 'Agent.Tasks';
+
+    // The reports of the earlier runs of a scheduled run's OWN task: purpose-bound (`Schedule.Run` preloads it, never in
+    // a chat's catalog) — the run keeps its report's structure and states what changed since.
+    public const string AGENT_TASK_RUN_REPORTS = 'Agent.TaskRunReports';
+
+    // The long-term memory, ONE loadable skill: durable facts/directives/solutions (search/remember/update/forget) and
+    // recall of what was SAID in this or a past chat. The always-on directive injection is not gated on it.
+    public const string AGENT_MEMORY = 'Agent.Memory';
+
+    // The agent's window onto the LIVE web: search, page reads, fast-model readings. The page screenshots are the
+    // sibling `Agent.Web.Pages` of `mgamadeus/ddd-agent-browser`; a host with that package names it as a sub-skill in
+    // its own copy of this skill file (the package's file names no skill of a package it does not require).
+    public const string AGENT_WEB_SEARCH = 'Agent.Web.Search';
+
+    // The user's UI: the agent reads the screen the user is on, lists and opens screens, highlights an element; the
+    // client executes the requests (client tool request channel).
+    public const string AGENT_UI = 'Agent.UI';
+
+    // ===== Core's features, shipped with this package (provider `ddd.`; platform operators only) =====
+
+    // Platform health at a glance: workers, crons, error groups and the application's sections; parent of the three.
+    public const string SYSTEM_HEALTH = 'System.Health';
+
+    // The error groups of Core's issues registry: list, one group, trend, status.
+    public const string SYSTEM_ISSUES = 'System.Issues';
+
+    // The Messenger workers: queues, processes, failures per transport and message class.
+    public const string SYSTEM_WORKERS = 'System.Workers';
+
+    // The cron jobs: state, schedule, runs and their output.
+    public const string SYSTEM_CRONS = 'System.Crons';
+
+    // ===== Known to the package, filled by the host (skill file + MCP package of the application) =====
+
+    // How the agent works OUTWARD on the owner's behalf: the standing way it writes what it PUBLISHES (automatic
+    // replies, tone, audience). Distinct from Agent.Memory (how it treats the USER in chat).
+    public const string AGENT_SETTINGS = 'Agent.Settings';
+
+    // The account's exact AI budget usage. Offered only when the account's policy allows the exact figures
+    // ({@see \DDD\Domain\AI\Entities\Conversations\AIConversationEntitlement::hidesExactAIBudget()}).
+    public const string AGENT_BUDGET = 'Agent.Budget';
+
+    // Real, freely licensed photos of public places and things — attribution per photo.
+    public const string AGENT_WEB_IMAGES = 'Agent.Web.Images';
+
+    // MESSAGES to the owner's OWN registered address on the user's wish or a standing directive. Not the run-report
+    // obligation (the loop meta-tool `send_owner_report`).
+    public const string AGENT_COMMUNICATION_MESSAGES = 'Agent.Communication.Messages';
+
+    // VOICE CALLS between the agent and the owner: calling the owner now, the call log, the caller numbers that may
+    // reach the agent by phone. PIN and channel activation stay settings-UI-only.
+    public const string AGENT_COMMUNICATION_VOICE_CALLS = 'Agent.Communication.VoiceCalls';
+
+    // ===== Other topics =====
+
     // Currency conversion at the DATED rate of a day (cached up to a month) — never a live quote.
     public const string MONEY_CURRENCY_CONVERSION = 'Money.CurrencyConversion';
-
-    // ===== Web =====
-    // The agent's window onto the LIVE web — current facts/news and anything not in the space's own data. Its own
-    // skill (not folded into a domain) because "look it up online" is a cross-cutting intent with no domain home; it
-    // will grow (fetch a page, analyse a URL) so the skill is the right container.
-    public const string WEB_SEARCH = 'Web.Search';
-
-    // Real, freely licensed photos of public places and things (Wikimedia Commons) — attribution per photo.
-    public const string WEB_IMAGES = 'Web.Images';
-
-    // Web.PageView: a vision-gated SUB-SKILL of Web.Search — `getWebPageAsScreenshot` renders a
-    // URL and returns the pixels so the model can SEE the page (layout/colours/design), the visual sibling of the
-    // markdown read. Sub-skill so Web.Search core stays usable on blind models; `requiresVisionCapabilities` so it only
-    // loads on a model that can process images.
-    public const string WEB_PAGE_VIEW = 'Web.PageView';
-
-    // ===== Communication =====
-    // VOICE CALLS between the agent and the owner (one call tool for every channel): the
-    // agent calling the owner now (`startVoiceCall` — the app ring on web tab and phones, or a verified number), the
-    // phone call log, and the caller numbers that may reach the agent by phone (add/verify/manage). PIN + channel
-    // activation stay settings-UI-only (secrets never travel through the model pipeline); the body routes those
-    // questions. The voice channel as a whole is gated by a feature flag; the phone package and each call channel
-    // carry their own flags.
-    public const string COMMUNICATION_VOICE_CALLS = 'Communication.VoiceCalls';
-
-    // MESSAGES to the owner: discretionary sends to the owner's OWN registered
-    // address on the user's wish or a standing directive (email for now; SMS/push follow with their transports).
-    // Deliberately NOT the run-report obligation — that is the loop meta-tool `send_owner_report`.
-    // Ungated like the phone channel — a billing flag is a later decision.
-    public const string COMMUNICATION_MESSAGES = 'Communication.Messages';
-
-    // Report the account's exact AI budget usage (monthly total / used / remaining). Its OWN skill so it is offered
-    // ONLY when the account's policy allows the exact figures — dropped from the catalog under a fair-use or
-    // hide-usage policy ({@see \DDD\Domain\AI\Entities\Conversations\AIConversationEntitlement::hidesExactAIBudget()}).
-    // An application gates it on its budget feature flag (its requirement overlay, `AI.skillRequirements`). Renamed
-    // AI.Budget → Assistant.Budget: the lone AI.* skill joins the "the assistant itself"
-    // family (Settings / Tasks / Budget).
-    public const string ASSISTANT_BUDGET = 'Assistant.Budget';
-
-    // SCHEDULED & BACKGROUND TASKS (an own skill — execution PLANNING is
-    // not a communication channel): one-off now, one-time at a moment on the space's clock, recurring on a cron, list +
-    // archive-policy delete. Delivery (EMAIL/CHAT) is a property OF a task; the report obligation itself is the
-    // loop meta-tool `send_owner_report`, never a skill tool. A TIMED phone call is a task here whose text says to
-    // call (Communication.VoiceCalls owns only the immediate call).
-    public const string ASSISTANT_TASKS = 'Assistant.Tasks';
-
-    // The reports of the earlier runs of a scheduled run's OWN task: purpose-bound
-    // (`Schedule.Run` preloads it, never in a chat's catalog) — the run keeps its report's structure and states what
-    // changed since. Its package and skill file ship with this package.
-    public const string ASSISTANT_TASK_RUN_REPORTS = 'Assistant.TaskRunReports';
-
-    // MANDATES: the customer's standing authorizations for consequential outward
-    // actions — grant from the customer's own server-verified statement, list, revoke. Its own skill in the
-    // "the assistant itself" family (Settings / Tasks / Budget / Mandates): "what may you do on your own?" and
-    // "stop doing X automatically" are assistant-governance intents, not domain intents; and the executor's
-    // mandate-gate refusal points the model here by name. Its package and skill file ship with this package.
-    public const string ASSISTANT_MANDATES = 'Assistant.Mandates';
 
     /** @var array<string, string[]>|null the binding read once per process ({@see getPackageClassesBySkillName()}) */
     protected static ?array $packageClassesBySkillName = null;
 
-    /** @var string The skill name / dot-path, e.g. 'Assistant.Mandates' — the skill's identifier. */
+    /** @var string The skill name / dot-path, e.g. 'Agent.Mandates' — the skill's identifier. */
     public string $name;
 
     /** The decision model's criteria line: the frontmatter `decisionCriteria`, else the first sentence of `description`, cut to 200 chars. */
@@ -797,7 +787,7 @@ class AISkill extends Entity
     /**
      * The TOOL method names a skill's packages expose, or null when the given name is not a skill at all.
      * Backs the skill-called-as-a-tool correction in {@see \DDD\Domain\AI\Entities\Conversations\Messages\ToolCall::buildRefusalBeforeExecution()}:
-     * a model that calls the SKILL name as if it were a tool (`Web.Search` instead of `searchTheWeb`) is told
+     * a model that calls the SKILL name as if it were a tool (`Agent.Web.Search` instead of `searchTheWeb`) is told
      * the skill's real tool names instead of looping through a dead-end "tool not found". Pure
      * reflection over the statically wired packages — no container, no cache.
      *

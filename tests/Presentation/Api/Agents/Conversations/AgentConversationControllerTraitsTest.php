@@ -37,6 +37,7 @@ class AgentConversationControllerTraitsTest extends TestCase
         'injectSignal' => ['POST', '/{aiConversationId}/injectSignal'],
         'retryFailedRun' => ['POST', '/{aiConversationId}/retry'],
         'patchTitle' => ['PATCH', '/{aiConversationId}/title'],
+        'answerClientToolRequest' => ['POST', '/{aiConversationId}/clientToolRequests/{requestId}/answer'],
         'delete' => ['DELETE', '/{aiConversationId}'],
         'getSelectableAgentModels' => ['GET', '/selectable-models'],
     ];

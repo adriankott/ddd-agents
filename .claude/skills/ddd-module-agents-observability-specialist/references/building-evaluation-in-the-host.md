@@ -148,7 +148,7 @@ What the package ships for it:
 - **Result files** (`AgentEvalResultFilesService`): the results folder (`AI.evalSuite.resultsDirectory`, default
   `var/agent-evals`), the files of a run, the baseline read and the retention sweep; an application adds the name
   patterns of its own dated folders through `getRetainedFolderNamePatterns()`.
-- **Run report** (`AIConversationRunReportService`, the base command `app:ai-agent:run-report`): the per-run figures
+- **Run report** (`AIConversationRunReportService`, the base command `app:agent:run-report`): the per-run figures
   of stored conversations. An application's same-path subclass of the service names the id its usage log files a
   conversation's cost under (`findUsageLogScopeIdOfConversation()`), reads the decision model's cost from its usage
   log (`findModelCostInUsageLog()`) and drops its prefix of skill section ids (`getSkillSectionIdPrefixToDrop()`).
@@ -171,23 +171,23 @@ package (`app:mcp:compare-tool-calls`, on the base `AgentConsoleCommand`) is in
 
 | Command | What it does | Fixture key | Override points |
 |---|---|---|---|
-| `app:ai-agent:eval-tools` | runs the tools cases (expectation, performance budget, state after the run), `--judge` in the judged flavor, `--repeat`; in this process or in child processes on the suite schedule | `tools` | `runCaseOfOwnShape()`, `buildPlanOptionsOfRun()`, the `*_LABEL` / `*_SKIP_REASON` constants |
-| `app:ai-agent:eval-suite` | every configured suite on every model and flavor, one child process per case, reads in a pool and writes in lanes per space and resource; pass and performance verdict against a baseline | `AI.evalSuite.suites` | `getDefaultModelName()`, `getRetriedInfrastructureErrors()`, `getChildCommandNameOfKind()`, `buildApplicationArgumentsOfTask()`, `buildPlanOptions()`, `buildFixturesOfSuite()`, `configureApplicationOptions()`, `isIsolateWholeScopeRequested()`, `getDecisionLayerLabel()`, `describeStopRequest()` |
-| `app:ai-agent:eval-selection` | whether the expected skill was loaded; accuracy; `--json`, `--result-file` for a suite parent | `selection` (one file) | `getDefaultFixturePath()`, `findFallbackScopeValueOfRow()`, `describeMissingScope()` |
-| `app:ai-agent:eval-recall` | seeds past conversations, asks on a fresh one, checks the recall tool and the mentioned facts; deletes the seed unless `--keep-seed` | `recall` | `getDefaultFixturePaths()` |
-| `app:ai-agent:eval-tiers` | the tools cases per model tier; pass rate and efficiency per tier | `tools` | `getDefaultFixturePaths()` |
-| `app:ai-agent:eval-analyze` | offline: classifies the failed cases of a stored run (a run ended on its step budget is `STALL`) and prints reproduce lines | — | `buildReproduceArguments()` |
-| `app:ai-agent:eval-eviction` | multi-skill trajectories on one conversation; the load curve and whether eviction fired | `eviction` (one file) | `trajectoryNamesItsScope()`, `getScopeWordOfSkipLine()` |
-| `app:ai-agent:eval-guard` | the injection guard probe: variants × inputs × `--runs`, false-block and bypass rate; `--parallel` children, each ended at its 1,200 s ceiling; each probe under its own evaluation envelope | `guard` | the guard class by same-path subclass (`ArgusAgentSentinelCanaryGuard::newInstance()`) |
-| `app:ai-agent:eval-schedule-runs` | fires one evaluation schedule `--runs` times and compares the structure of its reports; needs the workers | — | `configureReportOptions()`, `validateReportOptions()`, `runInsteadOfFiring()`, `afterRunEnded()`, `describeScope()`, `describeEvalAccountsSource()`, `describeRequiredOptions()` |
-| `app:ai-agent:eval-compaction-tree` | drives a long judged run with frequent compaction and judges the compaction tree after every turn and at the end; `--json`, `--persist` (stores the conversation and validates the stored build) | the case file (`--case-file`); the space comes from the case file first, the scope options are the fallback | `getDefaultCaseFile()`, `getDefaultCompactionParamsTemplate()`, `buildCompactionTreeParameters()`, `resolveTreeEvalScope()`, `buildJudgedRunOptions()`, the headings |
+| `app:agent:eval-tools` | runs the tools cases (expectation, performance budget, state after the run), `--judge` in the judged flavor, `--repeat`; in this process or in child processes on the suite schedule | `tools` | `runCaseOfOwnShape()`, `buildPlanOptionsOfRun()`, the `*_LABEL` / `*_SKIP_REASON` constants |
+| `app:agent:eval-suite` | every configured suite on every model and flavor, one child process per case, reads in a pool and writes in lanes per space and resource; pass and performance verdict against a baseline | `AI.evalSuite.suites` | `getDefaultModelName()`, `getRetriedInfrastructureErrors()`, `getChildCommandNameOfKind()`, `buildApplicationArgumentsOfTask()`, `buildPlanOptions()`, `buildFixturesOfSuite()`, `configureApplicationOptions()`, `isIsolateWholeScopeRequested()`, `getDecisionLayerLabel()`, `describeStopRequest()` |
+| `app:agent:eval-selection` | whether the expected skill was loaded; accuracy; `--json`, `--result-file` for a suite parent | `selection` (one file) | `getDefaultFixturePath()`, `findFallbackScopeValueOfRow()`, `describeMissingScope()` |
+| `app:agent:eval-recall` | seeds past conversations, asks on a fresh one, checks the recall tool and the mentioned facts; deletes the seed unless `--keep-seed` | `recall` | `getDefaultFixturePaths()` |
+| `app:agent:eval-tiers` | the tools cases per model tier; pass rate and efficiency per tier | `tools` | `getDefaultFixturePaths()` |
+| `app:agent:eval-analyze` | offline: classifies the failed cases of a stored run (a run ended on its step budget is `STALL`) and prints reproduce lines | — | `buildReproduceArguments()` |
+| `app:agent:eval-eviction` | multi-skill trajectories on one conversation; the load curve and whether eviction fired | `eviction` (one file) | `trajectoryNamesItsScope()`, `getScopeWordOfSkipLine()` |
+| `app:agent:eval-guard` | the injection guard probe: variants × inputs × `--runs`, false-block and bypass rate; `--parallel` children, each ended at its 1,200 s ceiling; each probe under its own evaluation envelope | `guard` | the guard class by same-path subclass (`ArgusAgentSentinelCanaryGuard::newInstance()`) |
+| `app:agent:eval-schedule-runs` | fires one evaluation schedule `--runs` times and compares the structure of its reports; needs the workers | — | `configureReportOptions()`, `validateReportOptions()`, `runInsteadOfFiring()`, `afterRunEnded()`, `describeScope()`, `describeEvalAccountsSource()`, `describeRequiredOptions()` |
+| `app:agent:eval-compaction-tree` | drives a long judged run with frequent compaction and judges the compaction tree after every turn and at the end; `--json`, `--persist` (stores the conversation and validates the stored build) | the case file (`--case-file`); the space comes from the case file first, the scope options are the fallback | `getDefaultCaseFile()`, `getDefaultCompactionParamsTemplate()`, `buildCompactionTreeParameters()`, `resolveTreeEvalScope()`, `buildJudgedRunOptions()`, the headings |
 
 The decision commands sit on the base `AgentConsoleCommand` (not on `AgentEvalConsoleCommand`):
 
 | Command | What it does | Override points |
 |---|---|---|
-| `app:ai-agent:decision-fixtures <fixture>` | sends the cases of a JSON fixture (sub-skill preload or reply language) to the decision model, `--repeat` times, and scores the picks against the expectations; each call under an evaluation envelope of its own, billed to the fixture's space | `getFixtureScopeKey()`, `getAgentSpaceFactsKey()`, `resolveBillingScope()`, `getDefaultSupportedLanguageCodes()`, `getDefaultReplyLanguageCode()` |
-| `app:ai-agent:decision-stats` | read-only statistics over the turn events of one decision site (`--site`, `--from`, `--to`, `--mode`): per mode, arm and day, shadow agreement; eval traffic excluded unless `--includeEval` | `buildStatisticsRequest()`, `renderSection()` |
+| `app:agent:decision-fixtures <fixture>` | sends the cases of a JSON fixture (sub-skill preload or reply language) to the decision model, `--repeat` times, and scores the picks against the expectations; each call under an evaluation envelope of its own, billed to the fixture's space | `getFixtureScopeKey()`, `getAgentSpaceFactsKey()`, `resolveBillingScope()`, `getDefaultSupportedLanguageCodes()`, `getDefaultReplyLanguageCode()` |
+| `app:agent:decision-stats` | read-only statistics over the turn events of one decision site (`--site`, `--from`, `--to`, `--mode`): per mode, arm and day, shadow agreement; eval traffic excluded unless `--includeEval` | `buildStatisticsRequest()`, `renderSection()` |
 | `AgentDecisionReplayCommand` (abstract) | the host's replay of stored tool calls against one decision: per conversation of `--conversations` it reads the messages with rights lifted, then replays each picked call as the conversation's account under an evaluation envelope; `--resultFile` writes the rows as JSON | the host names the command (`#[AsCommand]`) and implements `isToolCallReplayed()` and `replayToolCall()`; `configureReplayOptions()`, `executeReplayWork()`, `getRowTableHeaders()` |
 
 What every command shares (the base):
@@ -225,7 +225,7 @@ Cases that run in parallel must not share an account: every case resets its acco
   `resetHostAccountStateBeforePurge()`, the purge of every tree of the account created before now, and
   `resetHostAccountStateAfterPurge()`; the outcome is an `AgentEvalSeedAccountResetReport` (a host's subclass from
   `newResetReport()` carries its own lines). `findKeptAgentSpaceIds()` names spaces whose conversations stay.
-- **Purge:** `app:ai-agent:eval-conversations-purge` on `AIConversationEvalPurgeService` deletes the trees (root,
+- **Purge:** `app:agent:eval-conversations-purge` on `AIConversationEvalPurgeService` deletes the trees (root,
   delegation children, supervisor tandems) of the configured evaluation accounts whose newest activity is older than
   `--older-than-hours`, with every dependent row; a tree with a run in flight or a fresh heartbeat stays. A dry run is
   the default, `--apply` writes. `--accounts` names accounts; one outside the configured evaluation accounts is refused

@@ -23,11 +23,12 @@ use Symfony\Component\Console\Output\OutputInterface;
  * clears `finalizedAt` again ({@see AIConversationsService::recordInboundMessageActivity()}), so a resumed conversation
  * re-enters this sweep after its next idle window.
  *
- *   php bin/console app:ai-conversation:mark-finalized
- *   php bin/console app:ai-conversation:mark-finalized --idle-minutes=30 --dry-run
+ *   php bin/console app:agent:mark-finalized-conversations
+ *   php bin/console app:agent:mark-finalized-conversations --idle-minutes=30 --dry-run
  */
 #[AsCommand(
-    name: 'app:ai-conversation:mark-finalized',
+    name: 'app:agent:mark-finalized-conversations',
+    aliases: ['app:ai-conversation:mark-finalized'],
     description: 'Idle-finalize mark sweep: set finalizedAt on conversations idle past the window (one indexed UPDATE).',
 )]
 class AgentMarkFinalizedConversationsCommand extends AgentConsoleCommand

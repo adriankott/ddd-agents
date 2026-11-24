@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace DDD\Domain\AI\Services\Conversations;
 
-use DDD\Presentation\Mcp\Agent\AgentConsoleStream;
+use DDD\Presentation\Mcp\Agents\AgentConsoleStream;
 use DDD\Domain\AI\Listeners\Conversations\AIConversationTurnStartListener;
 use DDD\Domain\AI\Entities\Conversations\Agent\Turns\AgentOfferedTools;
 use DDD\Domain\AI\Entities\Conversations\Agent\Turns\AgentRepeatedToolCallCheck;

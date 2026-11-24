@@ -1185,7 +1185,7 @@ class ToolCall extends ValueObject
 
     /**
      * The refusal this call gets without reaching the executor (the pure part of the former
-     * `execute()`): a SKILL name called as a tool ("Web.Search" instead of searchTheWeb, which looped a model through
+     * `execute()`): a SKILL name called as a tool ("Agent.Web.Search" instead of searchTheWeb, which looped a model through
      * load_skills retries) names the skill's real tools; no loaded skill at all asks for `load_skills`. Marks the call
      * FAILED and returns the refusal, null when the call may run.
      *

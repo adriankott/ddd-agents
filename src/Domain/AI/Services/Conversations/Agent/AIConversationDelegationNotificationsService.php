@@ -17,7 +17,7 @@ use DDD\Domain\AI\Entities\Conversations\Messages\Delegation\DelegationSubAgentR
 use DDD\Domain\AI\Entities\Conversations\Messages\Delegation\DelegationSubAgentRecords;
 use DDD\Domain\AI\Exceptions\Conversations\AgentRunClaimLostException;
 use DDD\Domain\AI\MessageHandlers\AIConversationResumeMessage;
-use DDD\Presentation\Mcp\Agent\AgentConsoleStream;
+use DDD\Presentation\Mcp\Agents\AgentConsoleStream;
 use DDD\Domain\AI\Services\Conversations\AIConversationDelegationBatchesService;
 use DDD\Domain\AI\Services\Conversations\AIConversationMessagesService;
 use DDD\Domain\AI\Services\Conversations\AIConversationRealtimeSignalService;
