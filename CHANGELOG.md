@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.40
+
+- Reasoning carry-over per model: the conversation's row, else the model's catalog value
+  (`AIModel::$previousReasoningCarryOver`, mgamadeus/ddd-ai 3.4.7), else the per-API default. The catalog value applies
+  on the Responses API and on Chat Completions over the direct OpenRouter egress. Kimi K3.1 Pro carries its current
+  turn's `reasoning_details`, so it keeps what it decided about pictures that later calls no longer attach.
+- A model gets only its own reasoning items back (`RequestSnapshot::holdsWireReasoningItemsFor()` compares the stored
+  model name): after a model switch mid-conversation the earlier model's items stay behind. Items stored without a
+  model name go back only on the Responses API. The `capped` cut counts only the items a call would send.
+- A tool result whose pictures ride on the call ends with a note to write down, in the visible text, what the pictures
+  show and what was decided (`ToolCall::buildImagesRideOnlyNowNote()`); the dropped marker replaces it once the
+  pictures leave.
+- Requires `mgamadeus/ddd-ai` ^3.4.7.
+
 ## 0.1.39
 
 - Agent loop: a model call is sent again after a transport failure (cURL timeout, refused or reset connection), a 429

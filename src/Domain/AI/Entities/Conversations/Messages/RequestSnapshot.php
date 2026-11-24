@@ -6,6 +6,7 @@ namespace DDD\Domain\AI\Entities\Conversations\Messages;
 
 use DDD\Domain\AI\Entities\Conversations\Agent\Context\AgentContextSegment;
 use DDD\Domain\AI\Entities\Conversations\Agent\Wire\AgentResponsesServerStateChain;
+use DDD\Domain\AI\Entities\Models\AIModel;
 use DDD\Domain\Base\Entities\ValueObject;
 use DDD\Infrastructure\Traits\Serializer\Attributes\HideProperty;
 use DDD\Infrastructure\Base\DateTime\DateTime;
@@ -333,14 +334,37 @@ class RequestSnapshot extends ValueObject
     }
 
     /**
-     * The reasoning items to send back with the call's step when the next call speaks `$wireApi`;
-     * null when there are none or they belong to the other API.
+     * Whether this call's reasoning items may go back on a later call that speaks `$wireApi` with the model
+     * `$modelNameOfCall` (null = not known to the caller, checked by API only): the items exist, belong to that API and
+     * were produced by that model. A conversation can switch models mid-way (`aiModelNameOverride`): a model never
+     * receives another model's reasoning. Items stored without a model name (rows written before the name was stamped)
+     * go back only on the Responses API, whose encrypted items are bound to their model by the provider anyway (a
+     * mismatch is refused and the call is repeated without carried items); on Chat Completions they are dropped.
+     */
+    public function holdsWireReasoningItemsFor(string $wireApi, ?string $modelNameOfCall = null): bool
+    {
+        if ($this->wireReasoningApi !== $wireApi || $this->wireReasoningItemsJson === null || $this->wireReasoningItemsJson === '') {
+            return false;
+        }
+        if ($modelNameOfCall === null) {
+            return true;
+        }
+        if ($this->modelName === null || $this->modelName === '') {
+            return $wireApi === AIModel::AGENT_WIRE_API_RESPONSES;
+        }
+        return $this->modelName === $modelNameOfCall;
+    }
+
+    /**
+     * The reasoning items to send back with the call's step when the next call speaks `$wireApi` with the model
+     * `$modelNameOfCall`; null when there are none, they belong to the other API or to another model
+     * ({@see holdsWireReasoningItemsFor()}).
      *
      * @return array<int, array<string, mixed>>|null
      */
-    public function findWireReasoningItemsFor(string $wireApi): ?array
+    public function findWireReasoningItemsFor(string $wireApi, ?string $modelNameOfCall = null): ?array
     {
-        if ($this->wireReasoningApi !== $wireApi || $this->wireReasoningItemsJson === null || $this->wireReasoningItemsJson === '') {
+        if (!$this->holdsWireReasoningItemsFor($wireApi, $modelNameOfCall)) {
             return null;
         }
         $wireReasoningItems = json_decode($this->wireReasoningItemsJson, true);

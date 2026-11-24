@@ -1383,7 +1383,7 @@ class ArgusAIAgentConversation extends ArgusAIConversation
         // carry-over `capped`: the steps below the cut go without their reasoning items — the cut is
         // decided once per fold over these rows, starting from the cut the previous call recorded
         $this->lastPreviousReasoningCut = $this->agentWireConfiguration?->carriesCappedPreviousReasoning() === true
-            ? AgentPreviousReasoningCut::decideFor(array_values($messages), $this->agentWireConfiguration->wireApi, $this->agentWireConfiguration->previousReasoningCapTokens)
+            ? AgentPreviousReasoningCut::decideFor(array_values($messages), $this->agentWireConfiguration->wireApi, $this->agentWireConfiguration->previousReasoningCapTokens, $this->getAIModel()?->name)
             : null;
         $isSupersededTaskPlanCall = static fn (AIConversationMessage $callMessage): bool =>
             isset($taskPlanCallPositions[spl_object_id($callMessage)])
@@ -1625,7 +1625,8 @@ class ArgusAIAgentConversation extends ArgusAIConversation
         ) {
             return $assistantEntry;
         }
-        $wireReasoningItems = $stepMarkerRow->requestSnapshot->findWireReasoningItemsFor($this->agentWireConfiguration->wireApi);
+        // only the model of this call gets its own items back: a conversation may switch models mid-way
+        $wireReasoningItems = $stepMarkerRow->requestSnapshot->findWireReasoningItemsFor($this->agentWireConfiguration->wireApi, $this->getAIModel()?->name);
         if ($wireReasoningItems !== null) {
             $assistantEntry['reasoning_details'] = $wireReasoningItems;
         }

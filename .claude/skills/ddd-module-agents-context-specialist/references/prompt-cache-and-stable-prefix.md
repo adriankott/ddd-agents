@@ -148,7 +148,20 @@ compaction summarizer never see them.
 ## 5. Reasoning carry-over
 
 `AgentWireConfiguration::$previousReasoningCarryOver` (resolved from `RunSettings`): `all`, `currentTurn`, `capped`,
-`off`. Default `capped` on Responses, `off` on Chat Completions, always `off` on the server-state arm. Under `capped`,
+`off`. Order: the conversation's row, else the model's catalog value (`AIModel::$previousReasoningCarryOver` in
+mgamadeus/ddd-ai, host-overridable in `config/app/AI/models.php`; applied on the Responses API and on Chat Completions
+over the direct OpenRouter egress only, where `reasoning_details` reach the provider), else the per-API default:
+`capped` on Responses, `off` on Chat Completions; always `off` on the server-state arm. Kimi K3.1 Pro sets
+`currentTurn`: it keeps its verdicts (what it saw on pictures) in its reasoning, so without its own items it re-read the
+same pictures until the repeat guard stopped it.
+
+**Only the producing model gets its items back.** `RequestSnapshot::holdsWireReasoningItemsFor($wireApi, $modelName)`
+compares the stored `RequestSnapshot::$modelName` with the model of the current call — a conversation can switch models
+mid-way (`aiModelNameOverride`). Items stored without a model name go back only on the Responses API (encrypted items
+are model-bound and a refused item repeats the call without carried items); on Chat Completions they are dropped. The
+`capped` cut sums only the items the call would send. Whether a different host of the same model (OpenRouter order
+rotation on a retry) accepts carried items is not documented by OpenRouter; plain `reasoning.text` items are expected to
+pass, and a refusal naming `CARRIED_REASONING_REJECTION_ERROR_TEXTS` repeats the call without them. Under `capped`,
 `AgentPreviousReasoningCut` keeps the previous steps' reasoning items until their sum exceeds
 `previousReasoningCapTokens` (4000), then drops all but the newest `KEPT_NEWEST_STEPS_AT_A_CUT` (2) steps' items in one
 block and records the cut index (`RequestSnapshot::$previousReasoningCutFromMessageIndex`): a sawtooth with a stable

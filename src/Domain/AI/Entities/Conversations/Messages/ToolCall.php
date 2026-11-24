@@ -885,6 +885,10 @@ class ToolCall extends ValueObject
         // on the live wire, a full result with resolved bytes rides as a content-PARTS array so the image
         // reaches the model inside its own tool result (correlated by tool_call_id). Otherwise plain text content.
         if ($full && $resolvedImages !== []) {
+            // the pictures leave the wire after a later step (only the newest ride): a model that keeps its verdict only
+            // in its reasoning loses it then — so it writes what it saw into its visible text now. Set while the
+            // pictures ride; replaced once by the dropped marker when they leave (one change, then a stable prefix).
+            $content = ($content === '' ? '' : $content . "\n\n") . static::buildImagesRideOnlyNowNote(count($resolvedImages));
             $contentParts = [['type' => 'text', 'text' => $content]];
             foreach ($resolvedImages as $resolvedImage) {
                 $contentParts[] = $resolvedImage->toOpenAiImagePart();
@@ -1390,6 +1394,18 @@ class ToolCall extends ValueObject
      * down are gone. Without that, models read the marker as "the picture was never there" and take back their own
      * correct descriptions.
      */
+    /**
+     * The note on a result whose pictures ride on this call: they leave the wire after a later step, so the model writes
+     * down now — in its visible text — what it saw in them and decided. Model-neutral: any model that keeps its verdict
+     * only in its reasoning (which a later call may not carry) would otherwise look at the same pictures again.
+     */
+    public static function buildImagesRideOnlyNowNote(int $pictureCount): string
+    {
+        $pictures = $pictureCount === 1 ? 'this picture' : 'these pictures';
+        return "[$pictures " . ($pictureCount === 1 ? 'is' : 'are') . ' attached only while among the newest results and then removed: write down in your visible text what you see in '
+            . ($pictureCount === 1 ? 'it' : 'them') . ' and what you decided, with your next tool call at the latest — later steps keep only that text]';
+    }
+
     public static function buildImagesDroppedFromWireMarker(string $pictureWord, int $pictureCount): string
     {
         return "[the $pictureWord this result carried " . ($pictureCount === 1 ? 'is' : 'are') . ' no longer on the wire — only the newest pictures ride with each model call. '

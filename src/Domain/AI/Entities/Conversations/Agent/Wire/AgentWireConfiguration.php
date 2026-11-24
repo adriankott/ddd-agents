@@ -101,9 +101,14 @@ class AgentWireConfiguration
         // on by default on the Responses API; on Chat Completions only when the row asks for it (the
         // A arm stays today's request, A′ = A + `all` measures the carry-over alone)
         // the server-state arm never carries reasoning items: OpenAI keeps them in the stored conversation state
+        // the model's catalog value applies where `reasoning_details` reach the provider: the Responses API, or Chat
+        // Completions over the direct OpenRouter egress (a proxy may drop the field)
         $agentWireConfiguration->previousReasoningCarryOver = self::resolvePreviousReasoningCarryOver(
             $runSettings->previousReasoningCarryOver ?? null,
-            $agentWireConfiguration->wireApi
+            $agentWireConfiguration->wireApi,
+            $directOpenRouterEgress || $agentWireConfiguration->wireApi === AIModel::AGENT_WIRE_API_RESPONSES
+                ? $aiModel?->getPreviousReasoningCarryOver()
+                : null
         );
         $previousReasoningCapTokensRow = $runSettings->previousReasoningCapTokens ?? null;
         $agentWireConfiguration->previousReasoningCapTokens = $previousReasoningCapTokensRow !== null && $previousReasoningCapTokensRow > 0
@@ -192,11 +197,13 @@ class AgentWireConfiguration
 
     /**
      * The carry-over mode a call on `$wireApi` runs with, from the conversation's row (null = inherit): the row's value
-     * (the legacy `on` reads as `all`), else the per-API default — `capped` on the Responses API
-     * (cap {@see resolveDefaultPreviousReasoningCapTokens()}), `off` on Chat Completions; always `off` on the
-     * server-state arm.
+     * (the legacy `on` reads as `all`), else the model's catalog value (`$modelCarryOver`,
+     * {@see \DDD\Domain\AI\Entities\Models\AIModel::getPreviousReasoningCarryOver()} — e.g. `currentTurn` for a
+     * reasoning model that keeps its verdicts only in its reasoning), else the per-API default — `capped` on the
+     * Responses API (cap {@see resolveDefaultPreviousReasoningCapTokens()}), `off` on Chat Completions; always `off` on
+     * the server-state arm.
      */
-    public static function resolvePreviousReasoningCarryOver(?string $previousReasoningCarryOverRow, string $wireApi): string
+    public static function resolvePreviousReasoningCarryOver(?string $previousReasoningCarryOverRow, string $wireApi, ?string $modelCarryOver = null): string
     {
         if ($wireApi === RunSettings::AGENT_WIRE_API_RESPONSES_SERVER_STATE) {
             return RunSettings::PREVIOUS_REASONING_CARRY_OVER_OFF;
@@ -204,6 +211,10 @@ class AgentWireConfiguration
         $canonicalRow = $previousReasoningCarryOverRow !== null ? RunSettings::canonicalPreviousReasoningCarryOver($previousReasoningCarryOverRow) : null;
         if ($canonicalRow !== null && $canonicalRow !== RunSettings::PREVIOUS_REASONING_CARRY_OVER_INHERIT) {
             return $canonicalRow;
+        }
+        $canonicalModelCarryOver = $modelCarryOver !== null ? RunSettings::canonicalPreviousReasoningCarryOver($modelCarryOver) : null;
+        if ($canonicalModelCarryOver !== null && $canonicalModelCarryOver !== RunSettings::PREVIOUS_REASONING_CARRY_OVER_INHERIT) {
+            return $canonicalModelCarryOver;
         }
         return $wireApi === AIModel::AGENT_WIRE_API_RESPONSES
             ? RunSettings::PREVIOUS_REASONING_CARRY_OVER_CAPPED

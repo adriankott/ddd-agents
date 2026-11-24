@@ -75,7 +75,7 @@ class AgentPreviousReasoningCut
      *
      * @param AIConversationMessage[] $messages
      */
-    public static function decideFor(array $messages, string $wireApi, int $capTokens): static
+    public static function decideFor(array $messages, string $wireApi, int $capTokens, ?string $modelNameOfCall = null): static
     {
         $agentPreviousReasoningCut = new static();
         $agentPreviousReasoningCut->capTokens = $capTokens;
@@ -88,7 +88,7 @@ class AgentPreviousReasoningCut
             if ($messageIndex === null || $messageIndex < $anchorCutFromMessageIndex || !self::isStepMarkerRowSentWithItsReasoning($message)) {
                 continue;
             }
-            $stepReasoningTokens = self::estimateReasoningTokensOfStep($message->requestSnapshot, $wireApi);
+            $stepReasoningTokens = self::estimateReasoningTokensOfStep($message->requestSnapshot, $wireApi, $modelNameOfCall);
             if ($stepReasoningTokens !== null) {
                 $reasoningTokensByStepMarkerIndex[$messageIndex] = $stepReasoningTokens;
             }
@@ -164,9 +164,9 @@ class AgentPreviousReasoningCut
      * reported for that call ({@see RequestSnapshot::$wireReasoningTokens}), else the estimate from the items' JSON
      * length ({@see ESTIMATED_REASONING_ITEMS_JSON_OVERHEAD_BYTES}); null when the step holds no items of that API.
      */
-    public static function estimateReasoningTokensOfStep(RequestSnapshot $requestSnapshot, string $wireApi): ?int
+    public static function estimateReasoningTokensOfStep(RequestSnapshot $requestSnapshot, string $wireApi, ?string $modelNameOfCall = null): ?int
     {
-        if ($requestSnapshot->wireReasoningApi !== $wireApi || $requestSnapshot->wireReasoningItemsJson === null || $requestSnapshot->wireReasoningItemsJson === '') {
+        if (!$requestSnapshot->holdsWireReasoningItemsFor($wireApi, $modelNameOfCall)) {
             return null;
         }
         if ($requestSnapshot->wireReasoningTokens !== null) {
