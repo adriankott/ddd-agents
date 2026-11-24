@@ -8,11 +8,14 @@ use DDD\Infrastructure\Services\IssuesLogService;
 use Psr\Log\LogLevel;
 use Throwable;
 
-/** The issues log that only records the level of each logged throwable. */
+/** The issues log that only records the level and the message of each logged throwable. */
 class RecordingIssuesLogServiceDouble extends IssuesLogService
 {
     /** @var string[] The levels of the logged throwables, in order */
     public array $loggedLevels = [];
+
+    /** @var string[] The messages of the logged throwables, in order */
+    public array $loggedMessages = [];
 
     public function __construct()
     {
@@ -26,5 +29,6 @@ class RecordingIssuesLogServiceDouble extends IssuesLogService
         string $section = self::LOG_MESSAGE_SECTION_HTTP,
     ): void {
         $this->loggedLevels[] = $level;
+        $this->loggedMessages[] = $throwable->getMessage();
     }
 }

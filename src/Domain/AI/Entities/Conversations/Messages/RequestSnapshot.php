@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DDD\Domain\AI\Entities\Conversations\Messages;
 
 use DDD\Domain\AI\Entities\Conversations\Agent\Context\AgentContextSegment;
+use DDD\Domain\AI\Entities\Conversations\Agent\Images\AgentToolCallImageReadResult;
 use DDD\Domain\AI\Entities\Conversations\Agent\Wire\AgentResponsesServerStateChain;
 use DDD\Domain\AI\Entities\Models\AIModel;
 use DDD\Domain\Base\Entities\ValueObject;
@@ -77,6 +78,24 @@ class RequestSnapshot extends ValueObject
      *      = HTTP + parse), `snapshot` (this snapshot's JSON encode).
      */
     public ?array $loopStepOverheadMs = null;
+
+    /** @var int|null The tool-result pictures this call sent (null = none, or a call before 0.3.11) */
+    public ?int $toolResultImagesOnWire = null;
+
+    /** @var int|null Pictures of this call read from L1, the process cache of the picture store */
+    public ?int $toolCallImageProcessCacheHits = null;
+
+    /** @var int|null Pictures of this call read from L2, the shared cache of the picture store */
+    public ?int $toolCallImageSharedCacheHits = null;
+
+    /** @var int|null Pictures of this call read from L3, the object store of the picture store */
+    public ?int $toolCallImageObjectStoreHits = null;
+
+    /** @var int|null Pictures of this call the picture store found nowhere */
+    public ?int $toolCallImageMisses = null;
+
+    /** @var int|null The milliseconds of this call's read of the picture store */
+    public ?int $toolCallImageReadMs = null;
 
     /**
      * @var array<string, string>|null The skill variants — the conversation's resolved situation this call
@@ -370,6 +389,26 @@ class RequestSnapshot extends ValueObject
         $this->stateAtEpochStart = self::buildArrayFormOfStateValue($this->stateAtEpochStart);
         $this->stateDeltas = self::buildArrayFormOfStateValue($this->stateDeltas);
         $this->inputTransformations = self::buildArrayFormOfStateValue($this->inputTransformations);
+    }
+
+    /**
+     * Records the pictures this call sent and the counts of the picture store's read (null fields when the call sent
+     * no picture and read none — the snapshot of a text-only call stays as small as before).
+     */
+    public function recordToolCallImages(int $toolResultImagesOnWire, ?AgentToolCallImageReadResult $agentToolCallImageReadResult): void
+    {
+        $this->toolResultImagesOnWire = $toolResultImagesOnWire > 0 ? $toolResultImagesOnWire : null;
+        $readAnything = $agentToolCallImageReadResult !== null
+            && ($agentToolCallImageReadResult->processCacheHits + $agentToolCallImageReadResult->sharedCacheHits
+                + $agentToolCallImageReadResult->objectStoreHits + $agentToolCallImageReadResult->misses) > 0;
+        if (!$readAnything) {
+            return;
+        }
+        $this->toolCallImageProcessCacheHits = $agentToolCallImageReadResult->processCacheHits;
+        $this->toolCallImageSharedCacheHits = $agentToolCallImageReadResult->sharedCacheHits;
+        $this->toolCallImageObjectStoreHits = $agentToolCallImageReadResult->objectStoreHits;
+        $this->toolCallImageMisses = $agentToolCallImageReadResult->misses;
+        $this->toolCallImageReadMs = (int)round($agentToolCallImageReadResult->readMilliseconds);
     }
 
     /**

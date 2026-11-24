@@ -1,5 +1,61 @@
 # Changelog
 
+## 0.3.12
+
+The image release. It was planned as 0.3.10; 0.3.10 went to the evaluation scope fix and 0.3.11 to the `DriveFiles`
+schema fix. Files (PDF, Office: text extraction, an artifact, page images on demand) follow in a later version.
+
+**Added:**
+
+- **The tool picture store** (`AgentToolCallImageStoreService`, settings `AI.toolCallImageStore`,
+  `config/app/AI/toolCallImageStore.php`, `AgentToolCallImageStoreSettings`) replaces the spool of 0.3.7. Conversation
+  rows hold references only. Three optional tiers, all configured in one place:
+  - L1 `processCache`: APCu by default, 64 MB written per 600 s window.
+  - L2 `sharedCache`: a shared group of Core's Cache API (Redis, Valkey). One batch read per model call, writes in one
+    pipeline, TTL 1800 s, extended on a read.
+  - L3 `objectStore`: a Core object store `agentToolImages`, key `agent-tool-images/<agent space id>/<sha256>`. Read in
+    parallel; the lifecycle is the host's.
+  - A read goes L1 → one L2 batch → L3 in parallel, then fills the faster tiers again; a resume reads only the
+    pictures still in context.
+  - A picture is durable (`ToolCallImageReference::$isDurable`) once L3 acknowledged it. A failed L3 write is logged
+    and the picture stays in the caches.
+  - L1 + L2 without an object store is the 0.3.7 spool; with nothing reachable the picture stays inline.
+  - A process-local L2 and a missing L3 are reported once per process. Nothing throws.
+- **Wire profile**: a captured picture is normalized once: long edge 2048, at most 3.75 MP, WebP at quality 85 (or
+  JPEG), through Core's pinned `RasterImageDecoder`. The sha256 is taken over the wire form. The full check runs at
+  capture; a read checks the sha256 and the header only.
+- **Retention**: at a turn change the picture results of earlier turns beyond the newest four leave the context. Each
+  picture becomes a placeholder line with its image id; the current turn keeps all its pictures (at most 20 per call).
+  The call that moves the cut marks the prompt cache right before the first retired result, on the Messages and the
+  Responses API.
+- **Re-view tool** `viewEarlierToolImage` (package `agent.images`, `AgentImagesMCPPackage`, skill `Agent.Images`,
+  `AISkill::AGENT_IMAGES`): attaches a retired picture again from the store, with the same reference and the trust of
+  the call that produced it.
+- **Measurement**: request snapshots record the pictures sent and the store's L1/L2/L3 hits, misses and read time
+  (`RequestSnapshot::recordToolCallImages()`). `app:agent:cache-diff` prints the wire build p50/p95 with and without
+  pictures.
+- `MCPToolResponse::addImageContent()` takes `$isDurable`; `ToolResultImage::decodeMcpImageContentPart()` reads it.
+
+**Changed:**
+
+- Requires `mgamadeus/ddd` `^3.44.0`, for `Cache::getMultiple()` / `setMultiple()` / `extendTtlOfKeys()` and
+  `ParallelReadableObjectStorage`.
+- Removed `AgentToolCallImageSpoolService` and `config/app/AI/toolCallImageSpool.php`. A host's own
+  `AI.toolCallImageSpool` is still read (`cacheGroup` → `sharedCache.cacheGroup`, `cacheTtlSeconds` →
+  `sharedCache.ttlSeconds`, `objectStorage`, `objectKeyPrefix`) and reported once per process.
+
+**Host steps:**
+
+- Shared cache: set `sharedCache.cacheGroup` to a shared group (`'redis'`). On a Redis or Valkey that also holds keys
+  without a TTL, use `maxmemory-policy volatile-lru`.
+- Durable pictures:
+  - configure the object store `agentToolImages` (`OBJECT_STORAGE_AGENTTOOLIMAGES_*`, `async-aws/s3`);
+  - give its key prefix an expiry rule in the bucket;
+  - or set `objectStore.enabled` false.
+- A host with its own `config/app/AI/skillPackages.php` adds `AISkill::AGENT_IMAGES => [AgentImagesMCPPackage::class]`.
+- A host with its own `toolCallImageSpool.php` moves it to `toolCallImageStore.php`.
+- Setup and two examples: `ddd-module-agents-context-specialist` › references/tool-picture-store.md.
+
 ## 0.3.11
 
 **Fixed:**

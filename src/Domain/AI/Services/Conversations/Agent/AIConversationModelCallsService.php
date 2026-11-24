@@ -15,6 +15,7 @@ use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
 use DDD\Domain\AI\Entities\Conversations\Messages\ContextRetentionSettings;
 use DDD\Domain\AI\Entities\Conversations\Messages\RequestSnapshot;
 use DDD\Domain\AI\Entities\Conversations\Messages\ToolCall;
+use DDD\Domain\AI\Entities\MCPPackages\ToolCallImageReference;
 use DDD\Domain\AI\Entities\Conversations\Messages\ToolCalls;
 use DDD\Domain\AI\Exceptions\AIModelCallTransportFailedException;
 use DDD\Domain\AI\Exceptions\AIModelCallFailedException;
@@ -586,6 +587,11 @@ class AIConversationModelCallsService extends Service
             $requestSnapshot->skillSections = $argusAIAgentConversation->modelInput->renderedSkillSectionIds !== []
                 ? $argusAIAgentConversation->modelInput->renderedSkillSectionIds
                 : null;
+            // the pictures of the call and where the picture store found them (L1 / L2 / L3 / nowhere)
+            $requestSnapshot->recordToolCallImages(
+                $argusAIAgentConversation->modelInput->resolvedToolImages?->countImages() ?? 0,
+                $argusAIAgentConversation->modelInput->toolCallImageReadResult
+            );
             $loopStepOverheadMs['snapshot'] = (int)round((hrtime(true) - $stampStartedAt) / 1e6);
             $requestSnapshot->loopStepOverheadMs = $loopStepOverheadMs;
         }
@@ -660,8 +666,15 @@ class AIConversationModelCallsService extends Service
      * come from the transient carry this invocation captured ({@see AIConversation::$transientToolCallImages}) or —
      * for a DURABLE picture — are re-resolved through the loaded {@see \DDD\Domain\AI\Entities\MCPPackages\ToolCallImageStore}
      * package on every call, so a catalog sheet survives the 12-step worker chunk, the turn boundary and a resumed
-     * worker; a picture without a store of its own was spooled when its call completed and is re-read the same way
-     * ({@see AgentToolCallImageSpoolService}). An inline image the spool could not take is gone outside the carry.
+     * worker; a picture without a store of its own was stored when its call completed and is re-read in ONE batch
+     * through the package's picture store ({@see AgentToolCallImageStoreService}: L1, L2, L3). An inline image no tier
+     * could take is gone outside the carry.
+     *
+     * Image retention (`AI.toolCallImageStore` `retention`): the pictures of the current turn and of the newest N
+     * picture results of earlier turns ride; the older ones are retired at a turn change, their results carry one
+     * placeholder per picture ({@see AgentModelInput::findImageRetentionCutMessageIndex()}) — the cut moves only at a
+     * turn change, so every call of a turn renders the same history and a resume reads only the pictures still in the
+     * context. While the retention is on its picture ceiling replaces the cap.
      *
      * The wire cap counts PICTURES (`maxToolCallImagesOnWire`): newest results first, whole, until the cap is reached;
      * the newest result always rides (truncated to the cap). Every candidate that does NOT ride gets the dropped marker
@@ -672,13 +685,23 @@ class AIConversationModelCallsService extends Service
     {
         $transientToolCallImages = $conversation->getTransientToolCallImages();
         $keepToolResultsFromIndex = $agentContext->keepToolResultsFromIndex;
+        /** @var AgentToolCallImageStoreService $agentToolCallImageStoreService */
+        $agentToolCallImageStoreService = DDDService::instance()->getService(AgentToolCallImageStoreService::class);
+        $imageStoreSettings = $agentToolCallImageStoreService->getSettings();
+        $retentionCutMessageIndex = PHP_INT_MIN;
+        $previousRetentionCutMessageIndex = PHP_INT_MIN;
+        if ($imageStoreSettings->retentionEnabled) {
+            $retentionCutMessageIndex = AgentModelInput::findImageRetentionCutMessageIndex($agentContext->messages, $imageStoreSettings->retentionNewestImageResults);
+            $previousRetentionCutMessageIndex = AgentModelInput::findImageRetentionCutMessageIndex($agentContext->messages, $imageStoreSettings->retentionNewestImageResults, 1);
+        }
         // Pass 1 — the picture-bearing results on this wire, newest first, with their PICTURE COUNT (references, or the
-        // carry) but without touching any bytes yet: re-resolving a durable picture costs a registry read + a
-        // composition, so only the results that will actually ride are resolved (pass 2).
+        // carry) but without touching any bytes yet: only the results that will actually ride are read (pass 2).
         /** @var ToolCall[] $candidateCallsNewestFirst keyed by tool call id */
         $candidateCallsNewestFirst = [];
         /** @var array<string, int> $candidatePictureCounts */
         $candidatePictureCounts = [];
+        $retiredImageToolCallIds = [];
+        $newlyRetiredImageToolCallIds = [];
         for ($position = count($agentContext->messages) - 1; $position >= 0; $position--) {
             $message = $agentContext->messages[$position];
             $toolCall = isset($message->toolCall) ? $message->toolCall : null;
@@ -695,9 +718,19 @@ class AIConversationModelCallsService extends Service
             ) {
                 continue; // the result itself is a stub on this wire — no picture rides, no marker owed
             }
+            $messageIndex = $message->indexInConversation ?? PHP_INT_MAX;
+            if ($toolCall->imageReferences !== [] && $messageIndex < $retentionCutMessageIndex) {
+                $retiredImageToolCallIds[] = $toolCallId;
+                if ($messageIndex >= $previousRetentionCutMessageIndex) {
+                    $newlyRetiredImageToolCallIds[] = $toolCallId;
+                }
+                continue;
+            }
             $candidateCallsNewestFirst[$toolCallId] = $toolCall;
             $candidatePictureCounts[$toolCallId] = $carriedThisInvocation !== [] ? count($carriedThisInvocation) : count($toolCall->imageReferences);
         }
+        $agentContext->retiredImageToolCallIds = $retiredImageToolCallIds;
+        $agentContext->newlyRetiredImageToolCallIds = $newlyRetiredImageToolCallIds;
         if ($candidateCallsNewestFirst === []) {
             return;
         }
@@ -706,17 +739,35 @@ class AIConversationModelCallsService extends Service
             $agentContext->blindCapturedToolCallIds = array_keys($candidateCallsNewestFirst);
             return;
         }
-        $maxImagesOnWire = isset($conversation->contextRetentionSettings)
-            ? $conversation->contextRetentionSettings->getMaxToolCallImagesOnWire()
-            : ContextRetentionSettings::DEFAULT_MAX_TOOL_CALL_IMAGES_ON_WIRE;
+        if ($imageStoreSettings->retentionEnabled) {
+            $maxImagesOnWire = $imageStoreSettings->retentionMaxPicturesOnWire;
+        } else {
+            $maxImagesOnWire = isset($conversation->contextRetentionSettings)
+                ? $conversation->contextRetentionSettings->getMaxToolCallImagesOnWire()
+                : ContextRetentionSettings::DEFAULT_MAX_TOOL_CALL_IMAGES_ON_WIRE;
+        }
         $toolCallImageWireSelection = AgentModelInput::selectToolCallImagesForWire(
             array_map(static fn (int $count): array => array_fill(0, $count, true), $candidatePictureCounts),
             $maxImagesOnWire
         );
         $selectedCounts = $toolCallImageWireSelection->imagesOnWireByToolCallId;
         $dropped = $toolCallImageWireSelection->droppedToolCallIds;
-        // Pass 2 — bytes for the selected results only: the carry, or the durable store through the loaded packages. A
-        // selected result whose pictures cannot be produced any more joins the dropped set (its marker says so).
+        // Pass 2 — bytes for the selected results only: the carry, else the package's picture store in ONE batch read
+        // (L1, one L2 read, L3 in parallel), else the durable store through the loaded packages. A selected result whose
+        // pictures cannot be produced any more joins the dropped set (its marker says so).
+        $storedReferences = [];
+        foreach ($selectedCounts as $toolCallId => $selectedSlots) {
+            if (($transientToolCallImages[$toolCallId] ?? []) !== []) {
+                continue;
+            }
+            foreach ($candidateCallsNewestFirst[$toolCallId]->imageReferences as $toolCallImageReference) {
+                if ($toolCallImageReference->sourceStore === ToolCallImageReference::SOURCE_STORE_SPOOL) {
+                    $storedReferences[] = $toolCallImageReference;
+                }
+            }
+        }
+        $toolCallImageReadResult = $agentToolCallImageStoreService->readStoredToolCallImages($storedReferences);
+        $agentContext->toolCallImageReadResult = $toolCallImageReadResult;
         $toolResultImagesOnWire = new AgentToolResultImagesOfToolCalls();
         $loadedPackages = null;
         $toolExecutor = null;
@@ -730,6 +781,13 @@ class AIConversationModelCallsService extends Service
             foreach ($candidateCallsNewestFirst[$toolCallId]->imageReferences as $toolCallImageReference) {
                 if (count($reResolved) >= count($selectedSlots)) {
                     break;
+                }
+                if ($toolCallImageReference->sourceStore === ToolCallImageReference::SOURCE_STORE_SPOOL) {
+                    $storedImage = $toolCallImageReadResult->findImageOfSha256($toolCallImageReference->sha256);
+                    if ($storedImage !== null) {
+                        $reResolved[] = $storedImage;
+                    }
+                    continue;
                 }
                 if (!$toolCallImageReference->isReResolvable()) {
                     continue;

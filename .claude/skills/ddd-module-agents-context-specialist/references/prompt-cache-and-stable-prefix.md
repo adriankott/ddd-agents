@@ -325,15 +325,15 @@ that is not durable leaves at the end of its worker invocation (a turn end, a wo
 next invocation sends the "no longer on the wire" marker in its place. Seen live: a page picture viewed in turn 1,
 turn 2's first call lost the cache from that result on and three thinking blocks after it. One drop per picture that
 leaves; the cache before the picture and the thinking before it stay. Since 0.3.7 a picture without a store of its
-own is written to the package's spool when its call completes (`AgentToolCallImageSpoolService`,
-`ToolCallImageReference::SOURCE_STORE_SPOOL`, settings `AI.toolCallImageSpool`): every later call re-reads the same
-base64 text, so the result stays byte-identical across the worker boundary and the drop above is gone. It still
-happens where the spool cannot help: the spool is off, its store is a per-process cache, the cache TTL ran out, or
-the picture cap pushes the picture off. The spool's cache is Core's default group (APCu) unless `cacheGroup` names a
-shared one: APCu is local to one process, so a worker, a CLI run or the next turn cannot read what another process
-wrote, and the picture leaves at the turn change exactly as without the spool (the first diff is the picture's tool
-result; on the Messages API the thinking of the steps after it is dropped). The spool reports that once per process in
-the issues log; set `'cacheGroup' => 'redis'` or configure the object store. A tool may also return its own durable
+own is kept by the package (`ToolCallImageReference::SOURCE_STORE_SPOOL`; since 0.3.12 the picture store
+`AgentToolCallImageStoreService`, settings `AI.toolCallImageStore`): every later call re-reads the same bytes (L1 →
+L2 → L3), so the result stays byte-identical across the worker boundary and the drop above is gone. It still happens
+where no tier reaches the next process: only APCu (L2 skipped as process-local, no object store), the L2 TTL ran out
+without an object store, or the picture cap pushes the picture off. Both conditions are reported once per process in
+the issues log ([tool-picture-store.md](tool-picture-store.md)). The image retention moves its cut only at a turn
+change; the call that moves it changes the history at the first retired result and therefore marks the cache on the
+last text entry before it, on both wires, instead of on the previous call's entry (which lies behind the change):
+the calls of the new turn then read the prefix up to there. A tool may also return its own durable
 references (`ToolCallImageStore`). `app:agent:cache-diff` names such a change `pictureLeftWire` (a tool result that
 sent pictures on the previous call and sends fewer now) and any other rewrite of a tool result `toolResultRewrite` —
 on the Messages API a tool result sits in a user message, which is not an owner-message rewrite.

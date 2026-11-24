@@ -73,6 +73,36 @@ class PromptCacheDiffReport extends ValueObject
     /** The thinking blocks the provider dropped from the requests of the calls on the Messages API. */
     public int $droppedThinkingBlocks = 0;
 
+    /** @var int|null The median wire build time (ms) of the calls that sent tool-result pictures */
+    public ?int $wireBuildMsP50WithImages = null;
+
+    /** @var int|null The 95th percentile wire build time (ms) of the calls that sent tool-result pictures */
+    public ?int $wireBuildMsP95WithImages = null;
+
+    /** @var int|null The median wire build time (ms) of the calls without pictures */
+    public ?int $wireBuildMsP50WithoutImages = null;
+
+    /** @var int|null The 95th percentile wire build time (ms) of the calls without pictures */
+    public ?int $wireBuildMsP95WithoutImages = null;
+
+    /** @var int Pictures the picture store found in L1 (process cache), all calls */
+    public int $toolCallImageProcessCacheHits = 0;
+
+    /** @var int Pictures the picture store found in L2 (shared cache), all calls */
+    public int $toolCallImageSharedCacheHits = 0;
+
+    /** @var int Pictures the picture store found in L3 (object store), all calls */
+    public int $toolCallImageObjectStoreHits = 0;
+
+    /** @var int Pictures the picture store found nowhere, all calls */
+    public int $toolCallImageMisses = 0;
+
+    /** @var int[] the wire build times of the calls with pictures — the input of the percentiles, never serialized */
+    protected array $wireBuildMsOfCallsWithImages = [];
+
+    /** @var int[] the wire build times of the calls without pictures */
+    protected array $wireBuildMsOfCallsWithoutImages = [];
+
     /** Cache hit share over every call, 0–100. */
     public function hitPercent(): int
     {
@@ -90,6 +120,7 @@ class PromptCacheDiffReport extends ValueObject
             if ($snapshot === null) {
                 continue;
             }
+            $report->addWireBuildAndPictureStoreFigures($snapshot);
             $currentRegions = self::regionsOfSnapshot($snapshot);
             if ($currentRegions === null && $snapshot->systemSegmentHashes === null) {
                 continue;
@@ -170,7 +201,46 @@ class PromptCacheDiffReport extends ValueObject
             $previousSnapshot = $snapshot;
             $previousRegions = $currentRegions;
         }
+        $report->wireBuildMsP50WithImages = self::percentileOf($report->wireBuildMsOfCallsWithImages, 50);
+        $report->wireBuildMsP95WithImages = self::percentileOf($report->wireBuildMsOfCallsWithImages, 95);
+        $report->wireBuildMsP50WithoutImages = self::percentileOf($report->wireBuildMsOfCallsWithoutImages, 50);
+        $report->wireBuildMsP95WithoutImages = self::percentileOf($report->wireBuildMsOfCallsWithoutImages, 95);
         return $report;
+    }
+
+    /**
+     * Adds a call's wire build time (`loopStepOverheadMs.wire`) to the times with or without pictures and its picture
+     * store counts to the report's sums.
+     */
+    protected function addWireBuildAndPictureStoreFigures(RequestSnapshot $snapshot): void
+    {
+        $wireBuildMs = $snapshot->loopStepOverheadMs['wire'] ?? null;
+        if (is_int($wireBuildMs)) {
+            if (($snapshot->toolResultImagesOnWire ?? 0) > 0) {
+                $this->wireBuildMsOfCallsWithImages[] = $wireBuildMs;
+            } else {
+                $this->wireBuildMsOfCallsWithoutImages[] = $wireBuildMs;
+            }
+        }
+        $this->toolCallImageProcessCacheHits += (int)$snapshot->toolCallImageProcessCacheHits;
+        $this->toolCallImageSharedCacheHits += (int)$snapshot->toolCallImageSharedCacheHits;
+        $this->toolCallImageObjectStoreHits += (int)$snapshot->toolCallImageObjectStoreHits;
+        $this->toolCallImageMisses += (int)$snapshot->toolCallImageMisses;
+    }
+
+    /**
+     * The nearest-rank percentile of a list of times; null for an empty list.
+     *
+     * @param int[] $values
+     */
+    public static function percentileOf(array $values, int $percentile): ?int
+    {
+        if ($values === []) {
+            return null;
+        }
+        sort($values);
+        $rank = (int)ceil($percentile / 100 * count($values));
+        return $values[max(0, min(count($values) - 1, $rank - 1))];
     }
 
     /**

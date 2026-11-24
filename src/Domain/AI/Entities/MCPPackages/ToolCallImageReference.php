@@ -18,11 +18,15 @@ class ToolCallImageReference extends ValueObject
     public const string SOURCE_STORE_INLINE = 'inline';
 
     /**
-     * The package's durable spool of a picture that has no store of its own: the bytes were written when the call
-     * completed ({@see \DDD\Domain\AI\Services\Conversations\Agent\AgentToolCallImageSpoolService}), the id is
-     * `<conversation id>/<sha256>`, and every later model call re-reads the same bytes.
+     * The package's picture store of a picture that has no store of its own: the bytes (in the wire form) were written
+     * when the call completed ({@see \DDD\Domain\AI\Services\Conversations\Agent\AgentToolCallImageStoreService}),
+     * the id is `<scope>/<sha256>` (0.3.7–0.3.11: `<conversation id>/<sha256>`), and every later model call re-reads
+     * the same bytes through L1, L2 and L3.
      */
     public const string SOURCE_STORE_SPOOL = 'spool';
+
+    /** @var int The length of the short image id ({@see getShortImageId()}) */
+    public const int SHORT_IMAGE_ID_LENGTH = 12;
 
     /** @var string Where the bytes can be re-resolved: {@see SOURCE_STORE_INLINE}, or the name a {@see ToolCallImageStore} package declares. */
     public string $sourceStore = self::SOURCE_STORE_INLINE;
@@ -40,6 +44,9 @@ class ToolCallImageReference extends ValueObject
 
     /** @var string sha256 of the decoded bytes — the identity shown in the admin placeholder. */
     public string $sha256 = '';
+
+    /** @var bool Whether the object store (L3) acknowledged the bytes: the picture outlives the caches' TTL */
+    public bool $isDurable = false;
 
     /** @var string|null When the image was captured (ISO), for the trace. */
     public ?string $capturedAt = null;
@@ -60,5 +67,21 @@ class ToolCallImageReference extends ValueObject
         $shaPrefix = $this->sha256 !== '' ? substr($this->sha256, 0, 12) : 'unknown';
         $kiloBytes = (int)round($this->byteSize / 1024);
         return '[image ' . $shaPrefix . ', ' . $this->width . '×' . $this->height . ', ' . $kiloBytes . ' KB — bytes not retained]';
+    }
+
+    /** The first characters of the sha256 a placeholder names and the re-view tool accepts. */
+    public function getShortImageId(): string
+    {
+        return substr($this->sha256, 0, self::SHORT_IMAGE_ID_LENGTH);
+    }
+
+    /**
+     * The line that stands in a tool result for a picture that left the context at a turn change: what it was and how
+     * to see it again (the re-view tool of the skill `Agent.Images`).
+     */
+    public function toRetiredFromContextPlaceholder(): string
+    {
+        return '[image ' . $this->getShortImageId() . ', ' . $this->width . '×' . $this->height
+            . ' — no longer attached; to see it again call viewEarlierToolImage with imageId "' . $this->getShortImageId() . '" (skill Agent.Images)]';
     }
 }

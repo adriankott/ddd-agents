@@ -17,7 +17,7 @@ use DDD\Domain\Common\Entities\Accounts\Account;
 use DDD\Infrastructure\Exceptions\ForbiddenException;
 use DDD\Domain\AI\Entities\Conversations\Messages\RunSettings;
 use DDD\Domain\AI\Services\Conversations\Agent\OwnerConsentsService;
-use DDD\Domain\AI\Services\Conversations\Agent\AgentToolCallImageSpoolService;
+use DDD\Domain\AI\Services\Conversations\Agent\AgentToolCallImageStoreService;
 use DDD\Domain\AI\Entities\MCPPackages\MCPServerProvidedInput;
 use DDD\Domain\AI\Entities\MCPPackages\MCPTool;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolSummary;
@@ -336,11 +336,11 @@ class MCPToolExecutorService extends Service
             return null;
         }
         if ($toolCallImageReference->sourceStore === ToolCallImageReference::SOURCE_STORE_SPOOL) {
-            // the package's own durable spool of pictures without a store (AgentToolCallImageSpoolService)
+            // the package's own store of pictures without a store (AgentToolCallImageStoreService: L1, L2, L3)
             try {
-                /** @var AgentToolCallImageSpoolService $agentToolCallImageSpoolService */
-                $agentToolCallImageSpoolService = DDDService::instance()->getService(AgentToolCallImageSpoolService::class);
-                return $agentToolCallImageSpoolService->resolveSpooledToolCallImage($toolCallImageReference);
+                /** @var AgentToolCallImageStoreService $agentToolCallImageStoreService */
+                $agentToolCallImageStoreService = DDDService::instance()->getService(AgentToolCallImageStoreService::class);
+                return $agentToolCallImageStoreService->readStoredToolCallImage($toolCallImageReference);
             } catch (\Throwable) {
                 return null;
             }

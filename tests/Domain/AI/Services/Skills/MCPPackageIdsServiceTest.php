@@ -7,6 +7,7 @@ namespace DDD\Tests\Agents\Domain\AI\Services\Skills;
 use DDD\Domain\AI\Entities\Skills\AISkill;
 use DDD\Domain\AI\Services\Skills\MCPPackageIdsService;
 use DDD\Presentation\Mcp\Client\Agents\AgentMandatesMCPPackage;
+use DDD\Presentation\Mcp\Client\Agents\AgentImagesMCPPackage;
 use DDD\Presentation\Mcp\Client\Agents\AgentMemoriesMCPPackage;
 use DDD\Presentation\Mcp\Client\Agents\AgentTaskRunReportsMCPPackage;
 use DDD\Presentation\Mcp\Client\Agents\AgentTaskSchedulesMCPPackage;
@@ -67,6 +68,7 @@ class MCPPackageIdsServiceTest extends TestCase
                 AISkill::AGENT_TASKS => [AgentTaskSchedulesMCPPackage::class],
                 AISkill::AGENT_TASK_RUN_REPORTS => [AgentTaskRunReportsMCPPackage::class],
                 AISkill::AGENT_MEMORY => [AgentMemoriesMCPPackage::class],
+                AISkill::AGENT_IMAGES => [AgentImagesMCPPackage::class],
                 AISkill::AGENT_WEB_SEARCH => [WebSearchMCPPackage::class],
                 AISkill::AGENT_UI => [AgentUIMCPPackage::class],
                 AISkill::SYSTEM_HEALTH => [SystemHealthMCPPackage::class],

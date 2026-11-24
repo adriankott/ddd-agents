@@ -44,7 +44,7 @@ class ToolResultImage extends ValueObject
 
     /**
      * @var string Where the bytes can be RE-RESOLVED after this process forgets them: `inline` (the default — set to
-     * `spool` when the call completes and the package's spool took the bytes, {@see ToolCallImageReference::SOURCE_STORE_SPOOL})
+     * `spool` when the call completes and the package's picture store took the bytes, {@see ToolCallImageReference::SOURCE_STORE_SPOOL})
      * or the name a
      * {@see ToolCallImageStore} package declares (a durable catalog picture the loop re-reads on every model call
      * inside the wire window, so the picture survives the 12-step worker chunks and turn boundaries).
@@ -53,6 +53,9 @@ class ToolResultImage extends ValueObject
 
     /** @var string The id within {@see $sourceStore} — empty for an inline image (the reference then falls back to the sha256). */
     public string $sourceImageId = '';
+
+    /** @var bool Whether the package's picture store wrote the bytes to its object store (L3) and it acknowledged them */
+    public bool $isDurable = false;
 
     /**
      * The image of a valid MCP `type:image` content part, or null when it is rejected — the reason is
@@ -116,6 +119,7 @@ class ToolResultImage extends ValueObject
         if ($sourceStore !== '' && $sourceImageId !== '') {
             $toolResultImage->sourceStore = $sourceStore;
             $toolResultImage->sourceImageId = $sourceImageId;
+            $toolResultImage->isDurable = ($mcpImageContentPart['isDurable'] ?? false) === true;
         }
         return $toolResultImage;
     }
@@ -143,6 +147,7 @@ class ToolResultImage extends ValueObject
         $toolCallImageReference->height = $this->height;
         $toolCallImageReference->byteSize = $this->byteSize;
         $toolCallImageReference->sha256 = $this->sha256;
+        $toolCallImageReference->isDurable = $this->isDurable;
         return $toolCallImageReference;
     }
 }

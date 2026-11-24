@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use DDD\Domain\AI\Entities\Skills\AISkill;
+use DDD\Presentation\Mcp\Client\Agents\AgentImagesMCPPackage;
 use DDD\Presentation\Mcp\Client\Agents\AgentMandatesMCPPackage;
 use DDD\Presentation\Mcp\Client\Agents\AgentMemoriesMCPPackage;
 use DDD\Presentation\Mcp\Client\Agents\AgentTaskRunReportsMCPPackage;
@@ -28,6 +29,8 @@ return [
     AISkill::AGENT_TASK_RUN_REPORTS => [AgentTaskRunReportsMCPPackage::class],
     // offered only while the memory store is switched on (AI.agentMemory.enabled): the package is unavailable otherwise
     AISkill::AGENT_MEMORY => [AgentMemoriesMCPPackage::class],
+    // offered only while the picture store keeps pictures and their retention is on (AgentImagesMCPPackage::isAvailable())
+    AISkill::AGENT_IMAGES => [AgentImagesMCPPackage::class],
     // offered only while the web research is switched on (AI.webSearch) and its capability has an endpoint
     AISkill::AGENT_WEB_SEARCH => [WebSearchMCPPackage::class],
     // offered only to a conversation whose client executes client tool requests (AgentUIMCPPackage::isAvailable())

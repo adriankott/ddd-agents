@@ -95,9 +95,11 @@ instructions in a result read like an injection.
   `MAX_PIXELS` (20 MP). Per result: `DEFAULT_MAX_IMAGES_PER_TOOL_CALL` (4) unless `MCPToolImageBudget`, never more than
   `MAX_IMAGES_PER_TOOL_CALL_CEILING` (12), together at most `MAX_IMAGE_BYTES_PER_TOOL_CALL` (6 MB). A rejected or
   excess image becomes a text note, never a failed call.
-- An inline image is spooled by the package when the call completes (`AI.toolCallImageSpool`), so it rides on later
-  calls too while its result is in full and the picture cap allows it; with the spool off or unavailable it rides
-  once. A tool whose pictures already live in a store of its own declares it: a durable picture names its store and id on the part (`sourceStore`, `sourceImageId`),
+- An inline image is normalized to the wire profile and stored by the package's picture store when the call
+  completes (`AI.toolCallImageStore`: process cache, shared cache, object store), so it rides on later calls too while
+  its result is in full, the retention keeps it and the picture cap allows it; with no tier configured it rides once.
+  At a turn change older picture results leave the context with a placeholder line; `viewEarlierToolImage` (skill
+  `Agent.Images`) attaches one again (`ddd-module-agents-context-specialist` › references/tool-picture-store.md). A tool whose pictures already live in a store of its own declares it: a durable picture names its store and id on the part (`sourceStore`, `sourceImageId`),
   and the package that serves it implements `ToolCallImageStore` (`ToolCallImageStore::getToolCallImageStoreName()`,
   `ToolCallImageStore::resolveToolCallImage()`, deterministic and cheap per id); which pictures ride on later model calls is the context
   skill's (`ddd-module-agents-context-specialist`).

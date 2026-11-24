@@ -2567,7 +2567,8 @@ class AIConversationMessage extends Entity
         bool $capturedUnsentImage = false,
         bool $renderReferencePlaceholders = false,
         bool $imagesDroppedFromWire = false,
-        bool $rendersEntityReferences = false
+        bool $rendersEntityReferences = false,
+        bool $imagesRetiredFromContext = false
     ): array {
         if ($this->isDelegationCall()) {
             // A delegate call carries no image (its result is the composed child verdicts) — the image
@@ -2578,7 +2579,7 @@ class AIConversationMessage extends Entity
                 'content' => $this->getDelegationResult(),
             ];
         }
-        return (isset($this->toolCall) ? $this->toolCall : null)?->toOpenAiToolResultArray($full, $resolvedImages, $capturedUnsentImage, $renderReferencePlaceholders, $imagesDroppedFromWire, $rendersEntityReferences)
+        return (isset($this->toolCall) ? $this->toolCall : null)?->toOpenAiToolResultArray($full, $resolvedImages, $capturedUnsentImage, $renderReferencePlaceholders, $imagesDroppedFromWire, $rendersEntityReferences, $imagesRetiredFromContext)
             ?? ['role' => 'tool', 'tool_call_id' => '', 'content' => ''];
     }
 

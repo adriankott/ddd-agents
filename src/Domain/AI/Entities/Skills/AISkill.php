@@ -65,6 +65,10 @@ class AISkill extends Entity
     // recall of what was SAID in this or a past chat. The always-on directive injection is not gated on it.
     public const string AGENT_MEMORY = 'Agent.Memory';
 
+    // The pictures of the conversation's earlier tool results that left the context at a turn change
+    // (AI.toolCallImageStore retention): `viewEarlierToolImage` attaches one again from the picture store.
+    public const string AGENT_IMAGES = 'Agent.Images';
+
     // The agent's window onto the LIVE web: search, page reads, fast-model readings. The page screenshots are the
     // sibling `Agent.Web.Pages` of `mgamadeus/ddd-agent-browser`; a host with that package names it as a sub-skill in
     // its own copy of this skill file (the package's file names no skill of a package it does not require).

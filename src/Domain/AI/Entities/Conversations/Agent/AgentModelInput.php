@@ -23,6 +23,8 @@ use DDD\Domain\AI\Entities\MCPPackages\MCPPackageDocumentation;
 use DDD\Domain\AI\Entities\Skills\AISkills;
 use DDD\Domain\AI\Entities\Skills\AISkillSections;
 use DDD\Domain\AI\Entities\MCPPackages\ToolResultImage;
+use DDD\Domain\AI\Entities\Conversations\Agent\Images\AgentToolCallImageReadResult;
+use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessages;
 use DDD\Domain\AI\Entities\Conversations\Entitlements\AgentFeatureFlagsInterface;
 use DDD\Domain\AI\Entities\Conversations\Entitlements\AgentAccountRightsInterface;
 use DDD\Domain\Base\Entities\QueryOptions\QueryOptionsSyntax;
@@ -451,6 +453,22 @@ class AgentModelInput extends ValueObject
     public array $droppedImageToolCallIds = [];
 
     /**
+     * @var string[] The `tool_call_id`s whose pictures left the context at a turn change (the image retention,
+     * {@see findImageRetentionCutMessageIndex()}): their result carries one placeholder per picture with its short id
+     * for the re-view tool. Set by resolveToolCallImages(); never persisted.
+     */
+    public array $retiredImageToolCallIds = [];
+
+    /**
+     * @var string[] Of {@see $retiredImageToolCallIds}, the ones this call retires (the cut moved at this turn
+     * change): the history changes first at the earliest of them, so the call marks the cache right before it.
+     */
+    public array $newlyRetiredImageToolCallIds = [];
+
+    /** @var AgentToolCallImageReadResult|null Where this call's stored pictures came from (L1, L2, L3) and how long the read took */
+    public ?AgentToolCallImageReadResult $toolCallImageReadResult = null;
+
+    /**
      * @var AIConversationVariants|null The conversation's resolved situation:
      *      selects the skill sections the loaded-skills block renders and is named to the model in that block. Null
      *      = the purpose declares no dimensions — every skill renders whole.
@@ -536,6 +554,63 @@ class AgentModelInput extends ValueObject
     public function toolResultCapturedUnsentImage(string $toolCallId): bool
     {
         return in_array($toolCallId, $this->blindCapturedToolCallIds, true);
+    }
+
+    /** True when this call's pictures left the context at a turn change: the result carries the placeholders. */
+    public function toolResultImagesRetired(string $toolCallId): bool
+    {
+        return in_array($toolCallId, $this->retiredImageToolCallIds, true);
+    }
+
+    /** True when this call retires the pictures of the result with `$toolCallId` (the cut moved now). */
+    public function toolResultImagesRetiredOnThisCall(string $toolCallId): bool
+    {
+        return in_array($toolCallId, $this->newlyRetiredImageToolCallIds, true);
+    }
+
+    /**
+     * The image retention cut — pure. The picture-bearing results BEFORE the newest turn initiator (earlier turns)
+     * keep their pictures only for the newest `$newestImageResultsKept` of them; the cut is the row index of the
+     * oldest kept one (every picture result at or above it rides, every one below it is retired). The results of the
+     * current turn are never retired, so the cut moves only at a turn change and every call of a turn renders the
+     * same history. `$turnInitiatorsBack` 1 gives the cut of the turn before (to tell whether this turn moved it).
+     * PHP_INT_MIN when nothing is retired.
+     *
+     * @param AIConversationMessage[] $messages the rows of the context, oldest first
+     */
+    public static function findImageRetentionCutMessageIndex(array $messages, int $newestImageResultsKept, int $turnInitiatorsBack = 0): int
+    {
+        $messages = array_values($messages);
+        $turnInitiatorPosition = null;
+        $initiatorsToSkip = $turnInitiatorsBack;
+        for ($position = count($messages) - 1; $position >= 0; $position--) {
+            if (AIConversationMessages::isTurnInitiatorMessage($messages[$position])) {
+                if ($initiatorsToSkip === 0) {
+                    $turnInitiatorPosition = $position;
+                    break;
+                }
+                $initiatorsToSkip--;
+            }
+        }
+        if ($turnInitiatorPosition === null) {
+            return PHP_INT_MIN;
+        }
+        $keptImageResultIndexes = [];
+        for ($position = $turnInitiatorPosition - 1; $position >= 0; $position--) {
+            $toolCall = isset($messages[$position]->toolCall) ? $messages[$position]->toolCall : null;
+            $messageIndex = $messages[$position]->indexInConversation ?? null;
+            if ($toolCall === null || $messageIndex === null || $toolCall->imageReferences === []
+                || $toolCall->status !== AIConversationMessage::STATUS_COMPLETED
+            ) {
+                continue;
+            }
+            if (count($keptImageResultIndexes) >= $newestImageResultsKept) {
+                // an older picture result than the kept ones: the cut sits right above it
+                return $keptImageResultIndexes === [] ? $messageIndex + 1 : min($keptImageResultIndexes);
+            }
+            $keptImageResultIndexes[] = $messageIndex;
+        }
+        return PHP_INT_MIN;
     }
 
     /** True when this call's pictures were dropped from a VISION model's wire (cap-evicted or gone) — the result then carries the dropped marker. */

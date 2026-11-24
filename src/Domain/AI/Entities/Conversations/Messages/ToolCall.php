@@ -814,6 +814,8 @@ class ToolCall extends ValueObject
      *        ({@see buildEntityReferenceLineForModel()}) — only where the model is taught the kit
      *        ({@see \DDD\Domain\AI\Entities\Conversations\Agent\AgentModelInput::teachesComposedViewKit()}: a person on a
      *        screen or a scheduled report run, never a sub-agent, a platform run or the phone line); off by default
+     * @param bool $imagesRetiredFromContext the pictures of this result left the context at a turn change (the image
+     *        retention): one placeholder line per picture names its image id and the re-view tool
      * @return array<string, mixed>
      */
     public function toOpenAiToolResultArray(
@@ -822,7 +824,8 @@ class ToolCall extends ValueObject
         bool $capturedUnsentImage = false,
         bool $renderReferencePlaceholders = false,
         bool $imagesDroppedFromWire = false,
-        bool $rendersEntityReferences = false
+        bool $rendersEntityReferences = false,
+        bool $imagesRetiredFromContext = false
     ): array {
         $content = $this->stripBackgroundOperationsFromResultText($this->result ?? '');
         $bindablePathsLine = $full && $rendersEntityReferences ? $this->buildBindablePathsLineForModel() : null;
@@ -862,7 +865,13 @@ class ToolCall extends ValueObject
         }
         // A vision model whose wire no longer carries this result's pictures (only the newest ride, or the bytes are
         // gone) is told so at the picture's position — the caption above still says "look", the marker says "not here".
-        if ($imagesDroppedFromWire && !$capturedUnsentImage && $full && $resolvedImages === []) {
+        if ($imagesRetiredFromContext && !$capturedUnsentImage && $full && $resolvedImages === [] && $this->imageReferences !== []) {
+            $content = ($content === '' ? '' : $content . "\n\n")
+                . implode("\n", array_map(
+                    static fn (ToolCallImageReference $reference): string => $reference->toRetiredFromContextPlaceholder(),
+                    $this->imageReferences
+                ));
+        } elseif ($imagesDroppedFromWire && !$capturedUnsentImage && $full && $resolvedImages === []) {
             $content = ($content === '' ? '' : $content . "\n\n")
                 . static::buildImagesDroppedFromWireMarker($pictureWord, $pictureCount);
         }

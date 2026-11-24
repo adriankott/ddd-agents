@@ -226,9 +226,10 @@ class MCPToolResponse extends ValueObject
     /**
      * Add an image content item. A DURABLE picture names its `$sourceStore` (the name a
      * {@see \DDD\Domain\AI\Entities\MCPPackages\ToolCallImageStore} package declares) + `$sourceImageId`, so the loop can
-     * re-resolve it on later model calls; without them the image is inline — it rides once and is gone.
+     * re-resolve it on later model calls; without them the image is inline — it rides once and is gone. `$isDurable`:
+     * the store keeps the picture beyond its caches (the picture store's object store).
      */
-    public function addImageContent(string $data, string $mimeType = 'image/png', ?string $sourceStore = null, ?string $sourceImageId = null): self
+    public function addImageContent(string $data, string $mimeType = 'image/png', ?string $sourceStore = null, ?string $sourceImageId = null, bool $isDurable = false): self
     {
         $imagePart = [
             'type' => 'image',
@@ -238,6 +239,9 @@ class MCPToolResponse extends ValueObject
         if ($sourceStore !== null && $sourceStore !== '' && $sourceImageId !== null && $sourceImageId !== '') {
             $imagePart['sourceStore'] = $sourceStore;
             $imagePart['sourceImageId'] = $sourceImageId;
+            if ($isDurable) {
+                $imagePart['isDurable'] = true;
+            }
         }
         $this->content[] = $imagePart;
         return $this;

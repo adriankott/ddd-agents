@@ -116,6 +116,7 @@ The binding, `config/app/AI/skillPackages.php`:
 ```php
 use AgentsReference\Presentation\Mcp\Demo\DemoNotesMCPPackage;
 use DDD\Domain\AI\Entities\Skills\AISkill;
+use DDD\Presentation\Mcp\Client\Agents\AgentImagesMCPPackage;
 use DDD\Presentation\Mcp\Client\Agents\AgentMandatesMCPPackage;
 use DDD\Presentation\Mcp\Client\Agents\AgentMemoriesMCPPackage;
 use DDD\Presentation\Mcp\Client\Agents\AgentTaskRunReportsMCPPackage;
@@ -126,6 +127,7 @@ return [
     AISkill::AGENT_TASKS => [AgentTaskSchedulesMCPPackage::class],
     AISkill::AGENT_TASK_RUN_REPORTS => [AgentTaskRunReportsMCPPackage::class],
     AISkill::AGENT_MEMORY => [AgentMemoriesMCPPackage::class], // offered only while AI.agentMemory.enabled is on
+    AISkill::AGENT_IMAGES => [AgentImagesMCPPackage::class], // offered only while the picture store and its retention are on
     'Demo.Notes' => [DemoNotesMCPPackage::class],
 ];
 ```

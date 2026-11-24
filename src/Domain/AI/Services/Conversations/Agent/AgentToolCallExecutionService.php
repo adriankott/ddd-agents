@@ -97,7 +97,7 @@ class AgentToolCallExecutionService extends Service
         }
         // a picture without a store of its own goes to the durable spool first, so the reference built next names it
         // and the next worker invocation re-reads the same bytes (the frozen result stays byte-identical)
-        $this->findToolCallImageSpoolService()->spoolInlineToolResultImages($toolResult, $conversation);
+        $this->findToolCallImageStoreService()->storeInlineToolResultImages($toolResult, $conversation);
         $toolCall->applyExecutionOutcome($toolResult);
         $toolCall->wasHeldForOwnerConsent = $provenance->isWriteHeldForOwnerConsent;
         return $toolResult;
@@ -110,11 +110,11 @@ class AgentToolCallExecutionService extends Service
         return $evalOutboundRecipientsService;
     }
 
-    protected function findToolCallImageSpoolService(): AgentToolCallImageSpoolService
+    protected function findToolCallImageStoreService(): AgentToolCallImageStoreService
     {
-        /** @var AgentToolCallImageSpoolService $agentToolCallImageSpoolService */
-        $agentToolCallImageSpoolService = DDDService::instance()->getService(AgentToolCallImageSpoolService::class);
-        return $agentToolCallImageSpoolService;
+        /** @var AgentToolCallImageStoreService $agentToolCallImageStoreService */
+        $agentToolCallImageStoreService = DDDService::instance()->getService(AgentToolCallImageStoreService::class);
+        return $agentToolCallImageStoreService;
     }
 
     protected function findToolExecutor(): MCPToolExecutorService

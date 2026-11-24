@@ -74,7 +74,7 @@ starting after the compaction cover's edge. How a row renders:
 - on the Anthropic Messages API the newer part of the history is FROZEN: a step there goes out as the content the
   provider returned (thinking blocks included, from the thinking floor on), its tool results in full and its calls
   with their full arguments; the stubs and the shortened arguments above apply only below that part. The picture cap
-  still applies there, and a picture that is not durable (not spooled, no store of its own) leaves at the end of its worker invocation: a picture that
+  still applies there, and a picture the picture store could not keep (no tier reaches the next process, no store of its own) leaves at the end of its worker invocation: a picture that
   leaves the wire changes its result, the provider drops the thinking after it and those steps go on without it
   ([prompt-cache-and-stable-prefix.md](prompt-cache-and-stable-prefix.md), section 5a).
 
@@ -83,10 +83,12 @@ point where both the resolved model and the pictures are known. Candidates are t
 context that carried pictures (`ToolCall::$imageReferences`) and still ride in full; a stubbed result carries none.
 The bytes come from what the current worker invocation captured (`AIConversation::$transientToolCallImages`), or, for
 a durable picture, are re-resolved on every call through the loaded package that implements `ToolCallImageStore`. A
-picture without a store of its own (a browser viewport) is spooled when its call completes and re-read from the spool
-(`AgentToolCallImageSpoolService`, `AI.toolCallImageSpool`: the configured object store, else the cache group
-`cacheGroup` names (a shared one such as `redis`; the default APCu group reaches no other process) with a TTL; checked again by hash and magic type on every read); only when the spool could not take it is it gone once its
-invocation ended. The cap counts pictures, not results
+picture without a store of its own (a browser viewport) is stored when its call completes and re-read from the
+package's picture store (`AgentToolCallImageStoreService`, `AI.toolCallImageStore`: L1 process cache → one L2 batch →
+L3 object store in parallel; checked again by hash and header on every read); only when no tier kept it is it gone once
+its invocation ended. With the retention on (default), the picture results of earlier turns beyond the newest four leave
+the context at a turn change and carry one placeholder line per picture; the cap then is `maxPicturesOnWire` (20)
+([tool-picture-store.md](tool-picture-store.md)). Without it the cap counts pictures, not results
 (`ContextRetentionSettings::getMaxToolCallImagesOnWire()`, default 2, a purpose's `contextRetention:` map can raise
 it): newest results first and whole, the newest result always rides, truncated to the cap
 (`AgentModelInput::selectToolCallImagesForWire()`). A candidate that does not ride is listed in

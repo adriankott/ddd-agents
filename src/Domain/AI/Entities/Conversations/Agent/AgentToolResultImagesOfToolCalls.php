@@ -35,6 +35,16 @@ class AgentToolResultImagesOfToolCalls extends ObjectSet
         return $toolResultImagesOfToolCall instanceof AgentToolResultImagesOfToolCall ? $toolResultImagesOfToolCall->toolResultImages : [];
     }
 
+    /** The images of all tool calls of the set. */
+    public function countImages(): int
+    {
+        $imageCount = 0;
+        foreach ($this->getElements() as $toolResultImagesOfToolCall) {
+            $imageCount += count($toolResultImagesOfToolCall->toolResultImages);
+        }
+        return $imageCount;
+    }
+
     /** @return string[] The `tool_call_id`s that carry images, in the set's order. */
     public function getToolCallIds(): array
     {

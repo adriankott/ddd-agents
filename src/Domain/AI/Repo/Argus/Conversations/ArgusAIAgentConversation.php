@@ -864,6 +864,13 @@ class ArgusAIAgentConversation extends ArgusAIConversation
     public ?int $previousReasoningNewCutWirePosition = null;
 
     /**
+     * @var int|null The wire position of the first tool result whose pictures this call retires (the image retention
+     * moved at this turn change, {@see AgentModelInput::$newlyRetiredImageToolCallIds}); the history changes there,
+     * so the call marks the cache right before it instead of on the previous call's entry. Null = no move.
+     */
+    public ?int $imageRetentionCutWirePosition = null;
+
+    /**
      * @var string|null Why the LAST Responses answer carries neither text nor a call — a refusal or an answer cut off
      *      (`status: incomplete`; {@see AgentResponsesResponse::findUnusableAnswerReason()}); null otherwise and on Chat
      *      Completions. The loop fails the call with it, named, instead of reading an empty answer as a stall.
@@ -1231,9 +1238,15 @@ class ArgusAIAgentConversation extends ArgusAIConversation
                 $this->addPromptCacheBreakpointsAtPreviousReasoningCut($wireMessages, $usesResponsesApi);
             }
             if ($usesResponsesApi && !$movesThePreviousReasoningCut && $freeMarkerSlots >= 1) {
-                // a Responses request reads the cache only at breakpoints it carries itself: it re-marks the
-                // item the previous call marked, so the entry that call wrote is looked up
-                $this->addPromptCacheBreakpointToPreviousCallsWireMessage($wireMessages);
+                if ($this->imageRetentionCutWirePosition !== null) {
+                    // the image retention changed the history at this result: the previous call's entry is not
+                    // read, the marker goes right before the change (written now, read by the calls of this turn)
+                    $this->addPromptCacheBreakpointToLastTextMessageBefore($wireMessages, $this->imageRetentionCutWirePosition, true);
+                } else {
+                    // a Responses request reads the cache only at breakpoints it carries itself: it re-marks the
+                    // item the previous call marked, so the entry that call wrote is looked up
+                    $this->addPromptCacheBreakpointToPreviousCallsWireMessage($wireMessages);
+                }
             }
             array_unshift($wireMessages, ['role' => 'system', 'content' => $systemContentParts]);
             return $wireMessages;
@@ -1254,7 +1267,12 @@ class ArgusAIAgentConversation extends ArgusAIConversation
             $usesMessagesWirePreviousCallLayout = $this->agentWireConfiguration?->usesMessagesApi() === true
                 && $this->agentWireConfiguration->usesConversationAppend();
             if ($usesMessagesWirePreviousCallLayout && !$marksPreviousReasoningCut) {
-                $this->addPromptCacheBreakpointToPreviousCallsMessagesWireMessage($wireMessages);
+                if ($this->imageRetentionCutWirePosition !== null) {
+                    // the image retention changed the history at this result: the marker goes right before it
+                    $this->addPromptCacheBreakpointToLastTextMessageBefore($wireMessages, $this->imageRetentionCutWirePosition, false);
+                } else {
+                    $this->addPromptCacheBreakpointToPreviousCallsMessagesWireMessage($wireMessages);
+                }
             }
             array_unshift($wireMessages, ['role' => 'system', 'content' => $this->buildSystemContentPartsWithPromptCacheBreakpoints(
                 $this->lastSystemSegments,
@@ -1801,6 +1819,7 @@ class ArgusAIAgentConversation extends ArgusAIConversation
             $capturedUnsentImage = false;
             $renderReferencePlaceholders = false;
             $imagesDroppedFromWire = false;
+            $imagesRetiredFromContext = false;
             // the kit's `$from` paths and entity references ride where the kit is taught
             $rendersEntityReferences = false;
             if ($agentContext !== null) {
@@ -1810,6 +1829,7 @@ class ArgusAIAgentConversation extends ArgusAIConversation
                 $capturedUnsentImage = $agentContext->toolResultCapturedUnsentImage($toolCallId);
                 $renderReferencePlaceholders = $agentContext->renderImageReferencePlaceholders;
                 $imagesDroppedFromWire = $agentContext->toolResultImagesDropped($toolCallId);
+                $imagesRetiredFromContext = $agentContext->toolResultImagesRetired($toolCallId);
             }
             $toolResultArray = $callMessage->toOpenAiToolResultArray(
                 $keepsFullToolResult($callMessage),
@@ -1818,6 +1838,7 @@ class ArgusAIAgentConversation extends ArgusAIConversation
                 $renderReferencePlaceholders,
                 $imagesDroppedFromWire,
                 $rendersEntityReferences,
+                $imagesRetiredFromContext,
             );
             // while the owner is on the phone line, a result's widget dictation never reaches the model —
             // the ONE place every tool result passes (the stored result stays untouched)
@@ -1997,6 +2018,16 @@ class ArgusAIAgentConversation extends ArgusAIConversation
             }
             foreach ($appendedHistoryItems->buildWireEntriesOfThisCall() as $appendedWireEntry) {
                 $entries[] = $appendedWireEntry;
+            }
+        }
+        // where the image retention changes the history on this call: the first result whose pictures it retires now
+        $this->imageRetentionCutWirePosition = null;
+        if ($agentContext !== null && $agentContext->newlyRetiredImageToolCallIds !== []) {
+            foreach ($entries as $entryPosition => $entry) {
+                if (($entry['role'] ?? null) === 'tool' && $agentContext->toolResultImagesRetiredOnThisCall((string)($entry['tool_call_id'] ?? ''))) {
+                    $this->imageRetentionCutWirePosition = $entryPosition;
+                    break;
+                }
             }
         }
 

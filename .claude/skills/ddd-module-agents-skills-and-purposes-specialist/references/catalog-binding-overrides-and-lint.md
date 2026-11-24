@@ -45,7 +45,7 @@ return [
 The same rules for every package and host, with the other layers (Composer, console, config, env, images): the framework's rulebook `ddd-module-orchestrator` › references/package-cuts-and-names.md (mgamadeus/ddd).
 
 Every MCP package names itself with its static `MCPPackage::$name` (the package's own: `agent.mandates`,
-`agent.tasks`, `agent.taskRunReports`, `agent.memory`, `agent.web.search`, `agent.ui`, `ddd.system.health`,
+`agent.tasks`, `agent.taskRunReports`, `agent.memory`, `agent.images`, `agent.web.search`, `agent.ui`, `ddd.system.health`,
 `ddd.system.issues`, `ddd.system.workers`, `ddd.system.crons`; the kernel's: `demo.notes`). `MCPPackageIdsService` finds the packages by scanning the
 source roots of `AgentSourceRootsService` (the application's `src/` under the root namespace `App\` first, then every
 DDD module's `src/`), below `Presentation/Mcp`, file names ending in `MCPPackage.php`, abstract classes skipped. The
@@ -78,7 +78,7 @@ The config reader takes the application's file instead of the module's, key by k
 
 | Config | Package default | What a host's file must do |
 |---|---|---|
-| `AI.skillPackages` | binds `Agent.Mandates` → `agent.mandates`, `Agent.Tasks` → `agent.tasks`, `Agent.TaskRunReports` → `agent.taskRunReports`, `Agent.Memory` → `agent.memory` | list EVERY skill the host offers, the package's four included (`Agent.Memory` only while the memory store is on: an unavailable package, `MCPPackage::isAvailable()`, is left out of the binding and a skill bound to it alone disappears). Without `Agent.TaskRunReports` the purpose `Schedule.Run` preloads a skill that has no tools |
+| `AI.skillPackages` | binds `Agent.Mandates` → `agent.mandates`, `Agent.Tasks` → `agent.tasks`, `Agent.TaskRunReports` → `agent.taskRunReports`, `Agent.Memory` → `agent.memory`, `Agent.Images` → `agent.images` | list EVERY skill the host offers, the package's four included (`Agent.Memory` only while the memory store is on: an unavailable package, `MCPPackage::isAvailable()`, is left out of the binding and a skill bound to it alone disappears). Without `Agent.TaskRunReports` the purpose `Schedule.Run` preloads a skill that has no tools |
 | `AI.skillRequirements` | empty | the gates the host puts on any skill, its own or a module's (reference [gating-by-entitlements-and-rights.md](gating-by-entitlements-and-rights.md)) |
 | `AI.purposeRequirements` | empty | the flags a purpose needs before a customer may start it |
 | `AI.skillNamespaceGroups` | one group, `Agent` | the groups of the admin catalog view (below) |
@@ -102,7 +102,7 @@ test can pin the host's intended overrides.
 ## Skill name constants
 
 `AISkill` carries constants for the names the package knows. With a file and a package: `Agent.Mandates`,
-`Agent.Tasks`, `Agent.TaskRunReports`, `Agent.Memory`, `Agent.Web.Search`, `Agent.UI`, `System.Health`,
+`Agent.Tasks`, `Agent.TaskRunReports`, `Agent.Memory`, `Agent.Images`, `Agent.Web.Search`, `Agent.UI`, `System.Health`,
 `System.Issues`, `System.Workers`, `System.Crons`. Names a host fills with its own file and package:
 `Agent.Settings`, `Agent.Budget`, `Agent.Web.Images`, `Agent.Communication.Messages`,
 `Agent.Communication.VoiceCalls`, `Money.CurrencyConversion`; package code reads only

@@ -141,6 +141,19 @@ class AgentCacheDiffCommand extends AgentConsoleCommand
                 $promptCacheDiffReport->droppedThinkingBlocks
             ));
         }
+        if ($promptCacheDiffReport->wireBuildMsP50WithImages !== null || $promptCacheDiffReport->wireBuildMsP50WithoutImages !== null) {
+            $output->writeln(sprintf(
+                'wire build ms p50/p95: with pictures %s/%s · without %s/%s · picture store L1 %d · L2 %d · L3 %d · missed %d',
+                $promptCacheDiffReport->wireBuildMsP50WithImages ?? '—',
+                $promptCacheDiffReport->wireBuildMsP95WithImages ?? '—',
+                $promptCacheDiffReport->wireBuildMsP50WithoutImages ?? '—',
+                $promptCacheDiffReport->wireBuildMsP95WithoutImages ?? '—',
+                $promptCacheDiffReport->toolCallImageProcessCacheHits,
+                $promptCacheDiffReport->toolCallImageSharedCacheHits,
+                $promptCacheDiffReport->toolCallImageObjectStoreHits,
+                $promptCacheDiffReport->toolCallImageMisses
+            ));
+        }
         foreach ($promptCacheDiffReport->callsByCause as $cause => $callCount) {
             $inputTokensOfCause = $promptCacheDiffReport->inputByCause[$cause] ?? 0;
             $output->writeln(sprintf(

@@ -19,10 +19,11 @@ use DDD\Domain\AI\Repo\Argus\Conversations\ArgusAIAgentConversation;
 use DDD\Domain\AI\Repo\Argus\Conversations\Wire\AgentMessagesRequestComposer;
 use DDD\Domain\AI\Repo\Argus\Conversations\Wire\AgentResponsesRequestComposer;
 use DDD\Domain\AI\Repo\Argus\Conversations\Wire\AgentWireRequestParameters;
-use DDD\Domain\AI\Services\Conversations\Agent\AgentToolCallImageSpoolService;
+use DDD\Domain\AI\Services\Conversations\Agent\AgentToolCallImageStoreService;
 use DDD\Infrastructure\Services\DDDService;
 use DDD\Presentation\Mcp\Services\MCPToolExecutorService;
-use DDD\Tests\Agents\Domain\AI\Services\Conversations\Agent\InMemoryAgentToolCallImageSpoolServiceDouble;
+use DDD\Tests\Agents\Domain\AI\Services\Conversations\Agent\TieredAgentToolCallImageStoreServiceDouble;
+use DDD\Tests\Agents\Domain\AI\Services\Conversations\Agent\ToolPictureFixtures;
 use DDD\Tests\Agents\Support\IntegrationTestCase;
 use ReflectionClass;
 
@@ -30,21 +31,19 @@ use ReflectionClass;
  * A turn change on both wire APIs: turn N looked at a picture and ran one more tool, the owner then wrote again. The
  * first call of turn N+1 runs in a new invocation (no transient carry of the picture) and repeats the last call of
  * turn N byte for byte up to the last tool result of turn N — the picture result included, its bytes re-read from the
- * spool. Without the bytes the picture result carries the dropped marker: the history changes there, and on the
+ * picture store. Without the bytes the picture result carries the dropped marker: the history changes there, and on the
  * Messages API the thinking of every later step of turn N is bound to the changed prefix (the provider drops it).
  */
 class TurnChangeRequestPrefixTest extends IntegrationTestCase
 {
-    protected const string PNG_1X1_BASE64 =
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
-
-    protected InMemoryAgentToolCallImageSpoolServiceDouble $spoolDouble;
+    protected TieredAgentToolCallImageStoreServiceDouble $storeDouble;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->spoolDouble = new InMemoryAgentToolCallImageSpoolServiceDouble();
-        $this->replaceService(AgentToolCallImageSpoolService::class, $this->spoolDouble);
+        // a shared cache only: the next invocation (another process) finds the picture there
+        $this->storeDouble = TieredAgentToolCallImageStoreServiceDouble::withTiers(false, true, null);
+        $this->replaceService(AgentToolCallImageStoreService::class, $this->storeDouble);
     }
 
     public function testMessagesRequestsRepeatTheLastToolResultOfTheTurnAcrossTheTurnChange(): void
@@ -59,17 +58,16 @@ class TurnChangeRequestPrefixTest extends IntegrationTestCase
 
     protected function assertThePrefixRepeatsAcrossTheTurnChange(string $wireApi, string $promptCacheMarkers, string $historyKey): void
     {
-        $toolResult = new ToolResult('logo.png, 1200 x 210');
-        $toolResult->images = [ToolResultImage::fromMcpImageContentPart(['type' => 'image', 'data' => self::PNG_1X1_BASE64])];
+        $toolResult = ToolPictureFixtures::buildToolResultWithPicture(null, 'logo.png, 1200 x 210');
         $conversation = new AIConversation();
         $conversation->id = 4711;
-        $this->spoolDouble->spoolInlineToolResultImages($toolResult, $conversation);
+        $this->storeDouble->storeInlineToolResultImages($toolResult, $conversation);
         $pictureCall = static::buildCompletedToolCall('call_picture', 'viewWorkspaceImages', $toolResult);
         $shellCall = static::buildCompletedToolCall('call_shell', 'shell', new ToolResult('#0B0948 62%, #06D6E3 38%'));
 
         // turn N, its last call: the picture rides from the transient carry of this invocation
         $pictureEntryOfTurnN = $pictureCall->toOpenAiToolResultArray(true, $toolResult->images);
-        // turn N+1, its first call: a new invocation, the picture re-read through the executor (the spool)
+        // turn N+1, its first call: a new invocation, the picture re-read through the executor (the picture store)
         /** @var MCPToolExecutorService $mCPToolExecutorService */
         $mCPToolExecutorService = DDDService::instance()->getService(MCPToolExecutorService::class);
         $reResolvedImage = $mCPToolExecutorService->resolveToolCallImage($pictureCall->imageReferences[0], []);
@@ -96,7 +94,7 @@ class TurnChangeRequestPrefixTest extends IntegrationTestCase
             );
         }
 
-        // the bytes gone (no carry, no spool): the picture result is the first change of the history
+        // the bytes gone (no carry, no picture store): the picture result is the first change of the history
         $pictureEntryWithoutTheBytes = $pictureCall->toOpenAiToolResultArray(true, [], false, false, true);
         $firstCallWithoutTheBytes = $this->composeBody($wireApi, $promptCacheMarkers, $pictureEntryWithoutTheBytes, $shellEntry, true);
         $pictureResultPosition = static::findFirstToolResultPosition($lastCallOfTurnN[$historyKey]);
