@@ -91,6 +91,8 @@ use DDD\Domain\AI\MessageHandlers\AIConversationResumeMessage;
 use DDD\Domain\AI\Services\AIUsageEnvelopesService;
 use DDD\Domain\Common\Entities\Accounts\Account;
 use DDD\Domain\AI\Services\Conversations\Eligibility\AgentAutomationEligibilityService;
+use DDD\Domain\AI\Services\Skills\AISkillsService;
+use DDD\Domain\AI\Entities\Skills\AISkill;
 use DDD\Infrastructure\Services\DDDService;
 use DDD\Infrastructure\Services\AuthService;
 use DDD\Domain\AI\Exceptions\AiBudgetExceededException;
@@ -2655,7 +2657,29 @@ class AIConversationAgentService extends Service implements AgentModelCallRunner
     {
         /** @var AIConversationPurposeRunsService $aIConversationPurposeRunsService */
         $aIConversationPurposeRunsService = DDDService::instance()->getService(AIConversationPurposeRunsService::class);
-        return AIConversationTurnBudget::buildForConversation($conversation, $aIConversationPurposeRunsService->conversationPurposeWorksAutonomously($conversation));
+        return AIConversationTurnBudget::buildForConversation(
+            $conversation,
+            $aIConversationPurposeRunsService->conversationPurposeWorksAutonomously($conversation),
+            $this->findTurnMinimumStepsOfLoadedSkills($conversation)
+        );
+    }
+
+    /**
+     * The highest `turnMinimumSteps` of the skills loaded now (the newest loaded capability set), or null: a skill
+     * whose work runs long raises the step floor of every turn while it is loaded ({@see AISkill::$turnMinimumSteps}).
+     */
+    protected function findTurnMinimumStepsOfLoadedSkills(AIConversation $conversation): ?int
+    {
+        if (!isset($conversation->messages)) {
+            return null;
+        }
+        $loadedCapabilities = $conversation->messages->getNewestLoadedCapabilities();
+        if ($loadedCapabilities === null || $loadedCapabilities->getLoadedSkillNames() === []) {
+            return null;
+        }
+        /** @var AISkillsService $aISkillsService */
+        $aISkillsService = DDDService::instance()->getService(AISkillsService::class);
+        return $aISkillsService->findLoadedSkillsOf($loadedCapabilities)->findHighestTurnMinimumSteps();
     }
 
     /**

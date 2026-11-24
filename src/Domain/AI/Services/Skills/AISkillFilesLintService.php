@@ -286,6 +286,11 @@ class AISkillFilesLintService extends Service
                         $problems[] = "$skillFile: '$listKey' is not a list of strings";
                     }
                 }
+                if (array_key_exists('turnMinimumSteps', $frontmatter)
+                    && AISkill::readTurnMinimumStepsOfFrontmatter($frontmatter['turnMinimumSteps']) === null
+                ) {
+                    $problems[] = "$skillFile: 'turnMinimumSteps' is not a positive whole number (the loader ignores it)";
+                }
                 foreach ((array)($frontmatter['subSkillNames'] ?? []) as $subSkillName) {
                     if (is_string($subSkillName) && $aISkillsService->getAISkillByName($subSkillName) === null) {
                         $problems[] = "$skillFile: sub-skill '$subSkillName' resolves to no skill file";

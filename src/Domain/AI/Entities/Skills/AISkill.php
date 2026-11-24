@@ -402,6 +402,15 @@ class AISkill extends Entity
     public bool $nonEvictable = false;
 
     /**
+     * The step floor of an owner turn while this skill is loaded (frontmatter `turnMinimumSteps`, a positive whole
+     * number; null = none): a skill whose work runs long (build a document, render it, check it, hand it over) raises
+     * the turn's step budget to at least this. Capped by {@see \DDD\Domain\AI\Entities\Conversations\Agent\AIConversationTurnBudget::PLANNED_TURN_MAX_STEPS_CEILING};
+     * a raised turn carries the planned turn's default cost cap unless the run settings name one. Explicit
+     * `runSettings.maxStepsPerTurn` wins over every floor.
+     */
+    public ?int $turnMinimumSteps = null;
+
+    /**
      * @var string[] Product FeatureFlags this skill requires (frontmatter `requiredFeatureFlags`). The skill is
      * offered to a conversation ONLY if the agent space has ALL of them available; empty = ungated. Composes hierarchically
      * with each tool's #[MCPRequiresFeatureFlags] (a tool may narrow further, but a locked skill hides all its tools).
@@ -829,5 +838,18 @@ class AISkill extends Entity
             }
         }
         return $skillNames;
+    }
+
+    /** The step floor of a skill's frontmatter value: a positive whole number (also as a digit string), else null. */
+    public static function readTurnMinimumStepsOfFrontmatter(mixed $frontmatterValue): ?int
+    {
+        if (is_int($frontmatterValue)) {
+            return $frontmatterValue > 0 ? $frontmatterValue : null;
+        }
+        if (is_string($frontmatterValue) && ctype_digit(trim($frontmatterValue))) {
+            $turnMinimumSteps = (int)trim($frontmatterValue);
+            return $turnMinimumSteps > 0 ? $turnMinimumSteps : null;
+        }
+        return null;
     }
 }

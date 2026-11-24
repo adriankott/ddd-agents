@@ -63,7 +63,7 @@ class AISkillsService extends Service
         'description', 'shortDescription', 'decisionCriteria', 'salesTriggers', 'nonEvictable', 'requiredFeatureFlags',
         'anyOfRequiredFeatureFlags', 'requiresVisionCapabilities', 'requiredAccountRights', 'requiresAccountBillingAccess',
         'isSubSkill', 'subSkillNames', 'onlyUnderPurposeNames', 'notUnderPurposeNames', 'preloadOnWidgetTypes',
-        'providesWidgetTypes', 'onlyOnInitiatorTypes',
+        'providesWidgetTypes', 'onlyOnInitiatorTypes', 'turnMinimumSteps',
     ];
 
     /** @var array<string, array<string, mixed>>|null the skill requirement overlay, read once per process */
@@ -203,6 +203,9 @@ class AISkillsService extends Service
         $skill->salesTriggers = (string)($frontmatter['salesTriggers'] ?? ''); // "offer when" cues of a locked entry
         $skill->instruction = trim($body);
         $skill->nonEvictable = (bool)($frontmatter['nonEvictable'] ?? false); // PIN — frontmatter opt-in, default false
+        // Step floor of a turn while the skill is loaded (`turnMinimumSteps: 30`): long jobs (build, render, check,
+        // hand over) need more steps than one plain turn; capped by the planned-turn ceiling (AIConversationTurnBudget).
+        $skill->turnMinimumSteps = AISkill::readTurnMinimumStepsOfFrontmatter($frontmatter['turnMinimumSteps'] ?? null);
         // Product-flag gate: the skill is offered only if the agent space has ALL these flags available. Empty =
         // ungated. Frontmatter list of FeatureFlag constant VALUES, e.g. `requiredFeatureFlags: ['WORKSHOP.BOOKINGS']`.
         $skill->requiredFeatureFlags = array_values(array_map('strval', (array)($frontmatter['requiredFeatureFlags'] ?? [])));

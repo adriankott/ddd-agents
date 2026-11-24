@@ -53,11 +53,18 @@ class AIConversationTurnBudget extends ValueObject
     /** The effective cost ceiling of the owner turn, null = no cap (a plain interactive turn). */
     public ?float $maxTurnCostUsd = null;
 
-    public static function buildForConversation(AIConversation $conversation, bool $purposeWorksAutonomously): static
-    {
+    /**
+     * @param int|null $loadedSkillsTurnMinimumSteps the highest `turnMinimumSteps` of the skills loaded now
+     *        ({@see \DDD\Domain\AI\Entities\Skills\AISkill::$turnMinimumSteps}); a floor like a tool's, under the same ceiling
+     */
+    public static function buildForConversation(
+        AIConversation $conversation,
+        bool $purposeWorksAutonomously,
+        ?int $loadedSkillsTurnMinimumSteps = null
+    ): static {
         $turnBudget = new static();
         $runSettings = isset($conversation->runSettings) ? $conversation->runSettings : null;
-        $toolDeclaredFloor = self::getTurnMinimumStepsDeclaredForCurrentTurn($conversation);
+        $toolDeclaredFloor = self::combineStepFloors(self::getTurnMinimumStepsDeclaredForCurrentTurn($conversation), $loadedSkillsTurnMinimumSteps);
         $taskPlanTouchedInCurrentTurn = self::isTaskPlanTouchedInCurrentTurn($conversation);
 
         if ($runSettings?->maxStepsPerTurn !== null) {
@@ -82,6 +89,15 @@ class AIConversationTurnBudget extends ValueObject
             $turnBudget->maxTurnCostUsd = self::PLANNED_TURN_DEFAULT_COST_CAP_USD;
         }
         return $turnBudget;
+    }
+
+    /** The higher of two step floors; null only when neither is declared. */
+    public static function combineStepFloors(?int $toolDeclaredFloor, ?int $loadedSkillsFloor): ?int
+    {
+        if ($toolDeclaredFloor === null) {
+            return $loadedSkillsFloor !== null && $loadedSkillsFloor > 0 ? $loadedSkillsFloor : null;
+        }
+        return $loadedSkillsFloor !== null ? max($toolDeclaredFloor, $loadedSkillsFloor) : $toolDeclaredFloor;
     }
 
     /**

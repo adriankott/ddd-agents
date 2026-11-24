@@ -125,6 +125,18 @@ class AISkills extends EntitySet
         return $ids;
     }
 
+    /** The highest step floor (`turnMinimumSteps`) of these skills, or null when none declares one. */
+    public function findHighestTurnMinimumSteps(): ?int
+    {
+        $highestTurnMinimumSteps = null;
+        foreach ($this->getElements() as $aISkill) {
+            if ($aISkill->turnMinimumSteps !== null && $aISkill->turnMinimumSteps > ($highestTurnMinimumSteps ?? 0)) {
+                $highestTurnMinimumSteps = $aISkill->turnMinimumSteps;
+            }
+        }
+        return $highestTurnMinimumSteps;
+    }
+
     /**
      * A NEW set of only the skills the agent space is entitled to: a skill survives iff the agent space has ALL of its
      * `requiredFeatureFlags` and — when declared — ONE of its `anyOfRequiredFeatureFlags` available

@@ -23,7 +23,7 @@ class AISkillFilesLintServiceTest extends TestCase
         mkdir($this->temporaryDirectory . '/Skills/Broken', 0777, true);
         mkdir($this->temporaryDirectory . '/Purposes/Broken', 0777, true);
         file_put_contents($this->temporaryDirectory . '/Skills/Broken/Yaml.md', "---\ndescription: \"a \"quoted\" word\"\n---\nbody");
-        file_put_contents($this->temporaryDirectory . '/Skills/Broken/Keys.md', "---\ndescription: d\nrequiredFeatureFlag: [X]\nrequiredFeatureFlags: X\nsubSkillNames: [No.Such.Skill]\n---\nbody");
+        file_put_contents($this->temporaryDirectory . '/Skills/Broken/Keys.md', "---\ndescription: d\nrequiredFeatureFlag: [X]\nrequiredFeatureFlags: X\nturnMinimumSteps: many\nsubSkillNames: [No.Such.Skill]\n---\nbody");
         file_put_contents($this->temporaryDirectory . '/Purposes/Broken/Purpose.md', "---\ndescription: d\n---\nbody");
     }
 
@@ -103,8 +103,9 @@ class AISkillFilesLintServiceTest extends TestCase
         self::assertStringContainsString('Yaml.md: the frontmatter is no valid YAML', $problemsText);
         self::assertStringContainsString("Keys.md: unknown frontmatter key 'requiredFeatureFlag'", $problemsText);
         self::assertStringContainsString("Keys.md: 'requiredFeatureFlags' is not a list of strings", $problemsText);
+        self::assertStringContainsString("Keys.md: 'turnMinimumSteps' is not a positive whole number", $problemsText);
         self::assertStringContainsString("Keys.md: sub-skill 'No.Such.Skill' resolves to no skill file", $problemsText);
-        self::assertCount(4, $problems);
+        self::assertCount(5, $problems);
     }
 
     public function testAPurposeFileWithoutAPurposeClassIsReported(): void

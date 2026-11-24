@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.3.2
+
+**New:**
+
+- **A step floor per skill.** A skill file may declare `turnMinimumSteps: <n>`: while the skill is loaded, every owner
+  turn gets at least that many steps (the highest floor of the loaded skills counts, beside a tool-declared floor;
+  `AISkill::$turnMinimumSteps`, `AISkills::findHighestTurnMinimumSteps()`,
+  `AIConversationTurnBudget::buildForConversation(…, $loadedSkillsTurnMinimumSteps)`). Capped by
+  `PLANNED_TURN_MAX_STEPS_CEILING` (60); a raised turn carries the planned turn's default cost cap
+  (`PLANNED_TURN_DEFAULT_COST_CAP_USD`) unless the run settings name one; explicit `runSettings.maxStepsPerTurn`
+  wins. For skills whose work is long (build a document, render, check, hand over), so a turn no longer stops before
+  the hand-over. The skill-file lint rejects a value that is no positive whole number. No skill of this package
+  declares one; the default budget is unchanged.
+- **`./ui`: marks beside the agent window.** `DomScreenHighlighter` takes `getOccludingRect` (the region the
+  application's agent window covers) and scrolls a marked element into the band that region leaves free (the
+  region's height as scroll margin, `planHighlightScroll()`); a side panel over the element, or an element taller than
+  the free band, is answered as out of view. The note stays out of a window below the element. `onHighlight`
+  receives every mark (`ScreenHighlightEvent`: references, elements, region, `coveredAfterScroll`) so the application
+  can make its window smaller or move it. Without the new options nothing changes. `@mgamadeus/ddd-admin-ui` 0.7.1
+  fills both from its shell (`highlighterOptions`).
+
+**Host steps:** none. Optional: `turnMinimumSteps` in an own long-running skill; pass the highlighter options.
+
 ## 0.3.1
 
 **Fixed:**
