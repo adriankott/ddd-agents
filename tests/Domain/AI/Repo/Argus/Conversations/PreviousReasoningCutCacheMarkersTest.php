@@ -46,16 +46,20 @@ class PreviousReasoningCutCacheMarkersTest extends UnitTestCase
         self::assertStringNotContainsString('prompt_cache_breakpoint', json_encode($wireMessages));
     }
 
-    public function testACutCallLeavesOnlyTheSystemEndMarked(): void
+    public function testACutCallKeepsTheSplitOfTheSystemPartsAndMarksOnlyItsEnd(): void
     {
         $argusAIAgentConversation = static::buildConversationWithCut(true, 2, 6);
         $systemContentParts = $argusAIAgentConversation->buildSystemContentPartsWithPromptCacheBreakpoints([
             static::segment(AgentContextSegmentType::BASE_PROMPT, 'persona '),
             static::segment(AgentContextSegmentType::SKILL_CATALOG, 'catalog '),
             static::segment(AgentContextSegmentType::LOADED_SKILLS, 'skills '),
-        ], false, false);
+        ], true, false);
 
-        self::assertSame([['type' => 'text', 'text' => 'persona catalog skills ', 'prompt_cache_breakpoint' => ArgusAIAgentConversation::PROMPT_CACHE_BREAKPOINT]], $systemContentParts);
+        self::assertSame([
+            ['type' => 'text', 'text' => 'persona '],
+            ['type' => 'text', 'text' => 'catalog '],
+            ['type' => 'text', 'text' => 'skills ', 'prompt_cache_breakpoint' => ArgusAIAgentConversation::PROMPT_CACHE_BREAKPOINT],
+        ], $systemContentParts);
     }
 
     protected static function buildConversationWithCut(bool $movedOnThisCall, ?int $anchorWirePosition, ?int $newCutWirePosition): ArgusAIAgentConversation

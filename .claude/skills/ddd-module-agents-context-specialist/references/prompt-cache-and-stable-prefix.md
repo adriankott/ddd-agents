@@ -216,8 +216,13 @@ before the earlier cut (`$previousReasoningAnchorCutWirePosition`: the cut call 
 history up to it is unchanged, because the steps below a cut never send their reasoning again) and the last text entry
 before the new cut (`$previousReasoningNewCutWirePosition`: written now, read by the next cut call); the previous-call
 marker and the system markers after the base prompt and before the loaded skills give up their slots (end of the system
-content, the stable message and the two cut markers: four). On Responses the markers skip assistant entries like the
-other wire markers. Without these markers every cut call read only the system prefix (measured on Luna: 23 cut calls in
+content, the stable message and the two cut markers: four). The system parts keep their split: a cut call leaves out only
+their markers (`buildSystemContentPartsWithPromptCacheBreakpoints(…, $marksInnerParts: false)`); a merged part changes
+the block structure before every later entry — the call after the cut read only the system prefix, and on the Messages
+API every kept thinking block was dropped (`prefix_binding_mismatch`). `PreviousReasoningCutRequestPrefixTest` composes
+three calls around a cut on both wires and checks that the bodies, without markers, repeat byte for byte up to the
+earlier cut and up to the cut call's last marker. On Responses the markers skip assistant entries like the other wire
+markers. Without these markers every cut call read only the system prefix (measured on Luna: 23 cut calls in
 196, each reading exactly the system prefix). On the Messages API the entry lives 5 minutes from its last read; a gap of
 more than that between two cut calls reads the system prefix only, as before. A step's reasoning size is the provider's count (`RequestSnapshot::$wireReasoningTokens`),
 else an estimate from the items' JSON (`AgentPreviousReasoningCut::ESTIMATED_REASONING_ITEMS_JSON_OVERHEAD_BYTES`,

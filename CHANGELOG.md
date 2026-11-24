@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.3.4
+
+**Fixed:**
+
+- **A cut call keeps the split of the system parts.** A call that moved the reasoning cut (0.3.3) sent the system content
+  as one text part instead of the parts every other call sends. The call after a cut then read only the system prefix
+  from the cache and rewrote the history, and on the Messages API every kept thinking block was dropped
+  (`prefix_binding_mismatch`), the cut call's own one on the next call as well. The parts now split at the same
+  boundaries on every call; a cut call leaves out only the markers of the inner parts
+  (`ArgusAIAgentConversation::buildSystemContentPartsWithPromptCacheBreakpoints(…, $marksInnerParts)`).
+- The markers of a model call are set in one public method, `ArgusAIAgentConversation::addSystemMessageAndPromptCacheMarkers()`
+  (`PROMPT_CACHE_MARKERS_EXPLICIT_BREAKPOINTS`, `PROMPT_CACHE_MARKERS_ANTHROPIC_CACHE_CONTROL`), which
+  `buildModelContext()` calls. A test composes three calls around a cut on both wires and checks that the request
+  bodies, without markers, repeat byte for byte up to the earlier cut and up to the cut call's last marker.
+
+**Host steps:** none.
+
 ## 0.3.3
 
 **New:**
