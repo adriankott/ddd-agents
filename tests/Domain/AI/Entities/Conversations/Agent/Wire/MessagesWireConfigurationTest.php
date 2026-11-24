@@ -9,6 +9,7 @@ use DDD\Domain\AI\Entities\Conversations\Messages\ContextRetentionSettings;
 use DDD\Domain\AI\Entities\Conversations\Messages\RunSettings;
 use DDD\Domain\AI\Entities\Models\AIModel;
 use DDD\Domain\AI\Entities\Models\Settings\AILanguageModelSetting;
+use DDD\Domain\AI\Entities\Models\Settings\AIModelPreviousReasoningCarryOver;
 use DDD\Tests\Agents\Support\UnitTestCase;
 use ReflectionClass;
 
@@ -99,11 +100,11 @@ class MessagesWireConfigurationTest extends UnitTestCase
     {
         self::assertSame(
             RunSettings::PREVIOUS_REASONING_CARRY_OVER_ALL,
-            AgentWireConfiguration::resolvePreviousReasoningCarryOver(RunSettings::PREVIOUS_REASONING_CARRY_OVER_ALL, AIModel::AGENT_WIRE_API_MESSAGES, AIModel::PREVIOUS_REASONING_CARRY_OVER_CURRENT_TURN)
+            AgentWireConfiguration::resolvePreviousReasoningCarryOver(RunSettings::PREVIOUS_REASONING_CARRY_OVER_ALL, AIModel::AGENT_WIRE_API_MESSAGES, AIModelPreviousReasoningCarryOver::CARRY_OVER_CURRENT_TURN)
         );
         self::assertSame(
             RunSettings::PREVIOUS_REASONING_CARRY_OVER_CURRENT_TURN,
-            AgentWireConfiguration::resolvePreviousReasoningCarryOver(null, AIModel::AGENT_WIRE_API_MESSAGES, AIModel::PREVIOUS_REASONING_CARRY_OVER_CURRENT_TURN)
+            AgentWireConfiguration::resolvePreviousReasoningCarryOver(null, AIModel::AGENT_WIRE_API_MESSAGES, AIModelPreviousReasoningCarryOver::CARRY_OVER_CURRENT_TURN)
         );
         self::assertSame(
             RunSettings::PREVIOUS_REASONING_CARRY_OVER_CAPPED,
@@ -136,7 +137,6 @@ class MessagesWireConfigurationTest extends UnitTestCase
         $aiLanguageModelSetting->agentWireApi = $agentWireApi;
         $aiModel->settings = $aiLanguageModelSetting;
         $aiModel->vendor = $vendor;
-        $aiModel->previousReasoningCarryOver = null;
         return $aiModel;
     }
 }

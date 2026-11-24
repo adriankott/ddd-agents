@@ -195,7 +195,10 @@ class AgentChatCommand extends AgentConsoleCommand
             ->addOption('hint-recent-tool-calls', null, InputOption::VALUE_NONE, 'Test: contextRetentionSettings.hintRecentToolCallsToDiscourageRepeats: append an owner message at the wire tail listing the recent read tool calls with a reuse instruction. Stored.')
             ->addOption('agent-wire-api', null, InputOption::VALUE_REQUIRED, 'The wire API of the agent calls: `chatCompletions` | `responses` | `messages` (the Anthropic Messages API, Anthropic models over the direct OpenRouter egress) (`inherit` clears it). Stored as a run-settings row.')
             ->addOption('previous-reasoning-carry-over', null, InputOption::VALUE_REQUIRED, 'Send the reasoning items of the previous calls back on the later calls: `all` | `currentTurn` | `off` | `capped` (`inherit` = the default). Stored as a run-settings row.')
-            ->addOption('previous-reasoning-cap-tokens', null, InputOption::VALUE_REQUIRED, 'The cap of --previous-reasoning-carry-over=capped in reasoning tokens (`0` = the configured default). Stored as a run-settings row.');
+            ->addOption('previous-reasoning-cap-tokens', null, InputOption::VALUE_REQUIRED, 'The cap of --previous-reasoning-carry-over=capped in reasoning tokens (`0` = the configured default). Stored as a run-settings row.')
+            ->addOption('previous-reasoning-kept-tokens-at-cut', null, InputOption::VALUE_REQUIRED, 'At a cut of --previous-reasoning-carry-over=capped: keep whole steps from the newest back until at least this many reasoning tokens (0 or more; `inherit` = the model\'s or the configured default). Stored as a run-settings row.')
+            ->addOption('previous-reasoning-kept-steps-at-cut', null, InputOption::VALUE_REQUIRED, 'At a cut of --previous-reasoning-carry-over=capped: keep at least this many of the newest steps (a positive count; `inherit` = the model\'s or the configured default). Stored as a run-settings row.')
+            ->addOption('previous-reasoning-headroom-tokens-after-cut', null, InputOption::VALUE_REQUIRED, 'After a cut of --previous-reasoning-carry-over=capped: the next cut waits until the carried reasoning exceeds the kept reasoning plus this many tokens (0 or more; `inherit` = the model\'s or the configured default). Stored as a run-settings row.');
     }
 
     /**
@@ -398,8 +401,32 @@ class AgentChatCommand extends AgentConsoleCommand
         return RunSettingsOverride::fromValues(
             agentWireApi: $agentWireApi !== null && $agentWireApi !== '' ? $agentWireApi : null,
             previousReasoningCarryOver: $previousReasoningCarryOver !== null && $previousReasoningCarryOver !== '' ? $previousReasoningCarryOver : null,
-            previousReasoningCapTokens: $previousReasoningCapTokens !== null && $previousReasoningCapTokens !== '' ? (int)trim($previousReasoningCapTokens) : null
+            previousReasoningCapTokens: $previousReasoningCapTokens !== null && $previousReasoningCapTokens !== '' ? (int)trim($previousReasoningCapTokens) : null,
+            previousReasoningKeptTokensAtCut: $this->readCutCountOptionValue($input, 'previous-reasoning-kept-tokens-at-cut', 0),
+            previousReasoningKeptStepsAtCut: $this->readCutCountOptionValue($input, 'previous-reasoning-kept-steps-at-cut', 1),
+            previousReasoningHeadroomTokensAfterCut: $this->readCutCountOptionValue($input, 'previous-reasoning-headroom-tokens-after-cut', 0)
         );
+    }
+
+    /**
+     * A count option of the carry-over cut: null when not passed, -1 for `inherit` (the row is cleared), else the whole
+     * number (at least `$minimumValue`).
+     *
+     * @throws InvalidOptionException when the value is neither `inherit` nor a whole number of at least `$minimumValue`
+     */
+    protected function readCutCountOptionValue(InputInterface $input, string $optionName, int $minimumValue): ?int
+    {
+        $optionValue = $this->readOptionValue($input, $optionName);
+        if ($optionValue === null || trim($optionValue) === '') {
+            return null;
+        }
+        if (strtolower(trim($optionValue)) === RunSettings::PREVIOUS_REASONING_CARRY_OVER_INHERIT) {
+            return -1;
+        }
+        if (!ctype_digit(trim($optionValue)) || (int)trim($optionValue) < $minimumValue) {
+            throw new InvalidOptionException('--' . $optionName . ' must be `inherit` or a whole number of at least ' . $minimumValue);
+        }
+        return (int)trim($optionValue);
     }
 
     /**

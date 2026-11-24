@@ -172,12 +172,24 @@ compaction summarizer never see them.
 ## 5. Reasoning carry-over
 
 `AgentWireConfiguration::$previousReasoningCarryOver` (resolved from `RunSettings`): `all`, `currentTurn`, `capped`,
-`off`. Order: the conversation's row, else the model's catalog value (`AIModel::$previousReasoningCarryOver` in
-mgamadeus/ddd-ai, host-overridable in `config/app/AI/models.php`; applied on the Responses API and on Chat Completions
-over the direct OpenRouter egress only, where `reasoning_details` reach the provider), else the per-API default:
-`capped` on Responses and on Messages, `off` on Chat Completions; always `off` on the server-state arm. Kimi K3.1 Pro sets
-`currentTurn`: it keeps its verdicts (what it saw on pictures) in its reasoning, so without its own items it re-read the
-same pictures until the repeat guard stopped it.
+`off`. Order: the conversation's row, else the model's catalog value (`agenticUseCase.previousReasoning.carryOver`,
+the value object `AIModelPreviousReasoningCarryOver` on `AIModelAgenticUseCaseConfig::$previousReasoning` in
+mgamadeus/ddd-ai, read with `AIModel::getAgenticPreviousReasoningCarryOver()`, host-overridable in
+`config/app/AI/models.php`; applied on the Responses API, on Messages and on Chat Completions over the direct OpenRouter
+egress only, where `reasoning_details` reach the provider), else the per-API default: `capped` on Responses and on
+Messages, `off` on Chat Completions; always `off` on the server-state arm. Catalog values: Kimi K3.1 Pro `currentTurn`
+(it keeps its verdicts — what it saw on pictures — in its reasoning, so without its own items it re-read the same
+pictures until the repeat guard stopped it); GPT-6 Luna and GPT-6.2 Sol `capped` at 1,000 (the more of its own earlier
+reasoning Luna sees, the more it reasons per call and the slower it answers); Claude Opus 5.5 `all` (with its thinking
+replayed it thinks less per call, the replay is read from the cache, and a cut rewrites the cache from the first removed
+step).
+
+**The numbers of the cut, each resolved on its own** (`AgentWireConfiguration::resolveFor()`): 1. the conversation's
+row (`RunSettings::$previousReasoningCapTokens`, `…KeptTokensAtCut`, `…KeptStepsAtCut`, `…HeadroomTokensAfterCut`, each
+with its `SetBy` / `SetAt`); 2. the model's catalog value (`agenticUseCase.previousReasoning.capTokens`,
+`keptTokensAtCut`, `keptStepsAtCut`, `headroomTokensAfterCut`); 3. `AI.contextRetention.<key>ByAgentWireApi[<wire API>]`;
+4. `AI.contextRetention.<key>`; 5. the built-in default (cap 4,000, min 0, 2 steps, headroom 0 — the rule before the
+three cut settings existed). A model that sets only `capTokens` keeps the other three from the config.
 
 **Only the producing model gets its items back.** `RequestSnapshot::holdsWireReasoningItemsFor($wireApi, $modelName)`
 compares the stored `RequestSnapshot::$modelName` with the model of the current call — a conversation can switch models
@@ -186,10 +198,28 @@ are model-bound and a refused item repeats the call without carried items); on C
 `capped` cut sums only the items the call would send. Whether a different host of the same model (OpenRouter order
 rotation on a retry) accepts carried items is not documented by OpenRouter; plain `reasoning.text` items are expected to
 pass, and a refusal naming `CARRIED_REASONING_REJECTION_ERROR_TEXTS` repeats the call without them. Under `capped`,
-`AgentPreviousReasoningCut` keeps the previous steps' reasoning items until their sum exceeds
-`previousReasoningCapTokens` (4000), then drops all but the newest `KEPT_NEWEST_STEPS_AT_A_CUT` (2) steps' items in one
-block and records the cut index (`RequestSnapshot::$previousReasoningCutFromMessageIndex`): a sawtooth with a stable
-prefix between two crossings. A step's reasoning size is the provider's count (`RequestSnapshot::$wireReasoningTokens`),
+`AgentPreviousReasoningCut` keeps the previous steps' reasoning items until their sum exceeds the threshold, then drops
+the older steps' items in one block and records the cut index (`RequestSnapshot::$previousReasoningCutFromMessageIndex`):
+a sawtooth with a stable prefix between two crossings. The threshold is max (the cap) or, after an earlier cut, the
+reasoning that cut kept plus the headroom when that is larger: `max(capTokens, keptAtLastCut + headroomTokensAfterCut)`.
+At a cut, whole steps are kept walking back from the newest one until at least `keptTokensAtCut` reasoning tokens (min)
+and at least `keptStepsAtCut` steps; a step is never split, and a min that keeps every step cuts nothing. Worked example
+(cap 4,000, min 1,500, 2 steps, headroom 1,000): steps of 600, 900, 700, 1,200, 800 → 4,200 > 4,000 → 800 + 1,200 =
+2,000 ≥ 1,500 with two steps → the cut keeps the last two steps (2,000). The next cut fires above max(4,000, 2,000 +
+1,000) = 4,000. With a min of 3,500 the cut would keep 800 + 1,200 + 700 + 900 = 3,600 and the next cut would wait until
+max(4,000, 4,600) = 4,600 — without the headroom a large kept block is cut again one step later.
+
+**The cache markers of a cut call.** A call that moves the cut (`AgentPreviousReasoningCut::$movedOnThisCall`) changes the
+history from the first step it cuts on, so the entry the previous call wrote is not read. Such a call
+(`ArgusAIAgentConversation::addPromptCacheBreakpointsAtPreviousReasoningCut()`, both wire APIs) marks the last text entry
+before the earlier cut (`$previousReasoningAnchorCutWirePosition`: the cut call before wrote the cache there, and the
+history up to it is unchanged, because the steps below a cut never send their reasoning again) and the last text entry
+before the new cut (`$previousReasoningNewCutWirePosition`: written now, read by the next cut call); the previous-call
+marker and the system markers after the base prompt and before the loaded skills give up their slots (end of the system
+content, the stable message and the two cut markers: four). On Responses the markers skip assistant entries like the
+other wire markers. Without these markers every cut call read only the system prefix (measured on Luna: 23 cut calls in
+196, each reading exactly the system prefix). On the Messages API the entry lives 5 minutes from its last read; a gap of
+more than that between two cut calls reads the system prefix only, as before. A step's reasoning size is the provider's count (`RequestSnapshot::$wireReasoningTokens`),
 else an estimate from the items' JSON (`AgentPreviousReasoningCut::ESTIMATED_REASONING_ITEMS_JSON_OVERHEAD_BYTES`,
 1,600 bytes, plus `ESTIMATED_REASONING_ITEMS_JSON_BYTES_PER_TOKEN`, 13 bytes per token);
 `RequestSnapshot::$previousReasoningSentTokens` is the carried size of the call. A provider error naming one of `AgentWireConfiguration::CARRIED_REASONING_REJECTION_ERROR_TEXTS`
@@ -218,8 +248,9 @@ input, so the cap is a cache and cost lever, not a latency one. A host that want
 
 **A cap per wire API.** `previousReasoningCapTokensByAgentWireApi` (`AI.contextRetention`, keyed by the wire API:
 `responses`, `messages`) gives one wire API its own cap; a wire API without an entry takes `previousReasoningCapTokens`,
-a conversation's `RunSettings::$previousReasoningCapTokens` wins over both. The package ships no entry (every wire API at
-4000). The reason to set one: on the Messages API a cut drops thinking blocks from the cached history, so the next call
+a conversation's `RunSettings::$previousReasoningCapTokens` and the model's `agenticUseCase.previousReasoning.capTokens`
+win over both. The package ships no entry (every wire API at 4000). The same `…ByAgentWireApi` shape exists for
+`previousReasoningKeptTokensAtCut`, `previousReasoningKeptStepsAtCut` and `previousReasoningHeadroomTokensAfterCut`. The reason to set one: on the Messages API a cut drops thinking blocks from the cached history, so the next call
 writes that history to the cache again, while the blocks below the cap cost little to keep — in a measured
 conversation the carried thinking stayed under 3,000 tokens after nine calls, so a cut there costs far more than it
 saves. On the Responses API the cut is what bounds the input and stays wanted.

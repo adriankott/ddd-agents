@@ -307,7 +307,9 @@ class AIConversationPurposesService extends Service
     /**
      * The run settings of a purpose's `runSettings:` frontmatter map: `agentWireApi`
      * (`chatCompletions` | `responses` | `messages`), `previousReasoningCarryOver` (`all` | `currentTurn` | `capped` | `off`),
-     * `previousReasoningCapTokens` (a positive count) and `fixedReasoningEffort` (`low` | `medium` | `high`). An unknown
+     * `previousReasoningCapTokens` (a positive count), `previousReasoningKeptTokensAtCut` (0 or more),
+     * `previousReasoningKeptStepsAtCut` (a positive count), `previousReasoningHeadroomTokensAfterCut` (0 or more) and
+     * `fixedReasoningEffort` (`low` | `medium` | `high`). An unknown
      * key or value is ignored (= inherit); a map that names no valid value — `runSettings: {}`, the way an inheriting
      * purpose drops its parent's map — answers null.
      *
@@ -325,12 +327,20 @@ class AIConversationPurposesService extends Service
         $purposeRunSettings->previousReasoningCarryOver = $previousReasoningCarryOver !== RunSettings::PREVIOUS_REASONING_CARRY_OVER_INHERIT ? $previousReasoningCarryOver : null;
         $previousReasoningCapTokens = is_int($runSettingsMap['previousReasoningCapTokens'] ?? null) ? $runSettingsMap['previousReasoningCapTokens'] : null;
         $purposeRunSettings->previousReasoningCapTokens = $previousReasoningCapTokens !== null && $previousReasoningCapTokens > 0 ? $previousReasoningCapTokens : null;
+        $previousReasoningKeptTokensAtCut = is_int($runSettingsMap['previousReasoningKeptTokensAtCut'] ?? null) ? $runSettingsMap['previousReasoningKeptTokensAtCut'] : null;
+        $purposeRunSettings->previousReasoningKeptTokensAtCut = $previousReasoningKeptTokensAtCut !== null && $previousReasoningKeptTokensAtCut >= 0 ? $previousReasoningKeptTokensAtCut : null;
+        $previousReasoningKeptStepsAtCut = is_int($runSettingsMap['previousReasoningKeptStepsAtCut'] ?? null) ? $runSettingsMap['previousReasoningKeptStepsAtCut'] : null;
+        $purposeRunSettings->previousReasoningKeptStepsAtCut = $previousReasoningKeptStepsAtCut !== null && $previousReasoningKeptStepsAtCut > 0 ? $previousReasoningKeptStepsAtCut : null;
+        $previousReasoningHeadroomTokensAfterCut = is_int($runSettingsMap['previousReasoningHeadroomTokensAfterCut'] ?? null) ? $runSettingsMap['previousReasoningHeadroomTokensAfterCut'] : null;
+        $purposeRunSettings->previousReasoningHeadroomTokensAfterCut = $previousReasoningHeadroomTokensAfterCut !== null && $previousReasoningHeadroomTokensAfterCut >= 0 ? $previousReasoningHeadroomTokensAfterCut : null;
         $fixedReasoningEffort = strtolower(trim((string)($runSettingsMap['fixedReasoningEffort'] ?? '')));
         $purposeRunSettings->fixedReasoningEffort = in_array($fixedReasoningEffort, [RunSettings::DECISION_MODEL_REASONING_EFFORT_LOW, RunSettings::DECISION_MODEL_REASONING_EFFORT_MEDIUM, RunSettings::DECISION_MODEL_REASONING_EFFORT_HIGH], true)
             ? $fixedReasoningEffort
             : null;
         if ($purposeRunSettings->agentWireApi === null && $purposeRunSettings->previousReasoningCarryOver === null
             && $purposeRunSettings->previousReasoningCapTokens === null && $purposeRunSettings->fixedReasoningEffort === null
+            && $purposeRunSettings->previousReasoningKeptTokensAtCut === null && $purposeRunSettings->previousReasoningKeptStepsAtCut === null
+            && $purposeRunSettings->previousReasoningHeadroomTokensAfterCut === null
         ) {
             return null;
         }

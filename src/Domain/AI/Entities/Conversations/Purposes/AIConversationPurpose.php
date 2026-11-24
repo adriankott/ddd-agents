@@ -499,7 +499,8 @@ class AIConversationPurpose extends Entity
     /**
      * @var RunSettings|null The run settings every NEW conversation of this purpose starts with (frontmatter
      * `runSettings:`): the wire API (`agentWireApi`), the reasoning
-     * carry-over (`previousReasoningCarryOver`, `previousReasoningCapTokens`) and a fixed reasoning effort
+     * carry-over (`previousReasoningCarryOver`, `previousReasoningCapTokens`, `previousReasoningKeptTokensAtCut`,
+     * `previousReasoningKeptStepsAtCut`, `previousReasoningHeadroomTokensAfterCut`) and a fixed reasoning effort
      * (`fixedReasoningEffort`). Stamped at the creation into the fields the start's own run settings leave unset — an
      * eval arm or a caller's value wins, an admin override after the start wins, an existing conversation keeps what it
      * was stamped with. Together with the three creation choices of {@see $contextRetentionSettings} it forms the
@@ -523,6 +524,9 @@ class AIConversationPurpose extends Entity
         $runSettingsForNewConversation->agentWireApi ??= $this->runSettings->agentWireApi;
         $runSettingsForNewConversation->previousReasoningCarryOver ??= $this->runSettings->previousReasoningCarryOver;
         $runSettingsForNewConversation->previousReasoningCapTokens ??= $this->runSettings->previousReasoningCapTokens;
+        $runSettingsForNewConversation->previousReasoningKeptTokensAtCut ??= $this->runSettings->previousReasoningKeptTokensAtCut;
+        $runSettingsForNewConversation->previousReasoningKeptStepsAtCut ??= $this->runSettings->previousReasoningKeptStepsAtCut;
+        $runSettingsForNewConversation->previousReasoningHeadroomTokensAfterCut ??= $this->runSettings->previousReasoningHeadroomTokensAfterCut;
         $runSettingsForNewConversation->fixedReasoningEffort ??= $this->runSettings->fixedReasoningEffort;
         return $runSettingsForNewConversation;
     }

@@ -102,7 +102,10 @@ class AgentMessagesWireReplay
                 $agentWireConfiguration->previousReasoningCapTokens,
                 $modelNameOfCall,
                 $agentMessagesWireReplay->thinkingFromMessageIndex,
-                $agentMessagesWireReplay->droppedThinkingStepMessageIndexes
+                $agentMessagesWireReplay->droppedThinkingStepMessageIndexes,
+                $agentWireConfiguration->previousReasoningKeptTokensAtCut,
+                $agentWireConfiguration->previousReasoningKeptStepsAtCut,
+                $agentWireConfiguration->previousReasoningHeadroomTokensAfterCut
             );
             $agentMessagesWireReplay->thinkingFromMessageIndex = $agentMessagesWireReplay->previousReasoningCut->cutFromMessageIndex;
         }

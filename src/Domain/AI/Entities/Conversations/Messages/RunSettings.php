@@ -355,8 +355,9 @@ class RunSettings extends ValueObject
     /**
      * @var int|null The cap of the carry-over `capped`, in reasoning tokens: while the reasoning items the call would send
      *      back stay at or below it, all of them go; above it the older ones are dropped in one block. Null = the
-     *      committed default of the run's wire API (`AI.contextRetention.previousReasoningCapTokensByAgentWireApi`,
-     *      else `AI.contextRetention.previousReasoningCapTokens`)
+     *      model's catalog value (`agenticUseCase.previousReasoning.capTokens`), else the committed default of the run's
+     *      wire API (`AI.contextRetention.previousReasoningCapTokensByAgentWireApi`, else
+     *      `AI.contextRetention.previousReasoningCapTokens`)
      *      ({@see \DDD\Domain\AI\Entities\Conversations\Agent\Wire\AgentWireConfiguration::resolveDefaultPreviousReasoningCapTokens()}).
      *      Inert under every other mode. Written by the admin run-settings override, the console option and the eval
      *      arm `--previous-reasoning-cap-tokens`; inherited by delegation children.
@@ -368,6 +369,54 @@ class RunSettings extends ValueObject
 
     /** @var string|null `Y-m-d H:i:s` when {@see $previousReasoningCapTokens} was last set. */
     public ?string $previousReasoningCapTokensSetAt = null;
+
+    /**
+     * @var int|null At a cut of the carry-over `capped`: walking back from the newest step, whole steps keep their
+     *      reasoning until at least this many reasoning tokens are kept (the min of the cut; 0 = only the steps
+     *      {@see $previousReasoningKeptStepsAtCut} asks for). Null = the model's catalog value
+     *      (`agenticUseCase.previousReasoning.keptTokensAtCut`), else the committed default of the run's wire API
+     *      ({@see \DDD\Domain\AI\Entities\Conversations\Agent\Wire\AgentWireConfiguration::resolveDefaultPreviousReasoningKeptTokensAtCut()}).
+     *      Inert under every other mode. Written by the console option and the eval arm
+     *      `--previous-reasoning-kept-tokens-at-cut`; inherited by delegation children.
+     */
+    public ?int $previousReasoningKeptTokensAtCut = null;
+
+    /** @var int|null The admin account that last set {@see $previousReasoningKeptTokensAtCut}. */
+    public ?int $previousReasoningKeptTokensAtCutSetByAccountId = null;
+
+    /** @var string|null `Y-m-d H:i:s` when {@see $previousReasoningKeptTokensAtCut} was last set. */
+    public ?string $previousReasoningKeptTokensAtCutSetAt = null;
+
+    /**
+     * @var int|null At a cut of the carry-over `capped`: at least this many of the newest steps keep their reasoning
+     *      (at least 1). Null = the model's catalog value, else the committed default of the run's wire API
+     *      ({@see \DDD\Domain\AI\Entities\Conversations\Agent\Wire\AgentWireConfiguration::resolveDefaultPreviousReasoningKeptStepsAtCut()}).
+     *      Written by the console option and the eval arm `--previous-reasoning-kept-steps-at-cut`; inherited by
+     *      delegation children.
+     */
+    public ?int $previousReasoningKeptStepsAtCut = null;
+
+    /** @var int|null The admin account that last set {@see $previousReasoningKeptStepsAtCut}. */
+    public ?int $previousReasoningKeptStepsAtCutSetByAccountId = null;
+
+    /** @var string|null `Y-m-d H:i:s` when {@see $previousReasoningKeptStepsAtCut} was last set. */
+    public ?string $previousReasoningKeptStepsAtCutSetAt = null;
+
+    /**
+     * @var int|null After a cut of the carry-over `capped`: the next cut waits until the carried reasoning exceeds the
+     *      larger of the cap and the reasoning kept at that cut plus this many tokens (0 = the cap alone). Null = the
+     *      model's catalog value, else the committed default of the run's wire API
+     *      ({@see \DDD\Domain\AI\Entities\Conversations\Agent\Wire\AgentWireConfiguration::resolveDefaultPreviousReasoningHeadroomTokensAfterCut()}).
+     *      Written by the console option and the eval arm `--previous-reasoning-headroom-tokens-after-cut`; inherited
+     *      by delegation children.
+     */
+    public ?int $previousReasoningHeadroomTokensAfterCut = null;
+
+    /** @var int|null The admin account that last set {@see $previousReasoningHeadroomTokensAfterCut}. */
+    public ?int $previousReasoningHeadroomTokensAfterCutSetByAccountId = null;
+
+    /** @var string|null `Y-m-d H:i:s` when {@see $previousReasoningHeadroomTokensAfterCut} was last set. */
+    public ?string $previousReasoningHeadroomTokensAfterCutSetAt = null;
 
     /**
      * @var string|null The skill-loading strategy this conversation is ASKED to start with
@@ -586,6 +635,27 @@ class RunSettings extends ValueObject
             $this->previousReasoningCapTokens = $override->previousReasoningCapTokens === 0 ? null : $override->previousReasoningCapTokens;
             $this->previousReasoningCapTokensSetByAccountId = $setByAccountId;
             $this->previousReasoningCapTokensSetAt = $setAtText;
+        }
+        if ($override->previousReasoningKeptTokensAtCut !== null) {
+            // the min of a cut: a negative value clears it (inherit), 0 or a positive count sets it here
+            $this->previousReasoningKeptTokensAtCut = $override->previousReasoningKeptTokensAtCut < 0 ? null : $override->previousReasoningKeptTokensAtCut;
+            $this->previousReasoningKeptTokensAtCutSetByAccountId = $setByAccountId;
+            $this->previousReasoningKeptTokensAtCutSetAt = $setAtText;
+        }
+        if ($override->previousReasoningKeptStepsAtCut !== null) {
+            // the steps a cut keeps: a negative value clears it (inherit), a positive count sets it here
+            if ($override->previousReasoningKeptStepsAtCut === 0) {
+                throw new BadRequestException('previousReasoningKeptStepsAtCut must be -1 (inherit) or a positive number of steps');
+            }
+            $this->previousReasoningKeptStepsAtCut = $override->previousReasoningKeptStepsAtCut < 0 ? null : $override->previousReasoningKeptStepsAtCut;
+            $this->previousReasoningKeptStepsAtCutSetByAccountId = $setByAccountId;
+            $this->previousReasoningKeptStepsAtCutSetAt = $setAtText;
+        }
+        if ($override->previousReasoningHeadroomTokensAfterCut !== null) {
+            // the headroom after a cut: a negative value clears it (inherit), 0 or a positive count sets it here
+            $this->previousReasoningHeadroomTokensAfterCut = $override->previousReasoningHeadroomTokensAfterCut < 0 ? null : $override->previousReasoningHeadroomTokensAfterCut;
+            $this->previousReasoningHeadroomTokensAfterCutSetByAccountId = $setByAccountId;
+            $this->previousReasoningHeadroomTokensAfterCutSetAt = $setAtText;
         }
         if ($override->decisionModelOff !== null) {
             // the kill switch; false lifts it (stored as null so an untouched row stays byte-identical)

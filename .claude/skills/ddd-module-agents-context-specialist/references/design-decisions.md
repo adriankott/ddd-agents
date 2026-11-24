@@ -183,14 +183,17 @@ its sections at once, so a surface change starts an epoch).
 
 ## Reasoning carry-over capped
 
-**Rule.** On Responses the previous steps' reasoning items go back up to a cap; past it all but the two newest steps
-lose theirs in one block, at a recorded message index.
+**Rule.** On Responses and Messages the previous steps' reasoning items go back up to a cap; past it the older steps lose
+theirs in one block, at a recorded message index; the cut keeps whole steps (at least a min of tokens and a count of
+steps) and waits after a cut for a headroom above what it kept. Each model may set its own policy in the catalog; a cut
+call marks the cache before the old and the new cut.
 
 **Reason.** Sending none lowered task success in a measured comparison; sending all grows every call. A cut at a
 recorded index, moved only when the cap is crossed, keeps the prefix stable between crossings within and across turns.
 
-**Rejected.** All items (unbounded); only the current turn's (drops the plan's reasoning across turns); a sliding window
-per call (moves the prefix every call).
+**Rejected.** All items for every model (unbounded; kept for models that think less with their replay and read it from
+the cache); only the current turn's (drops the plan's reasoning across turns); a sliding window per call (moves the
+prefix every call); one global cap (a model that overthinks with its own reasoning in view needs a far lower one).
 
 **Would change if.** Providers kept reasoning server-side under a stateless request.
 

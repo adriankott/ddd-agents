@@ -47,6 +47,9 @@ class AgentEvalArms extends ValueObject
         'agentWireApi',
         'previousReasoningCarryOver',
         'previousReasoningCapTokens',
+        'previousReasoningKeptTokensAtCut',
+        'previousReasoningKeptStepsAtCut',
+        'previousReasoningHeadroomTokensAfterCut',
         'storeRequestSnapshot',
     ];
 
@@ -82,6 +85,15 @@ class AgentEvalArms extends ValueObject
 
     /** @var int|null The cap of the carry-over `capped` in reasoning tokens; null = the committed default */
     public ?int $previousReasoningCapTokens = null;
+
+    /** @var int|null The min of a cut of `capped` in reasoning tokens; null = the model's catalog value or the committed default */
+    public ?int $previousReasoningKeptTokensAtCut = null;
+
+    /** @var int|null The steps a cut of `capped` keeps; null = the model's catalog value or the committed default */
+    public ?int $previousReasoningKeptStepsAtCut = null;
+
+    /** @var int|null The headroom after a cut of `capped` in reasoning tokens; null = the model's catalog value or the committed default */
+    public ?int $previousReasoningHeadroomTokensAfterCut = null;
 
     /** @var string|null The skill-loading strategy stamped at each conversation's creation; null = the purpose's or the global default */
     public ?string $skillLoadingStrategy = null;
@@ -144,6 +156,9 @@ class AgentEvalArms extends ValueObject
         $runSettings->agentWireApi = $this->agentWireApi;
         $runSettings->previousReasoningCarryOver = $this->previousReasoningCarryOver;
         $runSettings->previousReasoningCapTokens = $this->previousReasoningCapTokens;
+        $runSettings->previousReasoningKeptTokensAtCut = $this->previousReasoningKeptTokensAtCut;
+        $runSettings->previousReasoningKeptStepsAtCut = $this->previousReasoningKeptStepsAtCut;
+        $runSettings->previousReasoningHeadroomTokensAfterCut = $this->previousReasoningHeadroomTokensAfterCut;
         $runSettings->requestedSkillLoadingStrategy = $this->skillLoadingStrategy;
         $runSettings->requestedRebuildEpochOnSituationChange = $this->rebuildEpochOnSituationChange;
         $runSettings->requestedStateChangeDelivery = $this->stateChangeDelivery;

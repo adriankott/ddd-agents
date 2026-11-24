@@ -15,6 +15,13 @@ declare(strict_types=1);
  * `appendOnlyReachableToolSetCeilingTokens` and `previousReasoningCapTokens`: see the settings class.
  * `previousReasoningCapTokensByAgentWireApi`: the cap of the carry-over `capped` per wire API (`responses`, `messages`),
  * e.g. `['messages' => 12000]`; a wire API without an entry takes `previousReasoningCapTokens`.
+ * The cut of `capped`: above max(cap, kept at the last cut + `previousReasoningHeadroomTokensAfterCut`) carried reasoning
+ * tokens the older steps lose their reasoning in one block; walking back from the newest step, whole steps are kept
+ * until at least `previousReasoningKeptTokensAtCut` tokens and `previousReasoningKeptStepsAtCut` steps. Each of the
+ * four numbers is resolved on its own: the conversation's run settings row, else the model's catalog value
+ * (`agenticUseCase.previousReasoning` in the AI model catalog), else the entry of the wire API in its
+ * `…ByAgentWireApi` map below, else the flat value below. The defaults keep the rule before the three cut settings
+ * existed (min 0, 2 steps, headroom 0).
  * `toolDelivery` (`native` / `callTool` / `callToolJsonSchema`, append-only loading only): `callTool` declares the meta
  * tools plus one fixed `call_tool(name, arguments)` and lists a loaded skill's tools as text in its load; `native`
  * declares every tool. `dropColdSkillsAtCompactionRebase`: at the first model call after a compaction, skills unused for
@@ -29,6 +36,12 @@ return [
     'appendOnlyReachableToolSetCeilingTokens' => 55000,
     'previousReasoningCapTokens' => 4000,
     'previousReasoningCapTokensByAgentWireApi' => [],
+    'previousReasoningKeptTokensAtCut' => 0,
+    'previousReasoningKeptTokensAtCutByAgentWireApi' => [],
+    'previousReasoningKeptStepsAtCut' => 2,
+    'previousReasoningKeptStepsAtCutByAgentWireApi' => [],
+    'previousReasoningHeadroomTokensAfterCut' => 0,
+    'previousReasoningHeadroomTokensAfterCutByAgentWireApi' => [],
     'toolDelivery' => 'callTool',
     'dropColdSkillsAtCompactionRebase' => true,
 ];

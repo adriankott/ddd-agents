@@ -8,6 +8,8 @@ use DDD\Domain\AI\Entities\Conversations\Agent\Wire\AgentWireConfiguration;
 use DDD\Domain\AI\Entities\Conversations\Messages\RunSettings;
 use DDD\Domain\AI\Entities\Models\AIModel;
 use DDD\Domain\AI\Entities\Models\Settings\AILanguageModelSetting;
+use DDD\Domain\AI\Entities\Models\Settings\AIModelAgenticUseCaseConfig;
+use DDD\Domain\AI\Entities\Models\Settings\AIModelPreviousReasoningCarryOver;
 use DDD\Tests\Agents\Support\UnitTestCase;
 use ReflectionClass;
 
@@ -21,7 +23,7 @@ class ModelCatalogPreviousReasoningCarryOverTest extends UnitTestCase
     public function testTheCatalogValueAppliesOnChatCompletionsOverDirectOpenRouter(): void
     {
         $agentWireConfiguration = AgentWireConfiguration::resolveFor(
-            static::buildModel(AIModel::PREVIOUS_REASONING_CARRY_OVER_CURRENT_TURN),
+            static::buildModel(AIModelPreviousReasoningCarryOver::CARRY_OVER_CURRENT_TURN),
             null,
             null,
             true
@@ -35,7 +37,7 @@ class ModelCatalogPreviousReasoningCarryOverTest extends UnitTestCase
     public function testTheCatalogValueDoesNotApplyThroughAProxyOnChatCompletions(): void
     {
         $agentWireConfiguration = AgentWireConfiguration::resolveFor(
-            static::buildModel(AIModel::PREVIOUS_REASONING_CARRY_OVER_CURRENT_TURN),
+            static::buildModel(AIModelPreviousReasoningCarryOver::CARRY_OVER_CURRENT_TURN),
             null,
             null,
             false
@@ -51,7 +53,7 @@ class ModelCatalogPreviousReasoningCarryOverTest extends UnitTestCase
             AgentWireConfiguration::resolvePreviousReasoningCarryOver(
                 RunSettings::PREVIOUS_REASONING_CARRY_OVER_OFF,
                 AIModel::AGENT_WIRE_API_CHAT_COMPLETIONS,
-                AIModel::PREVIOUS_REASONING_CARRY_OVER_CURRENT_TURN
+                AIModelPreviousReasoningCarryOver::CARRY_OVER_CURRENT_TURN
             )
         );
     }
@@ -71,7 +73,7 @@ class ModelCatalogPreviousReasoningCarryOverTest extends UnitTestCase
             AgentWireConfiguration::resolvePreviousReasoningCarryOver(
                 null,
                 RunSettings::AGENT_WIRE_API_RESPONSES_SERVER_STATE,
-                AIModel::PREVIOUS_REASONING_CARRY_OVER_ALL
+                AIModelPreviousReasoningCarryOver::CARRY_OVER_ALL
             ),
             'the server-state arm never carries items'
         );
@@ -85,7 +87,7 @@ class ModelCatalogPreviousReasoningCarryOverTest extends UnitTestCase
         $aiLanguageModelSetting = (new ReflectionClass(AILanguageModelSetting::class))->newInstanceWithoutConstructor();
         $aiModel->settings = $aiLanguageModelSetting;
         $aiModel->vendor = AIModel::VENDOR_MOONSHOT;
-        $aiModel->previousReasoningCarryOver = $previousReasoningCarryOver;
+        $aiModel->agenticUseCase = new AIModelAgenticUseCaseConfig(previousReasoning: new AIModelPreviousReasoningCarryOver($previousReasoningCarryOver));
         return $aiModel;
     }
 }

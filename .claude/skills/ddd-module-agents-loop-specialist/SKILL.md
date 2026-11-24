@@ -155,6 +155,7 @@ class DemoNotesConversationStartsService extends Service
 | `update_task_plan` / `set_task_status` rejected, a turn that yields, the step or cost budget | [task-plan-and-long-tasks](references/task-plan-and-long-tasks.md) |
 | Booking usage under the right scope, overhead costs of a background job, the cost of a conversation tree | [usage-scopes-and-cost-summaries](references/usage-scopes-and-cost-summaries.md) |
 | A turn that never answers (symptom → cause) | `ddd-module-agents-observability-specialist` |
+| A model that reasons more and answers slower the longer a turn runs; how much of its earlier reasoning goes back per call (carry-over per model, cut min / max / headroom) | `ddd-module-agents-context-specialist` › prompt-cache-and-stable-prefix › 5 |
 
 ### Package maintainer
 
@@ -171,7 +172,8 @@ class DemoNotesConversationStartsService extends Service
 
 - `ddd-module-agents-specialist` — installation, transports and workers, override points, the host duties with the
   templates for the recovery commands.
-- `ddd-module-agents-context-specialist` — the model input, compaction, skill and tool eviction.
+- `ddd-module-agents-context-specialist` — the model input, compaction, skill and tool eviction, the carry-over of the
+  model's earlier reasoning and its cut.
 - `ddd-module-agents-tools-specialist` — tool dispatch, execution, time limits, the closed owner question.
 - `ddd-module-agents-skills-and-purposes-specialist` — purposes, seeded task plans, done criteria, the plan record.
 - `ddd-module-agents-autonomy-specialist` — delegation, schedules, owner reports, the supervisor.

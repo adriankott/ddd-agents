@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.3.3
+
+**New:**
+
+- **The reasoning carry-over per model.** The model's catalog block `agenticUseCase.previousReasoning`
+  (mgamadeus/ddd-ai 3.6.0, `AIModelPreviousReasoningCarryOver`) decides the carry-over and the numbers of its cut. Each
+  value is resolved on its own: the conversation's run settings row, else the model's catalog value, else
+  `AI.contextRetention.<key>ByAgentWireApi[<wire API>]`, else `AI.contextRetention.<key>`, else the built-in default
+  (`AgentWireConfiguration::resolveFor()`). The catalog sets GPT-6 Luna and GPT-6.2 Sol to `capped` at 1,000 and
+  Claude Opus 5.5 to `all`; Kimi K3.1 Pro keeps `currentTurn`.
+- **Min, steps and headroom of the cut** (`AgentPreviousReasoningCut::decideFor()`): the cut fires above
+  `max(cap, kept at the last cut + headroom)`; at a cut, whole steps are kept walking back from the newest one until at
+  least `keptTokensAtCut` reasoning tokens and `keptStepsAtCut` steps. New run settings rows (with `SetBy` / `SetAt`),
+  console options of `app:agent:chat`, eval arms and purpose `runSettings:` keys: `previousReasoningKeptTokensAtCut`,
+  `previousReasoningKeptStepsAtCut`, `previousReasoningHeadroomTokensAfterCut` (`--previous-reasoning-kept-tokens-at-cut`,
+  `--previous-reasoning-kept-steps-at-cut`, `--previous-reasoning-headroom-tokens-after-cut`); config keys of the same
+  names in `contextRetention.php`, each with a `…ByAgentWireApi` map. Defaults keep the rule before: min 0, 2 steps,
+  headroom 0. Delegation children inherit the rows.
+
+**Fixed:**
+
+- **A cut call reads the cache up to the earlier cut.** A call that moves the cut marks the entry before the earlier
+  cut (written by the cut call before) and the entry before the new cut (read by the next cut call), on the Responses
+  and the Messages API; the previous-call marker and the system markers after the base prompt and before the loaded
+  skills give up their slots (`ArgusAIAgentConversation::addPromptCacheBreakpointsAtPreviousReasoningCut()`). Before,
+  every cut call read only the system prefix from the cache.
+
+**Host steps:** update `mgamadeus/ddd-ai` to 3.6.0 together with this release (required). A host catalog that sets
+`previousReasoningCarryOver` on a model moves it to `'agenticUseCase' => ['previousReasoning' => ['carryOver' => …]]`
+— the old key is no longer read. A host that replaces `contextRetention.php` needs nothing (missing keys take the
+defaults). Optional: the new cut settings per model, per wire API or per conversation.
+
 ## 0.3.2
 
 **New:**

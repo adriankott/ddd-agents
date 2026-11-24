@@ -40,6 +40,19 @@ trait AgentEvalArmOptionsTrait
     public const string ARM_PREVIOUS_REASONING_CARRY_OVER = 'previous-reasoning-carry-over';
     /** A COUNT arm (no choice): validated by {@see resolveEvalArmOptions()} itself, outside {@see getEvalArmChoices()}. */
     public const string ARM_PREVIOUS_REASONING_CAP_TOKENS = 'previous-reasoning-cap-tokens';
+    /** A COUNT arm (0 or more), validated like {@see ARM_PREVIOUS_REASONING_CAP_TOKENS}. */
+    public const string ARM_PREVIOUS_REASONING_KEPT_TOKENS_AT_CUT = 'previous-reasoning-kept-tokens-at-cut';
+    /** A COUNT arm (a positive count), validated like {@see ARM_PREVIOUS_REASONING_CAP_TOKENS}. */
+    public const string ARM_PREVIOUS_REASONING_KEPT_STEPS_AT_CUT = 'previous-reasoning-kept-steps-at-cut';
+    /** A COUNT arm (0 or more), validated like {@see ARM_PREVIOUS_REASONING_CAP_TOKENS}. */
+    public const string ARM_PREVIOUS_REASONING_HEADROOM_TOKENS_AFTER_CUT = 'previous-reasoning-headroom-tokens-after-cut';
+
+    /** @var array<string, int> The count arms of the carry-over cut and the smallest value each accepts */
+    public const array PREVIOUS_REASONING_CUT_COUNT_ARMS_MINIMUM_VALUES = [
+        self::ARM_PREVIOUS_REASONING_KEPT_TOKENS_AT_CUT => 0,
+        self::ARM_PREVIOUS_REASONING_KEPT_STEPS_AT_CUT => 1,
+        self::ARM_PREVIOUS_REASONING_HEADROOM_TOKENS_AFTER_CUT => 0,
+    ];
     public const string ARM_SKILL_LOADING_STRATEGY = 'skill-loading-strategy';
     public const string ARM_REBUILD_EPOCH_ON_SITUATION_CHANGE = 'rebuild-epoch-on-situation-change';
     public const string ARM_STATE_CHANGE_DELIVERY = 'state-change-delivery';
@@ -103,6 +116,9 @@ trait AgentEvalArmOptionsTrait
             ->addOption(self::ARM_AGENT_WIRE_API, null, InputOption::VALUE_REQUIRED, 'The wire API of the agent calls: `' . implode('` | `', RunSettings::AGENT_WIRE_APIS) . '`. Inherited by delegated conversations. Not passed = the model catalog.')
             ->addOption(self::ARM_PREVIOUS_REASONING_CARRY_OVER, null, InputOption::VALUE_REQUIRED, 'Which reasoning items of the previous calls go back on the later calls: `all` | `currentTurn` | `capped` (until --' . self::ARM_PREVIOUS_REASONING_CAP_TOKENS . ' is exceeded) | `off`. Not passed = the default of the wire API.')
             ->addOption(self::ARM_PREVIOUS_REASONING_CAP_TOKENS, null, InputOption::VALUE_REQUIRED, 'The cap of --' . self::ARM_PREVIOUS_REASONING_CARRY_OVER . '=capped in reasoning tokens (a positive count). Not passed = the committed default.')
+            ->addOption(self::ARM_PREVIOUS_REASONING_KEPT_TOKENS_AT_CUT, null, InputOption::VALUE_REQUIRED, 'At a cut of --' . self::ARM_PREVIOUS_REASONING_CARRY_OVER . '=capped: keep whole steps from the newest back until at least this many reasoning tokens (0 or more). Not passed = the model\'s or the committed default.')
+            ->addOption(self::ARM_PREVIOUS_REASONING_KEPT_STEPS_AT_CUT, null, InputOption::VALUE_REQUIRED, 'At a cut of --' . self::ARM_PREVIOUS_REASONING_CARRY_OVER . '=capped: keep at least this many of the newest steps (a positive count). Not passed = the model\'s or the committed default.')
+            ->addOption(self::ARM_PREVIOUS_REASONING_HEADROOM_TOKENS_AFTER_CUT, null, InputOption::VALUE_REQUIRED, 'After a cut of --' . self::ARM_PREVIOUS_REASONING_CARRY_OVER . '=capped: the next cut waits until the carried reasoning exceeds the kept reasoning plus this many tokens (0 or more). Not passed = the model\'s or the committed default.')
             ->addOption(self::ARM_SKILL_LOADING_STRATEGY, null, InputOption::VALUE_REQUIRED, 'How a loaded skill reaches the model: `' . implode('` | `', ContextRetentionSettings::SKILL_LOADING_STRATEGIES) . '`. Stamped at each conversation\'s creation. Not passed = the purpose\'s or the global default.')
             ->addOption(self::ARM_REBUILD_EPOCH_ON_SITUATION_CHANGE, null, InputOption::VALUE_REQUIRED, 'With append-only skill loading: `on` = a situation change starts a new prefix epoch, `off` = the change is appended. Stamped at each conversation\'s creation. Not passed = the purpose\'s or the global default.')
             ->addOption(self::ARM_STATE_CHANGE_DELIVERY, null, InputOption::VALUE_REQUIRED, 'How a change of a volatile value reaches the model: `' . implode('` | `', ContextRetentionSettings::STATE_CHANGE_DELIVERIES) . '`. Stamped at each conversation\'s creation. Not passed = the purpose\'s or the global default.')
@@ -151,6 +167,16 @@ trait AgentEvalArmOptionsTrait
             }
             $arms[self::ARM_PREVIOUS_REASONING_CAP_TOKENS] = (string)(int)trim($capTokensValue);
         }
+        foreach (self::PREVIOUS_REASONING_CUT_COUNT_ARMS_MINIMUM_VALUES as $countOptionName => $minimumValue) {
+            $countValue = $input->hasOption($countOptionName) ? $input->getOption($countOptionName) : null;
+            if (!is_string($countValue) || trim($countValue) === '' || in_array(strtolower(trim($countValue)), [self::ARM_VALUE_DEFAULT, self::ARM_VALUE_INHERIT], true)) {
+                continue;
+            }
+            if (!ctype_digit(trim($countValue)) || (int)trim($countValue) < $minimumValue) {
+                throw new InvalidOptionException('--' . $countOptionName . ' must be a whole number of at least ' . $minimumValue . ' (or ' . self::ARM_VALUE_DEFAULT . ' / ' . self::ARM_VALUE_INHERIT . ')');
+            }
+            $arms[$countOptionName] = (string)(int)trim($countValue);
+        }
         if ($input->hasOption(self::ARM_STORE_SNAPSHOT) && (bool)$input->getOption(self::ARM_STORE_SNAPSHOT)) {
             $arms[self::ARM_STORE_SNAPSHOT] = self::ARM_FLAG_VALUE_ON;
         }
@@ -178,6 +204,9 @@ trait AgentEvalArmOptionsTrait
         $agentEvalArms->agentWireApi = $arms[self::ARM_AGENT_WIRE_API] ?? null;
         $agentEvalArms->previousReasoningCarryOver = $arms[self::ARM_PREVIOUS_REASONING_CARRY_OVER] ?? null;
         $agentEvalArms->previousReasoningCapTokens = isset($arms[self::ARM_PREVIOUS_REASONING_CAP_TOKENS]) ? (int)$arms[self::ARM_PREVIOUS_REASONING_CAP_TOKENS] : null;
+        $agentEvalArms->previousReasoningKeptTokensAtCut = isset($arms[self::ARM_PREVIOUS_REASONING_KEPT_TOKENS_AT_CUT]) ? (int)$arms[self::ARM_PREVIOUS_REASONING_KEPT_TOKENS_AT_CUT] : null;
+        $agentEvalArms->previousReasoningKeptStepsAtCut = isset($arms[self::ARM_PREVIOUS_REASONING_KEPT_STEPS_AT_CUT]) ? (int)$arms[self::ARM_PREVIOUS_REASONING_KEPT_STEPS_AT_CUT] : null;
+        $agentEvalArms->previousReasoningHeadroomTokensAfterCut = isset($arms[self::ARM_PREVIOUS_REASONING_HEADROOM_TOKENS_AFTER_CUT]) ? (int)$arms[self::ARM_PREVIOUS_REASONING_HEADROOM_TOKENS_AFTER_CUT] : null;
         $agentEvalArms->skillLoadingStrategy = $arms[self::ARM_SKILL_LOADING_STRATEGY] ?? null;
         $agentEvalArms->stateChangeDelivery = $arms[self::ARM_STATE_CHANGE_DELIVERY] ?? null;
         $agentEvalArms->toolDelivery = $arms[self::ARM_TOOL_DELIVERY] ?? null;

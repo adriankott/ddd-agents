@@ -906,11 +906,14 @@ class AIConversation extends Entity
         // children's spend via their settle slices; a per-child copy would double-cap it.
         // A FIXED reasoning effort is inherited as well: it is a measurement setting for the whole run tree — children
         // on another effort would make two runs differ in more than the effort.
-        // the wire API, the reasoning carry-over and its cap are inherited too — an A/B arm measures the whole tree.
+        // the wire API, the reasoning carry-over and its cut settings are inherited too — an A/B arm measures the whole tree.
         if (isset($parentConversation->runSettings)
             && ($parentConversation->runSettings->maxStepsPerTurn !== null || $parentConversation->runSettings->fixedReasoningEffort !== null
                 || $parentConversation->runSettings->agentWireApi !== null || $parentConversation->runSettings->previousReasoningCarryOver !== null
                 || $parentConversation->runSettings->previousReasoningCapTokens !== null
+                || $parentConversation->runSettings->previousReasoningKeptTokensAtCut !== null
+                || $parentConversation->runSettings->previousReasoningKeptStepsAtCut !== null
+                || $parentConversation->runSettings->previousReasoningHeadroomTokensAfterCut !== null
                 || $parentConversation->runSettings->workspaceKey !== null)
         ) {
             $childRunSettings = RunSettings::newInstance();
@@ -919,6 +922,9 @@ class AIConversation extends Entity
             $childRunSettings->agentWireApi = $parentConversation->runSettings->agentWireApi;
             $childRunSettings->previousReasoningCarryOver = $parentConversation->runSettings->previousReasoningCarryOver;
             $childRunSettings->previousReasoningCapTokens = $parentConversation->runSettings->previousReasoningCapTokens;
+            $childRunSettings->previousReasoningKeptTokensAtCut = $parentConversation->runSettings->previousReasoningKeptTokensAtCut;
+            $childRunSettings->previousReasoningKeptStepsAtCut = $parentConversation->runSettings->previousReasoningKeptStepsAtCut;
+            $childRunSettings->previousReasoningHeadroomTokensAfterCut = $parentConversation->runSettings->previousReasoningHeadroomTokensAfterCut;
             // one run tree works in one workspace (an evaluation's case workspace reaches the sub-agents)
             $childRunSettings->workspaceKey = $parentConversation->runSettings->workspaceKey;
             $this->runSettings = $childRunSettings;

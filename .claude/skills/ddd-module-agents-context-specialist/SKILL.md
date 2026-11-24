@@ -166,8 +166,16 @@ Keep the method a single indexed read.
 | `appendOnlyReachableToolSetCeilingTokens` | 55000 | 55000 | `ContextRetentionSettings::resolveAppendOnlyReachableToolSetCeilingTokens()` |
 | `previousReasoningCapTokens` | 4000 | 4000 | `AgentWireConfiguration::resolveDefaultPreviousReasoningCapTokens()` |
 | `previousReasoningCapTokensByAgentWireApi` | `[]` (every wire API takes `previousReasoningCapTokens`) | `[]` | `AgentWireConfiguration::resolveDefaultPreviousReasoningCapTokens($wireApi)` |
+| `previousReasoningKeptTokensAtCut` (+ `…ByAgentWireApi`) | 0 | 0 | `AgentWireConfiguration::resolveDefaultPreviousReasoningKeptTokensAtCut($wireApi)` |
+| `previousReasoningKeptStepsAtCut` (+ `…ByAgentWireApi`) | 2 | 2 | `AgentWireConfiguration::resolveDefaultPreviousReasoningKeptStepsAtCut($wireApi)` |
+| `previousReasoningHeadroomTokensAfterCut` (+ `…ByAgentWireApi`) | 0 | 0 | `AgentWireConfiguration::resolveDefaultPreviousReasoningHeadroomTokensAfterCut($wireApi)` |
 | `toolDelivery` | `callTool` | `callTool` (a conversation without the stamp: `native`) | `ContextRetentionSettings::resolveDefaultToolDelivery()` |
 | `dropColdSkillsAtCompactionRebase` | `true` | `true` (a conversation without the stamp: no drop) | `ContextRetentionSettings::resolveDefaultDropColdSkillsAtCompactionRebase()` |
+
+The four numbers of the reasoning cut are resolved each on its own: the conversation's run settings row, else the
+model's catalog value (`agenticUseCase.previousReasoning` in the AI model catalog, e.g. Luna `capped` at 1,000), else the
+`…ByAgentWireApi` entry, else the flat key, else the built-in default (rule and worked example:
+[prompt-cache-and-stable-prefix.md](references/prompt-cache-and-stable-prefix.md) › 5).
 
 Per conversation, every other knob lives on `ContextRetentionSettings` (tool-result window and budget, image cap,
 eviction horizons, pressure, hard cap, pins) and `CompactionSettings` (threshold override, model, fallbacks); a

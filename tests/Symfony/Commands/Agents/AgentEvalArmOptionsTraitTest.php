@@ -92,6 +92,26 @@ class AgentEvalArmOptionsTraitTest extends UnitTestCase
         self::assertSame([], $probeCommand->resolveArms(['--previous-reasoning-cap-tokens' => 'Inherit']), 'every arm accepts inherit');
     }
 
+    public function testTheCutArmsReachTheRows(): void
+    {
+        $probeCommand = new AgentEvalArmOptionsProbeCommand();
+        $arms = $probeCommand->resolveArms([
+            '--previous-reasoning-kept-tokens-at-cut' => '0',
+            '--previous-reasoning-kept-steps-at-cut' => '3',
+            '--previous-reasoning-headroom-tokens-after-cut' => 'inherit',
+        ]);
+
+        self::assertSame(['previous-reasoning-kept-tokens-at-cut' => '0', 'previous-reasoning-kept-steps-at-cut' => '3'], $arms);
+        self::assertSame(['previousReasoningKeptTokensAtCut' => 0, 'previousReasoningKeptStepsAtCut' => 3], $probeCommand->buildArms($arms)->getRowValuesByRowName());
+    }
+
+    public function testAKeptStepCountBelowOneIsRefused(): void
+    {
+        $this->expectException(InvalidOptionException::class);
+        $this->expectExceptionMessage('--previous-reasoning-kept-steps-at-cut must be a whole number of at least 1');
+        (new AgentEvalArmOptionsProbeCommand())->resolveArms(['--previous-reasoning-kept-steps-at-cut' => '0']);
+    }
+
     public function testTheCreationStampArmsReachTheRunSettings(): void
     {
         $probeCommand = new AgentEvalArmOptionsProbeCommand();

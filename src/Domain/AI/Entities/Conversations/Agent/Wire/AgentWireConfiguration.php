@@ -82,6 +82,30 @@ class AgentWireConfiguration
      */
     public int $previousReasoningCapTokens = self::DEFAULT_PREVIOUS_REASONING_CAP_TOKENS;
 
+    /** The built-in min of a cut: 0 — only the steps {@see DEFAULT_PREVIOUS_REASONING_KEPT_STEPS_AT_CUT} asks for are kept. */
+    public const int DEFAULT_PREVIOUS_REASONING_KEPT_TOKENS_AT_CUT = 0;
+
+    /** The built-in count of steps a cut keeps ({@see AgentPreviousReasoningCut::KEPT_NEWEST_STEPS_AT_A_CUT}). */
+    public const int DEFAULT_PREVIOUS_REASONING_KEPT_STEPS_AT_CUT = AgentPreviousReasoningCut::KEPT_NEWEST_STEPS_AT_A_CUT;
+
+    /** The built-in headroom after a cut: 0 — the cap alone decides the next cut. */
+    public const int DEFAULT_PREVIOUS_REASONING_HEADROOM_TOKENS_AFTER_CUT = 0;
+
+    /**
+     * @var int At a cut of `capped`: walking back from the newest step, whole steps are kept until at least this many
+     *      reasoning tokens (the min). Resolved like {@see $previousReasoningCapTokens}.
+     */
+    public int $previousReasoningKeptTokensAtCut = self::DEFAULT_PREVIOUS_REASONING_KEPT_TOKENS_AT_CUT;
+
+    /** @var int At a cut of `capped`: at least this many of the newest steps keep their reasoning. Resolved like {@see $previousReasoningCapTokens}. */
+    public int $previousReasoningKeptStepsAtCut = self::DEFAULT_PREVIOUS_REASONING_KEPT_STEPS_AT_CUT;
+
+    /**
+     * @var int After a cut of `capped`: the next cut waits until the carried reasoning exceeds the larger of the cap and
+     *      the reasoning kept at that cut plus this many tokens. Resolved like {@see $previousReasoningCapTokens}.
+     */
+    public int $previousReasoningHeadroomTokensAfterCut = self::DEFAULT_PREVIOUS_REASONING_HEADROOM_TOKENS_AFTER_CUT;
+
     /** @var string|null Why this combination is not allowed; null = allowed. */
     public ?string $rejectionReason = null;
 
@@ -117,13 +141,20 @@ class AgentWireConfiguration
             $runSettings->previousReasoningCarryOver ?? null,
             $agentWireConfiguration->wireApi,
             $directOpenRouterEgress || $agentWireConfiguration->wireApi !== AIModel::AGENT_WIRE_API_CHAT_COMPLETIONS
-                ? $aiModel?->getPreviousReasoningCarryOver()
+                ? $aiModel?->getAgenticPreviousReasoningCarryOver()?->getCarryOver()
                 : null
         );
-        $previousReasoningCapTokensRow = $runSettings->previousReasoningCapTokens ?? null;
-        $agentWireConfiguration->previousReasoningCapTokens = $previousReasoningCapTokensRow !== null && $previousReasoningCapTokensRow > 0
-            ? $previousReasoningCapTokensRow
-            : static::resolveDefaultPreviousReasoningCapTokens($agentWireConfiguration->wireApi);
+        // the numbers of the cut, each on its own: the conversation's row, else the model's catalog value, else the
+        // committed default of the wire API, else the global one
+        $modelPreviousReasoning = $aiModel?->getAgenticPreviousReasoningCarryOver();
+        $agentWireConfiguration->previousReasoningCapTokens = self::firstCountOfAtLeast(1, [$runSettings->previousReasoningCapTokens ?? null, $modelPreviousReasoning?->capTokens])
+            ?? static::resolveDefaultPreviousReasoningCapTokens($agentWireConfiguration->wireApi);
+        $agentWireConfiguration->previousReasoningKeptTokensAtCut = self::firstCountOfAtLeast(0, [$runSettings->previousReasoningKeptTokensAtCut ?? null, $modelPreviousReasoning?->keptTokensAtCut])
+            ?? static::resolveDefaultPreviousReasoningKeptTokensAtCut($agentWireConfiguration->wireApi);
+        $agentWireConfiguration->previousReasoningKeptStepsAtCut = self::firstCountOfAtLeast(1, [$runSettings->previousReasoningKeptStepsAtCut ?? null, $modelPreviousReasoning?->keptStepsAtCut])
+            ?? static::resolveDefaultPreviousReasoningKeptStepsAtCut($agentWireConfiguration->wireApi);
+        $agentWireConfiguration->previousReasoningHeadroomTokensAfterCut = self::firstCountOfAtLeast(0, [$runSettings->previousReasoningHeadroomTokensAfterCut ?? null, $modelPreviousReasoning?->headroomTokensAfterCut])
+            ?? static::resolveDefaultPreviousReasoningHeadroomTokensAfterCut($agentWireConfiguration->wireApi);
         $agentWireConfiguration->rejectionReason = self::findRejectionReason(
             $agentWireConfiguration->wireApi,
             $agentWireConfiguration->skillLoadingStrategy,
@@ -274,7 +305,8 @@ class AgentWireConfiguration
     /**
      * The carry-over mode a call on `$wireApi` runs with, from the conversation's row (null = inherit): the row's value
      * (the legacy `on` reads as `all`), else the model's catalog value (`$modelCarryOver`,
-     * {@see \DDD\Domain\AI\Entities\Models\AIModel::getPreviousReasoningCarryOver()} — e.g. `currentTurn` for a
+     * {@see \DDD\Domain\AI\Entities\Models\AIModel::getAgenticPreviousReasoningCarryOver()}, catalog key
+     * `agenticUseCase.previousReasoning.carryOver` — e.g. `currentTurn` for a
      * reasoning model that keeps its verdicts only in its reasoning), else the per-API default — `capped` on the
      * Responses and the Messages API (cap {@see resolveDefaultPreviousReasoningCapTokens()}), `off` on Chat
      * Completions; always `off` on the server-state arm.
@@ -315,23 +347,86 @@ class AgentWireConfiguration
      */
     public static function resolveDefaultPreviousReasoningCapTokens(?string $wireApi = null): int
     {
+        return self::resolveConfiguredCount('previousReasoningCapTokens', self::CONFIG_KEY_PREVIOUS_REASONING_CAP_TOKENS_BY_AGENT_WIRE_API, $wireApi, 1, self::DEFAULT_PREVIOUS_REASONING_CAP_TOKENS);
+    }
+
+    /** The config key (below `AI.contextRetention`) of the min of a cut per wire API. */
+    public const string CONFIG_KEY_PREVIOUS_REASONING_KEPT_TOKENS_AT_CUT_BY_AGENT_WIRE_API = 'previousReasoningKeptTokensAtCutByAgentWireApi';
+
+    /** The config key (below `AI.contextRetention`) of the steps a cut keeps per wire API. */
+    public const string CONFIG_KEY_PREVIOUS_REASONING_KEPT_STEPS_AT_CUT_BY_AGENT_WIRE_API = 'previousReasoningKeptStepsAtCutByAgentWireApi';
+
+    /** The config key (below `AI.contextRetention`) of the headroom after a cut per wire API. */
+    public const string CONFIG_KEY_PREVIOUS_REASONING_HEADROOM_TOKENS_AFTER_CUT_BY_AGENT_WIRE_API = 'previousReasoningHeadroomTokensAfterCutByAgentWireApi';
+
+    /**
+     * The committed default min of a cut on `$wireApi`: `AI.contextRetention.previousReasoningKeptTokensAtCutByAgentWireApi`
+     * (0 or more, keyed by the wire API), else `AI.contextRetention.previousReasoningKeptTokensAtCut`, else
+     * {@see DEFAULT_PREVIOUS_REASONING_KEPT_TOKENS_AT_CUT}. Never throws.
+     */
+    public static function resolveDefaultPreviousReasoningKeptTokensAtCut(?string $wireApi = null): int
+    {
+        return self::resolveConfiguredCount('previousReasoningKeptTokensAtCut', self::CONFIG_KEY_PREVIOUS_REASONING_KEPT_TOKENS_AT_CUT_BY_AGENT_WIRE_API, $wireApi, 0, self::DEFAULT_PREVIOUS_REASONING_KEPT_TOKENS_AT_CUT);
+    }
+
+    /**
+     * The committed default count of steps a cut keeps on `$wireApi`: `AI.contextRetention.previousReasoningKeptStepsAtCutByAgentWireApi`
+     * (a positive count, keyed by the wire API), else `AI.contextRetention.previousReasoningKeptStepsAtCut`, else
+     * {@see DEFAULT_PREVIOUS_REASONING_KEPT_STEPS_AT_CUT}. Never throws.
+     */
+    public static function resolveDefaultPreviousReasoningKeptStepsAtCut(?string $wireApi = null): int
+    {
+        return self::resolveConfiguredCount('previousReasoningKeptStepsAtCut', self::CONFIG_KEY_PREVIOUS_REASONING_KEPT_STEPS_AT_CUT_BY_AGENT_WIRE_API, $wireApi, 1, self::DEFAULT_PREVIOUS_REASONING_KEPT_STEPS_AT_CUT);
+    }
+
+    /**
+     * The committed default headroom after a cut on `$wireApi`: `AI.contextRetention.previousReasoningHeadroomTokensAfterCutByAgentWireApi`
+     * (0 or more, keyed by the wire API), else `AI.contextRetention.previousReasoningHeadroomTokensAfterCut`, else
+     * {@see DEFAULT_PREVIOUS_REASONING_HEADROOM_TOKENS_AFTER_CUT}. Never throws.
+     */
+    public static function resolveDefaultPreviousReasoningHeadroomTokensAfterCut(?string $wireApi = null): int
+    {
+        return self::resolveConfiguredCount('previousReasoningHeadroomTokensAfterCut', self::CONFIG_KEY_PREVIOUS_REASONING_HEADROOM_TOKENS_AFTER_CUT_BY_AGENT_WIRE_API, $wireApi, 0, self::DEFAULT_PREVIOUS_REASONING_HEADROOM_TOKENS_AFTER_CUT);
+    }
+
+    /**
+     * A count of `AI.contextRetention`: the wire API's entry of `$byWireApiConfigKey`, else `$configKey`, each only
+     * when an integer of at least `$minimumValue`, else `$builtInDefault`. No environment variable. Never throws.
+     */
+    protected static function resolveConfiguredCount(string $configKey, string $byWireApiConfigKey, ?string $wireApi, int $minimumValue, int $builtInDefault): int
+    {
         try {
             $configured = Config::get(ContextRetentionSettings::CONFIG_KEY);
             if (is_array($configured)) {
-                $capTokensByWireApi = $configured[self::CONFIG_KEY_PREVIOUS_REASONING_CAP_TOKENS_BY_AGENT_WIRE_API] ?? null;
-                $wireApiCapTokens = $wireApi !== null && is_array($capTokensByWireApi) ? ($capTokensByWireApi[$wireApi] ?? null) : null;
-                if (is_int($wireApiCapTokens) && $wireApiCapTokens > 0) {
-                    return $wireApiCapTokens;
+                $countsByWireApi = $configured[$byWireApiConfigKey] ?? null;
+                $wireApiCount = $wireApi !== null && is_array($countsByWireApi) ? ($countsByWireApi[$wireApi] ?? null) : null;
+                if (is_int($wireApiCount) && $wireApiCount >= $minimumValue) {
+                    return $wireApiCount;
                 }
-                $configuredCapTokens = $configured['previousReasoningCapTokens'] ?? null;
-                if (is_int($configuredCapTokens) && $configuredCapTokens > 0) {
-                    return $configuredCapTokens;
+                $configuredCount = $configured[$configKey] ?? null;
+                if (is_int($configuredCount) && $configuredCount >= $minimumValue) {
+                    return $configuredCount;
                 }
             }
         } catch (Throwable) {
             // no config file — the built-in default
         }
-        return self::DEFAULT_PREVIOUS_REASONING_CAP_TOKENS;
+        return $builtInDefault;
+    }
+
+    /**
+     * The first of `$candidateCounts` that is an integer of at least `$minimumValue`; null when none is.
+     *
+     * @param array<int, int|null> $candidateCounts
+     */
+    protected static function firstCountOfAtLeast(int $minimumValue, array $candidateCounts): ?int
+    {
+        foreach ($candidateCounts as $candidateCount) {
+            if (is_int($candidateCount) && $candidateCount >= $minimumValue) {
+                return $candidateCount;
+            }
+        }
+        return null;
     }
 
     /** Whether the earlier steps' items go back up to the cap and are then cut in one block (`capped`). */

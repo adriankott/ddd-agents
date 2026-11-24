@@ -851,6 +851,19 @@ class ArgusAIAgentConversation extends ArgusAIConversation
     public ?AgentPreviousReasoningCut $lastPreviousReasoningCut = null;
 
     /**
+     * @var int|null The wire position (in the stable messages of the LAST fold) of the first entry at or above the cut
+     *      the previous calls recorded ({@see AgentPreviousReasoningCut::$anchorCutFromMessageIndex}); null = no earlier
+     *      cut or no entry there. A cut call marks the entry before it: the cut call before wrote the cache there.
+     */
+    public ?int $previousReasoningAnchorCutWirePosition = null;
+
+    /**
+     * @var int|null The wire position of the first entry at or above the cut the LAST fold moved to; null when the fold
+     *      did not move the cut. A cut call marks the entry before it, so the next cut call reads up to there.
+     */
+    public ?int $previousReasoningNewCutWirePosition = null;
+
+    /**
      * @var string|null Why the LAST Responses answer carries neither text nor a call — a refusal or an answer cut off
      *      (`status: incomplete`; {@see AgentResponsesResponse::findUnusableAnswerReason()}); null otherwise and on Chat
      *      Completions. The loop fails the call with it, named, instead of reading an empty answer as a stall.
@@ -1168,16 +1181,19 @@ class ArgusAIAgentConversation extends ArgusAIConversation
             // an assistant `output_text` part is not probed (a tool result's part is)
             $usesResponsesApi = $this->agentWireConfiguration?->usesResponsesApi() === true;
             $this->addPromptCacheBreakpointToLastStableWireMessage($messages, $usesResponsesApi);
-            if ($usesResponsesApi) {
+            $marksPreviousReasoningCut = $this->addPromptCacheBreakpointsAtPreviousReasoningCut($messages, $usesResponsesApi);
+            if ($usesResponsesApi && !$marksPreviousReasoningCut) {
                 // a Responses request reads the cache only at breakpoints it carries itself: it re-marks the
                 // item the previous call marked, so the entry that call wrote is looked up
                 $this->addPromptCacheBreakpointToPreviousCallsWireMessage($messages);
             }
             // an append-only epoch's loaded-skills segment is fixed — no marker before it (the slot the
-            // state delivery needs); on the Responses API the two wire markers take that slot under the cap of four
+            // state delivery needs); on the Responses API the two wire markers take that slot under the cap of four;
+            // a cut call's two cut markers take the slots of the base prompt and the loaded skills
             array_unshift($messages, ['role' => 'system', 'content' => $this->buildSystemContentPartsWithPromptCacheBreakpoints(
                 $this->lastSystemSegments,
-                !$usesResponsesApi && $this->agentWireConfiguration?->usesConversationAppend() !== true
+                !$marksPreviousReasoningCut && !$usesResponsesApi && $this->agentWireConfiguration?->usesConversationAppend() !== true,
+                !$marksPreviousReasoningCut
             )]);
             return $messages;
         }
@@ -1188,13 +1204,21 @@ class ArgusAIAgentConversation extends ArgusAIConversation
             // On the Messages API under append-only loading the loaded-skills segment is fixed, so the marker before it is
             // not needed: its slot goes to the item the PREVIOUS call marked. Anthropic looks an entry up only about 20
             // blocks back from a marker, and one step with many parallel calls adds more blocks than that.
-            $marksPreviousCallsWireMessage = $this->agentWireConfiguration?->usesMessagesApi() === true
-                && $this->agentWireConfiguration->usesConversationAppend();
+            // A call that moves the reasoning cut changes the history from the first step it cuts on: the previous call's
+            // entry is not read, so its marker and the two of the base prompt and the loaded skills go to the entries
+            // before the two cuts (the earlier cut: read the entry the cut call before wrote; the new one: write it).
             $this->addPromptCacheBreakpointToLastStableWireMessage($messages);
+            $marksPreviousReasoningCut = $this->addPromptCacheBreakpointsAtPreviousReasoningCut($messages, false);
+            $marksPreviousCallsWireMessage = !$marksPreviousReasoningCut && $this->agentWireConfiguration?->usesMessagesApi() === true
+                && $this->agentWireConfiguration->usesConversationAppend();
             if ($marksPreviousCallsWireMessage) {
                 $this->addPromptCacheBreakpointToPreviousCallsMessagesWireMessage($messages);
             }
-            array_unshift($messages, ['role' => 'system', 'content' => $this->buildSystemContentPartsWithPromptCacheBreakpoints($this->lastSystemSegments, !$marksPreviousCallsWireMessage)]);
+            array_unshift($messages, ['role' => 'system', 'content' => $this->buildSystemContentPartsWithPromptCacheBreakpoints(
+                $this->lastSystemSegments,
+                !$marksPreviousCallsWireMessage && !$marksPreviousReasoningCut,
+                !$marksPreviousReasoningCut
+            )]);
             return $this->convertPromptCacheBreakpointsToAnthropicCacheControl($messages);
         }
         $systemContent = implode('', array_map(static fn (AgentContextSegment $systemSegment): string => $systemSegment->text, $this->lastSystemSegments));
@@ -1276,7 +1300,7 @@ class ArgusAIAgentConversation extends ArgusAIConversation
      * @param AgentContextSegment[] $systemSegments {@see AgentModelInput::buildSystemSegments()} of this call
      * @return array<int, array<string, mixed>>
      */
-    public function buildSystemContentPartsWithPromptCacheBreakpoints(array $systemSegments, bool $marksBeforeLoadedSkills = true): array
+    public function buildSystemContentPartsWithPromptCacheBreakpoints(array $systemSegments, bool $marksBeforeLoadedSkills = true, bool $marksAfterBasePrompt = true): array
     {
         $systemContentParts = [];
         $currentPartText = '';
@@ -1286,7 +1310,7 @@ class ArgusAIAgentConversation extends ArgusAIConversation
                 $currentPartText = '';
             }
             $currentPartText .= $systemSegment->text;
-            if ($systemSegment->type === AgentContextSegmentType::BASE_PROMPT && $currentPartText !== '') {
+            if ($marksAfterBasePrompt && $systemSegment->type === AgentContextSegmentType::BASE_PROMPT && $currentPartText !== '') {
                 $systemContentParts[] = ['type' => 'text', 'text' => $currentPartText, 'prompt_cache_breakpoint' => self::PROMPT_CACHE_BREAKPOINT];
                 $currentPartText = '';
             }
@@ -1352,6 +1376,28 @@ class ArgusAIAgentConversation extends ArgusAIConversation
             $this->addPromptCacheBreakpointToLastTextMessageBefore($wireMessages, $position, false);
             return;
         }
+    }
+
+    /**
+     * On a call that moves the reasoning cut ({@see AgentPreviousReasoningCut::$movedOnThisCall}): a breakpoint before
+     * the cut the previous calls kept (the cut call before wrote the cache there, and the history up to it is the same)
+     * and one before the new cut (written now, read by the next cut call). The steps below a cut never send their
+     * reasoning again, so the history up to it stays the same until the next compaction. False when the call does not
+     * move the cut — the call marks as before.
+     *
+     * @param array<int, array<string, mixed>> $wireMessages
+     */
+    public function addPromptCacheBreakpointsAtPreviousReasoningCut(array &$wireMessages, bool $skipsAssistantMessages): bool
+    {
+        if ($this->lastPreviousReasoningCut?->movedOnThisCall !== true || $this->previousReasoningNewCutWirePosition === null) {
+            return false;
+        }
+        $stableWireMessageCount = min($this->stableWireMessageCount ?? count($wireMessages), count($wireMessages));
+        if ($this->previousReasoningAnchorCutWirePosition !== null) {
+            $this->addPromptCacheBreakpointToLastTextMessageBefore($wireMessages, min($this->previousReasoningAnchorCutWirePosition, $stableWireMessageCount), $skipsAssistantMessages);
+        }
+        $this->addPromptCacheBreakpointToLastTextMessageBefore($wireMessages, min($this->previousReasoningNewCutWirePosition, $stableWireMessageCount), $skipsAssistantMessages);
+        return true;
     }
 
     /**
@@ -1585,6 +1631,8 @@ class ArgusAIAgentConversation extends ArgusAIConversation
         }
         $count = count($messages);
         $entries = [];
+        $this->previousReasoningAnchorCutWirePosition = null;
+        $this->previousReasoningNewCutWirePosition = null;
 
         // The NEWEST genuine user turn (role USER + TEXT + authored by the user — not a SIGNAL, not an agent nudge)
         // gets the reply-language cue in its [time] bracket ({@see AIConversationMessage::getOpenAiMessageContent()}).
@@ -1627,7 +1675,15 @@ class ArgusAIAgentConversation extends ArgusAIConversation
             $this->lastPreviousReasoningCut = $messagesWireReplay->previousReasoningCut;
         } else {
             $this->lastPreviousReasoningCut = $this->agentWireConfiguration?->carriesCappedPreviousReasoning() === true
-                ? AgentPreviousReasoningCut::decideFor(array_values($messages), $this->agentWireConfiguration->wireApi, $this->agentWireConfiguration->previousReasoningCapTokens, $this->getAIModel()?->name)
+                ? AgentPreviousReasoningCut::decideFor(
+                    array_values($messages),
+                    $this->agentWireConfiguration->wireApi,
+                    $this->agentWireConfiguration->previousReasoningCapTokens,
+                    $this->getAIModel()?->name,
+                    keptTokensAtCut: $this->agentWireConfiguration->previousReasoningKeptTokensAtCut,
+                    keptStepsAtCut: $this->agentWireConfiguration->previousReasoningKeptStepsAtCut,
+                    headroomTokensAfterCut: $this->agentWireConfiguration->previousReasoningHeadroomTokensAfterCut
+                )
                 : null;
         }
         $isSupersededTaskPlanCall = static fn (AIConversationMessage $callMessage): bool =>
@@ -1716,9 +1772,22 @@ class ArgusAIAgentConversation extends ArgusAIConversation
         // never drops its item; a row folded into the group before it emits the item after that group)
         $appendedHistoryItems = $agentContext?->appendedHistoryItems;
         $pendingInsertionMessageIndexes = $appendedHistoryItems?->getInsertionMessageIndexesInOrder() ?? [];
+        $anchorCutFromMessageIndex = $this->lastPreviousReasoningCut?->anchorCutFromMessageIndex;
+        $newCutFromMessageIndex = $this->lastPreviousReasoningCut?->movedOnThisCall === true ? $this->lastPreviousReasoningCut->cutFromMessageIndex : null;
         for ($i = 0; $i < $count; $i++) {
             $message = $messages[$i];
             $messageIndex = $message->indexInConversation ?? null;
+            // where the cuts sit on the wire: the cache markers of a cut call go on the entries before them
+            if ($messageIndex !== null) {
+                if ($this->previousReasoningAnchorCutWirePosition === null && $anchorCutFromMessageIndex !== null && $anchorCutFromMessageIndex > 0
+                    && $messageIndex >= $anchorCutFromMessageIndex
+                ) {
+                    $this->previousReasoningAnchorCutWirePosition = count($entries);
+                }
+                if ($this->previousReasoningNewCutWirePosition === null && $newCutFromMessageIndex !== null && $messageIndex >= $newCutFromMessageIndex) {
+                    $this->previousReasoningNewCutWirePosition = count($entries);
+                }
+            }
             while ($appendedHistoryItems !== null && $messageIndex !== null && $pendingInsertionMessageIndexes !== [] && $pendingInsertionMessageIndexes[0] <= $messageIndex) {
                 foreach ($appendedHistoryItems->buildWireEntriesBeforeMessageIndex(array_shift($pendingInsertionMessageIndexes)) as $appendedWireEntry) {
                     $entries[] = $appendedWireEntry;

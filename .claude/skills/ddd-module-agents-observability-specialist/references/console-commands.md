@@ -65,6 +65,7 @@ prints every message of the turn as it is produced.
 | `--agent-wire-api` | none | `chatCompletions`, `responses` or `messages` (`inherit` clears it), stored as a run-settings row |
 | `--previous-reasoning-carry-over` | none | `all`, `currentTurn`, `off` or `capped` (`inherit` = the default), stored as a run-settings row |
 | `--previous-reasoning-cap-tokens` | none | the cap of `capped` in reasoning tokens (`0` = the configured default) |
+| `--previous-reasoning-kept-tokens-at-cut`, `--previous-reasoning-kept-steps-at-cut`, `--previous-reasoning-headroom-tokens-after-cut` | none | the min, the kept steps and the headroom of the cut of `capped` (`inherit` = the model's or the configured default), stored as run-settings rows |
 | the context-retention options | none | `--eager` (flag), `--evict-soft`, `--evict-hard`, `--evict-ref`, `--evict-tool-tokens`, `--evict-tool-turns`, `--evict-skill-tokens`, `--evict-skill-turns`, `--evict-min-residency`, `--unload-granularity`, `--skill-loading-strategy` (a new conversation only), `--rebuild-epoch-on-situation-change`, `--state-change-delivery` (`ContextRetentionSettingsOptionsTrait`) |
 | the compaction options | none | `--compact-trigger-tokens`, `--compact-keep-messages`, `--compact-segment-messages`, `--compact-fan-in`, `--compact-retention` |
 | `--record-run-for-comparison` | none | drive `--turns-file` on a new stored conversation and write the recording of the run to this JSON file (with `--async` every turn takes the worker path; its messages run in this process) |
@@ -1086,6 +1087,8 @@ unknown tier or vendor is an `InvalidOptionException`. `writeModelSelection()` p
 `--decision-model-plan-dynamics` (`AgentEvalArms::PLAN_DYNAMICS_ARMS`), `--decision-model-reasoning-effort` (`off` or a
 floor `low`/`medium`/`high`), `--decision-model-stall-recovery` (`on`/`off`), `--reasoning-effort` (a fixed effort for
 every call), `--agent-wire-api`, `--previous-reasoning-carry-over`, `--previous-reasoning-cap-tokens` (a positive count),
+`--previous-reasoning-kept-tokens-at-cut` (0 or more), `--previous-reasoning-kept-steps-at-cut` (a positive count),
+`--previous-reasoning-headroom-tokens-after-cut` (0 or more),
 `--skill-loading-strategy`, `--rebuild-epoch-on-situation-change` (`on`/`off`), `--state-change-delivery`; and the flag
 `--store-snapshot`. Not passed, `default` or `inherit` = the platform default. `resolveEvalArmOptions()` refuses any other
 value; `buildEvalArms()` builds the `AgentEvalArms` every conversation of the run is created with;

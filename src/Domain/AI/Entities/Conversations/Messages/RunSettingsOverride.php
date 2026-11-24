@@ -53,6 +53,15 @@ class RunSettingsOverride extends ValueObject
     /** @var int|null The cap of the carry-over `capped` in reasoning tokens — `0` clears it (the committed default), a positive count sets it. */
     public ?int $previousReasoningCapTokens = null;
 
+    /** @var int|null The min of a cut of `capped` in reasoning tokens — a negative value clears it (inherit), 0 or a positive count sets it. */
+    public ?int $previousReasoningKeptTokensAtCut = null;
+
+    /** @var int|null The steps a cut of `capped` keeps — a negative value clears it (inherit), a positive count sets it. */
+    public ?int $previousReasoningKeptStepsAtCut = null;
+
+    /** @var int|null The headroom after a cut of `capped` in reasoning tokens — a negative value clears it (inherit), 0 or a positive count sets it. */
+    public ?int $previousReasoningHeadroomTokensAfterCut = null;
+
     public static function fromValues(
         ?string $decisionModelSkillPreload = null,
         ?string $decisionModelTurnClosing = null,
@@ -64,7 +73,10 @@ class RunSettingsOverride extends ValueObject
         ?string $planDynamicsModelReceivesVerdict = null,
         ?string $agentWireApi = null,
         ?string $previousReasoningCarryOver = null,
-        ?int $previousReasoningCapTokens = null
+        ?int $previousReasoningCapTokens = null,
+        ?int $previousReasoningKeptTokensAtCut = null,
+        ?int $previousReasoningKeptStepsAtCut = null,
+        ?int $previousReasoningHeadroomTokensAfterCut = null
     ): ?static {
         $override = new static();
         $override->decisionModelSkillPreload = $decisionModelSkillPreload;
@@ -78,6 +90,9 @@ class RunSettingsOverride extends ValueObject
         $override->agentWireApi = $agentWireApi;
         $override->previousReasoningCarryOver = $previousReasoningCarryOver;
         $override->previousReasoningCapTokens = $previousReasoningCapTokens;
+        $override->previousReasoningKeptTokensAtCut = $previousReasoningKeptTokensAtCut;
+        $override->previousReasoningKeptStepsAtCut = $previousReasoningKeptStepsAtCut;
+        $override->previousReasoningHeadroomTokensAfterCut = $previousReasoningHeadroomTokensAfterCut;
         return $override->isEmpty() ? null : $override;
     }
 
@@ -88,7 +103,8 @@ class RunSettingsOverride extends ValueObject
             && $this->decisionModelReplyLanguage === null
             && $this->planDynamicsAskDecisionModel === null && $this->planDynamicsModelReceivesVerdict === null
             && $this->agentWireApi === null && $this->previousReasoningCarryOver === null
-            && $this->previousReasoningCapTokens === null;
+            && $this->previousReasoningCapTokens === null && $this->previousReasoningKeptTokensAtCut === null
+            && $this->previousReasoningKeptStepsAtCut === null && $this->previousReasoningHeadroomTokensAfterCut === null;
     }
 
     /**
