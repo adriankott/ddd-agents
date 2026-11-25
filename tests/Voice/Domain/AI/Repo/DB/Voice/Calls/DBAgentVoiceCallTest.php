@@ -117,7 +117,7 @@ class DBAgentVoiceCallTest extends AgentVoiceIntegrationTestCase
 
     public function testTheModelNamesTheTableAndTheRelation(): void
     {
-        static::assertSame('EntityAgentVoiceCalls', DBAgentVoiceCallModel::getTableName());
+        static::assertSame('AgentVoiceCalls', DBAgentVoiceCallModel::getTableName());
         static::assertSame(DBAgentVoiceCallModel::class, DBAgentVoiceCall::BASE_ORM_MODEL);
         static::assertTrue(property_exists(DBAgentVoiceCallModel::class, 'aiConversation'));
     }

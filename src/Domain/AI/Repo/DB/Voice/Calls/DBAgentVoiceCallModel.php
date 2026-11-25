@@ -13,12 +13,12 @@ use DDD\Domain\Base\Repo\DB\Database\DatabaseColumn;
 
 #[ORM\Entity]
 #[ORM\ChangeTrackingPolicy('DEFERRED_EXPLICIT')]
-#[ORM\Table(name: 'EntityAgentVoiceCalls')]
+#[ORM\Table(name: 'AgentVoiceCalls')]
 class DBAgentVoiceCallModel extends DoctrineModel
 {
 	public const string MODEL_ALIAS = 'AgentVoiceCall';
 
-	public const string TABLE_NAME = 'EntityAgentVoiceCalls';
+	public const string TABLE_NAME = 'AgentVoiceCalls';
 
 	public const string ENTITY_CLASS = 'DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceCall';
 
@@ -72,4 +72,5 @@ class DBAgentVoiceCallModel extends DoctrineModel
 	#[ORM\ManyToOne(targetEntity: DBAIConversationModel::class)]
 	#[ORM\JoinColumn(name: 'aiConversationId', referencedColumnName: 'id')]
 	public ?DBAIConversationModel $aiConversation;
+
 }
