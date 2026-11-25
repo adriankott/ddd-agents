@@ -12,7 +12,7 @@ npm install @mgamadeus/ddd-agents@~0.1.1 @types/google.maps@^3.55.0 apexcharts@^
   remark-directive@^4.0.0 remark-gfm@^4.0.1 remark-parse@^11.0.0 unified@^11.0.5 unist-util-visit@^5.0.0
 ```
 
-The second part is the peer set (React 19 assumed present; `axios` ^0.28.0 only for the optional axios client).
+The second part is the peer set (React 19 assumed present).
 `react-apexcharts` stays below 1.6.0: from 1.6.0 it needs apexcharts 4, the package draws with apexcharts 3.
 The agent skills come with the Composer package (`vendor/mgamadeus/ddd-agents/.claude/skills`), not with this one.
 
@@ -20,6 +20,12 @@ Entries: `@mgamadeus/ddd-agents` (provider and setup), `/provider` (the provider
 `/client`, `/client/testing`, `/preview`, `/image-render`, `/ui`, and the stylesheet `@mgamadeus/ddd-agents/styles.css`
 (import it once). Non-code files (widget documentation, preview fixtures, contracts, the node schema, the
 sandbox frame, SCSS tokens) are exported one subpath per file at their path below `src`. React 19 and the libraries listed under `peerDependencies` come from the application.
+
+The request stand-ins of `/preview` (`installWidgetPreviewRequests`) and `/image-render` (`installFrozenWidgetRequests`,
+`installLiveWidgetRequests`) replace `XMLHttpRequest` (the transport of axios's browser adapter) until the returned
+function is called; the preview and the live capture answer `fetch` as well. The frozen capture leaves `fetch` alone
+unless asked: `installFrozenWidgetRequests(responses, fail, { interceptFetch: true })` for an application that reads
+through `fetch`. No request needs to route through axios.
 
 ## The conversation client over HTTP
 

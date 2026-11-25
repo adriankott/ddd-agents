@@ -1,4 +1,4 @@
-import axios, { AxiosRequestConfig } from "axios";
+import { createHeaderlessResponse, interceptXMLHttpRequests, isFetchRequest } from "../request-interception/browser-request-interception";
 import type { WidgetPreviewResponse } from "./widget-preview.types";
 
 /** The key a fixture response is stored under: method, path and the sorted query (`GET /api/example/…?a=1&b=2`). */
@@ -19,46 +19,50 @@ export const isStatusResponse = (response: unknown): response is { __status: num
 export const isPendingResponse = (response: unknown): boolean =>
   typeof response === "object" && response !== null && (response as { __pending?: unknown }).__pending === true;
 
+/** A fixture answer as an `XMLHttpRequest` reads it; a status a `Response` cannot carry fails like a network error. */
+const xhrAnswer = (body: unknown, status: number): Response => {
+  if (status < 200 || status > 599) throw new TypeError(`preview response ${status}`);
+  if ([101, 204, 205, 304].includes(status)) return createHeaderlessResponse(null, status);
+  return createHeaderlessResponse(JSON.stringify(body), status, status === 200 ? "OK" : "");
+};
+
 /**
- * Serves every request of the preview — axios and `fetch` — from the fixture: a known request gets its body (a copy), a
- * `__status` entry fails with that status (a status of 400 or more is reported as a failed request — the error state the
- * fixture asked for), a `__pending` entry never answers (the loading state), and anything else — an unknown read, a
- * write the fixture does not answer — fails as a missing response and is reported. A write is answered only when the
- * fixture names it (`"POST /api/example/…"`, e.g. a widget's fire-and-forget measurement event). Nothing reaches a server.
+ * Serves every request of the preview — `XMLHttpRequest` (the transport of axios's browser adapter) and `fetch` — from
+ * the fixture: a known request gets its body (a copy), a `__status` entry fails with that status (a status of 400 or
+ * more is reported as a failed request — the error state the fixture asked for), a `__pending` entry never answers (the
+ * loading state), and anything else — an unknown read, a write the fixture does not answer — fails as a missing
+ * response and is reported. A write is answered only when the fixture names it (`"POST /api/example/…"`, e.g. a
+ * widget's fire-and-forget measurement event). Nothing reaches a server.
  */
 export const installWidgetPreviewRequests = (
   responses: Record<string, WidgetPreviewResponse>,
   onMissingResponse: (requestKey: string) => void,
   onFailedRequest: (requestKey: string) => void = () => {},
 ): (() => void) => {
-  const originalAdapter = axios.defaults.adapter;
-  axios.defaults.adapter = async (config: AxiosRequestConfig) => {
-    const method = (config.method ?? "get").toLowerCase();
-    const requestUrl = new URL(axios.getUri(config), window.location.origin);
-    if (isSilentlyAnswered(requestUrl)) return { data: {}, status: 200, statusText: "OK", config, headers: {} };
-    const requestKey = widgetPreviewRequestKey(method, requestUrl);
+  // XMLHttpRequest: a missing response fails like a network error (no response), a `__status` entry answers with its
+  // status and `__body`.
+  const restoreXMLHttpRequest = interceptXMLHttpRequests(async (request) => {
+    if (isSilentlyAnswered(request.url)) return xhrAnswer({}, 200);
+    const requestKey = widgetPreviewRequestKey(request.method, request.url);
     const response = Object.prototype.hasOwnProperty.call(responses, requestKey) ? responses[requestKey] : undefined;
     if (response === undefined) {
       onMissingResponse(requestKey);
-      return Promise.reject(Object.assign(new Error(`no preview response for ${requestKey}`), { config }));
+      throw new Error(`no preview response for ${requestKey}`);
     }
-    if (isPendingResponse(response)) return new Promise(() => {});
+    if (isPendingResponse(response)) return new Promise<Response>(() => {});
     if (isStatusResponse(response)) {
       if (response.__status >= 400) onFailedRequest(requestKey);
-      return Promise.reject(
-        Object.assign(new Error(`preview response ${response.__status}`), {
-          config,
-          response: { status: response.__status, data: response.__body ?? null, config, headers: {} },
-        }),
-      );
+      return xhrAnswer(response.__body ?? null, response.__status);
     }
-    return { data: structuredClone(response), status: 200, statusText: "OK", config, headers: {} };
-  };
-  // `fetch` is answered the same way (a few modules bypass axios); a missing response is a 404, reported.
+    return xhrAnswer(response, 200);
+  });
+  // `fetch` is answered the same way (a few modules bypass the XMLHttpRequest client); a missing response is a 404,
+  // reported. A `Request` of another realm is read by its brand, not by `instanceof`.
   const originalFetch = window.fetch;
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-    const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toLowerCase();
-    const url = new URL(input instanceof Request ? input.url : String(input), window.location.origin);
+    const fromRequest = isFetchRequest(input) ? input : undefined;
+    const method = (init?.method ?? (fromRequest ? fromRequest.method : "GET")).toLowerCase();
+    const url = new URL(fromRequest ? fromRequest.url : String(input), window.location.origin);
     if (isSilentlyAnswered(url)) return new Response("{}", { status: 200 });
     const requestKey = widgetPreviewRequestKey(method, url);
     const response = Object.prototype.hasOwnProperty.call(responses, requestKey) ? responses[requestKey] : undefined;
@@ -74,7 +78,7 @@ export const installWidgetPreviewRequests = (
     return new Response(JSON.stringify(response), { status: 200, headers: { "Content-Type": "application/json" } });
   };
   return () => {
-    axios.defaults.adapter = originalAdapter;
+    restoreXMLHttpRequest();
     window.fetch = originalFetch;
   };
 };

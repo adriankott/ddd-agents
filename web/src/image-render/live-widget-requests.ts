@@ -1,22 +1,23 @@
-import axios, { AxiosRequestConfig } from "axios";
 import type { WidgetImageRenderBootstrap } from "./widget-image-render.types";
 import type { createWidgetImageReadiness } from "./widget-image-readiness";
 import { isGoogleMapCapture } from "./widget-image-google-map";
+import { isStaticBundleImageRequest } from "./widget-image-static-assets";
 import { getWidgetImageCaptureReadPathPrefix } from "../provider/environment";
-
-const STATIC_ASSET_PATH =
-  /^\/react\/(?:app-build|widget-image-build)\/assets\/(?:[\w-]+\/)*[\w.-]+\.(?:svg|png|jpe?g|webp|gif)$/;
+import {
+  createHeaderlessResponse,
+  interceptXMLHttpRequests,
+  toSameRealmFetchInput,
+} from "../request-interception/browser-request-interception";
 
 /** Loaded only by the capture entry. SDK signatures stay unchanged; no ambient credentials are sent. */
 export const installLiveWidgetRequests = (
   bootstrap: WidgetImageRenderBootstrap,
   readiness: ReturnType<typeof createWidgetImageReadiness>,
 ) => {
-  const originalAdapter = axios.defaults.adapter;
   const originalFetch = window.fetch;
   const fetchRead = originalFetch.bind(window);
   // The one read a capture may make of the backend: a GET without body under the capture read path, with the
-  // capture token and nothing of the page (cookies, debug/noCache) — through axios and through fetch alike.
+  // capture token and nothing of the page (cookies, debug/noCache) — through XMLHttpRequest and through fetch alike.
   const isScopedRead = (url: URL, method: string, hasBody: boolean) =>
     Boolean(bootstrap.authToken) &&
     url.origin === window.location.origin &&
@@ -46,18 +47,18 @@ export const installLiveWidgetRequests = (
     return response;
   };
   // Captured widgets may import shared telemetry/helpers. They cannot bypass the scoped reads. Three reads pass:
-  // the capture read path (as through axios: a client on fetch reads its data the same way), static bundle images
-  // (useDynamicImport fetches icons such as review-source logos) and, for map captures only, the Google Maps SDK (a map
-  // widget, or a ComposedView tree holding a map).
+  // the capture read path (as through XMLHttpRequest: a client on fetch reads its data the same way), static bundle
+  // images (useDynamicImport fetches icons such as review-source logos) and, for map captures only, the Google Maps SDK
+  // (a map widget, or a ComposedView tree holding a map). A `Request` of another realm is read like one of this realm.
   window.fetch = async (input, init) => {
-    const request = new Request(typeof input === "string" ? new URL(input, window.location.origin).href : input, init);
+    const sameRealmInput = await toSameRealmFetchInput(input);
+    const request = new Request(
+      typeof sameRealmInput === "string" ? new URL(sameRealmInput, window.location.origin).href : sameRealmInput,
+      init,
+    );
     const url = new URL(request.url, window.location.origin);
     const unavailable = readiness.isFailed() || Date.now() >= bootstrap.expiresAt * 1000;
-    const isStaticAsset =
-      url.origin === window.location.origin &&
-      STATIC_ASSET_PATH.test(url.pathname) &&
-      url.search === "" &&
-      request.method === "GET";
+    const isStaticAsset = isStaticBundleImageRequest(url, request.method);
     if (url.origin === window.location.origin && url.pathname.startsWith(getWidgetImageCaptureReadPathPrefix())) {
       const finish = readiness.beginRequest();
       try {
@@ -115,25 +116,27 @@ export const installLiveWidgetRequests = (
       finish();
     }
   };
-  axios.defaults.adapter = async (config: AxiosRequestConfig) => {
+  // XMLHttpRequest (the transport of axios's browser adapter): the scoped capture read only, everything else fails
+  // closed. A failure reaches the page as a network error — status 0, no header, no body: never the URL, request
+  // headers, auth token or remote exception body to the page's shared interceptors (which log errors and submit
+  // telemetry).
+  const restoreXMLHttpRequest = interceptXMLHttpRequests(async (request) => {
     const finish = readiness.beginRequest();
     try {
-      const url = new URL(axios.getUri(config), window.location.origin);
-      if (!isScopedRead(url, config.method ?? "get", config.data !== undefined)) throw new Error("RENDER_READ_DENIED");
-      const response = await readScoped(url, config.signal as AbortSignal | undefined);
-      const data = await response.json();
-      return { data, status: response.status, statusText: "OK", config: {}, headers: {} };
+      if (!isScopedRead(request.url, request.method, request.body !== null)) throw new Error("RENDER_READ_DENIED");
+      const response = await readScoped(request.url, request.signal);
+      const text = await response.text();
+      JSON.parse(text);
+      return createHeaderlessResponse(text, response.status, "OK");
     } catch {
       readiness.fail("WIDGET_HYDRATION_FAILED");
-      // HttpStore logs errors and submits telemetry for status 500. Never expose the URL,
-      // request headers, auth token or remote exception body to those shared interceptors.
-      throw { message: "Widget hydration failed", response: { status: 0, data: { error: "Widget hydration failed" } } };
+      throw new TypeError("Widget hydration failed");
     } finally {
       finish();
     }
-  };
+  });
   return () => {
-    axios.defaults.adapter = originalAdapter;
+    restoreXMLHttpRequest();
     window.fetch = originalFetch;
   };
 };
