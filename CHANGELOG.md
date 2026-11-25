@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.4.2
+
+**Bug fix: a schedule stored without a zone no longer changes when it fires on an unrelated edit.** In 0.4.0 and 0.4.1
+`updateTaskSchedule` gave a schedule stored without a zone (an older row, on UTC) the zone of its space on EVERY edit —
+a title, a task text, a report channel — and the edit then re-armed `nextRunAt`: the old UTC cron digits were read as
+local digits and the schedule moved by the zone's offset.
+
+- **Fixed:** the zone is stored only together with a new cron (the model writes the new cron in local digits). A new
+  one-time moment (`runAtLocalTime`) of such a schedule is read in the zone of its space without storing it. Any other
+  edit leaves the zone and the next firing untouched. The timing edits are one protected method,
+  `applyTimingEditsToSchedule()`; the hooks see the update request: `applyTimezoneOnCronEditToScheduleWithoutZone()`
+  (by default `applyTimezoneForNewScheduleToScheduleWithoutZone()`, which a host override keeps serving, now for cron
+  edits only), `findTimezoneIdentifierForMomentEdit()` and `findTimezoneOfScopeForScheduleWithoutZone()`.
+- **Host check:** a zoneless schedule edited with 0.4.0 or 0.4.1 (title, task, channel, done criteria) may carry the
+  zone of its space and fire at the local reading of its old UTC digits; compare `timezone` and `schedule` of schedules
+  updated since the 0.4.0 deployment.
+
+**Consistency: a schedule the lists show is found by its id.** The task lists read the scope without entity rights (a
+space the acting account may use, or the account's own rows), but pausing, resuming, updating, deleting a schedule or
+reading its run report looked it up under the entity read rights: a sub-account saw a schedule in `getTaskSchedules`
+and got "No such task schedule" for it. The lookup now reads by id without the entity rights and the scope rule of the
+lists decides (`findScheduleByIdForScopeCheck()`, `isScheduleInScopeOfAccount()`, both protected). A hard delete still
+runs under the delete rights of the repository.
+
 ## 0.4.1
 
 **Security fix for 0.4.0 adopters: composed rights no longer open a fail-closed host.** In 0.4.0 a host that answers

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DDD\Presentation\Mcp\Client\Agents;
 
 use DDD\Domain\AI\Entities\AgentSpaces\AgentSpace;
+use DDD\Domain\AI\Entities\AgentSpaces\AgentSpaceTimezone;
 use DDD\Domain\AI\Entities\Conversations\Agent\AgentToolCallProvenance;
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Entities\Conversations\AIConversations;
@@ -741,62 +742,7 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
             $schedule->reportChannel = AIConversationScheduleCreationLimits::normalizeReportChannel($requestDto->reportChannel);
             $editedColumnNames[] = 'reportChannel';
         }
-        // 0 / negative minutes and an empty string mean "not set", as at creation
-        $editedRunInMinutes = $requestDto->runInMinutes !== null && $requestDto->runInMinutes > 0 ? $requestDto->runInMinutes : null;
-        $editedRunAtLocalTime = trim((string)($requestDto->runAtLocalTime ?? '')) !== '' ? trim((string)$requestDto->runAtLocalTime) : null;
-
-        // an explicit zone is applied first: the cron floor and the moment below are then evaluated in the zone the
-        // schedule fires in; a one-time task's zone changes only together with its moment
-        $overrideTimezoneIdentifier = $this->findValidatedTimezoneIdentifier($requestDto->timezoneIdentifier);
-        if ($overrideTimezoneIdentifier !== null) {
-            $timezoneEditOperation = $editedRunAtLocalTime !== null
-                ? AIConversationScheduleTransition::OPERATION_EDIT_TIMEZONE_WITH_NEW_MOMENT
-                : AIConversationScheduleTransition::OPERATION_EDIT_TIMEZONE;
-            if (!$schedule->buildTransitionTo($timezoneEditOperation, $now)->isAllowed) {
-                throw new BadRequestException("Changing a one-time task's time zone needs runAtLocalTime in the same call.");
-            }
-            $schedule->timezone = $overrideTimezoneIdentifier;
-            $schedule->timezoneUnverified = false;
-            $editedColumnNames[] = 'timezone';
-            $editedColumnNames[] = 'timezoneUnverified';
-        } elseif (trim((string)($schedule->timezone ?? '')) === '') {
-            // a schedule stored without a zone (an older row) gets the zone a new schedule of its scope would get; it
-            // stays on UTC only when none is known
-            $editedColumnNames = [...$editedColumnNames, ...$this->applyTimezoneForNewScheduleToScheduleWithoutZone($schedule)];
-        }
-
-        $editedCronExpression = trim((string)($requestDto->cronSchedule ?? ''));
-        if ($editedCronExpression !== '') {
-            if (!$schedule->buildTransitionTo(AIConversationScheduleTransition::OPERATION_EDIT_CRON, $now)->isAllowed) {
-                throw new BadRequestException(
-                    "Schedule {$schedule->id} is a ONE-TIME task — move its moment with runAtLocalTime/runInMinutes; a cron applies to recurring schedules only."
-                );
-            }
-            $schedule->schedule = $editedCronExpression;
-            $this->refuseCronAboveTheFiringsPerDay($schedule);
-            $editedColumnNames[] = 'schedule';
-        }
-
-        if ($editedRunInMinutes !== null || $editedRunAtLocalTime !== null) {
-            $momentEditTransition = $schedule->buildTransitionTo(AIConversationScheduleTransition::OPERATION_EDIT_ONE_TIME_MOMENT, $now);
-            if ($momentEditTransition->refusalReason === AIConversationScheduleTransition::REFUSAL_RECURRING_HAS_NO_ONE_TIME_MOMENT) {
-                throw new BadRequestException(
-                    "Schedule {$schedule->id} is a RECURRING schedule — change its firing times with cronSchedule; runAtLocalTime/runInMinutes apply to one-time tasks only."
-                );
-            }
-            if ($momentEditTransition->refusalReason === AIConversationScheduleTransition::REFUSAL_ONE_TIME_ALREADY_RAN) {
-                throw new BadRequestException(
-                    "Schedule {$schedule->id} already ran — a one-time task that ran is history; schedule a new one with scheduleOneTimeTask instead."
-                );
-            }
-            $schedule->oneTimeAt = AIConversationScheduleOneTimeMoment::resolveFor(
-                $editedRunInMinutes,
-                $editedRunAtLocalTime,
-                $schedule->getCronTimezoneIdentifier(),
-                $now
-            )->moment;
-            $editedColumnNames[] = 'oneTimeAt';
-        }
+        $editedColumnNames = [...$editedColumnNames, ...$this->applyTimingEditsToSchedule($schedule, $requestDto, $now)];
 
         if ($editedColumnNames === []) {
             throw new BadRequestException('Nothing to change — pass at least one field besides scheduleId.');
@@ -808,7 +754,7 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
         $responseDto->nextRunAt = $schedule->nextRunAt ?? null;
         $responseDto->note = 'Schedule updated IN PLACE (same id, run history preserved). ' . static::composeNextFiringNote($schedule);
         if (in_array('oneTimeAt', $editedColumnNames, true)) {
-            $responseDto->note .= static::composeOneTimeMomentNote($schedule->oneTimeAt, $schedule->getCronTimezoneIdentifier(), $now)
+            $responseDto->note .= static::composeOneTimeMomentNote($schedule->oneTimeAt, $this->findTimezoneIdentifierForMomentEdit($schedule, $requestDto), $now)
                 . 'VERIFY this matches what the user asked (wrong day → fix it with updateTaskSchedule). ';
         }
         $responseDto->note .= 'Confirm to the user in ONE short sentence what changed.';
@@ -931,28 +877,55 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
         AgentToolCallProvenance $callProvenance
     ): AIConversationSchedule {
         $actingAccount = $this->requireActingAccount($callProvenance);
-        $schedule = $aIConversationSchedulesService->find($scheduleId);
-        if (!$schedule instanceof AIConversationSchedule) {
-            throw new NotFoundException('No such task schedule — list them with getTaskSchedules.');
-        }
-        if (($schedule->agentSpaceId ?? null) === null) {
-            if ((int)($schedule->accountId ?? 0) !== (int)$actingAccount->id) {
-                throw new NotFoundException('No such task schedule — list them with getTaskSchedules.');
-            }
-            return $schedule;
-        }
-        /** @var AgentSpacesService $agentSpacesService */
-        $agentSpacesService = DDDService::instance()->getService(AgentSpacesService::class);
-        $agentSpaceOfSchedule = $schedule->agentSpace ?? null;
-        try {
-            if (!$agentSpaceOfSchedule instanceof AgentSpace) {
-                throw new ForbiddenException($agentSpacesService::NO_ACCESS_TO_AGENT_SPACE_MESSAGE);
-            }
-            $agentSpacesService->requireAgentSpaceUsableByAccount($agentSpaceOfSchedule, $actingAccount);
-        } catch (ForbiddenException) {
+        $schedule = $this->findScheduleByIdForScopeCheck($scheduleId, $aIConversationSchedulesService);
+        if (!$schedule instanceof AIConversationSchedule || !$this->isScheduleInScopeOfAccount($schedule, $actingAccount)) {
             throw new NotFoundException('No such task schedule — list them with getTaskSchedules.');
         }
         return $schedule;
+    }
+
+    /**
+     * A schedule by id without the entity read rights, its space loaded with it — the scope check that follows
+     * ({@see isScheduleInScopeOfAccount()}) decides, by the same rule as the lists ({@see isScopeReadWithoutEntityRights()}):
+     * a schedule the lists show is found by its id too. Null when there is none.
+     */
+    protected function findScheduleByIdForScopeCheck(int $scheduleId, AIConversationSchedulesService $aIConversationSchedulesService): ?AIConversationSchedule
+    {
+        DDDService::instance()->deactivateEntityRightsRestrictions();
+        try {
+            $schedule = $aIConversationSchedulesService->find($scheduleId, false);
+            if ($schedule instanceof AIConversationSchedule && ($schedule->agentSpaceId ?? null) !== null) {
+                // the space is read here too, without the read rights of a sub-account
+                $loadedAgentSpace = $schedule->agentSpace ?? null;
+            }
+        } finally {
+            DDDService::instance()->restoreEntityRightsRestrictionsStateSnapshot();
+        }
+        return $schedule instanceof AIConversationSchedule ? $schedule : null;
+    }
+
+    /**
+     * Whether a schedule lies in the scope the acting account reads: without a space it is the account's own; with one
+     * the account may use the space ({@see AgentSpacesService::requireAgentSpaceUsableByAccount()}) — the rule of the
+     * lists.
+     */
+    protected function isScheduleInScopeOfAccount(AIConversationSchedule $schedule, Account $actingAccount): bool
+    {
+        if (($schedule->agentSpaceId ?? null) === null) {
+            return (int)($schedule->accountId ?? 0) === (int)$actingAccount->id;
+        }
+        $agentSpaceOfSchedule = $schedule->agentSpace ?? null;
+        if (!$agentSpaceOfSchedule instanceof AgentSpace) {
+            return false;
+        }
+        /** @var AgentSpacesService $agentSpacesService */
+        $agentSpacesService = DDDService::instance()->getService(AgentSpacesService::class);
+        try {
+            $agentSpacesService->requireAgentSpaceUsableByAccount($agentSpaceOfSchedule, $actingAccount);
+            return true;
+        } catch (ForbiddenException) {
+            return false;
+        }
     }
 
     /**
@@ -1372,22 +1345,128 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
     }
 
     /**
+     * The timing edits of updateTaskSchedule: an explicit zone, a new cron, a new one-time moment; the edited column
+     * names. A schedule stored without a zone (an older row) changes its zone ONLY with a new cron (the model writes
+     * the cron in local digits): {@see applyTimezoneOnCronEditToScheduleWithoutZone()}. A new moment of such a schedule
+     * is read in the zone of its space without storing it ({@see findTimezoneIdentifierForMomentEdit()}). Any other
+     * edit (title, task, report channel, done criteria, pause) leaves the zone and the next firing untouched.
+     *
+     * @return string[]
+     * @throws BadRequestException
+     */
+    protected function applyTimingEditsToSchedule(AIConversationSchedule $schedule, TaskScheduleUpdateRequestDto $requestDto, DateTime $now): array
+    {
+        $editedColumnNames = [];
+        // 0 / negative minutes and an empty string mean "not set", as at creation
+        $editedRunInMinutes = $requestDto->runInMinutes !== null && $requestDto->runInMinutes > 0 ? $requestDto->runInMinutes : null;
+        $editedRunAtLocalTime = trim((string)($requestDto->runAtLocalTime ?? '')) !== '' ? trim((string)$requestDto->runAtLocalTime) : null;
+
+        // an explicit zone is applied first: the cron floor and the moment below are then evaluated in the zone the
+        // schedule fires in; a one-time task's zone changes only together with its moment
+        $overrideTimezoneIdentifier = $this->findValidatedTimezoneIdentifier($requestDto->timezoneIdentifier);
+        if ($overrideTimezoneIdentifier !== null) {
+            $timezoneEditOperation = $editedRunAtLocalTime !== null
+                ? AIConversationScheduleTransition::OPERATION_EDIT_TIMEZONE_WITH_NEW_MOMENT
+                : AIConversationScheduleTransition::OPERATION_EDIT_TIMEZONE;
+            if (!$schedule->buildTransitionTo($timezoneEditOperation, $now)->isAllowed) {
+                throw new BadRequestException("Changing a one-time task's time zone needs runAtLocalTime in the same call.");
+            }
+            $schedule->timezone = $overrideTimezoneIdentifier;
+            $schedule->timezoneUnverified = false;
+            $editedColumnNames[] = 'timezone';
+            $editedColumnNames[] = 'timezoneUnverified';
+        }
+
+        $editedCronExpression = trim((string)($requestDto->cronSchedule ?? ''));
+        if ($editedCronExpression !== '') {
+            if (!$schedule->buildTransitionTo(AIConversationScheduleTransition::OPERATION_EDIT_CRON, $now)->isAllowed) {
+                throw new BadRequestException(
+                    "Schedule {$schedule->id} is a ONE-TIME task — move its moment with runAtLocalTime/runInMinutes; a cron applies to recurring schedules only."
+                );
+            }
+            if (trim((string)($schedule->timezone ?? '')) === '') {
+                // a schedule stored without a zone (an older row) gets the zone of its space with a new cron: the model
+                // writes the new cron in local digits; it stays on UTC only when none is known
+                $editedColumnNames = [...$editedColumnNames, ...$this->applyTimezoneOnCronEditToScheduleWithoutZone($schedule, $requestDto)];
+            }
+            $schedule->schedule = $editedCronExpression;
+            $this->refuseCronAboveTheFiringsPerDay($schedule);
+            $editedColumnNames[] = 'schedule';
+        }
+
+        if ($editedRunInMinutes !== null || $editedRunAtLocalTime !== null) {
+            $momentEditTransition = $schedule->buildTransitionTo(AIConversationScheduleTransition::OPERATION_EDIT_ONE_TIME_MOMENT, $now);
+            if ($momentEditTransition->refusalReason === AIConversationScheduleTransition::REFUSAL_RECURRING_HAS_NO_ONE_TIME_MOMENT) {
+                throw new BadRequestException(
+                    "Schedule {$schedule->id} is a RECURRING schedule — change its firing times with cronSchedule; runAtLocalTime/runInMinutes apply to one-time tasks only."
+                );
+            }
+            if ($momentEditTransition->refusalReason === AIConversationScheduleTransition::REFUSAL_ONE_TIME_ALREADY_RAN) {
+                throw new BadRequestException(
+                    "Schedule {$schedule->id} already ran — a one-time task that ran is history; schedule a new one with scheduleOneTimeTask instead."
+                );
+            }
+            $schedule->oneTimeAt = AIConversationScheduleOneTimeMoment::resolveFor(
+                $editedRunInMinutes,
+                $editedRunAtLocalTime,
+                $this->findTimezoneIdentifierForMomentEdit($schedule, $requestDto),
+                $now
+            )->moment;
+            $editedColumnNames[] = 'oneTimeAt';
+        }
+        return $editedColumnNames;
+    }
+
+    /**
+     * Override point: the zone a schedule stored without one gets when its cron is edited — by default the zone a new
+     * schedule of its scope gets ({@see applyTimezoneForNewScheduleToScheduleWithoutZone()}). Returns the edited column
+     * names.
+     *
+     * @return string[]
+     */
+    protected function applyTimezoneOnCronEditToScheduleWithoutZone(AIConversationSchedule $schedule, TaskScheduleUpdateRequestDto $requestDto): array
+    {
+        return $this->applyTimezoneForNewScheduleToScheduleWithoutZone($schedule);
+    }
+
+    /**
+     * Override point: the zone a new one-time moment (`runAtLocalTime`) is read in — the schedule's stored zone, else
+     * (an older row without one) the zone a new schedule of its scope gets, which is NOT stored; UTC when none is known.
+     */
+    protected function findTimezoneIdentifierForMomentEdit(AIConversationSchedule $schedule, TaskScheduleUpdateRequestDto $requestDto): string
+    {
+        if (trim((string)($schedule->timezone ?? '')) !== '') {
+            return $schedule->getCronTimezoneIdentifier();
+        }
+        return $this->findTimezoneOfScopeForScheduleWithoutZone($schedule)?->identifier ?? $schedule->getCronTimezoneIdentifier();
+    }
+
+    /**
+     * The zone a new schedule of the schedule's scope gets ({@see AgentSpacesService::findTimezoneForNewSchedule()});
+     * null when none is known.
+     */
+    protected function findTimezoneOfScopeForScheduleWithoutZone(AIConversationSchedule $schedule): ?AgentSpaceTimezone
+    {
+        /** @var AgentSpacesService $agentSpacesService */
+        $agentSpacesService = DDDService::instance()->getService(AgentSpacesService::class);
+        try {
+            return $agentSpacesService->findTimezoneForNewSchedule($schedule);
+        } catch (BadRequestException|InternalErrorException|InvalidArgumentException|ReflectionException) {
+            return null;
+        }
+    }
+
+    /**
      * Gives a schedule stored without a zone the zone a new schedule of its scope gets
      * ({@see AgentSpacesService::findTimezoneForNewSchedule()}); no answer leaves it on UTC. Returns the edited column
-     * names.
+     * names. Called for a cron edit only ({@see applyTimezoneOnCronEditToScheduleWithoutZone()}).
      *
      * @param AIConversationSchedule $schedule
      * @return string[]
      */
     protected function applyTimezoneForNewScheduleToScheduleWithoutZone(AIConversationSchedule $schedule): array
     {
-        /** @var AgentSpacesService $agentSpacesService */
-        $agentSpacesService = DDDService::instance()->getService(AgentSpacesService::class);
-        try {
-            $agentSpaceTimezone = $agentSpacesService->findTimezoneForNewSchedule($schedule);
-        } catch (BadRequestException|InternalErrorException|InvalidArgumentException|ReflectionException) {
-            return [];
-        }
+        $agentSpaceTimezone = $this->findTimezoneOfScopeForScheduleWithoutZone($schedule);
         if ($agentSpaceTimezone === null) {
             return [];
         }
