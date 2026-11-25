@@ -15,7 +15,8 @@ use DDD\Domain\Base\Entities\ValueObject;
  *
  * The four answers to "which effort" read it:
  * - {@see resolveEffortToSend()} — the effort the model call is sent with;
- * - {@see buildFloor()} — the active effort the decision model is told;
+ * - {@see buildFloor()} — the active effort the decision model is told: the effort the call is sent with before the
+ *   turn's decision (site `off` and a fixed effort included);
  * - {@see resolveFallbackEffort()} / {@see resolveAnsweredEffort()} — the effective effort the site stamps;
  * - {@see buildBaseline()} — the admin panel's baseline.
  *
@@ -163,19 +164,28 @@ class AgentReasoningEffortLimits extends ValueObject
 
     /**
      * The turn's ACTIVE effort before any decision and its source — what the decision model is told the assistant
-     * already reasons at ({@see resolveFloorEffort()} over the base effort, the pin, the purpose minimum and the plan
-     * item's minimum, clamped to the ceiling).
-     *
+     * already reasons at. It is the effort the call is sent with ({@see resolveEffortToSend()}) before the turn's
+     * decision: a fixed effort as it is, clamped (source `fixed`); under site `off` the catalog's configured effort, else
+     * `low` (`configured` / `default`), because the call then sends nothing of this layer — no purpose base, no row pin,
+     * no minimum; otherwise {@see resolveFloorEffort()} over the base effort (the purpose's, source `purpose`, else the
+     * catalog's), the pin, the purpose minimum and the plan item's minimum, clamped to the ceiling.
      */
     public function buildFloor(): AgentReasoningEffortFloor
     {
+        if ($this->fixedEffort !== null) {
+            return AgentReasoningEffortFloor::create(self::clampTo($this->fixedEffort, $this->ceilingEffort), AgentReasoningEffortDecision::FLOOR_SOURCE_FIXED, $this->ceilingEffort);
+        }
+        if ($this->siteMode === AgentDecisionModelSettings::MODE_OFF) {
+            return self::resolveFloorEffort($this->configuredEffort, AgentDecisionModelSettings::REASONING_EFFORT_LOW, null, null, null, $this->ceilingEffort);
+        }
         return self::resolveFloorEffort(
             $this->purposeBaseEffort ?? $this->configuredEffort,
             AgentDecisionModelSettings::REASONING_EFFORT_LOW,
             $this->pinnedEffort,
             $this->purposeMinimum,
             $this->planItemMinimum,
-            $this->ceilingEffort
+            $this->ceilingEffort,
+            $this->purposeBaseEffort !== null ? AgentReasoningEffortDecision::FLOOR_SOURCE_PURPOSE : AgentReasoningEffortDecision::FLOOR_SOURCE_CONFIGURED
         );
     }
 
@@ -244,12 +254,20 @@ class AgentReasoningEffortLimits extends ValueObject
     /**
      * The turn's ACTIVE effort and its source, pure: the highest of the base (the configured effort, else the site
      * default), the row pin, the purpose floor and the plan item's minimum, clamped to the ceiling. On a tie the more
-     * specific declaration names the source (plan item > purpose > pin > base).
+     * specific declaration names the source (plan item > purpose > pin > base). `$configuredEffortSource` names where
+     * the base came from (`purpose` for a purpose's base effort; default `configured`, the catalog).
      */
-    public static function resolveFloorEffort(?string $configuredEffort, string $defaultEffort, ?string $pinnedEffort, ?string $purposeMinimum, ?string $planItemMinimum, string $ceilingEffort): AgentReasoningEffortFloor
-    {
+    public static function resolveFloorEffort(
+        ?string $configuredEffort,
+        string $defaultEffort,
+        ?string $pinnedEffort,
+        ?string $purposeMinimum,
+        ?string $planItemMinimum,
+        string $ceilingEffort,
+        string $configuredEffortSource = AgentReasoningEffortDecision::FLOOR_SOURCE_CONFIGURED
+    ): AgentReasoningEffortFloor {
         $effort = $configuredEffort ?? $defaultEffort;
-        $source = $configuredEffort !== null ? AgentReasoningEffortDecision::FLOOR_SOURCE_CONFIGURED : AgentReasoningEffortDecision::FLOOR_SOURCE_DEFAULT;
+        $source = $configuredEffort !== null ? $configuredEffortSource : AgentReasoningEffortDecision::FLOOR_SOURCE_DEFAULT;
         foreach ([AgentReasoningEffortDecision::FLOOR_SOURCE_PIN => $pinnedEffort, AgentReasoningEffortDecision::FLOOR_SOURCE_PURPOSE => $purposeMinimum, AgentReasoningEffortDecision::FLOOR_SOURCE_PLAN_ITEM => $planItemMinimum] as $candidateSource => $candidate) {
             if ($candidate !== null && AgentDecisionModelSettings::reasoningEffortRank($candidate) >= AgentDecisionModelSettings::reasoningEffortRank($effort)
                 && AgentDecisionModelSettings::reasoningEffortRank($candidate) > AgentDecisionModelSettings::reasoningEffortRank($configuredEffort ?? $defaultEffort)) {

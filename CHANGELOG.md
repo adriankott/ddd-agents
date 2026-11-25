@@ -1,5 +1,44 @@
 # Changelog
 
+## 0.5.16
+
+**A blocked or not-applicable container prunes its whole subtree in every count, walk and marker of the task plan; one
+leaf definition; the reasoning-effort floor reports what the call sends; a stalled model's turn says it got no answer
+instead of naming the step limit.** Package tests of the turn head, of "already decided this turn", of the
+reasoning-effort matrix, of the tool-result screen, of the release of a worker turn, of the loop's exits, of the origin
+predicates, of the run-state sets and of the task-plan tables, contributed by an application team. npm
+`@mgamadeus/ddd-agents` 0.5.16 in lockstep (no web change).
+
+- **Task plan, pruned subtrees:** the rule of `hasOpenItems()` now holds everywhere. `countItemsByStatus()` (the "Plan
+  now" counts) counts a not_applicable container done and its subtree nothing (before: "1 done, 2 open" on a plan with
+  nothing open). The owed walks (`hasOwedOpenItems()`, `getOwedOpenLeafTextsByNumberPath()`, the skill lookahead, the
+  tickable list after a call, `hasOwedOpenItemsForProgressStepKey()`) and both platform closings never reach a leaf
+  under a blocked or not_applicable container: a completed call no longer closes such a leaf, as the turn end never
+  did. The `← next` marker never lands inside such a container. The progress-step members, the purposed run's open
+  items and the criteria review count such a node as the container's verdict; the outcome summary lists the container
+  in place of its subtree. New `TaskPlanItemAddresses::getLeavesOutsideTerminalContainers()`,
+  `TaskPlanItemAddress::getStatusOfCoveringTerminalAncestor()`.
+- **One leaf definition:** `TaskPlanItem::isLeaf()` (no subtask level or an empty one) is read by the address walk, the
+  leaf count, the tick gate and the two step-key checks, which tested `subtasks === null` and never judged an item
+  with an empty level.
+- **Reasoning effort:** `AgentReasoningEffortLimits::buildFloor()` reports the effort the call is sent with. Its source
+  says `purpose` for the purpose's base effort, as the control panel's baseline does (before: `configured`). Under site
+  `off` (and the kill switch) the floor is the catalog's effort, because the call sends nothing of this layer — the
+  purpose's base and minimum, the plan item's minimum and the row pin belong to the site and apply under `shadow` and
+  `on` only (unchanged; the decisions and purposes skills say so now). A fixed effort reports as `fixed`.
+  `resolveFloorEffort()` takes an optional source of its base.
+- **Stalled model:** `AgentLoopStopReason::EMPTY_FINAL_TEXT` has its own terminal texts: the ERROR row "Turn ended
+  without an answer: the model returned no text, also after the nudges." and the run report's stop reason
+  `AgentRunReport::STOP_REASON_MODEL_GAVE_NO_ANSWER` ("the AI model gave me no answer, even after I asked it again.").
+  Before, both named the step budget after four of forty steps. The report text is a new English translation key
+  (`AgentOwnerFacingTextTranslationService`); a host with its own translations adds it, else English is shown.
+- **TurnHeadTest stays off the database:** each case starts with no entity manager in the process and asserts that
+  none was created, so a run with a database writes nothing and a swallowed connection error cannot pass it.
+- New package tests below `tests/Domain/AI/Services/Decisions/SiteOutcomes/`, `…/Conversations/RunRelease/`,
+  `…/Conversations/LoopExits/`, `…/Conversations/Agent/TaskPlanRecord/`, `tests/Domain/AI/Entities/Conversations/`
+  and `…/TaskPlan/Characterization/`; the rows of the findings flipped to the fixed behaviour.
+- Loop, decisions and purposes skills.
+
 ## 0.5.15
 
 **A completed `wait_for_sub_agents` is no longer an action of the turn: the final answer is not asked to report it,

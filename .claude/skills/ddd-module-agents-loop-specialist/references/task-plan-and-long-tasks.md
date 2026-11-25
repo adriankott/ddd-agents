@@ -147,6 +147,14 @@ produced, the obstacle or the reason (capped at `STATUS_NOTE_MAX_LENGTH`). A blo
 `TaskPlanItem::isOpen()` is tree-aware and the ONE predicate every reader uses: blocked and not_applicable prune their
 subtree; a done item with open subtasks stays open; an open container whose subtasks are all terminal is closed (the
 model ticks leaves, never containers).
+Every count, walk and marker prunes a blocked or not_applicable container's subtree the same way: the "Plan now" counts
+(`countItemsByStatus()`: the container counts blocked or done, its subtree nothing), the owed walks
+(`hasOwedOpenItems()`, `getOwedOpenLeafTextsByNumberPath()`, the skill lookahead, the tickable list), both platform
+closings (a completed call and the turn end never close a leaf under such a container), the `← next` marker, the
+progress-step members, the purposed run's open items and the outcome summary (the container stands for its subtree). A
+walk over leaves takes `TaskPlanItemAddresses::getLeavesOutsideTerminalContainers()`; a node walk skips
+`TaskPlanItemAddress::$isInsideTerminalContainer`. One leaf definition: `TaskPlanItem::isLeaf()` — no subtask level or
+an empty one (`TaskPlanItemAddress::$isLeaf`, `countLeafItems()` and the step-key checks read it).
 A container whose subtasks are all closed and none of them done takes its blocker's state
 (`TaskPlanItem::findBlockerOfClosedContainer()`): `rendersAsBlockedOnPlanLine()` true, the plan line `[✗ blocked: …]` with
 the blocker's note, and `countItemsByStatus()` counts it blocked — never ✓. It stays closed for the checked stop.

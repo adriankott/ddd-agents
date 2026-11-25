@@ -152,7 +152,11 @@ class TaskPlanItems extends ObjectSet
             $memberStatesByStepKey[$taskPlanItem->customerProgressStepKey] ??= CustomerProgressStepMemberState::forNoMembers();
             // Terminal by the DIALOG's doing (agent tick, owner deferral, platform deferral at the end) counts as
             // progress — a leaf the platform pre-resolved from live state before turn 1 does NOT.
-            $memberStatesByStepKey[$taskPlanItem->customerProgressStepKey]->addMember($taskPlanItem->isOpen(), $taskPlanItem->preResolvedAtSeed);
+            // a node under a blocked or not_applicable container is covered by its verdict: terminal, never open
+            $memberStatesByStepKey[$taskPlanItem->customerProgressStepKey]->addMember(
+                $taskPlanItem->isOpen() && !$taskPlanItemAddress->isInsideTerminalContainer,
+                $taskPlanItem->preResolvedAtSeed
+            );
         }
     }
 
@@ -192,7 +196,7 @@ class TaskPlanItems extends ObjectSet
      */
     public function hasOwedOpenItems(): bool
     {
-        foreach ($this->buildItemAddresses()->getLeaves() as $taskPlanItemAddress) {
+        foreach ($this->buildItemAddresses()->getLeavesOutsideTerminalContainers() as $taskPlanItemAddress) {
             if ($taskPlanItemAddress->item->isOwedOpen()) {
                 return true;
             }
@@ -266,7 +270,7 @@ class TaskPlanItems extends ObjectSet
     {
         $stampedCount = 0;
         foreach ($this->getElements() as $taskPlanItem) {
-            if ($taskPlanItem->subtasks !== null && $taskPlanItem->subtasks->count() > 0) {
+            if (!$taskPlanItem->isLeaf()) {
                 $stampedCount += $taskPlanItem->subtasks->stampRenderedNonBlockingOffers($conversationMessages);
                 continue;
             }
@@ -337,7 +341,7 @@ class TaskPlanItems extends ObjectSet
     public function getItemNumberPathsTickableAfterToolCall(string $toolName, TaskPlanEvidence $taskPlanEvidence, array $keysResolvedByPlatformInThisStep = []): array
     {
         $tickableKeys = [];
-        foreach ($this->buildItemAddresses()->getLeaves() as $taskPlanItemAddress) {
+        foreach ($this->buildItemAddresses()->getLeavesOutsideTerminalContainers() as $taskPlanItemAddress) {
             $taskPlanItem = $taskPlanItemAddress->item;
             $itemKey = $taskPlanItemAddress->key;
             $closedByPlatformWithAnotherVerdict = in_array($itemKey, $keysResolvedByPlatformInThisStep, true)
@@ -382,7 +386,8 @@ class TaskPlanItems extends ObjectSet
     public function closeLeavesProvenByCompletedCall(string $toolName, int $toolCallMessageIndex, TaskPlanEvidence $taskPlanEvidence): TaskPlanLeafClosings
     {
         $taskPlanLeafClosings = new TaskPlanLeafClosings();
-        foreach ($this->buildItemAddresses()->getLeaves() as $taskPlanItemAddress) {
+        // a leaf under a blocked or not_applicable container is covered by its verdict: never closed from a call
+        foreach ($this->buildItemAddresses()->getLeavesOutsideTerminalContainers() as $taskPlanItemAddress) {
             $taskPlanItemPlatformCloser = TaskPlanItemPlatformCloser::forItem($taskPlanItemAddress->item);
             $closingStatus = $taskPlanItemPlatformCloser->closeWhenCompletedCallProvesStatus($toolName, $toolCallMessageIndex, $taskPlanEvidence)
                 ?? $taskPlanItemPlatformCloser->closeWhenCompletedCallAndWrittenWidgetProveDone($toolName, $taskPlanEvidence);
@@ -415,7 +420,8 @@ class TaskPlanItems extends ObjectSet
     ): TaskPlanLeafClosings {
         $taskPlanLeafClosings = new TaskPlanLeafClosings();
         $anEarlierLeafIsOpen = false;
-        foreach ($this->buildItemAddresses()->getLeaves() as $taskPlanItemAddress) {
+        // a leaf under a blocked or not_applicable container is covered by its verdict: never closed at the turn end
+        foreach ($this->buildItemAddresses()->getLeavesOutsideTerminalContainers() as $taskPlanItemAddress) {
             $taskPlanItem = $taskPlanItemAddress->item;
             if ($holdsAnswerTextItemsBehindOpenItems && $anEarlierLeafIsOpen && $taskPlanItem->isResultTextInTheAnswer()) {
                 if ($taskPlanItem->isOpen() && $taskPlanEvidence->hasTranscript
@@ -429,7 +435,7 @@ class TaskPlanItems extends ObjectSet
             if ($closingStatus !== null) {
                 $taskPlanLeafClosings->addClosing($taskPlanItemAddress->key, $closingStatus);
             }
-            $anEarlierLeafIsOpen = $anEarlierLeafIsOpen || ($taskPlanItem->isOpen() && !$taskPlanItemAddress->hasBlockedAncestor);
+            $anEarlierLeafIsOpen = $anEarlierLeafIsOpen || $taskPlanItem->isOpen();
         }
         return $taskPlanLeafClosings;
     }
@@ -455,7 +461,7 @@ class TaskPlanItems extends ObjectSet
     public function getOwedOpenLeafTextsByNumberPath(int $limit = 1): array
     {
         $leafTextsByKey = [];
-        foreach ($this->buildItemAddresses()->getLeaves() as $taskPlanItemAddress) {
+        foreach ($this->buildItemAddresses()->getLeavesOutsideTerminalContainers() as $taskPlanItemAddress) {
             if (count($leafTextsByKey) >= $limit) {
                 break;
             }
@@ -524,7 +530,7 @@ class TaskPlanItems extends ObjectSet
     public function collectOwedOpenLeafSkillNamesByNumberPath(): array
     {
         $skillNamesByKey = [];
-        foreach ($this->buildItemAddresses()->getLeaves() as $taskPlanItemAddress) {
+        foreach ($this->buildItemAddresses()->getLeavesOutsideTerminalContainers() as $taskPlanItemAddress) {
             if ($taskPlanItemAddress->item->isOwedOpen()) {
                 $skillNamesByKey[$taskPlanItemAddress->key] = array_values($taskPlanItemAddress->effectiveSkillNames);
             }
@@ -676,13 +682,13 @@ class TaskPlanItems extends ObjectSet
         return false;
     }
 
-    /** Whether a node WITHOUT a subtask level of the given progress step was resolved by the PLATFORM (from the record), not only by the model's ticks. */
+    /** Whether a LEAF ({@see TaskPlanItem::isLeaf()}) of the given progress step was resolved by the PLATFORM (from the record), not only by the model's ticks. */
     public function hasPlatformResolvedItemsForProgressStepKey(string $customerProgressStepKey): bool
     {
         foreach ($this->buildItemAddresses()->getElements() as $taskPlanItemAddress) {
             $taskPlanItem = $taskPlanItemAddress->item;
-            // only nodes WITHOUT a subtask level are read — an empty level counts as a container here
-            if ($taskPlanItem->subtasks === null && $taskPlanItem->customerProgressStepKey === $customerProgressStepKey
+            // only leaves are read ({@see TaskPlanItem::isLeaf()}: an empty subtask level is a leaf)
+            if ($taskPlanItem->isLeaf() && $taskPlanItem->customerProgressStepKey === $customerProgressStepKey
                 && ($taskPlanItem->platformResolvedAtMessageIndex ?? null) !== null
             ) {
                 return true;
@@ -691,13 +697,16 @@ class TaskPlanItems extends ObjectSet
         return false;
     }
 
-    /** Whether a node WITHOUT a subtask level carries the given progress step and is still OWED open (a container's own key never counts). */
+    /** Whether a LEAF ({@see TaskPlanItem::isLeaf()}) outside a blocked or n/a container carries the given progress step and is still OWED open (a container's own key never counts). */
     public function hasOwedOpenItemsForProgressStepKey(string $customerProgressStepKey): bool
     {
         foreach ($this->buildItemAddresses()->getElements() as $taskPlanItemAddress) {
             $taskPlanItem = $taskPlanItemAddress->item;
-            // only nodes WITHOUT a subtask level are read — an empty level counts as a container here
-            if ($taskPlanItem->subtasks === null && $taskPlanItem->customerProgressStepKey === $customerProgressStepKey && $taskPlanItem->isOwedOpen()) {
+            // only leaves are read ({@see TaskPlanItem::isLeaf()}: an empty subtask level is a leaf); a leaf under a
+            // blocked or not_applicable container is covered by its verdict
+            if ($taskPlanItem->isLeaf() && !$taskPlanItemAddress->isInsideTerminalContainer
+                && $taskPlanItem->customerProgressStepKey === $customerProgressStepKey && $taskPlanItem->isOwedOpen()
+            ) {
                 return true;
             }
         }
@@ -871,10 +880,10 @@ class TaskPlanItems extends ObjectSet
      * Tree-wide item counts per EFFECTIVE state (this level + all subtrees) — the tool result's honest summary
      * line ("13 items (4 done, 7 open, 2 blocked)"). Buckets by the same tree-aware predicate the checked stop
      * enforces ({@see TaskPlanItem::isOpen()}), not the raw status — so the summary, the tail render, the bounce
-     * and the eval completion gate can never disagree: `blocked` counts blocked (raw) and PRUNES its subtree
-     * (mirroring {@see TaskPlanItem::isOpen()} — the named blocker covers the children, so they count neither
-     * open nor done; counting them `open` made the summary say "2 open" on a plan the checked stop accepted,
-     * which was wrong); everything else counts `open` iff it is effectively open (a `done` parent
+     * and the eval completion gate can never disagree: `blocked` counts blocked (raw), `not_applicable` counts done, and
+     * both PRUNE their subtree (mirroring {@see TaskPlanItem::isOpen()} and {@see hasOpenItems()} — the container's verdict
+     * covers the children, so they count neither open nor done; counting them `open` made the summary say "2 open" on a
+     * plan the checked stop accepted, which was wrong); everything else counts `open` iff it is effectively open (a `done` parent
      * with open subtasks counts open; an `open` container whose subtasks are all terminal counts done).
      *
      */
@@ -882,8 +891,8 @@ class TaskPlanItems extends ObjectSet
     {
         $taskPlanItemStatusCounts = new TaskPlanItemStatusCounts();
         foreach ($this->buildItemAddresses()->getElements() as $taskPlanItemAddress) {
-            // a blocked node prunes its subtree — isOpen() treats it as covered by the blocker (a not_applicable one does not)
-            if ($taskPlanItemAddress->hasBlockedAncestor) {
+            // a blocked or not_applicable node prunes its subtree — isOpen() and hasOpenItems() treat it as covered by its verdict
+            if ($taskPlanItemAddress->isInsideTerminalContainer) {
                 continue;
             }
             // a container whose subtasks are all closed and none done counts as its blocker
@@ -994,14 +1003,15 @@ class TaskPlanItems extends ObjectSet
     }
 
     /**
-     * The node the render marks `← next`: the FIRST node in the tail hint's own pre-order walk —
-     * every node visited, blocked / n-a subtrees included, exactly as {@see buildTailHintLines()} descends — whose
-     * {@see TaskPlanItem::claimsNextMarker()} holds. A NODE, not always a leaf. Null when nothing is open.
+     * The node the render marks `← next`: the FIRST node in the tail hint's own pre-order walk whose
+     * {@see TaskPlanItem::claimsNextMarker()} holds, outside every blocked or n/a container (the render still lists their
+     * subtrees; the marker never lands in one). A NODE, not always a leaf. Null when nothing is open.
      */
     public function getNextMarkedItem(): ?TaskPlanItem
     {
         foreach ($this->buildItemAddresses()->getElements() as $taskPlanItemAddress) {
-            if ($taskPlanItemAddress->item->claimsNextMarker()) {
+            // never inside a blocked or not_applicable container: its verdict covers the subtree
+            if (!$taskPlanItemAddress->isInsideTerminalContainer && $taskPlanItemAddress->item->claimsNextMarker()) {
                 return $taskPlanItemAddress->item;
             }
         }
@@ -1070,8 +1080,8 @@ class TaskPlanItems extends ObjectSet
         foreach ($this->buildItemAddresses()->getElements() as $taskPlanItemAddress) {
             $taskPlanItem = $taskPlanItemAddress->item;
             $hasOpenLeafBefore = $anEarlierLeafIsOpen;
-            if (($taskPlanItem->subtasks === null || $taskPlanItem->subtasks->count() === 0)
-                && $taskPlanItem->isOpen() && $taskPlanItem->isOwedWhenOpen() && !$taskPlanItemAddress->hasBlockedAncestor
+            if ($taskPlanItem->isLeaf()
+                && $taskPlanItem->isOpen() && $taskPlanItem->isOwedWhenOpen() && !$taskPlanItemAddress->isInsideTerminalContainer
                 && $taskPlanRenderTurnState?->isAddressWaitingForOwnerAnswer($taskPlanItemAddress) !== true
             ) {
                 $anEarlierLeafIsOpen = true;

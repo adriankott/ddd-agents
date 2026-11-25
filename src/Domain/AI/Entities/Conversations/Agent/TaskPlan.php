@@ -503,7 +503,9 @@ class TaskPlan extends ValueObject
 
     /**
      * The outcome per LEAF (containers derive their state), status-labelled, capped at {@see OUTCOME_SUMMARY_MAX_LENGTH}:
-     * `done: Attribut gesetzt — auf ja gesetzt · blocked: Leistung ergänzen — Tool lehnte ab`.
+     * `done: Attribut gesetzt — auf ja gesetzt · blocked: Leistung ergänzen — Tool lehnte ab`. A blocked or not_applicable
+     * container stands for its subtree with its own verdict and note (its leaves are covered by it, as in
+     * {@see TaskPlanItem::isOpen()}).
      */
     public function buildOutcomeSummary(): string
     {
@@ -511,8 +513,13 @@ class TaskPlan extends ValueObject
             return '';
         }
         $entries = [];
-        foreach ($this->items->buildItemAddresses()->getLeaves() as $taskPlanItemAddress) {
+        foreach ($this->items->buildItemAddresses()->getElements() as $taskPlanItemAddress) {
             $item = $taskPlanItemAddress->item;
+            $isTerminalContainer = !$taskPlanItemAddress->isLeaf
+                && ($item->status === TaskPlanItem::STATUS_BLOCKED || $item->status === TaskPlanItem::STATUS_NOT_APPLICABLE);
+            if ($taskPlanItemAddress->isInsideTerminalContainer || (!$taskPlanItemAddress->isLeaf && !$isTerminalContainer)) {
+                continue;
+            }
             $label = match ($item->status) {
                 TaskPlanItem::STATUS_BLOCKED => 'blocked',
                 TaskPlanItem::STATUS_NOT_APPLICABLE => 'n/a',

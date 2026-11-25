@@ -22,7 +22,10 @@ class AgentLoopStopReason extends ValueObject
     /** The model wrote a final text with content, or the delivered owner report is the final answer. */
     public const string ANSWERED = 'ANSWERED';
 
-    /** The model's final step (no tool call) wrote no text: the invocation ends like a spent step budget. */
+    /**
+     * The model's final step (no tool call) wrote no text — the stall give-up after its nudges. It may yield like a spent
+     * step budget ({@see mayYieldForContinuation()}); its terminal texts say that the model gave no answer.
+     */
     public const string EMPTY_FINAL_TEXT = 'EMPTY_FINAL_TEXT';
 
     /** The step started async delegation children: the loop ends without text, the children's answers resume it. */
@@ -190,6 +193,7 @@ class AgentLoopStopReason extends ValueObject
         return match ($this->reason) {
             self::REPEATED_CALL_ABORTED => 'Aborted: the model repeated an identical tool call without making progress.',
             self::COST_CAP_REACHED => 'Turn cost budget (maxTurnCostUsd) reached before completion.',
+            self::EMPTY_FINAL_TEXT => 'Turn ended without an answer: the model returned no text, also after the nudges.',
             default => 'Turn step budget reached before completion.',
         };
     }
@@ -200,6 +204,7 @@ class AgentLoopStopReason extends ValueObject
         return match ($this->reason) {
             self::REPEATED_CALL_ABORTED => AgentRunReport::STOP_REASON_REPEATED_STEP_WITHOUT_PROGRESS,
             self::COST_CAP_REACHED => AgentRunReport::STOP_REASON_COST_BUDGET_USED_UP,
+            self::EMPTY_FINAL_TEXT => AgentRunReport::STOP_REASON_MODEL_GAVE_NO_ANSWER,
             default => AgentRunReport::STOP_REASON_STEP_BUDGET_USED_UP,
         };
     }

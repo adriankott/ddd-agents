@@ -40,6 +40,8 @@ class AgentRunReport extends ValueObject
     public const string STOP_REASON_REPEATED_STEP_WITHOUT_PROGRESS = 'I kept repeating the same step without making progress — I may be missing information I would need (you can rephrase or narrow the task down).';
     public const string STOP_REASON_COST_BUDGET_USED_UP = 'I reached the spending limit for one continuous stretch of work — a safety brake, nothing went wrong.';
     public const string STOP_REASON_STEP_BUDGET_USED_UP = 'I reached the limit for how many steps I may work in one go — a safety brake, nothing went wrong.';
+    /** The model ended its step with neither a text nor a tool call, also after being asked again (the stall give-up). */
+    public const string STOP_REASON_MODEL_GAVE_NO_ANSWER = 'the AI model gave me no answer, even after I asked it again.';
     public const string STOP_REASON_RUN_ENDED_UNEXPECTEDLY = 'the run ended unexpectedly.';
     public const string STOP_REASON_NO_PROGRESS_ON_REQUEST = 'I could not make progress on this request.';
     /** Owner-facing sentences the inline terminals translate before the report names them ({@see AgentRunTerminalReport}). */

@@ -153,9 +153,13 @@ bookkeeping, owner-question picks, owner widget edits, the purpose widget, conti
 | `BUDGET_CLOSING_STALLED` | the budget closing step produced no owner message | yes (may yield) |
 | `STEP_BUDGET_REACHED` | the loop ran out of steps without another reason | yes (may yield) |
 
-A reason with a terminal report appends an ERROR row (`terminalErrorText()`) and delivers the run report
-(`AIConversationOwnerReportDeliveryService::deliverRunReportNow()`, `ddd-module-agents-autonomy-specialist`), then marks
-waiting sub-agent run-end notifications read.
+A reason with a terminal report appends an ERROR row (`terminalErrorText()`) and delivers the run report with the stop
+reason of `terminalReportStopReason()`: its own text for the repeat abort, the cost cap and the empty final text
+(`AgentRunReport::STOP_REASON_MODEL_GAVE_NO_ANSWER`: the model gave no answer, the step limit is not named), the step
+budget for the rest. The texts are English translation keys (`AgentOwnerFacingTextTranslationService`); a host with
+its own translations adds a new key. The report goes out through
+`AIConversationOwnerReportDeliveryService::deliverRunReportNow()` (`ddd-module-agents-autonomy-specialist`); the loop
+then marks waiting sub-agent run-end notifications read.
 
 ## 7. Chunks, budgets and the yield
 

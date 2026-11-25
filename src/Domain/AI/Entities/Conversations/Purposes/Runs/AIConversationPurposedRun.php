@@ -133,7 +133,8 @@ class AIConversationPurposedRun extends ValueObject
         $this->planBlocked = $statusCounts->blocked;
         $this->openItems = new AIConversationPurposedRunOpenItems();
         foreach ($taskPlan->items->buildItemAddresses()->getLeaves() as $leafAddress) {
-            if (!$leafAddress->itemIsOpen || $leafAddress->hasBlockedAncestor) {
+            // a leaf under a blocked or not_applicable container is covered by its verdict
+            if (!$leafAddress->itemIsOpen || $leafAddress->isInsideTerminalContainer) {
                 continue;
             }
             if ($this->openItems->count() >= self::MAX_LISTED_OPEN_ITEMS) {

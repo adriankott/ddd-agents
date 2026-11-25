@@ -384,8 +384,9 @@ class AgentReasoningEffortDecisionsService extends Service
 
     /**
      * The turn's ACTIVE effort before any decision (what the decision model is told the assistant
-     * already reasons at): {@see AgentReasoningEffortLimits::buildFloor()} over the configured effort (or
-     * the site default), the row pin, the purpose floor and the next open plan item's minimum, clamped to the ceiling.
+     * already reasons at): {@see AgentReasoningEffortLimits::buildFloor()} — the effort the call is sent with before the
+     * turn's decision: the base effort (the purpose's, else the catalog's, else the site default) raised by the row pin,
+     * the purpose floor and the next open plan item's minimum, clamped to the ceiling; under site `off` the catalog's.
      */
     protected function resolveFloorReasoningEffortForCurrentTurn(AIConversation $conversation, AgentDecisionModelSettings $decisionModelSettings): AgentReasoningEffortFloor
     {

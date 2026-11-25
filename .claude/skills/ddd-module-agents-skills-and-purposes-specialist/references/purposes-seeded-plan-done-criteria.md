@@ -68,7 +68,7 @@ misspelt key is silently ignored.
 | `contextBudgetTokens`, `contextRetention` | the working-context budget and the retention knobs (context skill) |
 | `modelInputOptions` | a map of the keys of `config/app/AI/agentModelInputOptions.php` (`offersDelegationTools`, `offersTaskPlanTools`, `offersAskOwner`, `offersFindWidgets`, `teachesWidgets`, `droppedBasePromptSections`, `dropsMemorySectionWithoutMemoryTool`, `offersReachableToolsFromTheFirstCall`): each key it names wins over the host's configuration for the purpose's conversations, a key it leaves out keeps the configured value (`AgentModelInputOptionsOverride`, context skill) |
 | `runSettings` | wire API and reasoning carry-over defaults of a new conversation (`AIConversationPurposesService::buildPurposeRunSettingsFromFrontmatter()`); with the creation choices of `contextRetention` the "agent wire profile", applied whole or not at all |
-| `preferredModelName`, `reasoningEffort`, `minReasoningEffort`, `fastMode` | the model and effort of the purpose's calls |
+| `preferredModelName`, `reasoningEffort`, `minReasoningEffort`, `fastMode` | the model and effort of the purpose's calls; the two efforts apply while the decision site `reasoningEffort` is `shadow` or `on`, under `off` the catalog's effort is sent (decisions skill) |
 | `worksAutonomouslyAfterKickoff` | the run works without owner input after the kickoff |
 | `usesSynthesizedOwnerText`, `loadsEarlierSessionsItself`, `readsLocalSituation` | what the context build may assume about the user rows and the history |
 | `commonPitfalls`, `supervisorCadence`, `supervisorRunCap` | supervision (autonomy skill) |

@@ -35,7 +35,7 @@ class TaskPlanItemAddress extends ValueObject
     /** 0 for a top-level item. */
     public int $depth = 0;
 
-    /** No subtasks, or an empty subtask level. */
+    /** No subtasks, or an empty subtask level ({@see TaskPlanItem::isLeaf()}). */
     public bool $isLeaf = true;
 
     /** @var string[] The item's own skill names, else the nearest ancestor's that names any. */
@@ -56,10 +56,13 @@ class TaskPlanItemAddress extends ValueObject
     /** An ancestor is not {@see TaskPlanItem::isOwedOpen()} — a walk that skips not-owed subtrees never reaches this node. */
     public bool $hasNotOwedAncestor = false;
 
-    /** An ancestor is `blocked` or `not_applicable` — the subtree {@see TaskPlanItem::isOpen()} treats as covered. */
+    /**
+     * An ancestor is `blocked` or `not_applicable` — the subtree {@see TaskPlanItem::isOpen()} treats as covered. Every
+     * count, walk and marker of the plan prunes it ({@see TaskPlanItemAddresses::getLeavesOutsideTerminalContainers()}).
+     */
     public bool $isInsideTerminalContainer = false;
 
-    /** An ancestor is `blocked` — the subtree the status counts prune (a `not_applicable` one they still count). */
+    /** An ancestor is `blocked` (a narrower fact than {@see $isInsideTerminalContainer}, which the counts and walks prune on). */
     public bool $hasBlockedAncestor = false;
 
     /**
@@ -76,6 +79,20 @@ class TaskPlanItemAddress extends ValueObject
         return false;
     }
 
+    /**
+     * The status of the outermost `blocked` or `not_applicable` ancestor — the container whose verdict covers this
+     * node — or null when no ancestor is terminal.
+     */
+    public function getStatusOfCoveringTerminalAncestor(): ?string
+    {
+        foreach ($this->ancestors as $ancestorItem) {
+            if ($ancestorItem->status === TaskPlanItem::STATUS_BLOCKED || $ancestorItem->status === TaskPlanItem::STATUS_NOT_APPLICABLE) {
+                return $ancestorItem->status;
+            }
+        }
+        return null;
+    }
+
     public function uniqueKey(): string
     {
         return static::uniqueKeyStatic($this->numberPath);
@@ -90,7 +107,7 @@ class TaskPlanItemAddress extends ValueObject
         $taskPlanItemAddress->key = $taskPlanItem->key ?? $taskPlanItemAddress->numberPath;
         $taskPlanItemAddress->textPath = ($parentAddress === null ? '' : $parentAddress->textPath . ' > ') . $taskPlanItem->text;
         $taskPlanItemAddress->depth = $parentAddress === null ? 0 : $parentAddress->depth + 1;
-        $taskPlanItemAddress->isLeaf = $taskPlanItem->subtasks === null || $taskPlanItem->subtasks->count() === 0;
+        $taskPlanItemAddress->isLeaf = $taskPlanItem->isLeaf();
         $taskPlanItemAddress->effectiveSkillNames = $taskPlanItem->skillNames !== [] ? $taskPlanItem->skillNames : ($parentAddress->effectiveSkillNames ?? []);
         $taskPlanItemAddress->itemIsOpen = $taskPlanItem->isOpen();
         $taskPlanItemAddress->itemIsOwedOpen = $taskPlanItemAddress->itemIsOpen && $taskPlanItem->isOwedWhenOpen();

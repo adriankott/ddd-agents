@@ -69,4 +69,19 @@ class TaskPlanItemAddresses extends ObjectSet
             static fn (TaskPlanItemAddress $taskPlanItemAddress): bool => $taskPlanItemAddress->isLeaf
         ));
     }
+
+    /**
+     * The leaves outside every `blocked` or `not_applicable` container — the leaves a walk over open or owed work reaches:
+     * the container's verdict covers its subtree, exactly as {@see TaskPlanItem::isOpen()} and
+     * {@see TaskPlanItems::hasOpenItems()} prune it.
+     *
+     * @return TaskPlanItemAddress[]
+     */
+    public function getLeavesOutsideTerminalContainers(): array
+    {
+        return array_values(array_filter(
+            $this->getElements(),
+            static fn (TaskPlanItemAddress $taskPlanItemAddress): bool => $taskPlanItemAddress->isLeaf && !$taskPlanItemAddress->isInsideTerminalContainer
+        ));
+    }
 }

@@ -492,7 +492,7 @@ class TaskPlanItemTickGate extends ValueObject
         if (!$requiresUserAction
             && $this->setTaskStatusArgumentsUpdate->retryable
             && $taskPlanItem->isClosedByThePlatformFromTheRecord()
-            && ($taskPlanItem->subtasks === null || $taskPlanItem->subtasks->count() === 0)
+            && $taskPlanItem->isLeaf()
             && $taskPlanItem->platformResolvedAtMessageIndex === null
         ) {
             $taskPlanItem->reopenWithObstacleNote($this->setTaskStatusArgumentsUpdate->statusNote);

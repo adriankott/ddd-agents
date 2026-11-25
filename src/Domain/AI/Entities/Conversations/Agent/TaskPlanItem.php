@@ -613,7 +613,16 @@ class TaskPlanItem extends ValueObject
     public function isOpenOrBlockedByTheModel(): bool
     {
         return $this->isOpen()
-            || ($this->status === self::STATUS_BLOCKED && $this->platformResolvedAtMessageIndex === null && ($this->subtasks === null || $this->subtasks->count() === 0));
+            || ($this->status === self::STATUS_BLOCKED && $this->platformResolvedAtMessageIndex === null && $this->isLeaf());
+    }
+
+    /**
+     * Whether the item is a LEAF: no subtask level, or an empty one. The one leaf definition of the plan — the address
+     * walk ({@see TaskPlanItemAddress::$isLeaf}), the leaf count, the step-key checks and every gate read it.
+     */
+    public function isLeaf(): bool
+    {
+        return $this->subtasks === null || $this->subtasks->count() === 0;
     }
 
     /**
@@ -630,7 +639,7 @@ class TaskPlanItem extends ValueObject
         if ($this->status === self::STATUS_BLOCKED || $this->status === self::STATUS_NOT_APPLICABLE) {
             return false;
         }
-        if ($this->subtasks !== null && $this->subtasks->count() > 0) {
+        if (!$this->isLeaf()) {
             return $this->subtasks->hasOpenItems();
         }
         return $this->status === self::STATUS_OPEN;
@@ -693,7 +702,7 @@ class TaskPlanItem extends ValueObject
         if ($this->isAwaitingOwnerOffer()) {
             return false;
         }
-        if ($this->subtasks !== null && $this->subtasks->count() > 0) {
+        if (!$this->isLeaf()) {
             // a container claims the marker for its awaiting offers
             return !$this->subtasks->hasOwedOpenItems();
         }
@@ -979,7 +988,7 @@ class TaskPlanItem extends ValueObject
     public function getClosedLineStatusNote(): string
     {
         $statusNote = trim((string)($this->statusNote ?? ''));
-        if ($statusNote !== '' || $this->subtasks === null || $this->subtasks->count() === 0) {
+        if ($statusNote !== '' || $this->isLeaf()) {
             return $statusNote;
         }
         $subtaskCount = $this->subtasks->count();
@@ -1081,7 +1090,7 @@ class TaskPlanItem extends ValueObject
      */
     public function markResultIsTextInTheAnswer(): bool
     {
-        if ($this->seededByPurpose || ($this->subtasks !== null && $this->subtasks->count() > 0) || $this->carriesRecordEvidenceGate()) {
+        if ($this->seededByPurpose || !$this->isLeaf() || $this->carriesRecordEvidenceGate()) {
             return false;
         }
         $this->doneRequiresOwnerVisibleAnswerInSameTurn = true;
@@ -1119,7 +1128,7 @@ class TaskPlanItem extends ValueObject
      */
     public function findBlockerOfClosedContainer(): ?TaskPlanItem
     {
-        if ($this->subtasks === null || $this->subtasks->count() === 0
+        if ($this->isLeaf()
             || $this->status === self::STATUS_BLOCKED || $this->status === self::STATUS_NOT_APPLICABLE || $this->isOpen()
         ) {
             return null;

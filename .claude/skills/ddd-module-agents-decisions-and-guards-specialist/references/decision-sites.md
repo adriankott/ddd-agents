@@ -170,6 +170,13 @@ answer or switched off. The constant is on `AgentDecisionModelSettings`.
   included; the activity narrator, compaction, the supervisor and the decision calls are not.
 - **Without an answer:** the floor — the configured effort raised by the purpose's and the plan item's minimums and the
   pin; never lower. The base is the model catalog's agentic effort or the purpose's own, not a setting of this file.
+  The floor's source names it: `purpose` for the purpose's base effort, `configured` for the catalog's — as in the
+  control panel's baseline.
+- **Site `off`** (and the kill switch): the call sends no effort of this layer — the catalog's agentic effort applies;
+  the purpose's base effort and minimum, the plan item's minimum and the row pin do not. They belong to the site: a
+  host that wants them sets the site `shadow` (declarations and pin sent, no model asked) or `on`. The floor and the
+  panel's baseline report what is sent (`AgentReasoningEffortLimits::buildFloor()`, `buildBaseline()`), so under `off`
+  both read the catalog effort (`configured`, else `low` as `default`); a fixed effort reads as `fixed`.
 - **Service:** `AgentReasoningEffortDecisionsService`.
 
 ### `planDynamics` (`SITE_PLAN_DYNAMICS`)

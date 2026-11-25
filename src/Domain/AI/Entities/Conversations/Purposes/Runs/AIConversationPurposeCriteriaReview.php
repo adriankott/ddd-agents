@@ -64,7 +64,8 @@ class AIConversationPurposeCriteriaReview extends ObjectSet implements LlmMarkdo
                 );
                 $this->add($criterionReview);
             }
-            $criterionReview->countItemOfRun($runId, $itemAddress->item->status, $itemAddress->hasBlockedAncestor);
+            // a node under a blocked or not_applicable container counts as that container's verdict
+            $criterionReview->countItemOfRun($runId, $itemAddress->getStatusOfCoveringTerminalAncestor() ?? $itemAddress->item->status, false);
         }
     }
 
