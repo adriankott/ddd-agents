@@ -1,11 +1,12 @@
 # Changelog
 
-## 0.5.16
+## 0.5.17
 
 **The web package no longer needs axios: the request stand-ins of the widget preview and the widget-image capture
 replace `XMLHttpRequest` (the transport of axios's browser adapter) instead of `axios.defaults.adapter`; new opt-in
 `interceptFetch` for the frozen capture.** Additive and non-breaking: with the default options a host on axios gets the
-answers it got before; a host on `fetch` opts in. npm `@mgamadeus/ddd-agents` 0.5.16 in lockstep (no PHP change).
+answers it got before; a host on `fetch` opts in. npm `@mgamadeus/ddd-agents` 0.5.17 in lockstep (no PHP change).
+Contributed through a pull request.
 
 - **axios** left `peerDependencies` (it was optional), `peerDependenciesMeta`, `devDependencies` and the lockfile; no
   module of the package imports it. A host may keep axios: its browser adapter sends through `XMLHttpRequest`, which
@@ -23,11 +24,14 @@ answers it got before; a host on `fetch` opts in. npm `@mgamadeus/ddd-agents` 0.
 - `installFrozenWidgetRequests(responses, fail, options?)`: `XMLHttpRequest` answers as the former axios adapter (a
   supplied GET by its key `METHOD /path?sortedQuery`, a copy per read, no response header; anything else
   `MISSING_FROZEN_RESPONSE`); `fetch` stays untouched by default, as before. **New:** `options.interceptFetch` (default
-  false) answers `fetch` the same way; a static bundle image of the page's origin and a request to another origin (a
-  map's SDK) still go to the network unchanged, as they did without the option.
+  false) answers `fetch` the same way; only a static bundle image of the page's origin and a request of the Google Maps
+  SDK (`maps.googleapis.com` `/maps/`, `/$rpc/`, `maps.gstatic.com` `/mapfiles/`, https) still go to the network
+  unchanged, any other origin fails with `MISSING_FROZEN_RESPONSE`.
 - `installLiveWidgetRequests`: unchanged signature. The `fetch` stand-in keeps its rules; `XMLHttpRequest` follows the
   former axios adapter's rules (the scoped capture read only, answered with its JSON and no header; anything else
-  `WIDGET_HYDRATION_FAILED`, failing without URL, headers, token or remote body).
+  `WIDGET_HYDRATION_FAILED`, failing without URL, headers, token or remote body). In a map capture a Google Maps SDK
+  request sent through `XMLHttpRequest` goes through the `fetch` stand-in and its map rules (no credentials, no
+  referrer, the allowed headers, `MAP_ASSET_FAILED` on failure), so a map is drawn whichever transport the SDK uses.
 - `installWidgetPreviewRequests`: unchanged signature. `XMLHttpRequest` as the former axios adapter (a missing response
   fails without response and is reported, a `__status` entry answers with its status and `__body`, `__pending` never
   answers); the `fetch` stand-in keeps its answers.
@@ -37,6 +41,24 @@ answers it got before; a host on `fetch` opts in. npm `@mgamadeus/ddd-agents` 0.
   `_widget-image-render.spec.ts` (frozen, default and `interceptFetch`) and the new `_widget-preview-requests.spec.ts`,
   with plain `fetch` and `XMLHttpRequest`, the security cases (no token, credentials, URL or remote body leak; fail
   closed) included. README: the peer set without axios and the request stand-ins.
+- `isGoogleMapsSdkRequestUrl(url)` (`widget-image-google-map.ts`): the one Maps SDK predicate of the live and the frozen
+  capture. The upload side of the `XMLHttpRequest` stand-in is its own module
+  (`src/request-interception/intercepted-xml-http-request-upload.ts`).
+
+**Behaviour changes for a host on axios** (axios now builds its result from the `XMLHttpRequest` stand-in instead of
+receiving the adapter's object; checked with axios 0.28 and 1.7):
+
+- A failed request (a missing preview fixture, a refused frozen or live request) rejects with axios's own
+  `Network Error` (`code` `ERR_NETWORK`, no `response`) instead of the adapter's error object. The failure and readiness
+  codes are the same; no token, request header, URL or backend response reaches the error.
+- Preview `__status`: axios's `validateStatus` decides. A 2xx `__status` now resolves with `__body` (before: every
+  `__status` entry rejected); 3xx, 4xx and 5xx reject with `response.status` and `response.data` as before; only a
+  status of 400 or more is reported as a failed request, as before.
+- A 204, 205 or 304 `__status` has no body: axios gives `data` `""` instead of `null`.
+- A `__status` outside 200–599 cannot be a response: it fails as a network error.
+- Every `XMLHttpRequest` of the page is answered now, not only the requests of axios's default instance: a raw
+  `XMLHttpRequest` and an axios instance created before the install get the same answers and failures (before, they
+  went to the network). An axios instance with an adapter of its own (not `xhr`) is not answered.
 
 ## 0.5.16
 

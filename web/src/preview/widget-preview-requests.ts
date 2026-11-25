@@ -22,7 +22,7 @@ export const isPendingResponse = (response: unknown): boolean =>
 /** A fixture answer as an `XMLHttpRequest` reads it; a status a `Response` cannot carry fails like a network error. */
 const xhrAnswer = (body: unknown, status: number): Response => {
   if (status < 200 || status > 599) throw new TypeError(`preview response ${status}`);
-  if ([101, 204, 205, 304].includes(status)) return createHeaderlessResponse(null, status);
+  if ([204, 205, 304].includes(status)) return createHeaderlessResponse(null, status);
   return createHeaderlessResponse(JSON.stringify(body), status, status === 200 ? "OK" : "");
 };
 

@@ -31,3 +31,12 @@ export const isGoogleMapCapture = (widgetName: string, props: Record<string, unk
     return false;
   }
 };
+
+/**
+ * A request of the Google Maps SDK (its API and RPC paths, its static files) — the only other origin a map capture
+ * may reach, through `fetch` and `XMLHttpRequest` alike.
+ */
+export const isGoogleMapsSdkRequestUrl = (url: URL): boolean =>
+  url.protocol === "https:" &&
+  ((url.hostname === "maps.googleapis.com" && (url.pathname.startsWith("/maps/") || url.pathname.startsWith("/$rpc/"))) ||
+    (url.hostname === "maps.gstatic.com" && url.pathname.startsWith("/mapfiles/")));

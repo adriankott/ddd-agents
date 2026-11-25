@@ -1,3 +1,10 @@
+import {
+  createProgressEvent,
+  InterceptedXMLHttpRequestUpload,
+  type XhrEventHandler,
+  type XhrEventName,
+} from "./intercepted-xml-http-request-upload";
+
 /**
  * The browser-level request stand-in of the capture and preview pages: `XMLHttpRequest` (the transport of axios's
  * browser adapter and of uploads with progress) and, where an install asks for it, `window.fetch` are replaced for the
@@ -75,14 +82,6 @@ export const readFetchRequest = async (
   };
 };
 
-type XhrEventName = "loadstart" | "progress" | "load" | "error" | "abort" | "timeout" | "loadend" | "readystatechange";
-type XhrEventHandler = ((this: unknown, event: Event) => unknown) | null;
-
-const createProgressEvent = (type: string, loaded: number, total: number): Event =>
-  typeof ProgressEvent === "function"
-    ? new ProgressEvent(type, { lengthComputable: total > 0, loaded, total })
-    : new Event(type);
-
 const bodySize = (body: BodyInit | null): number => {
   if (body === null) return 0;
   if (typeof body === "string") return new TextEncoder().encode(body).byteLength;
@@ -91,23 +90,6 @@ const bodySize = (body: BodyInit | null): number => {
   if (ArrayBuffer.isView(body)) return body.byteLength;
   return 0;
 };
-
-/** The event target of `xhr.upload`: listeners and `on…` handlers for the upload's progress. */
-class InterceptedXMLHttpRequestUpload extends EventTarget {
-  onloadstart: XhrEventHandler = null;
-  onprogress: XhrEventHandler = null;
-  onload: XhrEventHandler = null;
-  onerror: XhrEventHandler = null;
-  onabort: XhrEventHandler = null;
-  ontimeout: XhrEventHandler = null;
-  onloadend: XhrEventHandler = null;
-
-  emit(type: XhrEventName, loaded = 0, total = 0) {
-    const event = createProgressEvent(type, loaded, total);
-    this.dispatchEvent(event);
-    (this[`on${type}` as keyof this] as XhrEventHandler)?.call(this, event);
-  }
-}
 
 const invalidState = (message: string) => new DOMException(message, "InvalidStateError");
 
@@ -144,16 +126,16 @@ const createInterceptedXMLHttpRequest = (handle: InterceptedRequestHandler, orig
     ontimeout: XhrEventHandler = null;
     onloadend: XhrEventHandler = null;
 
-    private method = "GET";
-    private requestUrl = "";
-    private requestHeaders = new Headers();
-    private responseHeaders = new Headers();
-    private responseValue: unknown = "";
-    private responseTextValue = "";
-    private sent = false;
-    private settled = false;
-    private controller: AbortController | undefined;
-    private timer: ReturnType<typeof setTimeout> | undefined;
+    protected method = "GET";
+    protected requestUrl = "";
+    protected requestHeaders = new Headers();
+    protected responseHeaders = new Headers();
+    protected responseValue: unknown = "";
+    protected responseTextValue = "";
+    protected sent = false;
+    protected settled = false;
+    protected controller: AbortController | undefined;
+    protected timer: ReturnType<typeof setTimeout> | undefined;
 
     get response(): unknown {
       if (this.responseType === "" || this.responseType === "text") return this.responseText;
@@ -260,7 +242,7 @@ const createInterceptedXMLHttpRequest = (handle: InterceptedRequestHandler, orig
       this.readyState = 0;
     }
 
-    private async receive(controller: AbortController, response: Response, responseUrl: string) {
+    protected async receive(controller: AbortController, response: Response, responseUrl: string) {
       if (this.controller !== controller || this.settled) return;
       try {
         this.status = response.status;
@@ -283,7 +265,7 @@ const createInterceptedXMLHttpRequest = (handle: InterceptedRequestHandler, orig
       }
     }
 
-    private async readBody(response: Response): Promise<unknown> {
+    protected async readBody(response: Response): Promise<unknown> {
       switch (this.responseType) {
         case "json": {
           const text = await response.text();
@@ -309,7 +291,7 @@ const createInterceptedXMLHttpRequest = (handle: InterceptedRequestHandler, orig
     }
 
     /** A request that ends without a response — an error, an abort or a timeout: status 0, nothing of a body. */
-    private finishWithoutResponse(type: "error" | "abort" | "timeout") {
+    protected finishWithoutResponse(type: "error" | "abort" | "timeout") {
       if (this.settled) return;
       this.settle();
       this.controller?.abort();
@@ -323,18 +305,18 @@ const createInterceptedXMLHttpRequest = (handle: InterceptedRequestHandler, orig
       this.emit("loadend");
     }
 
-    private settle() {
+    protected settle() {
       this.settled = true;
       if (this.timer !== undefined) clearTimeout(this.timer);
       this.timer = undefined;
     }
 
-    private setReadyState(state: number) {
+    protected setReadyState(state: number) {
       this.readyState = state;
       this.emit("readystatechange");
     }
 
-    private emit(type: XhrEventName, loaded = 0, total = 0) {
+    protected emit(type: XhrEventName, loaded = 0, total = 0) {
       const event = type === "readystatechange" ? new Event(type) : createProgressEvent(type, loaded, total);
       this.dispatchEvent(event);
       (this[`on${type}` as keyof this] as XhrEventHandler)?.call(this, event);

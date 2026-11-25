@@ -288,12 +288,13 @@ describe("installLiveWidgetRequests — XMLHttpRequest rules (the former axios a
     window.fetch = pageFetch;
   });
 
-  it("refuses every other request — other paths, other origins, static images, Google Maps even in a map capture — as a failed hydration", async () => {
+  it("refuses every other request — other paths, other origins, static images, Google Maps outside a map capture — as a failed hydration", async () => {
     for (const [input, url, options] of [
       [{}, "/graphql", {}],
       [{}, "https://elsewhere.test/collect", { method: "POST", body: "{}" }],
       [{}, "/react/app-build/assets/review-sources/google.svg", {}],
-      [MAP_CAPTURE, "https://maps.googleapis.com/maps/api/js", {}],
+      [{}, "https://maps.googleapis.com/maps/api/js", {}],
+      [MAP_CAPTURE, "https://elsewhere.test/collect", {}],
     ] as const) {
       const state = readiness();
       uninstall = installLiveWidgetRequests(bootstrap("capture-token", {}, input), state as never);
@@ -304,6 +305,33 @@ describe("installLiveWidgetRequests — XMLHttpRequest rules (the former axios a
     }
     uninstall = undefined;
     expect(backendFetch).not.toHaveBeenCalled();
+  });
+
+  it("sends a map capture's Google Maps SDK request through the fetch rules: no credentials, its own headers only", async () => {
+    const state = readiness();
+    uninstall = installLiveWidgetRequests(bootstrap("capture-token", {}, MAP_CAPTURE), state as never);
+    expect(
+      await send("xhr", "https://maps.googleapis.com/$rpc/google.maps.Service/Get", {
+        method: "POST",
+        body: "[1]",
+        headers: { "Content-Type": "application/json+protobuf", "X-Goog-Api-Key": "maps-key", Authorization: "Bearer page" },
+        withCredentials: true,
+      }),
+    ).toMatchObject({ ok: true, status: 200 });
+    const [mapRequest, init] = backendFetch.mock.calls[0] as [Request, RequestInit];
+    expect([mapRequest.url, mapRequest.method, await mapRequest.text()]).toEqual([
+      "https://maps.googleapis.com/$rpc/google.maps.Service/Get",
+      "POST",
+      "[1]",
+    ]);
+    expect(init).toMatchObject({ credentials: "omit", referrerPolicy: "no-referrer", redirect: "error" });
+    expect([...(init.headers as Headers).entries()]).toEqual([
+      ["content-type", "application/json+protobuf"],
+      ["x-goog-api-key", "maps-key"],
+    ]);
+    backendFetch.mockResolvedValue(new Response("nope", { status: 403 }));
+    expect(await send("xhr", "https://maps.gstatic.com/mapfiles/a.png")).toMatchObject({ ok: false, status: 0, text: "" });
+    expect(state.failures).toEqual(["MAP_ASSET_FAILED"]);
   });
 
   it("refuses a GET that passes a body", async () => {

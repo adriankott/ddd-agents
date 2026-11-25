@@ -176,7 +176,7 @@ describe("frozen widget input", () => {
       expect(window.fetch).toBe(network);
     });
 
-    it("lets a fetch of a static bundle image or another origin pass unchanged, as without the option", async () => {
+    it("lets a fetch of a static bundle image or of the Google Maps SDK pass unchanged; any other origin fails", async () => {
       const network = vi.fn(async () => new Response("asset"));
       window.fetch = network as unknown as typeof window.fetch;
       const fail = vi.fn();
@@ -186,7 +186,10 @@ describe("frozen widget input", () => {
         expect(await send("fetch", "GET", "https://maps.googleapis.com/maps/api/js")).toMatchObject({ ok: true });
         expect(network).toHaveBeenCalledTimes(2);
         expect(await send("fetch", "GET", "/react/app-build/assets/logos/google.svg?v=1")).toEqual({ ok: false });
-        expect(fail).toHaveBeenCalledOnce();
+        expect(await send("fetch", "POST", "https://elsewhere.test/collect", "{}")).toEqual({ ok: false });
+        expect(await send("fetch", "GET", "http://maps.googleapis.com/maps/api/js")).toEqual({ ok: false });
+        expect(network).toHaveBeenCalledTimes(2);
+        expect(fail).toHaveBeenCalledTimes(3);
       } finally {
         restore();
       }

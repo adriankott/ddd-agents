@@ -1,6 +1,6 @@
 import type { WidgetImageRenderBootstrap } from "./widget-image-render.types";
 import type { createWidgetImageReadiness } from "./widget-image-readiness";
-import { isGoogleMapCapture } from "./widget-image-google-map";
+import { isGoogleMapCapture, isGoogleMapsSdkRequestUrl } from "./widget-image-google-map";
 import { isStaticBundleImageRequest } from "./widget-image-static-assets";
 import { getWidgetImageCaptureReadPathPrefix } from "../provider/environment";
 import {
@@ -85,11 +85,7 @@ export const installLiveWidgetRequests = (
       }
     }
     const isMap = isGoogleMapCapture(bootstrap.input.widgetName, bootstrap.input.props);
-    const isGoogleMapRequest =
-      url.protocol === "https:" &&
-      ((url.hostname === "maps.googleapis.com" &&
-        (url.pathname.startsWith("/maps/") || url.pathname.startsWith("/$rpc/"))) ||
-        (url.hostname === "maps.gstatic.com" && url.pathname.startsWith("/mapfiles/")));
+    const isGoogleMapRequest = isGoogleMapsSdkRequestUrl(url);
     if (!isMap || !isGoogleMapRequest || !["GET", "POST"].includes(request.method) || unavailable) {
       readiness.fail("UNSCOPED_REQUEST");
       throw new Error("Unscoped render request");
@@ -116,11 +112,14 @@ export const installLiveWidgetRequests = (
       finish();
     }
   };
-  // XMLHttpRequest (the transport of axios's browser adapter): the scoped capture read only, everything else fails
-  // closed. A failure reaches the page as a network error — status 0, no header, no body: never the URL, request
-  // headers, auth token or remote exception body to the page's shared interceptors (which log errors and submit
-  // telemetry).
+  // XMLHttpRequest (the transport of axios's browser adapter): the scoped capture read and, for a map capture, the
+  // Google Maps SDK; everything else fails closed. A Maps SDK request goes through the fetch stand-in above (the page's
+  // `fetch` at this install), so it gets exactly the rules of a fetch: no credentials, no referrer, the allowed headers.
+  // A failure reaches the page as a network error — status 0, no header, no body: never the URL, request headers, auth
+  // token or remote exception body to the page's shared interceptors (which log errors and submit telemetry).
+  const isMapCapture = isGoogleMapCapture(bootstrap.input.widgetName, bootstrap.input.props);
   const restoreXMLHttpRequest = interceptXMLHttpRequests(async (request) => {
+    if (isMapCapture && isGoogleMapsSdkRequestUrl(request.url)) return request.forward();
     const finish = readiness.beginRequest();
     try {
       if (!isScopedRead(request.url, request.method, request.body !== null)) throw new Error("RENDER_READ_DENIED");
