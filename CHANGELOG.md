@@ -170,6 +170,17 @@ application that does not switch it on gets no tool, no skill, no required table
   `AccountRealtimePollSubscriber`. The package's surface snapshot (`agent-package-surface.json`) is unchanged:
   `Agent.Voice` is offered only while voice can run.
 
+**The call table** is `AgentVoiceCalls`, shipped without a table prefix like every package model: an application
+regenerates the models with its own `DATABASE_TABLE_PREFIX` (`post-update-cmd`), so its table is
+`<prefix>AgentVoiceCalls`. No table is required while voice is off. Database tests of the three atomic writes of the call
+store (the answer claim, the end claim of a call nobody answered, the relative booking of seconds) run on MariaDB and
+PostgreSQL (`tests/Integration/Voice/`).
+
+**Announced for 0.6.1:** the lists of objects on the voice signatures (`AgentVoiceSeedInputMessage[]`,
+`LiveTranscriptSentence[]`, `AgentVoiceCall[]`, the trace rows, the admin's derived values) become sets; a provider of
+the application's own wins over the package's without the "several providers" warning; `createAgentVoiceRingSource()`
+keeps only the poll form. An application binding voice on 0.6.0 adapts its overrides with 0.6.1.
+
 **An application that already has voice classes of its own** (a voice channel below its root namespace, at the paths of
 these classes) keeps what it adds as same-path subclasses and deletes what the package now ships. Where a path or a name
 differs:
@@ -260,6 +271,9 @@ receiving the adapter's object; checked with axios 0.28 and 1.7):
 - Every `XMLHttpRequest` of the page is answered now, not only the requests of axios's default instance: a raw
   `XMLHttpRequest` and an axios instance created before the install get the same answers and failures (before, they
   went to the network). An axios instance with an adapter of its own (not `xhr`) is not answered.
+- **Specs:** a spec setup that gives axios an adapter of its own (a fallback for unmocked requests) no longer reaches the
+  stand-ins; such a spec gives axios its browser adapter (`xhr`) back. A stubbed `fetch` answer for the live capture
+  carries `text()`: the scoped read parses the text.
 
 ## 0.5.16
 
