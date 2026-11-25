@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.5.11
+
+**Core floor `mgamadeus/ddd ^3.47.1`; a schedule expires only while ACTIVE; a package test of the transition table of
+a schedule.** The transition table test was contributed by an application team. npm `@mgamadeus/ddd-agents` 0.5.11 in
+lockstep (no web change).
+
+- Core 3.47.1: the attribute-instance cache of a property keyed on the lookup flags, and `FiltersDefinitions` reads
+  the framework's `Choice` with `IS_INSTANCEOF`. Before, the filter description of a property with a `Choice` listed
+  its allowed values only when no exact-name read of the attribute had run first in the process, so the shipped
+  surface (`src/Testing/Agents/Surface/agent-package-surface.json`) depended on the order of the tests. The filter
+  descriptions now always list the allowed values ("one of [...]") and the value check always applies.
+  A second order dependence of the surface test was in the package's own suite: `AgentInstallationCheckServiceTest`
+  resolved `AISkill`'s process-wide skill binding from a test binding and left it behind, so the surface test after
+  it saw no skills; the test now restores the binding. The surface test passes with and without the installation
+  check tests before it, in either order, and two regenerations are byte-identical.
+  **Host surface snapshots change once:** the filter descriptions of e.g. `getTaskSchedules` gain the allowed values
+  of `status` and `reportChannel`; accept the difference once (`REGENERATE_AGENT_SURFACE_SNAPSHOT=1`).
+- `AIConversationScheduleTransition::OPERATION_EXPIRE` has a status rule: only an ACTIVE schedule expires. A PAUSED
+  or final (EXPIRED, DONE, CANCELLED, ARCHIVED) schedule past its ttl or its runs is refused with `REFUSAL_STATUS`
+  (before: "allowed → EXPIRED" for every status). The fire command asks only for ACTIVE rows, so nothing it writes
+  changes; a second caller can no longer move a final status. A paused row past its ttl expires at the first fire
+  scan after a resume; a platform-paused one-time row whose moment passed is still closed by the state sweep.
+- `REFUSAL_ALREADY_FIRED` (start-now) stays: `createSchedule()` caps every one-time schedule at one run, and such a
+  schedule that fired is told `EXPIRED` first; the reason is reached by a one-time schedule without a cap (a host's
+  writer that bypasses `createSchedule()`, rows written without one). The precedence is unchanged; the package's only
+  start-now caller starts a schedule it has just created.
+- New test `AIConversationScheduleTransitionTest`: every operation on every status per kind of schedule, the resume
+  with the eligibility of the scope, the manual fire interval, expiry, the state sweep table, an unknown operation,
+  and a guard that every `OPERATION_*` and `REFUSAL_*` constant has a case (311 cases; the EXPIRE row added on
+  ingest).
+
 ## 0.5.10
 
 **Schedules: the frequency floor counts per wall-clock day, a skip for a running previous run gives its iteration

@@ -13,6 +13,7 @@ use DDD\Domain\AI\Entities\Installation\AgentFeatureTableCondition;
 use DDD\Domain\AI\Entities\Installation\AgentFeatureTableConditions;
 use DDD\Domain\AI\Entities\Installation\AgentPackageRenames;
 use DDD\Domain\AI\Entities\Mandates\AgentMandate;
+use DDD\Domain\AI\Entities\Skills\AISkill;
 use DDD\Domain\AI\Services\Installation\AgentInstallationCheckService;
 use DDD\Domain\Common\Entities\Roles\Role;
 use DDD\Infrastructure\Libs\Config;
@@ -34,6 +35,9 @@ class AgentInstallationCheckServiceTest extends UnitTestCase
     /** @var array<string, mixed> */
     protected array $configValuesBefore = [];
 
+    /** @var array<string, string[]>|null The process's resolved skill binding before the test: a check that reads a skill resolves it from the test's binding */
+    protected ?array $packageClassesBySkillNameBefore = null;
+
     protected ?string $fixtureDirectory = null;
 
     protected function setUp(): void
@@ -41,11 +45,13 @@ class AgentInstallationCheckServiceTest extends UnitTestCase
         parent::setUp();
         $configTree = new ReflectionProperty(Config::class, 'configTree');
         $this->configValuesBefore = $configTree->isInitialized() ? (array)$configTree->getValue() : [];
+        $this->packageClassesBySkillNameBefore = (new ReflectionProperty(AISkill::class, 'packageClassesBySkillName'))->getValue();
     }
 
     protected function tearDown(): void
     {
         (new ReflectionProperty(Config::class, 'configTree'))->setValue(null, $this->configValuesBefore);
+        (new ReflectionProperty(AISkill::class, 'packageClassesBySkillName'))->setValue(null, $this->packageClassesBySkillNameBefore);
         if ($this->fixtureDirectory !== null) {
             array_map('unlink', glob($this->fixtureDirectory . '/*') ?: []);
             rmdir($this->fixtureDirectory);

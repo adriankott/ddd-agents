@@ -48,7 +48,8 @@ line, every minute to every five minutes (the entry skill's host duties). A host
    `AIConversationSchedulesService::DUE_SCHEDULES_BATCH_LIMIT`.
 2. Load each one fresh (no registry cache); skip it when it is no longer active.
 3. **Expiry is the caller's step:** when `buildTransitionTo(AIConversationScheduleTransition::OPERATION_EXPIRE, now)`
-   is allowed (TTL passed or quota used), `transitionStatus()` to `EXPIRED` and do not fire. A dry run
+   is allowed (an ACTIVE row whose TTL passed or quota is used; a paused or final row is refused with `STATUS` and
+   never expires), `transitionStatus()` to `EXPIRED` and do not fire. A dry run
    (`--dry-run`) writes nothing, prints "would expire" and counts nothing, as it prints "would fire" for a due one.
 4. `claimFireOccurrence()` — one compare-and-set on `nextRunAt`: it moves the anchor to the next occurrence (with the
    failure backoff when `failureStreak` is above zero), stamps `lastFiredAt` and counts `iterationsUsed`. False = another

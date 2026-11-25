@@ -30,6 +30,7 @@ use InvalidArgumentException;
  *   refused), not expired, recurring, at most once per
  *   {@see MANUAL_FIRE_MINIMUM_INTERVAL_SECONDS}; start now (the first firing of a row created to run at once): ACTIVE,
  *   not expired, one-time with its moment due, never ran;
+ * - expire: ACTIVE only, past its ttl or its maximum firings (a paused or final row never expires);
  * - EXPIRED, DONE and the state sweep's statuses are reached through the service's status transitions only; the
  *   sweep closes a platform-paused one-time row whose moment passed as EXPIRED instead of re-arming it.
  *
@@ -383,6 +384,9 @@ class AIConversationScheduleTransition extends ValueObject
             $this->refuseFor(self::REFUSAL_ONE_TIME_MOMENT_NOT_DUE);
             return;
         }
+        // Reached by a one-time row WITHOUT a cap that fired. The package's createSchedule() caps every one-time row
+        // at one run, and such a row that fired is told EXPIRED above. The reason stays for the rows that carry no
+        // cap: a host's writer that bypasses createSchedule() and rows written without one.
         if ($schedule->iterationsUsed > 0) {
             $this->refuseFor(self::REFUSAL_ALREADY_FIRED);
             return;
@@ -390,8 +394,19 @@ class AIConversationScheduleTransition extends ValueObject
         $this->allowTo(null);
     }
 
+    /**
+     * Only an ACTIVE row expires; the status is told before the expiry. A final row (EXPIRED, DONE, CANCELLED,
+     * ARCHIVED) never moves. A PAUSED row does not expire either: the pause is the owner's (or the platform's, with
+     * its reason) and stands as the other transitions keep it. The fire path is where a row expires and it reads ACTIVE
+     * rows only: a paused row past its ttl or its runs is closed by the first fire scan after a resume, and a
+     * platform-paused one-time row whose moment passed is closed by the state sweep.
+     */
     protected function decideExpiry(AIConversationSchedule $schedule, DateTime $now): void
     {
+        if (!$schedule->isActive()) {
+            $this->refuseFor(self::REFUSAL_STATUS);
+            return;
+        }
         if (!$schedule->isExpired($now)) {
             $this->refuseFor(self::REFUSAL_NOT_EXPIRED);
             return;
