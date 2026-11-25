@@ -28,6 +28,7 @@ use DDD\Infrastructure\Exceptions\BadRequestException;
 use DDD\Infrastructure\Exceptions\ForbiddenException;
 use DDD\Infrastructure\Services\DDDService;
 use DDD\Infrastructure\Services\Service;
+use ReflectionMethod;
 use Symfony\Component\Messenger\Stamp\DelayStamp;
 use Throwable;
 
@@ -42,13 +43,14 @@ use Throwable;
  * 3. never while the owner is on a call with the agent already: this conversation's own call, or a call of the
  *    owner's account elsewhere;
  * 4. the medium: {@see AgentVoiceCallRoute::resolveForRequest()} over whether the voice channel is available to the
- *    owner (the admission port) and whether a ring reaches the owner right now ({@see isAppRingable()}, free of side
- *    effects);
+ *    owner (the admission port) and whether a ring reaches the owner right now ({@see isAppRingableInAgentSpace()},
+ *    free of side effects);
  * 5. the start: {@see startRing()}.
  *
  * RING TARGETS are a list ({@see getRingTargetNames()}) with one entry in this version, the owner's open clients
  * ({@see self::RING_TARGET_OPEN_CLIENTS}, the ring message of {@see AgentVoiceRingService}). A call is created once and
- * rung on every target that is reachable; a ring that reaches no target ends the call FAILED at once.
+ * rung on every target that is reachable or decides when it is rung ({@see findRingTargetNamesToRing()}); a ring that
+ * reaches no target ends the call FAILED at once.
  *
  * Every call started through `startVoiceCall()` is stamped as started by the agent
  * ({@see AgentVoiceCallFollowUpsService::markCallStartedByAgent()}, the follow-up conversation = the chat the agent is
@@ -63,6 +65,10 @@ use Throwable;
  *   it are `protected` methods the override composes;
  * - a further ring target: {@see getRingTargetNames()}, {@see isRingTargetReachableNow()},
  *   {@see ringCallOnTarget()} and {@see buildRingTargetTraceEvent()};
+ * - a ring target whose reachability needs the agent space, or is found out only when the target is rung (a
+ *   network read that should run only then): {@see findRingTargetReachability()};
+ * - how many devices a ring target selected and rang (a target that rings several phones):
+ *   {@see findSelectedDeviceCountOfRingTarget()}, {@see findRungDeviceCountOfRingTarget()};
  * - {@see applyApplicationValuesToNewCall()}: the application's own columns on a new ringing call;
  * - {@see isAppIncluded()}, {@see findAdmissionRefusalCodeOfCallStart()} and
  *   {@see buildCallStartRefusedByAdmission()}: how the application's own entitlement reads and words itself;
@@ -86,6 +92,18 @@ class AgentVoiceCallStartsService extends Service
 
     /** @var string The trace event of a started ring: how many of the selected ring targets were rung */
     public const string TRACE_EVENT_RING_STARTED = 'call.ring_started';
+
+    /** @var string A ring target takes a ring for this owner right now ({@see findRingTargetReachability()}) */
+    public const string RING_TARGET_REACHABLE_NOW = 'reachableNow';
+
+    /** @var string A ring target takes no ring for this owner right now ({@see findRingTargetReachability()}) */
+    public const string RING_TARGET_NOT_REACHABLE_NOW = 'notReachableNow';
+
+    /**
+     * @var string A ring target that finds out only when it is rung whether it reaches the owner: it counts as a
+     *     target to ring, and its ring ({@see ringCallOnTarget()}) answers ({@see findRingTargetReachability()})
+     */
+    public const string RING_TARGET_DECIDED_WHEN_RUNG = 'decidedWhenRung';
 
     /**
      * Starts the agent's call to the owner.
@@ -132,7 +150,7 @@ class AgentVoiceCallStartsService extends Service
         $ringConversation = $carrierConversation !== null && !$carrierConversation->isHiddenFromCustomer()
             ? $carrierConversation
             : null;
-        $appIsRingable = $appIsIncluded && $this->isAppRingable($ownerAccount, $ringConversation);
+        $appIsRingable = $appIsIncluded && $this->isAppRingableInAgentSpace($ownerAccount, $agentSpace, $ringConversation);
 
         $agentVoiceCallRoute = $this->resolveCallRoute($appIsIncluded, $appIsRingable);
         if ($agentVoiceCallRoute->refusalReason !== null) {
@@ -184,8 +202,8 @@ class AgentVoiceCallStartsService extends Service
         $this->expireOverdueRingsOfOwner($ownerAccount);
         // An eval run never rings: a ring reaches a real person and has no test sink.
         $this->refuseRingInsideAnEvalRun($ownerAccount, $agentSpace, $aiConversation);
-        $reachableRingTargetNames = $this->findReachableRingTargetNames($ownerAccount, $aiConversation);
-        if ($reachableRingTargetNames === []) {
+        $ringTargetNamesToRing = $this->findRingTargetNamesToRing($ownerAccount, $agentSpace, $aiConversation);
+        if ($ringTargetNamesToRing === []) {
             throw new BadRequestException(static::ERROR_CODE_NO_RING_TARGET_REACHABLE);
         }
 
@@ -209,7 +227,7 @@ class AgentVoiceCallStartsService extends Service
         }
         $agentVoiceCall = $this->getAgentVoiceCallStoreService()->createCall($agentVoiceCall);
 
-        $this->ringCallOnTargets($agentVoiceCall, $reachableRingTargetNames, $agentSpace);
+        $this->ringCallOnTargets($agentVoiceCall, $ringTargetNamesToRing, $agentSpace);
         if ($agentVoiceCall->endedAt === null) {
             $this->dispatchRingDeadlineCheck($agentVoiceCall);
         }
@@ -231,7 +249,7 @@ class AgentVoiceCallStartsService extends Service
         $agentVoiceCallReachableChannels = AgentVoiceCallReachableChannels::newInstance();
         $agentVoiceCallReachableChannels->appIsIncluded = $this->isAppIncluded($ownerAccount, $agentSpace, $conversation);
         $agentVoiceCallReachableChannels->appIsRingableNow = $agentVoiceCallReachableChannels->appIsIncluded
-            && $this->isAppRingable($ownerAccount, $conversation !== null && !$conversation->isHiddenFromCustomer() ? $conversation : null);
+            && $this->isAppRingableInAgentSpace($ownerAccount, $agentSpace, $conversation !== null && !$conversation->isHiddenFromCustomer() ? $conversation : null);
         return $agentVoiceCallReachableChannels;
     }
 
@@ -276,8 +294,41 @@ class AgentVoiceCallStartsService extends Service
     }
 
     /**
+     * Whether `$ringTargetName` takes a ring for this owner, without ringing anything: one of
+     * {@see self::RING_TARGET_REACHABLE_NOW}, {@see self::RING_TARGET_NOT_REACHABLE_NOW} and
+     * {@see self::RING_TARGET_DECIDED_WHEN_RUNG}. The question the package asks of every ring target
+     * ({@see findRingTargetNamesToRing()}). The base asks {@see isRingTargetReachableNow()} and maps its answer; it
+     * never answers "decided when rung".
+     *
+     * Override point: an application overrides this one when a target's reachability needs the agent space, or when it
+     * is a read that should run only when the target is actually rung (after the targets before it in
+     * {@see getRingTargetNames()} were rung): it answers {@see self::RING_TARGET_DECIDED_WHEN_RUNG}, the target counts
+     * as a target to ring (the ring is not refused as `no_registered_devices` because of it), and its
+     * {@see ringCallOnTarget()} finds out and answers false when it reached nobody, as for any target whose ring was
+     * not delivered. An application that only answers yes or no without the agent space keeps overriding
+     * {@see isRingTargetReachableNow()}.
+     *
+     * `$agentSpace` is the space the caller of the ring named ({@see startRing()}, {@see findReachableChannelsForOwner()}):
+     * this service checks no right of the owner on it, and the agent's path asks with the rights lifted
+     * ({@see startAppRing()}). An override that reads rows of the space or of its devices narrows its own reads to
+     * `$ownerAccount` and to that space.
+     */
+    protected function findRingTargetReachability(
+        string $ringTargetName,
+        Account $ownerAccount,
+        ?AgentSpace $agentSpace,
+        ?AIConversation $ringConversation
+    ): string {
+        return $this->isRingTargetReachableNow($ringTargetName, $ownerAccount, $ringConversation)
+            ? static::RING_TARGET_REACHABLE_NOW
+            : static::RING_TARGET_NOT_REACHABLE_NOW;
+    }
+
+    /**
      * Whether `$ringTargetName` would take a ring for this owner right now, without ringing anything. The open
-     * clients: a client of the account that would be rung listens.
+     * clients: a client of the account that would be rung listens. Asked by the default of
+     * {@see findRingTargetReachability()}; an application that needs the agent space or the third answer overrides
+     * that one instead.
      */
     protected function isRingTargetReachableNow(string $ringTargetName, Account $ownerAccount, ?AIConversation $ringConversation): bool
     {
@@ -291,7 +342,34 @@ class AgentVoiceCallStartsService extends Service
     }
 
     /**
-     * The ring targets that would take a ring for this owner right now.
+     * The ring targets a ring is tried on, in the order of {@see getRingTargetNames()}: those that are reachable now
+     * and those that decide when they are rung ({@see findRingTargetReachability()}). Empty = no target can take the
+     * ring (`no_registered_devices`).
+     *
+     * An application that overrides {@see findReachableRingTargetNames()} keeps its answer: while its subclass declares
+     * that method, this one answers with it (without the agent space and without the third answer). Such an
+     * application may now move its decision into {@see findRingTargetReachability()} and remove that override.
+     *
+     * @return string[]
+     */
+    protected function findRingTargetNamesToRing(Account $ownerAccount, ?AgentSpace $agentSpace, ?AIConversation $ringConversation): array
+    {
+        if ($this->isOverriddenByTheApplication('findReachableRingTargetNames')) {
+            return $this->findReachableRingTargetNames($ownerAccount, $ringConversation);
+        }
+        $ringTargetNamesToRing = [];
+        foreach ($this->getRingTargetNames() as $ringTargetName) {
+            if ($this->findRingTargetReachability($ringTargetName, $ownerAccount, $agentSpace, $ringConversation) !== static::RING_TARGET_NOT_REACHABLE_NOW) {
+                $ringTargetNamesToRing[] = $ringTargetName;
+            }
+        }
+        return $ringTargetNamesToRing;
+    }
+
+    /**
+     * The ring targets that would take a ring for this owner right now, by {@see isRingTargetReachableNow()}. The
+     * package asks {@see findRingTargetNamesToRing()}; it asks this one only when an application's subclass overrides
+     * it (that override keeps working unchanged).
      *
      * @return string[]
      */
@@ -331,6 +409,7 @@ class AgentVoiceCallStartsService extends Service
             $ringDelivered = $this->ringCallOnTarget($ringTargetName, $agentVoiceCall, $agentSpace);
             $deliveredRingCount += $ringDelivered ? 1 : 0;
             $ringTargetTraceEvent = $this->buildRingTargetTraceEvent($ringTargetName, $agentVoiceCall, $ringDelivered, $targetRingStartedAtUnixMs);
+            $this->addDeviceCountsToRingTargetTraceEvent($ringTargetTraceEvent, $ringTargetName, $agentVoiceCall);
             $ringTraceEvents->add($ringTargetTraceEvent);
         }
         if ($deliveredRingCount === 0) {
@@ -374,6 +453,59 @@ class AgentVoiceCallStartsService extends Service
             AIConversationTraceEvent::nowUnixMs() - $targetRingStartedAtUnixMs,
             $targetRingStartedAtUnixMs
         );
+    }
+
+    /**
+     * How many devices `$ringTargetName` selected for the ring of `$agentVoiceCall`; null = unknown. Asked after the
+     * target was rung ({@see ringCallOnTarget()}, whose answer stays the one bool of a delivered ring), so the count
+     * reaches the trace without a change of the ring's signature. The base: unknown (its open clients are one
+     * message, not counted devices).
+     *
+     * Override point: an application whose target rings several devices (one push per phone) answers the count here,
+     * for example from what its ring of this call recorded under the call's id. A known count lands in the trace event
+     * of that target as `devicesSelected` ({@see addDeviceCountsToRingTargetTraceEvent()}); the `devicesSelected` of
+     * the started ring ({@see self::TRACE_EVENT_RING_STARTED}) keeps counting ring targets. The call is the one this
+     * service has just stored for the owner; an override reads only the records of that call.
+     */
+    protected function findSelectedDeviceCountOfRingTarget(string $ringTargetName, AgentVoiceCall $agentVoiceCall): ?int
+    {
+        return null;
+    }
+
+    /**
+     * How many devices `$ringTargetName` rang for `$agentVoiceCall`; null = unknown. The counterpart of
+     * {@see findSelectedDeviceCountOfRingTarget()}, asked at the same moment; a known count lands in the trace event of
+     * that target as `devicesRung`, the started ring's `devicesRung` keeps counting ring targets. The base: unknown.
+     */
+    protected function findRungDeviceCountOfRingTarget(string $ringTargetName, AgentVoiceCall $agentVoiceCall): ?int
+    {
+        return null;
+    }
+
+    /**
+     * Adds the known device counts of ONE ring target ({@see findSelectedDeviceCountOfRingTarget()},
+     * {@see findRungDeviceCountOfRingTarget()}) to the payload of that target's trace event, whoever built the event
+     * ({@see buildRingTargetTraceEvent()} or an application's override of it). An unknown count adds nothing, so the
+     * event of an application without these overrides stays as it was.
+     */
+    protected function addDeviceCountsToRingTargetTraceEvent(
+        AIConversationTraceEvent $ringTargetTraceEvent,
+        string $ringTargetName,
+        AgentVoiceCall $agentVoiceCall
+    ): void {
+        $deviceCounts = [];
+        $selectedDeviceCount = $this->findSelectedDeviceCountOfRingTarget($ringTargetName, $agentVoiceCall);
+        if ($selectedDeviceCount !== null) {
+            $deviceCounts['devicesSelected'] = $selectedDeviceCount;
+        }
+        $rungDeviceCount = $this->findRungDeviceCountOfRingTarget($ringTargetName, $agentVoiceCall);
+        if ($rungDeviceCount !== null) {
+            $deviceCounts['devicesRung'] = $rungDeviceCount;
+        }
+        if ($deviceCounts === []) {
+            return;
+        }
+        $ringTargetTraceEvent->setPayloadArray(array_merge($ringTargetTraceEvent->getPayloadArray(), $deviceCounts));
     }
 
     /** The trace events of a ring in one batched write, in the order of the set. */
@@ -640,10 +772,39 @@ class AgentVoiceCallStartsService extends Service
         return $agentVoiceCallAdmissionService->findRefusalOfCallStart($ownerAccount, $agentSpace, $conversation)?->code;
     }
 
-    /** Whether a ring would reach this owner right now on any ring target, without ringing anything. */
+    /**
+     * Whether a ring would reach this owner right now on any ring target, without ringing anything: some target is
+     * reachable now or decides when it is rung ({@see findRingTargetNamesToRing()}). What {@see startVoiceCall()} and
+     * {@see findReachableChannelsForOwner()} route on.
+     *
+     * An application that overrides {@see isAppRingable()} keeps its answer: while its subclass declares that method,
+     * this one answers with it (without the agent space).
+     */
+    protected function isAppRingableInAgentSpace(Account $ownerAccount, ?AgentSpace $agentSpace, ?AIConversation $ringConversation): bool
+    {
+        if ($this->isOverriddenByTheApplication('isAppRingable')) {
+            return $this->isAppRingable($ownerAccount, $ringConversation);
+        }
+        return $this->findRingTargetNamesToRing($ownerAccount, $agentSpace, $ringConversation) !== [];
+    }
+
+    /**
+     * Whether a ring would reach this owner right now on any ring target, without ringing anything, by
+     * {@see findReachableRingTargetNames()}. The package asks {@see isAppRingableInAgentSpace()}; it asks this one only
+     * when an application's subclass overrides it (that override keeps working unchanged).
+     */
     protected function isAppRingable(Account $ownerAccount, ?AIConversation $ringConversation): bool
     {
         return $this->findReachableRingTargetNames($ownerAccount, $ringConversation) !== [];
+    }
+
+    /**
+     * Whether a subclass of this service declares `$methodName`: the package then asks that method where it asked it
+     * before a newer override point took its place, so an application's override of the older method keeps working.
+     */
+    protected function isOverriddenByTheApplication(string $methodName): bool
+    {
+        return (new ReflectionMethod($this, $methodName))->getDeclaringClass()->getName() !== self::class;
     }
 
     /**

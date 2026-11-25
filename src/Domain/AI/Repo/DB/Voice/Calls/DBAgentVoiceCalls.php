@@ -30,7 +30,8 @@ class DBAgentVoiceCalls extends DBEntitySet
      * The calls that ring or run at `$nowUnixTime`, newest first: not ended, and answered less than the maximum call
      * length ago (the worker's hard stop: a row a dead worker left open is not running), or never answered and still
      * inside the ring window. The same bounds as {@see AgentVoiceCall::getCallStateAt()}. Only the calls of
-     * `$ownerAccountId` ({@see restrictToCallsOfAccount()}).
+     * `$ownerAccountId` ({@see restrictToCallsOfAccount()}). The ring window of a row without a deadline of its own is
+     * {@see getRingSecondsWithoutDeadline()}.
      *
      * @throws BadRequestException
      * @throws InternalErrorException
@@ -51,7 +52,7 @@ class DBAgentVoiceCalls extends DBEntitySet
             )
             ->setParameter('openCallAnsweredFloor', date('Y-m-d H:i:s', $nowUnixTime - $agentVoiceConfiguration->maximumCallSeconds))
             ->setParameter('openCallNow', date('Y-m-d H:i:s', $nowUnixTime))
-            ->setParameter('openCallRingFloor', date('Y-m-d H:i:s', $nowUnixTime - $agentVoiceConfiguration->ringSeconds))
+            ->setParameter('openCallRingFloor', date('Y-m-d H:i:s', $nowUnixTime - $this->getRingSecondsWithoutDeadline()))
             ->orderBy("$alias.id", 'DESC')
             ->setMaxResults(max(1, $limit));
 
@@ -372,6 +373,23 @@ class DBAgentVoiceCalls extends DBEntitySet
             . ' WHERE ' . $sqlDialect->quote('id') . ' = :callId',
             ['seconds' => $seconds, 'callId' => $callId]
         );
+    }
+
+    /**
+     * How long a never-answered call WITHOUT a ring deadline still counts as open in {@see findOpenCalls()}, in
+     * seconds: the read's half of {@see AgentVoiceCall::getRingSecondsWithoutDeadline()}. The base: the configured ring
+     * length (`AI.agentVoice.limits.ringSeconds`), the same value as the call's half.
+     *
+     * Override point: an application whose own medium rings longer than the configured length answers that length
+     * here, together with the call's half in its subclass of the call, instead of overriding the whole query. It is
+     * ONE number for the whole read, not one per row: the call table of the package names no medium (a call's medium
+     * is answered by the application's subclass of the call from its own columns), so the query has no column to
+     * pick a window by. An application with several lengths answers the longest; the readers that list open calls
+     * narrow the rows once more with the call's own window ({@see AgentVoiceCalls::getOpenCallsAt()}).
+     */
+    protected function getRingSecondsWithoutDeadline(): int
+    {
+        return AgentVoiceConfiguration::current()->ringSeconds;
     }
 
     /** The table of the call rows, as the application's model names it. */

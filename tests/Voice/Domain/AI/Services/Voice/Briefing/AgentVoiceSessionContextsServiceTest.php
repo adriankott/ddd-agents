@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DDD\Tests\Agents\Voice\Domain\AI\Services\Voice\Briefing;
 
+use DDD\Domain\AI\Entities\AgentSpaces\AgentSpace;
 use DDD\Domain\AI\Entities\Conversations\Agent\AgentWorkingState;
 use DDD\Domain\AI\Entities\Conversations\Agent\Decisions\AgentReplyLanguageDecision;
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
@@ -59,6 +60,9 @@ class AgentVoiceSessionContextsServiceTest extends AgentVoiceIntegrationTestCase
         $conversation = new AIConversation();
         $conversation->accountId = $accountId;
         $conversation->agentSpaceId = 9;
+        $agentSpace = new AgentSpace();
+        $agentSpace->id = 9;
+        $conversation->agentSpace = $agentSpace;
         $conversation->episodicHistory = 'The menu update.';
         $conversation->messages = new AIConversationMessages();
 

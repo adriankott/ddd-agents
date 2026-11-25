@@ -91,6 +91,19 @@ never the same class under a second name.
   `isRingTargetReachableNow()`, `ringCallOnTarget()` and `buildRingTargetTraceEvent()` of
   `AgentVoiceCallStartsService`; `AgentVoiceRingService::clearRing()` stops it at the moments the package's ring
   stops; `AgentVoiceCallsService::stopRingingCallBestEffort()` when the call ends before an answer.
+- **The reachability of a ring target with the agent space, and "decided when rung"**: `findRingTargetReachability()`
+  answers `RING_TARGET_REACHABLE_NOW`, `RING_TARGET_NOT_REACHABLE_NOW` or `RING_TARGET_DECIDED_WHEN_RUNG` and gets the
+  agent space; its default maps `isRingTargetReachableNow()`. A deferred target counts as a target to ring (no
+  `no_registered_devices` because of it), is rung in the order of `getRingTargetNames()` and its `ringCallOnTarget()`
+  finds out (false = not delivered, as for any target); every target deferred and none rang ends the call `FAILED`
+  like any ring that reached nobody. The agent space is the one the ring's caller named, unchecked by this service and
+  asked with the rights lifted on the agent's path: an override narrows its reads to the owner and that space. An
+  override of the older `findReachableRingTargetNames()` or `isAppRingable()` is still asked while it exists
+  (`isOverriddenByTheApplication()`), without the agent space and the third answer.
+- **The devices of a ring target** (a target that rings several phones): `findSelectedDeviceCountOfRingTarget()` and
+  `findRungDeviceCountOfRingTarget()`, asked after the target was rung, unknown (null) by default. A known count is
+  added as `devicesSelected` / `devicesRung` to the trace event of that target; an unknown one adds nothing. The
+  started ring's own `devicesSelected` / `devicesRung` keep counting ring targets.
 - **A medium** (a call that does not run in the application's window): the application overrides `startVoiceCall()`
   with its own arguments after the base's, decides with its subclass of `AgentVoiceCallRoute` and starts its own
   medium; `resolveCallRoute()` is the decision of the base. The entity's `getChannelType()` names the medium of a
@@ -99,6 +112,10 @@ never the same class under a second name.
   (`prepareApplicationStateOfAttachedCall()`, `applyApplicationSessionEvent()`, `finishApplicationPartOfTheCall()`
   and the others its docblock lists) do nothing by default. `keepCompletedSentenceOutOfTheConversation()` is handed
   each completed sentence as a `LiveTranscriptSentence`.
+- **A medium that rings longer than `limits.ringSeconds`**: the call's `getRingSecondsWithoutDeadline()` and, for the
+  store `entity`, the repository's `DBAgentVoiceCalls::getRingSecondsWithoutDeadline()` (the window of a row without a
+  deadline in the read of the open calls; one number for the read, the longest of the application's media, since the
+  package's table names no medium).
 - **The caller context of a ring** (what the application tells the ringing client about who calls): the fields of
   the application's subclass of `AgentVoiceRingCallerContext` at the same path, named in its `toPayloadArray()`
   and filled in `AgentVoiceRingService::buildCallerContext()`. `AgentVoiceRingPayload::toPayloadJson()` is the one
@@ -118,6 +135,11 @@ subclass of `AgentVoiceSessionContext`), a source of its own for one block (`fin
 `findCharacterCoreOfConversation()`, `findMemoryDirectivesBlockOfConversation()`,
 `findProductCapabilitiesOfConversation()`), and the prompt names of the notes sent while a call runs
 (`getSilenceCheckPromptName()`, `getGoodbyePromptName()`, `getBudgetEndPromptName()` and their siblings).
+
+The standing directives are read through the chat's memory port
+(`AgentMemoriesService::findStandingDirectivesForAgentSpace()`), the same read as the chat's model input: an
+application whose memories sit behind its own service binds that port, and both channels follow; it overrides
+`findMemoryDirectivesBlockOfConversation()` only when the call's directives must differ from the chat's.
 
 Further seed rows of the application are `buildApplicationSeedInputMessages()` of its subclass of
 `AgentVoiceSessionContext`: it returns the set `AgentVoiceSeedInputMessages` (built with

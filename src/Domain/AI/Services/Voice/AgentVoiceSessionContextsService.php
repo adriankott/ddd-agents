@@ -44,6 +44,8 @@ use Throwable;
  *   {@see applyApplicationAdditions()} (the fields of its own subclass of the context);
  * - a source of its own for one block: {@see findCallTask()}, {@see findCharacterCoreOfConversation()},
  *   {@see findMemoryDirectivesBlockOfConversation()}, {@see findProductCapabilitiesOfConversation()};
+ * - the application's own memories in the standing directives: no override here; the briefing reads them through the
+ *   chat's memory port ({@see AgentMemoriesService}), which the application binds once for chat and call;
  * - the prompts of the notes sent while the call runs: {@see getSilenceCheckPromptName()},
  *   {@see getQuestionRepeatPromptName()}, {@see getGoodbyePromptName()},
  *   {@see getGoodbyeAfterSilenceChecksPromptName()}, {@see getBudgetEndPromptName()},
@@ -106,7 +108,7 @@ class AgentVoiceSessionContextsService extends Service
             // Best-effort: the briefing simply lacks the addressing line.
         }
 
-        // The standing directives: the same store and rendering as the chat's model input.
+        // The standing directives: the same port, store and rendering as the chat's model input.
         try {
             $voiceSessionContext->memoryDirectivesBlock = $this->findMemoryDirectivesBlockOfConversation($conversation);
         } catch (Throwable) {
@@ -348,17 +350,25 @@ class AgentVoiceSessionContextsService extends Service
     }
 
     /**
-     * The owner's standing directives of the conversation's account and agent space, rendered by the agent's memory
-     * store. Null without an account, while the memory store is switched off, or without a directive.
+     * The owner's standing directives of the conversation's account and agent space, read through the same port as the
+     * chat's model input ({@see AgentMemoriesService::findStandingDirectivesForAgentSpace()}): the package's memory
+     * store renders them while it is switched on, and an application whose memories sit behind its own service binds
+     * that service there once, for chat and call alike. Null without an account, without directives (the port answers
+     * none while the memory store is switched off), or with an empty block.
+     *
+     * Override point: an application overrides this method only when the call's directives must differ from the
+     * chat's; to serve its own memories it binds the port instead.
      */
     protected function findMemoryDirectivesBlockOfConversation(AIConversation $conversation): ?string
     {
-        if (!(isset($conversation->accountId) && $conversation->accountId) || !AgentMemoriesService::isMemoryStoreEnabled()) {
+        if (!(isset($conversation->accountId) && $conversation->accountId)) {
             return null;
         }
-        $directivesBlock = $this->getAgentMemoryStoreService()
-            ->findCurrentDirectivesForScope((int)$conversation->accountId, $conversation->agentSpaceId ?? null)
-            ->toDirectivesBlock();
+        // the agent space as the chat reads it (a read of the relation loads it); none without a space id
+        $agentSpace = isset($conversation->agentSpaceId) ? ($conversation->agentSpace ?? null) : null;
+        $directivesBlock = $this->getAgentMemoriesService()
+            ->findStandingDirectivesForAgentSpace((int)$conversation->accountId, $agentSpace)
+            ?->directivesBlock ?? '';
 
         return trim($directivesBlock) !== '' ? $directivesBlock : null;
     }
@@ -446,6 +456,14 @@ class AgentVoiceSessionContextsService extends Service
         /** @var AgentSpacesService $agentSpacesService */
         $agentSpacesService = DDDService::instance()->getService(AgentSpacesService::class);
         return $agentSpacesService;
+    }
+
+    /** The port of the agent's durable memory the chat reads its standing directives through. */
+    protected function getAgentMemoriesService(): AgentMemoriesService
+    {
+        /** @var AgentMemoriesService $agentMemoriesService */
+        $agentMemoriesService = DDDService::instance()->getService(AgentMemoriesService::class);
+        return $agentMemoriesService;
     }
 
     /**

@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.6.8
+
+**Voice: four override points — the ring window of the open-calls read, ring target reachability with the agent space
+and a deferred answer, the briefing's directives through the memory port, device counts per ring target.** No web
+change; npm `@mgamadeus/ddd-agents` 0.6.8 in lockstep.
+
+- Voice: the ring window of a call row without a ring deadline, in the read of the open calls, is a protected method of
+  the call repository, `DBAgentVoiceCalls::getRingSecondsWithoutDeadline(): int` (the read's half of the call's
+  `AgentVoiceCall::getRingSecondsWithoutDeadline()`). Default: `limits.ringSeconds`, so the query is unchanged. It is
+  one number for the whole read (the package's call table names no medium); an application with several ring lengths
+  answers the longest. An application that overrode `findOpenCalls()` only to widen that window may remove the
+  override.
+- Voice: the reachability of a ring target gets the agent space and a third answer.
+  `AgentVoiceCallStartsService::findRingTargetReachability(string $ringTargetName, Account $ownerAccount, ?AgentSpace $agentSpace, ?AIConversation $ringConversation): string`
+  answers `RING_TARGET_REACHABLE_NOW`, `RING_TARGET_NOT_REACHABLE_NOW` or `RING_TARGET_DECIDED_WHEN_RUNG`. Default: the
+  answer of `isRingTargetReachableNow()` mapped to the first two, so nothing changes without an override. A target that
+  answers "decided when rung" counts as a target to ring (no `no_registered_devices` because of it), is rung in the
+  order of `getRingTargetNames()`, and its `ringCallOnTarget()` finds out; if every target deferred and none rang, the
+  call ends `FAILED` as any ring that reached nobody (the agent's tool answers `APP_RING_DELIVERED_NOWHERE`). The agent
+  space is not checked by the service and is asked with the rights lifted on the agent's path: an override narrows its
+  reads to the owner account and that space. The package now asks the new list `findRingTargetNamesToRing()` and
+  `isAppRingableInAgentSpace()`; an existing override of `findReachableRingTargetNames()` or `isAppRingable()` is still
+  asked while it exists (without the agent space and the third answer). An application that overrode
+  `findReachableRingTargetNames()` wholesale to defer a target may move that decision into
+  `findRingTargetReachability()` and remove the override.
+- Voice: the standing directives of the call's briefing are read through the chat's memory port,
+  `AgentMemoriesService::findStandingDirectivesForAgentSpace()`, instead of the memory store directly. With the
+  package's binding the block is the same as before. An application whose memories sit behind its own service binds
+  that port once, for chat and call, and may remove its override of
+  `AgentVoiceSessionContextsService::findMemoryDirectivesBlockOfConversation()`. The briefing now reads the
+  conversation's agent space relation (as the chat does) to hand it to the port: a space that is gone, or that the
+  caller of `open` cannot read, gives the account-wide directives.
+- Voice: the device counts of a ring target in the trace of a started ring.
+  `AgentVoiceCallStartsService::findSelectedDeviceCountOfRingTarget(string $ringTargetName, AgentVoiceCall $agentVoiceCall): ?int`
+  and `findRungDeviceCountOfRingTarget(string $ringTargetName, AgentVoiceCall $agentVoiceCall): ?int` are asked after
+  the target was rung. Default: null (unknown), and an unknown count writes nothing, so the stored events are
+  byte-identical to before. A known count is added as `devicesSelected` / `devicesRung` to the trace event of that
+  target (whoever built it); the `devicesRung` / `devicesSelected` of `call.ring_started` keep counting ring targets.
+  An application that wrote a parallel trace event per device to say how many devices a target rang may drop it.
+- Tests: the ring window of the open-calls read, the three reachability answers (deferred targets rung in order, all
+  deferred and none rung ends FAILED, an older override still asked), the directives through a bound memory port
+  (space gone → account-wide), the device counts merged into the target's trace event (unknown writes nothing).
+
 ## 0.6.7
 
 **Voice: who pays for a call start and which account "call me" rings are override points.** No web change; npm
