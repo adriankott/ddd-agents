@@ -43,7 +43,7 @@ through a type provider.
 | `sendMessage()` | a message of a registered type (`AgentRealtimeMessageTypeProvider`) with a key, a payload of one JSON object and an expiry, to one account's open clients or to the clients of one conversation (`AgentRealtimeAudience::forAccount()` / `forConversation()`), optionally to one client of them |
 | `clearMessage()` | removes it; a later message of the same type and key replaces the earlier one |
 | `findListenerCredential()` | issues or reuses what a client needs to listen on the host's transport (null without a transport) |
-| `isClientListening()` | whether a client listens: the transport's own answer when it has one, else the presence the clients state with what they already send (`AgentClientPresenceService`) |
+| `isClientListening()` | whether a client listens: the transport's own answer when it has one, else the presence the clients state with what they already send (`AgentClientPresenceService`) — for a conversation audience a fresh statement of a client of that conversation, for an account audience a fresh statement of any client of the account: one that shows a conversation, or one that shows none and repeats the account-level read (below) |
 
 The package always keeps a **mailbox in the shared cache** (`config/app/AI/agentRealtimeChannel.php`,
 `sharedCacheGroup`; null tries `redis`, then Core's default group): the run-state read carries the pending messages
@@ -71,13 +71,44 @@ messages left out, a message for one client only to that client, client tool req
 out, a conversation's mailbox and another account's never read. Hooks: `findRealtimeMessageDeliveriesOfAccountClient()`,
 `findRealtimeListenerCredentialOfAccount()`, `getAgentRealtimeChannelService()`.
 
-Web: the HTTP binding's `getAccountRealtimeMessages()` (optional on `AgentsConversationClient`) reads it;
-`createAccountRealtimePoll({ readAccountRealtime, onMessage, onListenerCredential, isTransportBound, intervalMs })` of
-`@mgamadeus/ddd-agents/ui` reads at once, then every `ACCOUNT_REALTIME_POLL_INTERVAL_MS` (5 s) while no transport is
+**The read states the reading client's presence (since 0.6.0).** A read that carries `clientId` — the query parameter
+of the run-state read, checked the same way (`AgentClientPresence::isValidClientId()`: 8 to 64 letters, digits and
+`-`) — records that a client of the account is there: `stampUIClientOfAccount()` →
+`AgentClientPresenceService::recordClientStatementWithoutConversation()`. `isClientListening()` of the account
+audience then answers true while only a polling client is open, so a message to the account's clients (a call's ring)
+is sent instead of refused.
+
+- **No table.** One entry per account in the channel's shared cache, kept for
+  `AgentClientPresenceService::PRESENCE_TTL_SECONDS`, under a key of its own
+  (`AgentClientPresenceService::ACCOUNT_WITHOUT_CONVERSATION_KEY_PREFIX`): it never replaces what a client that shows
+  a conversation stated. `findNewestPresenceOfAccount()` answers the fresh statement of a client that shows a
+  conversation first, else this one (`conversationId` 0, no route, no UI state).
+- **Bounded.** The entry is written when the account has none or its newest one is
+  `AgentClientPresenceService::STATEMENT_THROTTLE_SECONDS` (10 s) old, whichever client wrote it: with the 5 s poll
+  every second read of a client writes the cache once (about one write per account in 10 s, however many clients
+  poll), and every read costs one cache read more than before. Never a database statement.
+- **Fresh for `AgentClientPresence::FRESH_FOR_SECONDS` (25 s),** the window of every presence statement. A client that
+  reads at least that often stays listening; a longer `intervalMs` leaves gaps in which the account reads as gone.
+- **Without `clientId`,** or with a value that is no client id, the read states nothing and answers as before; without
+  a shared cache nothing is stated.
+- **With a bound transport** the client reads once and then only on pings, so its statement runs out and the transport
+  answers instead (`askTransportWhetherClientIsListening()`). A host that binds a transport answers that hook for the
+  account audience too; while it answers null the statements decide, and a client that no longer polls reads as gone.
+
+Hooks: `stampUIClientOfAccount()`, `getAgentClientPresenceService()`.
+
+Web: the HTTP binding's `getAccountRealtimeMessages()` (optional on `AgentsConversationClient`) reads it and states a
+client id on every read: the poll's `clientId` option, else the id of the bound UI client, else one the client creates
+once (`createAgentUIClientId`); a binding of the host's own states one itself.
+`createAccountRealtimePoll({ readAccountRealtime, onMessage, onMessageCleared, onListenerCredential, isTransportBound, intervalMs, clientId })`
+of `@mgamadeus/ddd-agents/ui` reads at once, then every `ACCOUNT_REALTIME_POLL_INTERVAL_MS` (5 s) while no transport is
 bound, and hands each message once to `onMessage` (the arrival hook; a replaced payload and a message sent again after
-a read saw it gone arrive again). A transport that carries the message hands it to `poll.acceptArrivedMessage()`; one
-that only pings calls `poll.readAfterPing()` (one re-read after `ACCOUNT_REALTIME_PING_REREAD_DELAY_MS` when the first
-read brought nothing new).
+a read saw it gone arrive again). A message a later read no longer holds is reported once to `onMessageCleared`. A
+subscriber added after the creation (`poll.subscribe()`, type `AccountRealtimePollSubscriber`) gets the messages open
+now, then every arrival, and the clear only of a message it was handed. A transport that carries the message hands it
+to `poll.acceptArrivedMessage()`; one that only pings calls `poll.readAfterPing()` (one re-read after
+`ACCOUNT_REALTIME_PING_REREAD_DELAY_MS` when the first read brought nothing new). With a bound transport the poll does
+not read by itself, so a clear comes only with such a read.
 
 `AIConversationRealtimeSignalService::publishClientToolRequestSignal()` is deprecated since 0.5.0: the package still
 rings it after every client tool request, so a host override keeps working; move it to `publishMessageToTransport()`.

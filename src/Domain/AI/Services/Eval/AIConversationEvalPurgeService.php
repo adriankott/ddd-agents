@@ -15,6 +15,7 @@ use DDD\Domain\AI\Entities\Evals\ConversationPurge\AIConversationEvalTreeConvers
 use DDD\Domain\AI\Entities\Evals\ConversationPurge\AIConversationEvalTreeConversations;
 use DDD\Domain\AI\Entities\Evals\ConversationPurge\AIConversationEvalTrees;
 use DDD\Domain\AI\Entities\MCPPackages\ToolCallImageReference;
+use DDD\Domain\AI\Entities\Voice\AgentVoiceConfiguration;
 use DDD\Domain\AI\Interfaces\AIConversationProgressReporterInterface;
 use DDD\Domain\AI\Repo\DB\Conversations\A2A\DBAIConversationTaskPushNotificationConfigModel;
 use DDD\Domain\AI\Repo\DB\Conversations\Agent\DBAIConversationDelegationBatchModel;
@@ -28,6 +29,7 @@ use DDD\Domain\AI\Repo\DB\Conversations\TraceEvents\DBAIConversationTraceEventMo
 use DDD\Domain\AI\Repo\DB\Conversations\TurnEvents\DBAIConversationTurnEventModel;
 use DDD\Domain\AI\Repo\DB\Evals\SuiteRuns\AgentEvalSuiteCases\DBAgentEvalSuiteCaseModel;
 use DDD\Domain\AI\Repo\DB\Mandates\DBAgentMandateModel;
+use DDD\Domain\AI\Repo\DB\Voice\Calls\DBAgentVoiceCallModel;
 use DDD\Domain\AI\Services\Conversations\Agent\AgentEvalAccountsService;
 use DDD\Domain\AI\Services\Conversations\Agent\AgentToolCallImageStoreService;
 use DDD\Domain\AI\Services\Conversations\AIConversationMessagesService;
@@ -196,6 +198,8 @@ class AIConversationEvalPurgeService extends Service
      * Columns pointing at a conversation or its rows that are deliberately NOT a purge step, with the reason. An
      * application adds the columns of its own tables (`array_merge` with the parent's). The memory columns come from the
      * memory store ({@see AgentMemoryStoreService::getColumnsNotPurgedByEvalPurge()}): a host store names its own.
+     * The two columns of the voice call table are listed while that table is not in use, and are steps while it is
+     * ({@see getVoiceCallColumnsNotPurged()}).
      *
      * @return string[] `table.column` → why it is not a step
      */
@@ -206,6 +210,7 @@ class AIConversationEvalPurgeService extends Service
         $toolCallBatchTableName = (string)DBAIConversationToolCallBatchModel::getTableName();
         return [
             ...$this->getAgentMemoryStoreService()->getColumnsNotPurgedByEvalPurge(),
+            ...$this->getVoiceCallColumnsNotPurged(),
             "{$conversationTableName}.rootConversationId" => 'inside the tree: the tree expansion follows it',
             "{$conversationTableName}.supervisedConversationId" => 'inside the tree: the tree expansion follows it',
             "{$conversationTableName}.delegatedFromMessageId" => 'inside the tree: the child conversation goes with it',
@@ -219,6 +224,36 @@ class AIConversationEvalPurgeService extends Service
             DBAIConversationTraceEventModel::getTableName() . '.agentVoiceCallId' => 'the trace event goes with its conversation',
             DBAgentEvalSuiteCaseModel::getTableName() . '.aiConversationId' => 'the stored case of a suite run keeps the id of the conversation it ran as a plain number; the record outlives the conversation',
         ];
+    }
+
+    /**
+     * The two conversation pointers of the voice call table while that table is not in use
+     * ({@see isVoiceCallTableInUse()}): nothing writes a call row then and the table need not exist, so a statement
+     * on it would fail. While the table is in use the two are purge steps ({@see buildModulePurgeSteps()}) and
+     * this list is empty.
+     *
+     * @return string[] `table.column` → why it is not a step
+     */
+    protected function getVoiceCallColumnsNotPurged(): array
+    {
+        if ($this->isVoiceCallTableInUse()) {
+            return [];
+        }
+        $voiceCallTableName = (string)DBAgentVoiceCallModel::getTableName();
+        $reason = 'the call table is not in use (voice is switched off, or calls are kept in a store of the application): no row is written and the table need not exist';
+        return [
+            "{$voiceCallTableName}.aiConversationId" => $reason,
+            "{$voiceCallTableName}.startedByAgentInConversationId" => $reason,
+        ];
+    }
+
+    /**
+     * Whether voice calls are kept in the package's call table ({@see AgentVoiceConfiguration::isCallTableInUse()}).
+     * An application that keeps its calls in a store of its own purges them in {@see buildHostDependantPurgeSteps()}.
+     */
+    protected function isVoiceCallTableInUse(): bool
+    {
+        return AgentVoiceConfiguration::current()->isCallTableInUse();
     }
 
     /**
@@ -262,6 +297,8 @@ class AIConversationEvalPurgeService extends Service
         $conversation = AIConversationEvalPurgeKeys::KIND_CONVERSATION;
         $message = AIConversationEvalPurgeKeys::KIND_MESSAGE;
         $mandateTableName = (string)DBAgentMandateModel::getTableName();
+        $voiceCallTableName = (string)DBAgentVoiceCallModel::getTableName();
+        $voiceCallTableIsInUse = $this->isVoiceCallTableInUse();
         $moduleSteps = AIConversationEvalPurgeSteps::newInstance();
         // per-conversation records
         $this->addPurgeStep($moduleSteps, AIConversationEvalPurgeStep::deleteRows((string)DBAIConversationTurnEventModel::getTableName(), 'aiConversationId', $conversation));
@@ -270,12 +307,20 @@ class AIConversationEvalPurgeService extends Service
         $this->addPurgeStep($moduleSteps, AIConversationEvalPurgeStep::deleteRows((string)DBAIConversationDelegationBatchModel::getTableName(), 'parentConversationId', $conversation));
         $this->addPurgeStep($moduleSteps, AIConversationEvalPurgeStep::deleteRows((string)DBAIConversationTaskPushNotificationConfigModel::getTableName(), 'aiConversationId', $conversation));
         $this->addPurgeStep($moduleSteps, AIConversationEvalPurgeStep::deleteRows((string)DBAIConversationCompactionNodeModel::getTableName(), 'aiConversationId', $conversation, hasHeavyRows: true));
+        if ($voiceCallTableIsInUse) {
+            // the voice calls that ran on the conversation (their trace events went with the conversation above)
+            $this->addPurgeStep($moduleSteps, AIConversationEvalPurgeStep::deleteRows($voiceCallTableName, 'aiConversationId', $conversation));
+        }
         // records that exist because of the conversation run
         $this->addPurgeStep($moduleSteps, AIConversationEvalPurgeStep::deleteRows($mandateTableName, 'sourceConversationId', $conversation));
         // records that outlive the conversation: the pointer goes, the record stays
         $this->addPurgeStep($moduleSteps, AIConversationEvalPurgeStep::nullifyColumn((string)DBAIConversationScheduleModel::getTableName(), 'createdByConversationId', $conversation));
         $this->addPurgeStep($moduleSteps, AIConversationEvalPurgeStep::nullifyColumn($mandateTableName, 'sourceUserMessageId', $message));
         $this->addPurgeStep($moduleSteps, AIConversationEvalPurgeStep::nullifyColumn($mandateTableName, 'revokedByMessageId', $message));
+        if ($voiceCallTableIsInUse) {
+            // a call the agent started from the conversation and that ran on another one
+            $this->addPurgeStep($moduleSteps, AIConversationEvalPurgeStep::nullifyColumn($voiceCallTableName, 'startedByAgentInConversationId', $conversation));
+        }
         // the messages, their embeddings first
         $this->addPurgeStep($moduleSteps, AIConversationEvalPurgeStep::deleteRows((string)DBAIConversationMessageEmbeddingModel::getTableName(), 'aiConversationMessageId', $message, hasHeavyRows: true));
         $this->addPurgeStep($moduleSteps, AIConversationEvalPurgeStep::deleteRows((string)DBAIConversationMessageModel::getTableName(), 'id', $message, hasHeavyRows: true));

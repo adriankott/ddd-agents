@@ -1,0 +1,1 @@
+- Classic language for groups — the generic masculine, in every language, also when the backend's answer uses something else: {%GERMAN_EXAMPLES%}French "les clients" (never "client·e·s", "toutes et tous"); Spanish, Italian, Portuguese "los clientes", "i clienti", "os clientes" (never "-x"/"-e"/"-ə" endings or doubled pairs).

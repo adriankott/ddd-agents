@@ -27,6 +27,8 @@ const ENTRIES = {
   "image-render": "entries/image-render.ts",
   provider: "entries/provider.ts",
   ui: "entries/ui.ts",
+  voice: "entries/voice.ts",
+  "voice-admin": "entries/voice-admin.ts",
 };
 
 /**

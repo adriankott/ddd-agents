@@ -1,0 +1,1 @@
+Billing anchor of voice sessions: the seconds of a realtime voice session are recorded under this prompt name by the application's usage recorder. There is no executable prompt behind it — the spoken instructions are composed per call by the voice session context.

@@ -21,6 +21,94 @@
       ]
     },
     {
+      "key": "%agentName% could not join the voice chat. Please try again.",
+      "defaultText": "%agentName% could not join the voice chat. Please try again.",
+      "placeholders": [
+        "agentName"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/call/agent-voice-call-store.ts"
+      ]
+    },
+    {
+      "key": "%agentName% ended the voice chat",
+      "defaultText": "%agentName% ended the voice chat",
+      "placeholders": [
+        "agentName"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/AgentVoiceCallBand/agent-voice-call-outcome-title-text-key.ts"
+      ]
+    },
+    {
+      "key": "%agentName% is listening",
+      "defaultText": "%agentName% is listening",
+      "placeholders": [
+        "agentName"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/AgentVoiceCallBand/AgentVoiceCallBand.tsx"
+      ]
+    },
+    {
+      "key": "%agentName% is speaking",
+      "defaultText": "%agentName% is speaking",
+      "placeholders": [
+        "agentName"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/AgentVoiceCallBand/AgentVoiceCallBand.tsx"
+      ]
+    },
+    {
+      "key": "%agentName% is thinking",
+      "defaultText": "%agentName% is thinking",
+      "placeholders": [
+        "agentName"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/AgentVoiceCallBand/AgentVoiceCallBand.tsx"
+      ]
+    },
+    {
+      "key": "%agentName% needs your microphone. Allow microphone access in your browser, then try again.",
+      "defaultText": "%agentName% needs your microphone. Allow microphone access in your browser, then try again.",
+      "placeholders": [
+        "agentName"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/call/agent-voice-call-store.ts"
+      ]
+    },
+    {
+      "key": "%agentName% stopped asking to talk.",
+      "defaultText": "%agentName% stopped asking to talk.",
+      "placeholders": [
+        "agentName"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/ring/answer-incoming-agent-voice-call.ts"
+      ]
+    },
+    {
+      "key": "%agentName% wants to talk",
+      "defaultText": "%agentName% wants to talk",
+      "placeholders": [
+        "agentName"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/ring/agent-voice-caller-label.ts"
+      ]
+    },
+    {
       "key": "%conversion% of the previous stage",
       "defaultText": "%conversion% of the previous stage",
       "placeholders": [
@@ -199,6 +287,40 @@
       ]
     },
     {
+      "key": "Accept",
+      "defaultText": "Accept",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/AgentVoiceCallBand/AgentVoiceCallBand.tsx",
+        "src/voice/AgentVoiceIncomingCall/AgentVoiceIncomingCall.tsx"
+      ]
+    },
+    {
+      "key": "Account",
+      "defaultText": "Account",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call",
+        "agent-voice-call-filter"
+      ],
+      "usedIn": [
+        "src/voice/admin/AgentVoiceCallDetailScreen/AgentVoiceCallDetailScreen.tsx",
+        "src/voice/admin/AgentVoiceCallsScreen/AgentVoiceCallsScreen.tsx"
+      ]
+    },
+    {
+      "key": "Account ID",
+      "defaultText": "Account ID",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call-filter"
+      ],
+      "usedIn": [
+        "src/voice/admin/AgentVoiceCallsScreen/AgentVoiceCallsScreen.tsx"
+      ]
+    },
+    {
       "key": "Added to your message",
       "defaultText": "Added to your message",
       "placeholders": [],
@@ -208,12 +330,34 @@
       ]
     },
     {
+      "key": "All",
+      "defaultText": "All",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call-filter"
+      ],
+      "usedIn": [
+        "src/voice/admin/AgentVoiceCallsScreen/AgentVoiceCallsScreen.tsx"
+      ]
+    },
+    {
       "key": "Almost ready…",
       "defaultText": "Almost ready…",
       "placeholders": [],
       "contexts": [],
       "usedIn": [
         "src/chat/ConversationMessage/ConversationMessageWidgets/ConversationMessageThinking/ConversationMessageThinking.tsx"
+      ]
+    },
+    {
+      "key": "Answered",
+      "defaultText": "Answered",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call"
+      ],
+      "usedIn": [
+        "src/voice/admin/AgentVoiceCallDetailScreen/AgentVoiceCallDetailScreen.tsx"
       ]
     },
     {
@@ -264,6 +408,51 @@
       ]
     },
     {
+      "key": "Booked seconds",
+      "defaultText": "Booked seconds",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call"
+      ],
+      "usedIn": [
+        "src/voice/admin/AgentVoiceCallDetailScreen/AgentVoiceCallDetailScreen.tsx",
+        "src/voice/admin/AgentVoiceCallsScreen/AgentVoiceCallsScreen.tsx"
+      ]
+    },
+    {
+      "key": "Booked seconds, at least",
+      "defaultText": "Booked seconds, at least",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call-filter"
+      ],
+      "usedIn": [
+        "src/voice/admin/AgentVoiceCallsScreen/AgentVoiceCallsScreen.tsx"
+      ]
+    },
+    {
+      "key": "Both sides hung up normally",
+      "defaultText": "Both sides hung up normally",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call-end-reason"
+      ],
+      "usedIn": [
+        "src/voice/admin/agent-voice-admin-format.ts"
+      ]
+    },
+    {
+      "key": "Canceled",
+      "defaultText": "Canceled",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call-end-reason"
+      ],
+      "usedIn": [
+        "src/voice/admin/agent-voice-admin-format.ts"
+      ]
+    },
+    {
       "key": "Clarifying response…",
       "defaultText": "Clarifying response…",
       "placeholders": [],
@@ -279,6 +468,15 @@
       "contexts": [],
       "usedIn": [
         "src/widgets/MultiChoiceConversationWidget/MultiChoiceConversationWidget.tsx"
+      ]
+    },
+    {
+      "key": "Close",
+      "defaultText": "Close",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/AgentVoiceCallBand/AgentVoiceCallBand.tsx"
       ]
     },
     {
@@ -298,6 +496,17 @@
       "contexts": [],
       "usedIn": [
         "src/kit/components/map/ComposedMapView.tsx"
+      ]
+    },
+    {
+      "key": "Completed",
+      "defaultText": "Completed",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call-end-reason"
+      ],
+      "usedIn": [
+        "src/voice/admin/agent-voice-admin-format.ts"
       ]
     },
     {
@@ -321,6 +530,27 @@
       "contexts": [],
       "usedIn": [
         "src/widgets/MultiChoiceConversationWidget/MultiChoiceConversationWidget.tsx"
+      ]
+    },
+    {
+      "key": "Connecting…",
+      "defaultText": "Connecting…",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/AgentVoiceCallBand/AgentVoiceCallBand.tsx"
+      ]
+    },
+    {
+      "key": "Conversation",
+      "defaultText": "Conversation",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call"
+      ],
+      "usedIn": [
+        "src/voice/admin/AgentVoiceCallDetailScreen/AgentVoiceCallDetailScreen.tsx",
+        "src/voice/admin/AgentVoiceCallsScreen/AgentVoiceCallsScreen.tsx"
       ]
     },
     {
@@ -374,6 +604,31 @@
       ]
     },
     {
+      "key": "Costs",
+      "defaultText": "Costs",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call"
+      ],
+      "usedIn": [
+        "src/voice/admin/AgentVoiceCallDetailScreen/AgentVoiceCallDetailScreen.tsx",
+        "src/voice/admin/AgentVoiceCallsScreen/AgentVoiceCallsScreen.tsx"
+      ]
+    },
+    {
+      "key": "Created",
+      "defaultText": "Created",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call",
+        "agent-voice-call-filter"
+      ],
+      "usedIn": [
+        "src/voice/admin/AgentVoiceCallDetailScreen/AgentVoiceCallDetailScreen.tsx",
+        "src/voice/admin/AgentVoiceCallsScreen/AgentVoiceCallsScreen.tsx"
+      ]
+    },
+    {
       "key": "Currency converter",
       "defaultText": "Currency converter",
       "placeholders": [],
@@ -401,12 +656,25 @@
       ]
     },
     {
-      "key": "Declined",
-      "defaultText": "Declined",
+      "key": "Decline",
+      "defaultText": "Decline",
       "placeholders": [],
       "contexts": [],
       "usedIn": [
-        "src/kit/components/form/Form.composed.tsx"
+        "src/voice/AgentVoiceCallBand/AgentVoiceCallBand.tsx",
+        "src/voice/AgentVoiceIncomingCall/AgentVoiceIncomingCall.tsx"
+      ]
+    },
+    {
+      "key": "Declined",
+      "defaultText": "Declined",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call-end-reason"
+      ],
+      "usedIn": [
+        "src/kit/components/form/Form.composed.tsx",
+        "src/voice/admin/agent-voice-admin-format.ts"
       ]
     },
     {
@@ -439,6 +707,18 @@
       ]
     },
     {
+      "key": "Duration",
+      "defaultText": "Duration",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call"
+      ],
+      "usedIn": [
+        "src/voice/admin/AgentVoiceCallDetailScreen/AgentVoiceCallDetailScreen.tsx",
+        "src/voice/admin/AgentVoiceCallsScreen/AgentVoiceCallsScreen.tsx"
+      ]
+    },
+    {
       "key": "E-mail draft",
       "defaultText": "E-mail draft",
       "placeholders": [],
@@ -466,12 +746,89 @@
       ]
     },
     {
+      "key": "End",
+      "defaultText": "End",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/AgentVoiceCallBand/AgentVoiceCallBand.tsx"
+      ]
+    },
+    {
+      "key": "End reason",
+      "defaultText": "End reason",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call-filter"
+      ],
+      "usedIn": [
+        "src/voice/admin/AgentVoiceCallsScreen/AgentVoiceCallsScreen.tsx"
+      ]
+    },
+    {
+      "key": "Ended",
+      "defaultText": "Ended",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call",
+        "agent-voice-call-state"
+      ],
+      "usedIn": [
+        "src/voice/admin/AgentVoiceCallDetailScreen/AgentVoiceCallDetailScreen.tsx",
+        "src/voice/admin/agent-voice-admin-format.ts"
+      ]
+    },
+    {
+      "key": "Ended by the agent",
+      "defaultText": "Ended by the agent",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call-end-reason"
+      ],
+      "usedIn": [
+        "src/voice/admin/agent-voice-admin-format.ts"
+      ]
+    },
+    {
       "key": "Enter an amount, such as 250 or 1,250.75",
       "defaultText": "Enter an amount, such as 250 or 1,250.75",
       "placeholders": [],
       "contexts": [],
       "usedIn": [
         "src/widgets/CurrencyConverterConversationWidget/CurrencyConverterWidget/CurrencyConverterWidget.tsx"
+      ]
+    },
+    {
+      "key": "Every client the call rang on declined it",
+      "defaultText": "Every client the call rang on declined it",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call-end-reason"
+      ],
+      "usedIn": [
+        "src/voice/admin/agent-voice-admin-format.ts"
+      ]
+    },
+    {
+      "key": "Expired",
+      "defaultText": "Expired",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call-end-reason"
+      ],
+      "usedIn": [
+        "src/voice/admin/agent-voice-admin-format.ts"
+      ]
+    },
+    {
+      "key": "Failed",
+      "defaultText": "Failed",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call-end-reason"
+      ],
+      "usedIn": [
+        "src/voice/admin/agent-voice-admin-format.ts"
       ]
     },
     {
@@ -502,12 +859,39 @@
       ]
     },
     {
+      "key": "I can’t hear you — is your microphone on?",
+      "defaultText": "I can’t hear you — is your microphone on?",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/AgentVoiceCallBand/AgentVoiceCallBand.tsx"
+      ]
+    },
+    {
       "key": "Interactive visualization — open the conversation to use it.",
       "defaultText": "Interactive visualization — open the conversation to use it.",
       "placeholders": [],
       "contexts": [],
       "usedIn": [
         "src/widgets/CustomVisualizationConversationWidget/CustomVisualizationWidget/CustomVisualizationWidget.tsx"
+      ]
+    },
+    {
+      "key": "It does not exist, or it belongs to an account you may not read.",
+      "defaultText": "It does not exist, or it belongs to an account you may not read.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/admin/AgentVoiceCallDetailScreen/AgentVoiceCallDetailScreen.tsx"
+      ]
+    },
+    {
+      "key": "Its messages are what was said in the call.",
+      "defaultText": "Its messages are what was said in the call.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/admin/AgentVoiceCallDetailScreen/AgentVoiceCallDetailScreen.tsx"
       ]
     },
     {
@@ -523,9 +907,12 @@
       "key": "Limit reached",
       "defaultText": "Limit reached",
       "placeholders": [],
-      "contexts": [],
+      "contexts": [
+        "agent-voice-call-end-reason"
+      ],
       "usedIn": [
-        "src/chat/ConversationErrorWidget/ConversationErrorWidget.tsx"
+        "src/chat/ConversationErrorWidget/ConversationErrorWidget.tsx",
+        "src/voice/admin/agent-voice-admin-format.ts"
       ]
     },
     {
@@ -549,6 +936,15 @@
       ]
     },
     {
+      "key": "Loading the voice calls",
+      "defaultText": "Loading the voice calls",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/admin/AgentVoiceCallsScreen/AgentVoiceCallsScreen.tsx"
+      ]
+    },
+    {
       "key": "Message draft",
       "defaultText": "Message draft",
       "placeholders": [],
@@ -558,12 +954,32 @@
       ]
     },
     {
+      "key": "Mute",
+      "defaultText": "Mute",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/AgentVoiceCallBand/AgentVoiceCallBand.tsx"
+      ]
+    },
+    {
       "key": "Network error",
       "defaultText": "Network error",
       "placeholders": [],
       "contexts": [],
       "usedIn": [
         "src/chat/ConversationErrorWidget/ConversationErrorWidget.tsx"
+      ]
+    },
+    {
+      "key": "Newer",
+      "defaultText": "Newer",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-pagination"
+      ],
+      "usedIn": [
+        "src/voice/admin/AgentVoiceCallsScreen/AgentVoiceCallsScreen.tsx"
       ]
     },
     {
@@ -639,6 +1055,15 @@
       ]
     },
     {
+      "key": "No price is known for the model this call ran on.",
+      "defaultText": "No price is known for the model this call ran on.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/admin/AgentVoiceCallDetailScreen/AgentVoiceCallDetailScreen.tsx"
+      ]
+    },
+    {
       "key": "No recipient yet",
       "defaultText": "No recipient yet",
       "placeholders": [],
@@ -663,6 +1088,79 @@
       "contexts": [],
       "usedIn": [
         "src/widgets/ClockConversationWidget/ClockConversationWidget.tsx"
+      ]
+    },
+    {
+      "key": "No voice call matches these filters.",
+      "defaultText": "No voice call matches these filters.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/admin/AgentVoiceCallsScreen/AgentVoiceCallsScreen.tsx"
+      ]
+    },
+    {
+      "key": "No voice call yet: a call starts when an owner opens a voice chat or the agent rings.",
+      "defaultText": "No voice call yet: a call starts when an owner opens a voice chat or the agent rings.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/admin/AgentVoiceCallsScreen/AgentVoiceCallsScreen.tsx"
+      ]
+    },
+    {
+      "key": "Nobody answered before the ringing stopped",
+      "defaultText": "Nobody answered before the ringing stopped",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call-end-reason"
+      ],
+      "usedIn": [
+        "src/voice/admin/agent-voice-admin-format.ts"
+      ]
+    },
+    {
+      "key": "Nobody has answered yet",
+      "defaultText": "Nobody has answered yet",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call-state"
+      ],
+      "usedIn": [
+        "src/voice/admin/agent-voice-admin-format.ts"
+      ]
+    },
+    {
+      "key": "Nobody picked up",
+      "defaultText": "Nobody picked up",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call-end-reason"
+      ],
+      "usedIn": [
+        "src/voice/admin/agent-voice-admin-format.ts"
+      ]
+    },
+    {
+      "key": "Not answered",
+      "defaultText": "Not answered",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call-end-reason"
+      ],
+      "usedIn": [
+        "src/voice/admin/agent-voice-admin-format.ts"
+      ]
+    },
+    {
+      "key": "Older",
+      "defaultText": "Older",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-pagination"
+      ],
+      "usedIn": [
+        "src/voice/admin/AgentVoiceCallsScreen/AgentVoiceCallsScreen.tsx"
       ]
     },
     {
@@ -710,6 +1208,17 @@
       "contexts": [],
       "usedIn": [
         "src/kit/components/media/video-widget/VideoWidget.composed.tsx"
+      ]
+    },
+    {
+      "key": "Open the conversation",
+      "defaultText": "Open the conversation",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call"
+      ],
+      "usedIn": [
+        "src/voice/admin/AgentVoiceCallDetailScreen/AgentVoiceCallDetailScreen.tsx"
       ]
     },
     {
@@ -870,6 +1379,17 @@
       ]
     },
     {
+      "key": "Provider call ID",
+      "defaultText": "Provider call ID",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call"
+      ],
+      "usedIn": [
+        "src/voice/admin/AgentVoiceCallDetailScreen/AgentVoiceCallDetailScreen.tsx"
+      ]
+    },
+    {
       "key": "Rate of %rateDate%",
       "defaultText": "Rate of %rateDate%",
       "placeholders": [
@@ -897,6 +1417,16 @@
       "contexts": [],
       "usedIn": [
         "src/widgets/WritingDraftConversationWidget/WritingDraftWidget/WritingDraftWidget.tsx"
+      ]
+    },
+    {
+      "key": "Refresh",
+      "defaultText": "Refresh",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/admin/AgentVoiceCallDetailScreen/AgentVoiceCallDetailScreen.tsx",
+        "src/voice/admin/AgentVoiceCallsScreen/AgentVoiceCallsScreen.tsx"
       ]
     },
     {
@@ -954,6 +1484,39 @@
       ]
     },
     {
+      "key": "Ringing",
+      "defaultText": "Ringing",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call-state"
+      ],
+      "usedIn": [
+        "src/voice/admin/agent-voice-admin-format.ts"
+      ]
+    },
+    {
+      "key": "Rings until",
+      "defaultText": "Rings until",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call"
+      ],
+      "usedIn": [
+        "src/voice/admin/AgentVoiceCallDetailScreen/AgentVoiceCallDetailScreen.tsx"
+      ]
+    },
+    {
+      "key": "Running",
+      "defaultText": "Running",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call-state"
+      ],
+      "usedIn": [
+        "src/voice/admin/agent-voice-admin-format.ts"
+      ]
+    },
+    {
       "key": "Running: %tool%...",
       "defaultText": "Running: %tool%...",
       "placeholders": [
@@ -983,6 +1546,17 @@
       "usedIn": [
         "src/widgets/ConversationSearchResultsConversationWidget/ConversationSearchResultsCanvas.tsx",
         "src/widgets/ConversationSearchResultsConversationWidget/ConversationSearchResultsConversationWidget.tsx"
+      ]
+    },
+    {
+      "key": "Seconds",
+      "defaultText": "Seconds",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call-filter"
+      ],
+      "usedIn": [
+        "src/voice/admin/AgentVoiceCallsScreen/AgentVoiceCallsScreen.tsx"
       ]
     },
     {
@@ -1178,6 +1752,52 @@
       ]
     },
     {
+      "key": "Started",
+      "defaultText": "Started",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call"
+      ],
+      "usedIn": [
+        "src/voice/admin/AgentVoiceCallsScreen/AgentVoiceCallsScreen.tsx"
+      ]
+    },
+    {
+      "key": "Started by",
+      "defaultText": "Started by",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call"
+      ],
+      "usedIn": [
+        "src/voice/admin/AgentVoiceCallDetailScreen/AgentVoiceCallDetailScreen.tsx",
+        "src/voice/admin/AgentVoiceCallsScreen/AgentVoiceCallsScreen.tsx"
+      ]
+    },
+    {
+      "key": "Started by the agent in conversation",
+      "defaultText": "Started by the agent in conversation",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call"
+      ],
+      "usedIn": [
+        "src/voice/admin/AgentVoiceCallDetailScreen/AgentVoiceCallDetailScreen.tsx"
+      ]
+    },
+    {
+      "key": "State",
+      "defaultText": "State",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call"
+      ],
+      "usedIn": [
+        "src/voice/admin/AgentVoiceCallDetailScreen/AgentVoiceCallDetailScreen.tsx",
+        "src/voice/admin/AgentVoiceCallsScreen/AgentVoiceCallsScreen.tsx"
+      ]
+    },
+    {
       "key": "Subject",
       "defaultText": "Subject",
       "placeholders": [],
@@ -1205,6 +1825,40 @@
       ]
     },
     {
+      "key": "Talk to %agentName%",
+      "defaultText": "Talk to %agentName%",
+      "placeholders": [
+        "agentName"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/AgentVoiceChatStartButton/AgentVoiceChatStartButton.tsx"
+      ]
+    },
+    {
+      "key": "Talk with %agentName% again",
+      "defaultText": "Talk with %agentName% again",
+      "placeholders": [
+        "agentName"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/AgentVoiceCallBand/AgentVoiceCallBand.tsx"
+      ]
+    },
+    {
+      "key": "Task",
+      "defaultText": "Task",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call"
+      ],
+      "usedIn": [
+        "src/voice/admin/AgentVoiceCallDetailScreen/AgentVoiceCallDetailScreen.tsx",
+        "src/voice/admin/AgentVoiceCallsScreen/AgentVoiceCallsScreen.tsx"
+      ]
+    },
+    {
       "key": "Text draft",
       "defaultText": "Text draft",
       "placeholders": [],
@@ -1220,6 +1874,83 @@
       "contexts": [],
       "usedIn": [
         "src/widgets/WritingDraftConversationWidget/WritingDraftWidget/WritingDraftWidget.tsx"
+      ]
+    },
+    {
+      "key": "The agent hung up the running call or withdrew its ring",
+      "defaultText": "The agent hung up the running call or withdrew its ring",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call-end-reason"
+      ],
+      "usedIn": [
+        "src/voice/admin/agent-voice-admin-format.ts"
+      ]
+    },
+    {
+      "key": "The agent rang",
+      "defaultText": "The agent rang",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call-direction"
+      ],
+      "usedIn": [
+        "src/voice/admin/agent-voice-admin-format.ts"
+      ]
+    },
+    {
+      "key": "The agent rang the owner’s open clients",
+      "defaultText": "The agent rang the owner’s open clients",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call-direction"
+      ],
+      "usedIn": [
+        "src/voice/admin/agent-voice-admin-format.ts"
+      ]
+    },
+    {
+      "key": "The call is over",
+      "defaultText": "The call is over",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call-state"
+      ],
+      "usedIn": [
+        "src/voice/admin/agent-voice-admin-format.ts"
+      ]
+    },
+    {
+      "key": "The call ran into its time, daily or budget limit",
+      "defaultText": "The call ran into its time, daily or budget limit",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call-end-reason"
+      ],
+      "usedIn": [
+        "src/voice/admin/agent-voice-admin-format.ts"
+      ]
+    },
+    {
+      "key": "The call was answered and is going on",
+      "defaultText": "The call was answered and is going on",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call-state"
+      ],
+      "usedIn": [
+        "src/voice/admin/agent-voice-admin-format.ts"
+      ]
+    },
+    {
+      "key": "The connection to %agentName% dropped. Please try again.",
+      "defaultText": "The connection to %agentName% dropped. Please try again.",
+      "placeholders": [
+        "agentName"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/call/agent-voice-call-store.ts"
       ]
     },
     {
@@ -1250,6 +1981,50 @@
       ]
     },
     {
+      "key": "The owner called",
+      "defaultText": "The owner called",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call-direction"
+      ],
+      "usedIn": [
+        "src/voice/admin/agent-voice-admin-format.ts"
+      ]
+    },
+    {
+      "key": "The owner started a voice chat with the agent",
+      "defaultText": "The owner started a voice chat with the agent",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call-direction"
+      ],
+      "usedIn": [
+        "src/voice/admin/agent-voice-admin-format.ts"
+      ]
+    },
+    {
+      "key": "The session ended on an error of the provider, the model or the worker",
+      "defaultText": "The session ended on an error of the provider, the model or the worker",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call-end-reason"
+      ],
+      "usedIn": [
+        "src/voice/admin/agent-voice-admin-format.ts"
+      ]
+    },
+    {
+      "key": "The side that started the call withdrew it before anyone answered",
+      "defaultText": "The side that started the call withdrew it before anyone answered",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call-end-reason"
+      ],
+      "usedIn": [
+        "src/voice/admin/agent-voice-admin-format.ts"
+      ]
+    },
+    {
       "key": "The text is too long for a mail link: copy it and paste it into the e-mail.",
       "defaultText": "The text is too long for a mail link: copy it and paste it into the e-mail.",
       "placeholders": [],
@@ -1268,6 +2043,17 @@
       ]
     },
     {
+      "key": "The time for voice chats with %agentName% is used up for today. Please try again tomorrow.",
+      "defaultText": "The time for voice chats with %agentName% is used up for today. Please try again tomorrow.",
+      "placeholders": [
+        "agentName"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/call/agent-voice-call-store.ts"
+      ]
+    },
+    {
       "key": "The time zones of this clock are unknown.",
       "defaultText": "The time zones of this clock are unknown.",
       "placeholders": [],
@@ -1283,6 +2069,80 @@
       "contexts": [],
       "usedIn": [
         "src/widgets/CustomVisualizationConversationWidget/CustomVisualizationWidget/CustomVisualizationFrame.tsx"
+      ]
+    },
+    {
+      "key": "The voice call could not be loaded.",
+      "defaultText": "The voice call could not be loaded.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/admin/AgentVoiceCallDetailScreen/AgentVoiceCallDetailScreen.tsx"
+      ]
+    },
+    {
+      "key": "The voice calls could not be loaded.",
+      "defaultText": "The voice calls could not be loaded.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/admin/AgentVoiceCallsScreen/AgentVoiceCallsScreen.tsx"
+      ]
+    },
+    {
+      "key": "The voice channel is switched off in this application, so its calls are not listed.",
+      "defaultText": "The voice channel is switched off in this application, so its calls are not listed.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/admin/AgentVoiceCallsScreen/AgentVoiceCallsScreen.tsx"
+      ]
+    },
+    {
+      "key": "The voice channel is switched off in this application, so its calls cannot be read.",
+      "defaultText": "The voice channel is switched off in this application, so its calls cannot be read.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/admin/AgentVoiceCallDetailScreen/AgentVoiceCallDetailScreen.tsx"
+      ]
+    },
+    {
+      "key": "The voice chat could not be started. Please try again.",
+      "defaultText": "The voice chat could not be started. Please try again.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/call/agent-voice-call-store.ts"
+      ]
+    },
+    {
+      "key": "The voice chat could not start. Please try again.",
+      "defaultText": "The voice chat could not start. Please try again.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/ring/answer-incoming-agent-voice-call.ts"
+      ]
+    },
+    {
+      "key": "The voice chats the owners started with the agent and the calls the agent rang them with, newest first.",
+      "defaultText": "The voice chats the owners started with the agent and the calls the agent rang them with, newest first.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/admin/AgentVoiceCallsScreen/AgentVoiceCallsScreen.tsx"
+      ]
+    },
+    {
+      "key": "The voice of %agentName% is not reachable right now. Please try again in a minute.",
+      "defaultText": "The voice of %agentName% is not reachable right now. Please try again in a minute.",
+      "placeholders": [
+        "agentName"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/call/agent-voice-call-store.ts"
       ]
     },
     {
@@ -1319,6 +2179,17 @@
       "contexts": [],
       "usedIn": [
         "src/widgets/EntityMentionConversationWidget/shared/entity-mention-presentation.ts"
+      ]
+    },
+    {
+      "key": "This conversation cannot take a voice chat. Start a new chat and talk to %agentName% from there.",
+      "defaultText": "This conversation cannot take a voice chat. Start a new chat and talk to %agentName% from there.",
+      "placeholders": [
+        "agentName"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/call/agent-voice-call-store.ts"
       ]
     },
     {
@@ -1484,6 +2355,15 @@
       ]
     },
     {
+      "key": "This voice call was not found.",
+      "defaultText": "This voice call was not found.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/admin/AgentVoiceCallDetailScreen/AgentVoiceCallDetailScreen.tsx"
+      ]
+    },
+    {
       "key": "This widget shows data for %label%, not for what you currently have selected.",
       "defaultText": "This widget shows data for %label%, not for what you currently have selected.",
       "placeholders": [
@@ -1531,7 +2411,17 @@
       "placeholders": [],
       "contexts": [],
       "usedIn": [
+        "src/voice/AgentVoiceCallBand/AgentVoiceCallBand.tsx",
         "src/widgets/DriveFilesConversationWidget/DriveFilesConversationWidget.tsx"
+      ]
+    },
+    {
+      "key": "Unmute",
+      "defaultText": "Unmute",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/AgentVoiceCallBand/AgentVoiceCallBand.tsx"
       ]
     },
     {
@@ -1573,6 +2463,33 @@
       ]
     },
     {
+      "key": "Voice call",
+      "defaultText": "Voice call",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/admin/AgentVoiceCallDetailScreen/AgentVoiceCallDetailScreen.tsx"
+      ]
+    },
+    {
+      "key": "Voice calls",
+      "defaultText": "Voice calls",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/admin/AgentVoiceCallsScreen/AgentVoiceCallsScreen.tsx"
+      ]
+    },
+    {
+      "key": "Voice chat cancelled",
+      "defaultText": "Voice chat cancelled",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/AgentVoiceCallBand/agent-voice-call-outcome-title-text-key.ts"
+      ]
+    },
+    {
       "key": "Voice chat did not connect",
       "defaultText": "Voice chat did not connect",
       "placeholders": [],
@@ -1587,7 +2504,26 @@
       "placeholders": [],
       "contexts": [],
       "usedIn": [
-        "src/chat/ConversationMessage/ConversationCallMarkerChip/ConversationCallMarkerChip.tsx"
+        "src/chat/ConversationMessage/ConversationCallMarkerChip/ConversationCallMarkerChip.tsx",
+        "src/voice/AgentVoiceCallBand/agent-voice-call-outcome-title-text-key.ts"
+      ]
+    },
+    {
+      "key": "Voice chat failed",
+      "defaultText": "Voice chat failed",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/AgentVoiceCallBand/agent-voice-call-outcome-title-text-key.ts"
+      ]
+    },
+    {
+      "key": "Voice chat limit reached",
+      "defaultText": "Voice chat limit reached",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/AgentVoiceCallBand/agent-voice-call-outcome-title-text-key.ts"
       ]
     },
     {
@@ -1597,6 +2533,38 @@
       "contexts": [],
       "usedIn": [
         "src/chat/ConversationMessage/ConversationCallMarkerChip/ConversationCallMarkerChip.tsx"
+      ]
+    },
+    {
+      "key": "Voice chats with %agentName% are not available here.",
+      "defaultText": "Voice chats with %agentName% are not available here.",
+      "placeholders": [
+        "agentName"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/call/agent-voice-call-store.ts"
+      ]
+    },
+    {
+      "key": "Voice is switched off",
+      "defaultText": "Voice is switched off",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/admin/AgentVoiceCallDetailScreen/AgentVoiceCallDetailScreen.tsx",
+        "src/voice/admin/AgentVoiceCallsScreen/AgentVoiceCallsScreen.tsx"
+      ]
+    },
+    {
+      "key": "Voice provider",
+      "defaultText": "Voice provider",
+      "placeholders": [],
+      "contexts": [
+        "agent-voice-call"
+      ],
+      "usedIn": [
+        "src/voice/admin/AgentVoiceCallDetailScreen/AgentVoiceCallDetailScreen.tsx"
       ]
     },
     {
@@ -1675,6 +2643,28 @@
       "contexts": [],
       "usedIn": [
         "src/widgets/ClockConversationWidget/ClockWidget/ClockRow.tsx"
+      ]
+    },
+    {
+      "key": "You already answered %agentName% on another device.",
+      "defaultText": "You already answered %agentName% on another device.",
+      "placeholders": [
+        "agentName"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/ring/answer-incoming-agent-voice-call.ts"
+      ]
+    },
+    {
+      "key": "You are already in a voice chat with %agentName%. End it first, then start a new one.",
+      "defaultText": "You are already in a voice chat with %agentName%. End it first, then start a new one.",
+      "placeholders": [
+        "agentName"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/call/agent-voice-call-store.ts"
       ]
     },
     {
@@ -1773,6 +2763,26 @@
       ]
     },
     {
+      "key": "Your AI budget is used up, so %agentName% cannot talk right now.",
+      "defaultText": "Your AI budget is used up, so %agentName% cannot talk right now.",
+      "placeholders": [
+        "agentName"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/call/agent-voice-call-store.ts"
+      ]
+    },
+    {
+      "key": "Your browser could not set up the voice chat. Please try again.",
+      "defaultText": "Your browser could not set up the voice chat. Please try again.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/call/agent-voice-call-store.ts"
+      ]
+    },
+    {
       "key": "Your changes stay on this screen — the assistant does not see them.",
       "defaultText": "Your changes stay on this screen — the assistant does not see them.",
       "placeholders": [],
@@ -1790,6 +2800,24 @@
       "contexts": [],
       "usedIn": [
         "src/chat/ConversationMessageInput/ConversationMessageInput.tsx"
+      ]
+    },
+    {
+      "key": "You’re muted",
+      "defaultText": "You’re muted",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/AgentVoiceCallBand/AgentVoiceCallBand.tsx"
+      ]
+    },
+    {
+      "key": "You’re speaking",
+      "defaultText": "You’re speaking",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/AgentVoiceCallBand/AgentVoiceCallBand.tsx"
       ]
     },
     {

@@ -1,0 +1,26 @@
+/* The captions: the same rhythm as the message list they end (--agents-voice-captions-gap changes it). */
+.captions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--agents-voice-captions-gap, var(--chat-messages-gap, 1.5rem));
+}
+
+.line {
+  display: flex;
+  flex-direction: column;
+  animation: captionIn 400ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes captionIn {
+  from {
+    opacity: 0;
+    filter: blur(0.25rem);
+    transform: translateY(0.5rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .line {
+    animation: none;
+  }
+}

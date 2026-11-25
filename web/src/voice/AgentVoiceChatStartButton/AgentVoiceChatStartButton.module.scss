@@ -1,0 +1,51 @@
+/*
+ * The start button: the send button's size and spot, in the agent's dark colour. Custom properties, each read with its
+ * default: --agents-voice-surface, --agents-voice-on-surface, --agents-voice-start-button-size,
+ * --agents-voice-focus-ring.
+ */
+.startButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--agents-voice-start-button-size, 2rem);
+  height: var(--agents-voice-start-button-size, 2rem);
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--agents-voice-surface, #00495d);
+  color: var(--agents-voice-on-surface, #ffffff);
+  cursor: pointer;
+  animation: startButtonIn 260ms cubic-bezier(0.23, 1, 0.32, 1);
+  transition: transform 150ms ease;
+}
+
+.startButton:hover {
+  transform: scale(1.06);
+}
+
+.startButton:active {
+  transform: scale(0.96);
+}
+
+.startButton:focus-visible {
+  outline: 0.125rem solid var(--agents-voice-focus-ring, #2563eb);
+  outline-offset: 0.125rem;
+}
+
+.startButton:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+@keyframes startButtonIn {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .startButton {
+    animation: none;
+  }
+}

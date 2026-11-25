@@ -279,7 +279,7 @@ export const subscribeToAgentsEnvironment = (listener: () => void): (() => void)
 const substitutePlaceholders = (key: string, replacements?: Record<string, string | number>): string =>
   replacements
     ? key.replace(/%([A-Za-z0-9_]+)%/g, (placeholder, name: string) =>
-        name in replacements ? String(replacements[name]) : placeholder,
+        Object.hasOwn(replacements, name) ? String(replacements[name]) : placeholder,
       )
     : key;
 

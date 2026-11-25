@@ -166,7 +166,8 @@ class AgentRealtimeChannelService extends Service
 
     /**
      * (d) Whether a client of the audience listens now: the transport's answer when it has one, else a fresh presence
-     * statement of a client of the conversation (or, for an account audience, of the account).
+     * statement of a client of the conversation (or, for an account audience, of the account: a client that shows one
+     * of its conversations, or one that shows none and repeats the account-level realtime read with its client id).
      */
     public function isClientListening(AgentRealtimeAudience $agentRealtimeAudience): bool
     {

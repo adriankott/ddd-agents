@@ -12,12 +12,13 @@ npm install @mgamadeus/ddd-agents@~0.1.1 @types/google.maps@^3.55.0 apexcharts@^
   remark-directive@^4.0.0 remark-gfm@^4.0.1 remark-parse@^11.0.0 unified@^11.0.5 unist-util-visit@^5.0.0
 ```
 
-The second part is the peer set (React 19 assumed present).
+The second part is the peer set (React 19 assumed present). `@mgamadeus/ddd-admin-ui`, `@mgamadeus/ddd-web` and
+`lucide-react` are optional peers: only `/voice/admin` loads them.
 `react-apexcharts` stays below 1.6.0: from 1.6.0 it needs apexcharts 4, the package draws with apexcharts 3.
 The agent skills come with the Composer package (`vendor/mgamadeus/ddd-agents/.claude/skills`), not with this one.
 
 Entries: `@mgamadeus/ddd-agents` (provider and setup), `/provider` (the provider alone), `/chat`, `/renderer`, `/widgets`, `/kit`, `/contract`,
-`/client`, `/client/testing`, `/preview`, `/image-render`, `/ui`, and the stylesheet `@mgamadeus/ddd-agents/styles.css`
+`/client`, `/client/testing`, `/preview`, `/image-render`, `/ui`, `/voice`, `/voice/admin`, and the stylesheet `@mgamadeus/ddd-agents/styles.css`
 (import it once). Non-code files (widget documentation, preview fixtures, contracts, the node schema, the
 sandbox frame, SCSS tokens) are exported one subpath per file at their path below `src`. React 19 and the libraries listed under `peerDependencies` come from the application.
 
@@ -126,10 +127,20 @@ const uiClient = useAgentUIClient({
   `readRunStateAfterClientToolRequestPing(conversationId, client.getConversationRunState, uiClient)`: a read that
   finds no request is repeated once after `CLIENT_TOOL_REQUEST_PING_REREAD_DELAY_MS` (400 ms).
 - A client that shows no conversation reads the messages addressed to its account (e.g. a call's ring) with
-  `createAccountRealtimePoll({ readAccountRealtime: client.getAccountRealtimeMessages, onMessage, onListenerCredential,
-  isTransportBound })`: a read at once, then every 5 s while no transport is bound; `onMessage` gets each message once.
+  `createAccountRealtimePoll({ readAccountRealtime: client.getAccountRealtimeMessages, onMessage, onMessageCleared,
+  onListenerCredential, isTransportBound })`: a read at once, then every 5 s while no transport is bound; `onMessage`
+  gets each message once, `onMessageCleared` each message a read finds gone, once (the answer holds no message of its
+  type and key any more: it was answered or withdrawn on the server, or its time is over; a replacement is an arrival).
+  `poll.subscribe({ onMessage, onMessageCleared })` adds a subscriber after the poll was created: it gets the messages
+  open now, then every arrival, and the clear only of a message it was handed (a message past its `secondsLeft` when
+  the subscriber came is not handed to it, and neither is its clear); the function it returns removes it.
   A transport hands what it carries to `poll.acceptArrivedMessage(message)`; one that only pings calls
-  `poll.readAfterPing()` (one re-read after 400 ms when nothing new arrived). `runClientToolRequestForDevelopment(uiClient, 'LIST_TARGETS')` tries the
+  `poll.readAfterPing()` (one re-read after 400 ms when nothing new arrived); while a transport is bound, only such a
+  read or `poll.readNow()` tells a clear. The account read always states a client id (query parameter `clientId`, as
+  on the run-state read): the server knows a client that only polls by that id. The HTTP binding decides which: the
+  `clientId` option of the poll (`createAccountRealtimePoll({ …, clientId })`, for a host that manages its own ids),
+  else the id of its `uiClient`, else an id it creates once and keeps while it lives. The conversation reads state a
+  client id only with a `uiClient`. `runClientToolRequestForDevelopment(uiClient, 'LIST_TARGETS')` tries the
   adapters without a model.
 
 ## Texts and translations
@@ -147,7 +158,9 @@ setAgentsEnvironment({
 
 Icon-only buttons carry their accessible name through the same function (the composer's send button: `Send message`;
 the scroll-to-latest button beside it: `Scroll to the latest message`). In the package, `pnpm i18n-keys` rewrites the manifest from the sources; the build and the specs fail when it is stale. A
-key the generator cannot see as a literal is wrapped in `textKey("…")`.
+key the generator cannot see as a literal is wrapped in `textKey("…")`. The admin screens of `/voice/admin` are the one
+exception to the first sentence: they ask the text function of `@mgamadeus/ddd-admin-ui` (see there); the manifest lists
+their keys with their contexts.
 
 ## Links, entities and default components
 
@@ -238,6 +251,151 @@ conversation's layers (they go up to 10; the default uses 20) and an opaque back
 overflowing horizontally (`box-sizing: border-box`, the split clipped with `overflow: hidden`). The default chat starts its
 thread at the top of the pane (`--agents-chat-top-padding: 24px` on its chat area); a host with a top bar floating over
 the thread sets that variable on `[data-agents-chat-scroll]` or through its own `chatAreaClassName`.
+
+## Voice (`/voice`, `/voice/admin`)
+
+The voice chat with the agent in the browser window (WebRTC straight to the voice provider) and the agent ringing the
+owner's open clients. The chat shows the call's conversation; the routes are `AgentVoiceSessionsTrait`.
+
+```tsx
+import { createAccountRealtimePoll } from "@mgamadeus/ddd-agents/ui";
+import {
+  AgentVoiceCallProvider,
+  AgentVoiceIncomingCall,
+  createAgentVoiceApi,
+  createAgentVoiceFetchBaseApi,
+  createAgentVoiceRingSource,
+} from "@mgamadeus/ddd-agents/voice";
+
+const agentVoiceApi = createAgentVoiceApi({
+  baseApi: createAgentVoiceFetchBaseApi({ fetchOptions: () => ({ headers: { Authorization: `Bearer ${readAccessToken()}` } }) }),
+  apiPrefix: "/api/agents/voiceSession", // the #[Route] of the application's voice session controller
+});
+const accountRealtimePoll = createAccountRealtimePoll({ readAccountRealtime: client.getAccountRealtimeMessages });
+const agentVoiceRingSource = createAgentVoiceRingSource(accountRealtimePoll);
+
+<AgentsProvider client={client}>
+  <AgentVoiceCallProvider
+    api={agentVoiceApi}
+    ringSource={agentVoiceRingSource}
+    onConversationOfCallChanged={(conversationId) => showConversation(conversationId)}
+  >
+    <App />
+    <AgentVoiceIncomingCall />
+  </AgentVoiceCallProvider>
+</AgentsProvider>;
+```
+
+What the application passes to `AgentVoiceCallProvider`:
+
+- **`api`** (`AgentVoiceApi`): six functions, one per voice route (`openSession`, `hangUp`, `reportDeviceStatus`,
+  `readCallState`, `answerRing`, `declineRing`). `createAgentVoiceApi({ baseApi, apiPrefix })` builds it for an
+  application whose routes are the trait's own paths with the agent space in the body of `open`; `baseApi` is the
+  application's request layer as one function (`request({ url, method, body })` answering a Promise), for which
+  `createAgentVoiceFetchBaseApi()` is the binding over `fetch`. An application whose `open` names its space in the path
+  writes the six functions itself. A refused request rejects with the route's error code where
+  `readAgentVoiceErrorCode` finds it (`error`, `data.error`, `code` or the message).
+- **`ringSource`** (`AgentVoiceRingSource`): the stream of the `agent.voice.ring` messages.
+  `createAgentVoiceRingSource(accountRealtimePoll)` listens to the account realtime poll of `/ui` while the incoming
+  call is mounted: a ring message that arrives rings, and one a read finds gone (answered or declined on another
+  client, canceled) ends the ring on this client with that read instead of at its deadline. The poll stays the
+  application's, which stops it. Given a function instead,
+  `createAgentVoiceRingSource((onMessage) => createAccountRealtimePoll({ readAccountRealtime, onMessage }))`, the ring
+  source starts the poll with its first subscriber and stops it with its last. An application with its own transport
+  passes its own source (and reports a cleared ring through `onRingCleared`). Without a ring source nothing rings. The
+  backend rings an account only while it knows one of its clients: the account read of the poll states the client's id
+  (see `/ui`), with or without a `uiClient`.
+- **`onConversationOfCallChanged(conversationId, agentSpaceId)`**: called once per call when the conversation the call
+  writes into is known; the application shows that conversation.
+
+The call lives in a store at module level, so it goes on when the chat that shows it closes. `useAgentVoiceCall()`
+returns it: `phase` (`idle`, `connecting`, `live`, `ended`, `failed`), `callId`, `conversationId`, `lines` (what was
+said), `isMuted`, `endReason`, `elapsedSeconds`; `useAgentVoiceCallValue(selector)` reads one field without rendering
+on every transcript delta. Actions: `startAgentVoiceCall({ agentSpaceId?, conversationId?, callId? })` (call it straight
+from the click: the microphone prompt needs the user's gesture), `hangUpAgentVoiceCall(reason?)`,
+`toggleAgentVoiceCallMute()`, `dismissAgentVoiceCallOutcome()`. The store asks for the microphone, opens the peer
+connection and the provider's event channel, reports the device status, and ends the call when the server says it ended.
+
+| Component | Where it goes | Props |
+|---|---|---|
+| `AgentVoiceCallProvider` | once, above every voice component, below the conversation client (`AgentsProvider`) | `api`, `ringSource`, `onConversationOfCallChanged` |
+| `AgentVoiceChatStartButton` | the chat input's send spot while nothing is typed | `agentSpaceId?`, `conversationId?`, `disabled?`, `testId?` |
+| `AgentVoiceCallBand` | over the chat input | `renderAgentSpot?(call)`, `agentSpaceId?`, `isPresented?` |
+| `AgentVoiceCallCaptions` | after the chat's message list, inside the chat | `agentSpaceId?`, `ownerMessageTheme?` |
+| `AgentVoiceInputGlow` | the chat input's underlay | `agentSpaceId?` |
+| `AgentVoiceIncomingCall` | once, outside the chat | `resolveCallerLabel?(ring)`, `renderAgentSpot?()` |
+
+- The band also shows the agent's ring while a chat is in sight (`isPresented`); the incoming call then keeps its own
+  card away. A surface that covers the chats reports it with `useAgentVoiceRingCover(true)`.
+- The server-side end of a call is read after the change signal of the call's conversation
+  (`subscribeToConversationChanges` of the conversation client in the React context). An application without that
+  client calls `useAgentVoiceCallServerEnd(subscribeToConversationChanges)` with its own signal, or
+  `checkAgentVoiceCallEndedOnServer()` when it knows the conversation changed.
+- Texts go through `AgentsEnvironment.texts` like every other text of the package; `%agentName%` is filled from
+  `AgentsEnvironment.agentDisplayName`. `useAgentVoiceTranslateText()` is that text function for an application's own
+  caller line (`resolveCallerLabel`).
+- The styles are part of `styles.css`. Every colour and size is a custom property starting with `--agents-voice-`,
+  read with its default (`--agents-voice-surface`, `--agents-voice-on-surface`, `--agents-voice-end`,
+  `--agents-voice-accept`, `--agents-voice-band-max-width`, `--agents-voice-glow-color-1` … `-4`, …; each component's
+  SCSS module lists its own at the top). Test ids start with `agent-voice-`.
+
+### The admin screens of the calls (`/voice/admin`)
+
+The calls an administrator may read, on the blocks of `@mgamadeus/ddd-admin-ui`: the RTK Query client of the admin
+call routes (`AdminAgentVoiceCallsTrait`) and two screens. This is the one entry that loads the optional peers
+`@mgamadeus/ddd-admin-ui` (≥ 0.7.0), `@mgamadeus/ddd-web` (≥ 0.13.0) and `lucide-react`; an application that uses the
+other entries installs none of them (`boundary.json` names the three for this entry, `scripts/check-package.mjs` fails
+the build when another entry loads one).
+
+```tsx
+import { AgentVoiceCallDetailScreen, AgentVoiceCallsScreen, createAgentVoiceAdminApi } from "@mgamadeus/ddd-agents/voice/admin";
+
+export const agentVoiceAdminApi = createAgentVoiceAdminApi({ baseApi: adminApi, apiPrefix: "/api/admin/ai/voiceCalls" });
+
+<AgentVoiceCallsScreen
+  api={agentVoiceAdminApi}
+  onOpenCall={(callId) => router.push(`/voice-calls/${callId}`)}
+  buildConversationHref={(conversationId) => `/conversations/${conversationId}`}
+/>;
+<AgentVoiceCallDetailScreen api={agentVoiceAdminApi} callId={callId} buildConversationHref={(conversationId) => `/conversations/${conversationId}`} />;
+```
+
+- `createAgentVoiceAdminApi({ baseApi, apiPrefix })` injects two queries into the host's RTK Query api (one with the
+  React hooks module): `useAgentVoiceCallsQuery({ accountId?, conversationId?, createdFrom?, createdTo?,
+  bookedSecondsFrom?, bookedSecondsTo?, endReason?, limit?, offset? })` (`GET <prefix>/calls` with `filters`, `top`,
+  `skip`; newest first) and `useAgentVoiceCallQuery({ callId })` (`GET <prefix>/calls/{callId}`).
+  `createStaticAgentVoiceAdminApi` answers fixed payloads for reviews and tests.
+- `AgentVoiceCallsScreen`: one row per call (when it began, the account, who started it, the state with the end
+  reason, the duration, the booked seconds, their costs, the task, the conversation); filters for the account, the day
+  the call was created, the booked seconds and the end reason; pages of `pageSize` calls (default 50). Props: `api`,
+  `title?`, `description?`, `headerActions?`, `onOpenCall?(callId)`, `accountId?`, `conversationId?`,
+  `buildConversationHref?(conversationId)`, `linkComponent?`, `pageSize?`.
+- `AgentVoiceCallDetailScreen`: the same values in full, the call's times, its provider, and the link that opens the
+  call's conversation, whose messages are what was said. Props: `api`, `callId`, `backLink?`, `headerActions?`,
+  `buildConversationHref?(conversationId)`, `linkComponent?`.
+- Conversation links (`buildConversationHref`) render with the host's router link: `AdminUiProvider.linkComponent`,
+  or a screen's own `linkComponent` prop; without either they are a plain `<a>` (full page load). Without
+  `buildConversationHref` the conversation shows as its id. `AgentVoiceCallConversationLink` is the same link on its
+  own.
+- While the voice channel is switched off (`403 feature_not_available`) both screens say so instead of showing an
+  error; a call outside what the signed-in account may read (`404 call_not_found`) reads as not found.
+- A call's state (ringing, running, ended) is the server's reading at answer time (`callState`): the screens show it
+  as it came and derive none from the call's times, so a call a dead session worker left open reads as ended. The
+  duration is the difference of the call's two times. Costs are missing while no price is known for the call's model
+  or nothing was booked; the screens then show no amount, never zero.
+- Date-times: the backend writes them without an offset in the time zone of its PHP processes, and the screens read
+  them as UTC, as the admin UI's date cells do; the day filter sends the bounds of the viewer's day in UTC. So the
+  application has to run its PHP processes in UTC; in another zone every time on the screens is off by its offset.
+- A call's task is written by the agent or the owner: the screens show it as text only.
+- Texts: the screens translate through the admin UI's text function (`useTranslate().t`, the marker `m`), not through
+  `AgentsEnvironment.texts`, because the blocks they stand on (status maps, filters, badges) do. Their keys are in
+  `i18n-keys.json` too (`usedIn` below `src/voice/admin/`), each with the contexts it is asked in (`agent-voice-call`,
+  `agent-voice-call-state`, `agent-voice-call-end-reason`, `agent-voice-call-direction`, `agent-voice-call-filter`,
+  `agent-voice-pagination`); in the admin UI's translation bundle the key of a text with a context is
+  `<text>__<context>`. Every state and every end reason has its own key.
+- The screens need `AdminUiProvider` above them and Tailwind scanning
+  `node_modules/@mgamadeus/ddd-agents/dist/voice-admin.js`. They use neither the package stylesheet nor
+  `AgentVoiceCallProvider`.
 
 ## Stylesheet and theme
 

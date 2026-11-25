@@ -13,7 +13,7 @@ ended, a voice call's events. The task plan's own trace is read with the plan: `
 |---|---|---|---|
 | trace log lines (`AITraceLogTrait`) | no, the logger at INFO, only with `AGENT_TRACE` on | every service and handler at its async boundaries | a developer running a worker in the foreground ([debugging-a-turn](debugging-a-turn.md)) |
 | turn events (`AIConversationTurnEvent`) | yes, always | the loop, the decision sites, the release | the admin inspector, the decision statistics, the integrity report |
-| trace events (`AIConversationTraceEvent`) | yes | the host's voice worker, voice controller or device endpoint — the package ships the table, the service and the readers and writes none; never the turn path | the admin inspector, the writer of each row |
+| trace events (`AIConversationTraceEvent`) | yes | the voice channel (its routes, its ring and its session worker; the events are built by `AgentVoiceCallTraceEventsService`) and a host's own voice worker, voice controller or device endpoint; never the turn path | the admin inspector, the writer of each row |
 
 ## Turn events
 
@@ -103,7 +103,8 @@ voice provider's events (`SOURCE_VOICE_PROVIDER`), the voice worker's own events
 A payload is capped (`PAYLOAD_MAX_BYTES`, `truncated` and `originalLength` say so), the summary line too
 (`SUMMARY_MAX_LENGTH`); credential keys of a caller who is not authenticated yet are removed
 (`CREDENTIAL_PAYLOAD_KEYS`). `AIConversationTraceAnomalies` is the value object a host fills with what looks wrong
-in a call's trace. The voice channel itself: `ddd-module-agents-specialist` (channels).
+in a call's trace. The voice channel itself, with the event kinds it writes (`AgentVoiceCallTraceSummary`):
+`ddd-module-agents-voice-specialist`.
 
 ## Who wrote a row
 

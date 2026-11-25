@@ -240,6 +240,11 @@ Cases that run in parallel must not share an account: every case resets its acco
   that are deliberately no step (`getColumnsNotPurged()`). Its own reads during a run go between
   `beginStatementLimitedRead()` and `endStatementLimitedRead()` (in a `finally`). `preparePoliteWriteSession()` is
   deprecated and does nothing.
+- **The voice call table** is optional, so its two conversation pointers are steps only while it is in use
+  (`AgentVoiceConfiguration::isCallTableInUse()`: voice switched on, calls kept in the package's table): the calls
+  that ran on a purged conversation go, the pointer of a call the agent started from it is emptied. Otherwise no
+  statement touches the table and `getColumnsNotPurged()` lists the two with that reason. An application that
+  answers differently overrides `isVoiceCallTableInUse()`.
 
 ## Throwaway spaces and cleanup
 

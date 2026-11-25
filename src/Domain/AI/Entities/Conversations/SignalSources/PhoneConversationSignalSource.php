@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace DDD\Domain\AI\Entities\Conversations\SignalSources;
 
 /**
- * The phone channel's signal sources: the stored
+ * The signal sources of a call: the stored
  * {@see \DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage::$signalSource} values the voice channel
- * (`Domain/AI/Services/Channels/`) writes — kept out of the AI core enum so the channel can leave the core as one block.
- * Found by {@see ConversationSignalSources} through the folder convention; the cases answer the basic questions, the
- * derived ones (among them {@see ConversationSignalSource::isPhoneCallLifecycle()}) and the core vocabulary come from
+ * writes (the services in `Domain/AI/Services/Voice/`). The enum lives in this folder, beside the other signal source
+ * enums and outside the `Voice/` folders: {@see ConversationSignalSources} finds it here through the folder
+ * convention. A case no class of the package writes ({@see self::PHONE_VOICEMAIL}) stays for an application whose own
+ * medium writes it and whose tables hold it. The cases answer the basic questions, the derived ones (among them
+ * {@see ConversationSignalSource::isPhoneCallLifecycle()}) and the core vocabulary come from
  * {@see ConversationSignalSourceDefaultAnswers}.
  */
 enum PhoneConversationSignalSource: string implements ConversationSignalSource
@@ -19,7 +21,8 @@ enum PhoneConversationSignalSource: string implements ConversationSignalSource
     /**
      * A phone VOICEMAIL from a caller whose number is not enabled for authentication: the doorman took a
      * message; the session worker posts its transcript as this signal into a fresh conversation of the called agent
-     * number's OWNER account and dispatches a resume, so the agent surfaces the message proactively.
+     * number's OWNER account and dispatches a resume, so the agent surfaces the message proactively. No class of the
+     * package writes this case: it is the case of an application's own medium.
      */
     case PHONE_VOICEMAIL = 'PHONE_VOICEMAIL';
 
@@ -50,7 +53,7 @@ enum PhoneConversationSignalSource: string implements ConversationSignalSource
      * the phone call was not answered or could not be connected: the platform starts ONE turn in the
      * conversation the agent started the call from, so the agent tells the owner they did not pick up and ASKS
      * whether to try another channel — never calls again by itself. Written once per call by
-     * the host's voice call follow-up service behind the call's unanswered-end claim;
+     * the voice channel's follow-up service (`AgentVoiceCallFollowUpsService`) behind the call's unanswered-end claim;
      * the text names the outcome and the channels that reach the owner now. TURN-OWING; a running turn takes it over
      * at its next model call instead of a second reaction. A DECLINED ring never writes it.
      */

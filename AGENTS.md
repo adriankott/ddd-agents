@@ -2,7 +2,8 @@
 
 The agentic loop for the `mgamadeus/ddd` framework, on top of `mgamadeus/ddd-ai`: conversations, messages,
 compaction, the task plan, skills and MCP tool metadata, purposes and done criteria, widgets and signal sources,
-delegation, the supervisor, run claims, the decision layer, the loop's message handlers and the MCP tool executor.
+delegation, the supervisor, run claims, the decision layer, the loop's message handlers and the MCP tool executor; and,
+optional and switched off by default, the voice channel.
 
 **Package:** `mgamadeus/ddd-agents` (v0.1.x, not released)
 **Namespace:** `DDD\`
@@ -12,8 +13,8 @@ delegation, the supervisor, run claims, the decision layer, the loop's message h
 > **This module follows all DDD Core conventions.** For base patterns, see `vendor/mgamadeus/ddd/AGENTS.md` and skills in `vendor/mgamadeus/ddd`. For models, prompts and usage envelopes, see `vendor/mgamadeus/ddd-ai`. For Argus patterns, see `vendor/mgamadeus/ddd-argus`.
 
 Detailed knowledge: the entry skill `.claude/skills/ddd-module-agents-specialist/SKILL.md` (installation, host
-duties, configuration, the folder → skill table) and eight topic skills `ddd-module-agents-<topic>-specialist` (loop,
-context, skills-and-purposes, tools, widgets, autonomy, decisions-and-guards, observability).
+duties, configuration, the folder → skill table) and nine topic skills `ddd-module-agents-<topic>-specialist` (loop,
+context, skills-and-purposes, tools, widgets, autonomy, decisions-and-guards, observability, voice).
 
 ## Architecture
 
@@ -33,8 +34,10 @@ src/
 |   +-- Repo/DB/Conversations/, Mandates/ ; Repo/Argus/Conversations/, Guard/, Mandates/
 |   +-- Services/Conversations/, Decisions/, Skills/, Mandates/, Eval/, SystemPrompts/, Texts/Embeddings/
 |   +-- Traits/Conversations/           [AITraceLogTrait]
-+-- Presentation/Api/Agents/            [chat controller traits and DTOs]
-+-- Presentation/Mcp/                   [MCP / JSON-RPC DTOs, Services/MCPToolExecutorService, console printer, MCPController]
+|   +-- {Entities,Services,Repo/DB,MessageHandlers,Exceptions}/Voice/ [the optional voice channel: call, store, admission, ring, provider seam, session worker]
++-- Presentation/Api/Agents/            [chat controller traits and DTOs; Voice/: the routes of a call]
++-- Presentation/Api/Admin/Voice/       [the admin list of voice calls as a controller trait]
++-- Presentation/Mcp/                   [MCP / JSON-RPC DTOs, Services/MCPToolExecutorService, console printer, MCPController; Client/Voice/: the voice tools]
 +-- Modules/Agents/AgentsModule.php
 config/app/                             [the module's defaults: prompts and agent settings]
 examples/reference-kernel/              [a minimal host without an application]
@@ -129,14 +132,16 @@ model-built URL is refused (skill `ddd-module-agents-decisions-and-guards-specia
 ## Names, rights and what belongs where
 
 - **Skills** are `<Topic>.<Feature>` (three parts at most, upper camel case). `Agent.*` is the agent's own tools and
-  organs (`Agent.Memory`, `Agent.Tasks`, `Agent.Mandates`, `Agent.TaskRunReports`, `Agent.Web.Search`, `Agent.UI`);
+  organs (`Agent.Memory`, `Agent.Tasks`, `Agent.Mandates`, `Agent.TaskRunReports`, `Agent.Web.Search`, `Agent.UI`,
+  `Agent.Voice`);
   Core's features are `System.*`; every other topic is the world the agent works on. No skill file beside a folder of
   the same name. A rename is code and config, without an alias.
 - **Package ids** are `<provider>.<topic>.<feature>` in the skill's words (`agent.web.search`, `ddd.system.health`,
   a host's `rb.challenges.campaigns`); the provider is the host's prefix (`AI.packageIdProvider`), `ddd` or a
   module's word, never an audience. `skillPackages.php` binds classes.
 - **Rights** are declared by the package that needs them (`AgentAccountRights`: `operatePlatform`,
-  `scheduleAgentTasks`, `useAgentMemory`, `useWeb`, `useUI`), carried by its package class
+  `scheduleAgentTasks`, `useAgentMemory`, `useWeb`, `useUI`; `AgentVoiceAccountRights`: `useVoice`), carried by its
+  package class
   (`#[MCPRequiresAccountRights]`) and named in its skill. A host maps them to its roles (`AI.accountRights`, the
   default `AgentRoleMappedAccountRights`) or answers them itself; an unmapped right is not held. The platform skills
   are for the operators: right plus `#[MCPRequiresAdminWithAccessToAllResources]`.
@@ -166,10 +171,67 @@ keeps what an agent workspace needs from the agent: the tool effect `MCPToolEffe
 (`AIConversationsService::findNewestRootConversationsOfAgentSpaceId()`, `countRootConversationsPerAgentSpaceId()`,
 `findAgentSpaceIdsWithALiveTurn()`).
 
+## Voice channel
+
+Optional and off (`AI.agentVoice.enabled`, `config/app/AI/agentVoice.php`): the owner talks to the agent in the
+application's window, the agent rings the owner's open clients, a session worker stays with each call. The channel's
+classes are in a folder `Voice/` of every layer; outside it are only the places where the package asks voice (the
+installation check, the sweep of `app:agent:reap`, the seam `AgentVoiceChannelService`) and the call's signal source
+enum. Skill: `ddd-module-agents-voice-specialist` — load it before changing voice code.
+
+- **The WebSocket library is suggested, not required** (`ratchet/pawl`, `react/event-loop`; in `require-dev` so the
+  suite covers the worker). Only a class below `AgentsModule::VOICE_SESSION_WORKER_NAMESPACES` (the two
+  `SessionWorker` folders) imports it; `AgentsModule::getNamespacesRequiringClasses()` keeps those classes out of the
+  container of an installation without the library. Code outside the two folders never imports the library and
+  reaches a gated class only behind `canVoiceRunHere()` (`tests/Kernel/VoiceWithoutSessionWorkerLibraryTest.php`).
+- **One place answers whether voice can run here:** `AgentVoiceCallAdmissionService::canVoiceRunHere()` (switched on
+  AND the library installed; the override point is the `protected` `isSessionWorkerLibraryInstalled()`). The admission,
+  the channel provider, the tools and skill, the routes and the installation check ask it. Switched on without the
+  library is a named WARNING of `app:agent:check-installation`, never a fatal.
+- **Switched off costs nothing:** no tool, no skill, no required table, nothing reads the call table.
+- **Configuration only through `AgentVoiceConfiguration::current()`;** secrets never in a config file (the config
+  names the environment variable that holds the provider key).
+- **Calls only through `AgentVoiceCallStoreService`.** No repository call and no `update()` on a call outside a
+  store. Every write names its columns: a ring, an answer, the worker and an end can write the same call within one
+  second. Raw SQL quotes identifiers through the dialect (MariaDB and PostgreSQL).
+- **A call ends once.** Every exit goes through the one end path of `AgentVoiceCallsService`; an unanswered end is
+  claimed atomically before anything is written to the conversation.
+- **Stored values keep their spelling** (end reasons, directions, trace event kinds, usage scope, envelope and prompt
+  names): applications bind tables that already hold them. A new value is additive.
+- **Every sentence the voice model is told is a prompt file,** read through `AgentVoicePromptText::forName()`. No
+  sentence in code. A missing file costs its block, never the call.
+- **The provider's wire:** a field is sent only when the provider's own reference documents it; the docblock names
+  the page. A failed session action is a `BadGatewayException` with the code `provider_unavailable` and the
+  provider's words in the previous exception; those words go to the log and the trace, never to a client.
+- **An application's own medium, columns or rules** are same-path subclasses; every class docblock lists its override
+  points (`protected` methods). No dead branch "for later".
+- **Untrusted text:** a call's task and its transcript are written by the agent or the owner; a screen shows them as
+  text only.
+- **What voice hands on is a value object, never a keyed array:** seed rows (`AgentVoiceSeedInputMessage`), completed
+  sentences (`LiveTranscriptSentence`), the ring (`AgentVoiceRingPayload` with `AgentVoiceRingCallerContext`, rendered
+  only in `toPayloadJson()`), task answers (`AgentCallTaskStart`, `AgentCallTaskOutcome`). A collection is a typed
+  list.
+- **Who is rung:** a ring starts only while a client of the account listens (`isClientListening()` of the account
+  audience). A bound transport answers; without its answer a fresh presence statement counts, and the account-level
+  realtime read states it for a client that only polls (`stampUIClientOfAccount()`: a cache entry per account, written
+  whether voice is on or off, because it is the realtime port's). The web client states a client id on every account
+  read.
+- **The call's signal sources** are the enum `PhoneConversationSignalSource` in
+  `Entities/Conversations/SignalSources/`: found there by the folder convention, so it stays outside the `Voice/`
+  folders. Its values are stored and keep their spelling. A case no class of the package writes stays for an
+  application that stores it.
+- **Web** (`web/src/voice/`, the entries `@mgamadeus/ddd-agents/voice` and `/voice/admin`): texts through
+  `AgentsEnvironment.texts` (no `translate` prop), keys in `i18n-keys.json`; styles in the package's one stylesheet,
+  custom properties `--agents-voice-*`; only `/voice/admin` imports the three optional peers (`boundary.json`,
+  `optionalPeerImports`; check 10 of `web/scripts/check-package.mjs`).
+- **Tests** live in `tests/Voice/` (base classes and helpers in `tests/Voice/Support/`) and run in the `package` suite
+  with voice switched off by default.
+
 ## Messenger
 
 `AgentMessengerTransports` lists six transports and the routing. The framework registers neither; the host copies them
-into its messenger configuration and runs one consumer per transport (`examples/workers.yaml`).
+into its messenger configuration and runs one consumer per transport (`examples/workers.yaml`). The voice channel has
+two transports of its own (`AgentVoiceMessengerTransports`), copied only by an application that switches voice on.
 
 ## Table prefix
 

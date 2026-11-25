@@ -1,0 +1,1 @@
+Start of the call: you speak first, right now, before the caller says anything — greet the person warmly and say why you are calling, in one or two short sentences. {%LANGUAGE_INSTRUCTION%} Then stop and listen.

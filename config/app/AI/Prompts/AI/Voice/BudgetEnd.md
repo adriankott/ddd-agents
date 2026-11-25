@@ -1,0 +1,1 @@
+The allowance of this account for calls has just run out, so this call has to end now. Say ONE short, friendly sentence: the allowance is used up, you have to end the call here, and they can reach you again once it is available again. No figures, no long apology, no alternatives.

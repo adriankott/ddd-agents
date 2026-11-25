@@ -1,5 +1,206 @@
 # Changelog
 
+## 0.6.0
+
+**The voice channel: the owner talks to the agent in the application's window, and the agent rings the owner's open
+clients, a client that only polls included. Optional and switched off by default (`AI.agentVoice.enabled`): an
+application that does not switch it on gets no tool, no skill, no required table and no new dependency.** Additive. npm
+`@mgamadeus/ddd-agents` 0.6.0 in lockstep (new entries `./voice` and `./voice/admin`).
+
+**New (PHP):**
+
+- **A folder `Voice/` in every layer** (`DDD\Domain\AI\{Entities,Services,Repo\DB,MessageHandlers,Exceptions}\Voice\`,
+  `DDD\Presentation\{Api\Agents,Api\Admin,Mcp\Client}\Voice\`): the call (`AgentVoiceCall`, state derived, read under
+  the rights of its conversation) and its store port (`AgentVoiceCallStoreService`, contract `AgentVoiceCallStore`,
+  shipped store `entity`); call life with the one end path (`AgentVoiceCallsService`); admission of a call start and of
+  a running call (`AgentVoiceCallAdmissionService`: the right `useVoice`, the daily cap, the model-call gate, the
+  longest a call may last); call start and ring (`AgentVoiceCallStartsService`, `AgentVoiceRingService`, the realtime
+  message type `agent.voice.ring`, `AgentVoiceRingDeadlineMessage`); the provider seam `RealtimeVoiceProviderAdapter`
+  with `OpenAILiveVoiceProviderAdapter`; the briefing (`AgentVoiceSessionContextsService`, the prompt files under
+  `config/app/AI/Prompts/AI/Voice/`); the session worker (`AgentLiveVoiceSessionsService`,
+  `VoiceLiveSessionAttachMessage`); the routes (`AgentVoiceSessionsTrait`) and the admin list of calls
+  (`AdminAgentVoiceCallsTrait`) as controller traits; three tools (`AgentVoiceCallsMCPPackage`, package id
+  `agent.voice`: `startVoiceCall`, `endVoiceCall`, `getVoiceCalls`).
+- **The agent skill `Agent.Voice`** (`AISkill::AGENT_VOICE`) is bound to the tool package in the shipped
+  `skillPackages.php` and offered only while voice can run; an application that replaced that file adds the line when it
+  switches voice on. **The right `useVoice`** (`AgentVoiceAccountRights::USE_VOICE`) is not mapped by the shipped
+  `accountRights.php`, so nobody holds it until the application says who.
+- **Typed value objects where voice hands rows on,** no keyed arrays (`DDD\Domain\AI\Entities\Voice\Calls\`): the
+  provider seam takes the seed rows of a session as `AgentVoiceSeedInputMessage[]`
+  (`RealtimeVoiceProviderAdapter::buildSessionCreationPayload()`; an application adds its own in
+  `AgentVoiceSessionContext::buildApplicationSeedInputMessages()`); the ring is an `AgentVoiceRingPayload`
+  (`AgentVoiceRingService::buildRingPayload()`, rendered in one place, `toPayloadJson()`) with the caller context
+  `AgentVoiceRingCallerContext` (empty in the package; an application's same-path subclass names its fields in
+  `toPayloadArray()` and is filled in `buildCallerContext()`); a completed sentence of a call is a
+  `LiveTranscriptSentence` (handed to the worker's hook `keepCompletedSentenceOutOfTheConversation()`), a sentence that
+  waits to be written a `LiveTranscriptBacklogSentence`; the call task service answers `AgentCallTaskStart` and
+  `AgentCallTaskOutcome`, the progress schedule `AgentVoiceTaskProgressUpdate`. A collection of them is a typed list.
+- **The call's signal sources stay where they are:** the enum `PhoneConversationSignalSource`
+  (`DDD\Domain\AI\Entities\Conversations\SignalSources\`) with its stored values. The voice services of the package
+  write `PHONE_CALL_STARTED`, `PHONE_CALL_ENDED`, `PHONE_DELEGATION` and `PHONE_CALL_UNANSWERED_FOLLOW_UP`; the case no
+  class of the package writes (`PHONE_VOICEMAIL`) stays for an application that stores it.
+- **Config** `config/app/AI/agentVoice.php` (`AI.agentVoice`, read through `AgentVoiceConfiguration::current()`):
+  `enabled` (false), `callStore`, the provider adapters and their settings, `language`, `limits`.
+- **Two transports of their own,** `voice_live_session` and `voice_ring_deadline` (`AgentVoiceMessengerTransports`, with
+  the routing of the two message classes). Only an application that switches voice on copies them;
+  `AgentMessengerTransports` is unchanged.
+- **One more table,** the call table of `AgentVoiceCall` (17 package tables). It is in use only while `enabled` is true
+  and `callStore` is `entity` (`AgentVoiceConfiguration::isCallTableInUse()`): `missingTables` requires it only then
+  (`AgentVoiceFeatureTableConditionProviderService`), and `app:agent:eval-conversations-purge` touches it only then
+  (`AIConversationEvalPurgeService`: the calls of a purged conversation are deleted, the pointer of a call the agent
+  started from it is emptied; override point `isVoiceCallTableInUse()`). Otherwise the two pointers are listed in
+  `getColumnsNotPurged()` and no statement names the table.
+- **`config/untrusted-sinks-allowlist.php`:** one entry, the HTTP client of `OpenAILiveVoiceProviderAdapter` (the two
+  REST calls of a session go to the provider host of the committed config on fixed paths).
+- **`AgentsModule`:** `OWNED_NAMESPACES` gains `DDD\Domain\AI\{Entities,Exceptions,Repo\DB,Services}\Voice\` and
+  `DDD\Presentation\Api\Admin\Voice\`; `getPublicServiceNamespaces()` gains `DDD\Domain\AI\Services\Voice\`.
+- **The session worker's WebSocket library is suggested, not required:** `ratchet/pawl` and `react/event-loop` are in
+  `suggest` (and in `require-dev`). New `AgentsModule::getNamespacesRequiringClasses()` with
+  `VOICE_SESSION_WORKER_NAMESPACES` (`…\Services\Voice\SessionWorker\`, `…\MessageHandlers\Voice\SessionWorker\`) and
+  `VOICE_SESSION_WORKER_LIBRARY_CLASS`: without the library the session worker and the handler of its message are no
+  services and are never loaded; the container compiles and everything else in voice loads (the call, the store, the
+  ring, the admin list, the adapter's session creation).
+- **One place answers whether voice can run in an installation:** `AgentVoiceCallAdmissionService::canVoiceRunHere()` =
+  `enabled` AND the library installed (override point: the `protected` `isSessionWorkerLibraryInstalled()`). The
+  admission of a call start, `AgentVoiceChannelProviderService`, the tool package (`isAvailable()`) with its skill, the
+  routes and the installation check ask it.
+- **`app:agent:check-installation`:** the check `voiceChannel` has a second finding, a WARNING when voice is switched on
+  without the library (subject `AI.agentVoice.enabled`; the hint names the two packages). The channel then reads as
+  switched off; nothing fails.
+- **`app:agent:reap`** closes voice calls a dead worker left running: the default of `closeStaleChannelSessions()` runs
+  the new `closeStaleVoiceCalls()` (one line per closed call through `buildClosedStaleVoiceCallLine()`, one count line,
+  a lock of its own, `STALE_VOICE_CALLS_LOCK_NAME`). No command, cron line or option of its own. While voice is switched
+  off it reads and prints nothing.
+
+**New: a client that only polls is rung (PHP and web):**
+
+- **The account-level realtime read states the reading client's presence.** `GET …/realtimeMessages` with the query
+  parameter `clientId` (as on the run-state read; a value that is no client id is ignored, never a 400) records that a
+  client of the account is there: `stampUIClientOfAccount()` → new
+  `AgentClientPresenceService::recordClientStatementWithoutConversation()`. One entry per account in the channel's
+  shared cache, no table, under a key of its own (`ACCOUNT_WITHOUT_CONVERSATION_KEY_PREFIX`), so it never replaces what
+  a client that shows a conversation stated; written when the account has none or its newest one is
+  `STATEMENT_THROTTLE_SECONDS` (10 s) old, whichever client reads; fresh for `AgentClientPresence::FRESH_FOR_SECONDS`
+  (25 s). `findNewestPresenceOfAccount()` answers the fresh statement of a client that shows a conversation first, else
+  this one, so `isClientListening()` of the account audience is true while only a polling client is open and a call's
+  ring is no longer refused with `no_registered_devices`. A read without `clientId` answers as before and states
+  nothing. New hooks of the chat controller traits: `stampUIClientOfAccount()`, `getAgentClientPresenceService()`.
+- **A bound transport still answers first** (`askTransportWhetherClientIsListening()`); only without its answer the
+  statements decide. A client with a bound transport stops polling and its statement runs out, so an application that
+  binds a transport answers that hook for the account audience too.
+- **The account read always states a client id** (`GET …/realtimeMessages?clientId=…`), so the server knows a client
+  that only polls, with or without `Agent.UI`: the `clientId` option of `createAccountRealtimePoll` when the host gives
+  one, else the id of the bound `uiClient`, else an id the HTTP conversation client creates once
+  (`createAgentUIClientId()`) and keeps while it lives. `getAccountRealtimeMessages` takes the optional argument
+  `clientId`; the conversation reads still state a client id only with a `uiClient`.
+- **The account realtime poll reports a cleared message and takes subscribers after its creation** (`./ui`): new
+  `AccountRealtimePollSubscriber` (`onMessage`, `onMessageCleared`, both optional) and
+  `AccountRealtimePoll.subscribe(subscriber)`, which answers the function that removes the subscriber. A message is
+  cleared when a read that started after the message became known holds none of its type and key. A subscriber that
+  comes late gets the messages open now before `subscribe` returns, then every arrival; it is told the clear only of a
+  message it was handed. The creation-time `onMessage` is optional now. With a bound transport the poll does not read by
+  itself: a clear comes with `readNow()` or `readAfterPing()`.
+- **The ring source takes the poll or a starter:** `createAgentVoiceRingSource(accountRealtimePollOrStarter)` subscribes
+  to the application's running poll (and never stops it) or starts and stops a poll of its own. A ring another client
+  answered or declined, or that was withdrawn, stops in a polling client with the read that finds it gone instead of at
+  its deadline (`acceptClearedRealtimeMessage()`; `onRingCleared(callId)` only for a ring the subscriber was handed).
+
+**New (web):**
+
+- **Entries `./voice` and `./voice/admin`** (`dist/voice.js`, `dist/voice-admin.js`; the names in `public-api.json`).
+  `./voice`: the api of the routes (`createAgentVoiceApi`, `createAgentVoiceFetchBaseApi`), the call store with its
+  hooks, `AgentVoiceCallProvider`, the components of a chat (`AgentVoiceChatStartButton`, `AgentVoiceCallBand`,
+  `AgentVoiceCallCaptions`, `AgentVoiceInputGlow`), `AgentVoiceIncomingCall` and the ring source. `./voice/admin`: the
+  api of the admin routes (`createAgentVoiceAdminApi`, `createStaticAgentVoiceAdminApi`) and the screens
+  `AgentVoiceCallsScreen` and `AgentVoiceCallDetailScreen`. Neither entry is in `sideEffects`.
+- **Texts and styles as in the rest of the package:** `AgentVoiceCallProvider` takes no `translate` prop, the texts are
+  keys of `i18n-keys.json` and go through `AgentsEnvironment.texts` (`useAgentVoiceTranslateText()` for an application's
+  own voice component). The voice styles are part of `styles.css`, no stylesheet of their own; every colour and size is
+  a custom property `--agents-voice-*` read with its default; class names are module-scoped.
+- **Three optional peers, loaded by `./voice/admin` alone:** `@mgamadeus/ddd-admin-ui`, `@mgamadeus/ddd-web` and
+  `lucide-react`. `boundary.json` (now in `files`) names per code subpath the optional peers it may import
+  (`optionalPeerImports`), and the new check 10 of `scripts/check-package.mjs` fails when another subpath loads one. An
+  application without the admin screens installs none of them.
+- **`scripts/i18n-keys.mjs`** also reads the texts of the admin screens (their `t` and `m` calls with their contexts)
+  into `i18n-keys.json`.
+- **Fixed, the default translate** (`provider/environment.ts`): a placeholder is filled only from a replacement the
+  caller gave (`Object.hasOwn`), so `%toString%` is no longer filled from the prototype.
+
+**Skills, docs and tests:**
+
+- **Developer skill** `ddd-module-agents-voice-specialist` (the tenth skill, manifest id `voice`; it also owns
+  `PhoneConversationSignalSource`); the entry skill routes to it. README section "Voice", `AGENTS.md` section "Voice
+  channel".
+- **Tests:** the voice suite in `tests/Voice/` (under the package kernel, voice switched off by default; base classes in
+  `tests/Voice/Support/`); the kernel without the WebSocket library
+  (`tests/Kernel/VoiceWithoutSessionWorkerLibraryTest.php`: the gate map, the imports, the compiled container, the
+  answers of the one place, the handler list, the installation finding); the sweep of the reap command
+  (`AgentReapStaleVoiceCallsSweepTest`, `AgentReapStaleVoiceCallsSweepRightsTest`); the evaluation purge and the call
+  table (`AIConversationEvalPurgeVoiceCallTableTest`); the installation check (a right of a switched-off feature); the
+  polling client's presence (`AgentClientPresenceWithoutConversationTest`, `AgentAccountRealtimeReadPresenceTest`, and
+  for the ring `AgentVoiceCallStartsServiceStartRingOfAPollingClientTest`). Web specs: the voice specs below
+  `src/voice/`, `_account-realtime.spec.ts`, `_agent-voice-ring-source.spec.ts`,
+  `_createAgentsHttpConversationClient.spec.ts`.
+
+**Behaviour changes for an existing application.** None of them needs voice switched on to apply.
+
+- **An application command that overrides `AgentReapStuckConversationsCommand::closeStaleChannelSessions()`** calls the
+  parent, or the package's sweep of stale voice calls never runs. The default did nothing before.
+- **The account-level read writes a cache entry** for a client that states `clientId`, and the web client now always
+  states one: one small entry per account, at most every 10 s, and one cache read more per read. The write is the
+  realtime port's and does not ask whether voice is switched on. An application that wants none overrides
+  `stampUIClientOfAccount()` with an empty body.
+- **A conversation client binding of the application's own** is called with the poll's `clientId` option
+  (`getAccountRealtimeMessages(clientId)`, the argument is optional) and states an id itself; without one its polling
+  clients are not counted as listening.
+- **The creation-time `onMessage` of `createAccountRealtimePoll`,** two edges: an answer that comes back after the
+  answer of a later-started read is left out (`readNow()` resolves 0, no credential is handed over); the known messages
+  are updated before the hooks run, so a hook that throws is not handed the same message again.
+- **A text placeholder named like a member of `Object.prototype`** (`%toString%`) stays as written unless the caller's
+  replacements hold it (the fix above).
+- **`rightsHeldByNobody`** leaves out a right that only tool packages of a switched-off feature require (every class
+  that declares it is an MCP package whose `isAvailable()` answers false); it is reported once the feature is switched
+  on. `useVoice` is such a right.
+- **An application with a voice channel provider of its own** now has two registered providers (the package's is
+  registered in every installation and unavailable while voice cannot run): it reads the `voiceChannel` WARNING "several
+  providers" and one log line per process. The application's provider still answers, as the first available one.
+- **Lists an application's suite may pin:** the declared rights (`AgentDeclaredAccountRightsService`) contain
+  `useVoice`; the package's database entities are 17; the realtime message types contain `agent.voice.ring`; the owned
+  and the public service namespaces of the module are longer; the types of `./ui` contain
+  `AccountRealtimePollSubscriber`. The package's surface snapshot (`agent-package-surface.json`) is unchanged:
+  `Agent.Voice` is offered only while voice can run.
+
+**An application that already has voice classes of its own** (a voice channel below its root namespace, at the paths of
+these classes) keeps what it adds as same-path subclasses and deletes what the package now ships. Where a path or a name
+differs:
+
+- **The session worker** is `DDD\Domain\AI\Services\Voice\SessionWorker\AgentLiveVoiceSessionsService`: a subclass in a
+  folder `Services\Voice\Live\` moves to `Services\Voice\SessionWorker\`. **The attach message and its handler**
+  (`VoiceLiveSessionAttachMessage`, `VoiceLiveSessionAttachHandler`) are in
+  `DDD\Domain\AI\MessageHandlers\Voice\SessionWorker\`, not directly in `MessageHandlers\Voice\`. Only classes of these
+  two folders import the WebSocket library.
+- **The attach message's class name is a routed and queued name.** The application's Messenger routing names the new
+  class (take `AgentVoiceMessengerTransports::ROUTING_BY_MESSAGE_CLASS`), and the queue of `voice_live_session` is
+  drained before the deploy: a message queued under another class name finds no handler.
+- **No module class and no command of its own.** `AgentsModule` owns the voice namespaces, so a module class the
+  application registered for them goes. Stale calls are closed inside `app:agent:reap`: a command of the application's
+  own that closed them goes with its cron line (the sweep prints lines and has no JSON output), and an override of
+  `closeStaleChannelSessions()` calls the parent.
+- **The skill** is `AISkill::AGENT_VOICE`: an enum of the application's own for `Agent.Voice` goes, and a
+  `skillPackages.php` of its own binds `AISkill::AGENT_VOICE => [AgentVoiceCallsMCPPackage::class]`.
+- **Typed answers and override points.** `AgentCallTasksService::startAgentTaskOnTranscript()` answers
+  `AgentCallTaskStart` (`started`, where an array held `ok`), `findAgentTaskOutcome()` answers `AgentCallTaskOutcome`,
+  `AgentVoiceTaskProgressSchedule::decideUpdateAt()` answers `AgentVoiceTaskProgressUpdate`. An override of
+  `buildApplicationSeedInputMessages()` returns `AgentVoiceSeedInputMessage[]`, one of `buildCallerContext()` returns an
+  `AgentVoiceRingCallerContext`, one of `keepCompletedSentenceOutOfTheConversation()` takes a `LiveTranscriptSentence`,
+  and a provider adapter of the application's own takes the seed rows typed. What the provider and a ringing client
+  receive is unchanged.
+- **A worker of the application's own** that carries the calls without the package's session worker: answer
+  `isSessionWorkerLibraryInstalled()` for it and override `openProviderSessionForCall()` of the routes trait, which
+  attaches the package's worker.
+- **Web:** the components and the admin screens come from the two entries; texts through `AgentsEnvironment.texts`,
+  custom properties `--agents-voice-*`, the styles with `styles.css`.
+
 ## 0.5.17
 
 **The web package no longer needs axios: the request stand-ins of the widget preview and the widget-image capture

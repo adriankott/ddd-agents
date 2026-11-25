@@ -19,7 +19,7 @@ use DDD\Domain\AI\Entities\Conversations\SignalSources\ConversationSignalSpeaker
  * method and consolidated there, not here). The property stays a string ({@see AIConversationMessage::$signalSource}
  * also carries markers on TEXT rows, a tool name on TOOL_MESSAGE rows and an error code on ERROR rows): read
  * it through {@see ConversationSignalSources::tryFrom()}. The domain sources live in their domain's enum (the
- * application's enums and the phone channel's
+ * application's enums and the call sources of the voice channel,
  * {@see \DDD\Domain\AI\Entities\Conversations\SignalSources\PhoneConversationSignalSource}).
  * {@see AIConversationMessage}'s `SIGNAL_SOURCE_*` constants carry the meaning of the core sources; a domain source has
  * no constant there — its writer passes the typed case of its domain's enum (`<Domain>ConversationSignalSource::<CASE>->value`).

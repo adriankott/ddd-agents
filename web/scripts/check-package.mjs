@@ -15,6 +15,10 @@
 //      declared name is exported by the built entry: a value by the JavaScript entry AND its declaration, a type by the
 //      declaration. A name an entry exports beyond the declared ones is listed, not failed; a declared subpath that
 //      `exports` no longer has fails.
+//  10. an optional peer (`peerDependenciesMeta`) is loaded only by the code subpaths `boundary.json` names for it
+//      (`optionalPeerImports`: subpath → the optional peers it may import): neither the JavaScript a subpath loads (its
+//      entry and, transitively, the chunks it imports) nor its declarations import one it is not named for — an
+//      application that uses the other subpaths installs none of them
 //
 // Usage: node scripts/check-package.mjs <packageDir>
 //        node scripts/check-package.mjs <packageDir> --write-public-api   (rewrites public-api.json from the build)
@@ -25,6 +29,7 @@ import * as path from "node:path";
 const packageDir = path.resolve(process.argv[2] ?? ".");
 const writesPublicApi = process.argv.includes("--write-public-api");
 const PUBLIC_API_FILE = "public-api.json";
+const BOUNDARY_FILE = "boundary.json";
 const manifest = JSON.parse(fs.readFileSync(path.join(packageDir, "package.json"), "utf-8"));
 const distDir = path.join(packageDir, "dist");
 const problems = [];
@@ -131,6 +136,70 @@ if (!fs.existsSync(distDir)) {
 
   const testFiles = distFiles.filter((file) => /\.(?:spec|test|stories|story)\.|spec-helper|story-helper/i.test(file));
   report(testFiles.length === 0, "no spec, story or test file in dist", `test files in dist: ${testFiles.join(", ")}`);
+
+  // 10. An optional peer is loaded only by the subpaths `boundary.json` names for it.
+  const optionalPeers = Object.entries(manifest.peerDependenciesMeta ?? {})
+    .filter(([, meta]) => meta?.optional === true)
+    .map(([name]) => name);
+  if (optionalPeers.length > 0) {
+    const boundaryPath = path.join(packageDir, BOUNDARY_FILE);
+    const optionalPeerImports = fs.existsSync(boundaryPath) ? JSON.parse(fs.readFileSync(boundaryPath, "utf-8")).optionalPeerImports : undefined;
+    const toDistFile = (file) => path.relative(distDir, path.resolve(packageDir, file));
+    /** The built file a relative specifier of `fromFile` names: a JavaScript file as written, a declaration by its name. */
+    const resolveLoadedFile = (fromFile, specifier) => {
+      const base = path.normalize(path.join(path.dirname(fromFile), specifier));
+      const withoutJs = base.replace(/\.js$/, "");
+      return [base, `${withoutJs}.d.ts`, path.join(withoutJs, "index.d.ts")].find((candidate) => specifiersByFile.has(candidate));
+    };
+    /** Every built file a target loads: the target itself and, transitively, the relative imports of each file. */
+    const readLoadedFiles = (targetFile) => {
+      const loadedFiles = new Set();
+      const pendingFiles = [toDistFile(targetFile)];
+      while (pendingFiles.length > 0) {
+        const file = pendingFiles.pop();
+        if (loadedFiles.has(file) || !specifiersByFile.has(file)) continue;
+        loadedFiles.add(file);
+        for (const specifier of specifiersByFile.get(file)) {
+          if (!specifier.startsWith("./") && !specifier.startsWith("../")) continue;
+          const loadedFile = resolveLoadedFile(file, specifier);
+          if (loadedFile !== undefined) pendingFiles.push(loadedFile);
+        }
+      }
+      return loadedFiles;
+    };
+    const codeSubpathTargets = Object.entries(manifest.exports ?? {}).filter(
+      ([, target]) => target && typeof target === "object" && typeof target.import === "string",
+    );
+    const boundaryProblems = [];
+    if (!optionalPeerImports || typeof optionalPeerImports !== "object") {
+      boundaryProblems.push(`${BOUNDARY_FILE} has no optionalPeerImports`);
+    } else {
+      for (const [subpath, target] of codeSubpathTargets) {
+        const allowedPeers = new Set(optionalPeerImports[subpath] ?? []);
+        for (const targetFile of [target.import, target.types].filter((file) => typeof file === "string")) {
+          for (const file of readLoadedFiles(targetFile)) {
+            for (const specifier of specifiersByFile.get(file)) {
+              const packageName = readPackageName(specifier);
+              if (optionalPeers.includes(packageName) && !allowedPeers.has(packageName)) {
+                boundaryProblems.push(`${subpath} loads ${specifier} (${file})`);
+              }
+            }
+          }
+        }
+      }
+      for (const [subpath, peers] of Object.entries(optionalPeerImports)) {
+        if (!codeSubpathTargets.some(([codeSubpath]) => codeSubpath === subpath)) boundaryProblems.push(`${subpath} is no code subpath of exports`);
+        for (const peer of peers) if (!optionalPeers.includes(peer)) boundaryProblems.push(`${subpath} names ${peer}, which is no optional peer`);
+      }
+      const namedPeers = new Set(Object.values(optionalPeerImports).flat());
+      for (const peer of optionalPeers) if (!namedPeers.has(peer)) boundaryProblems.push(`no subpath is named for the optional peer ${peer}`);
+    }
+    report(
+      boundaryProblems.length === 0,
+      `an optional peer (${optionalPeers.join(", ")}) is loaded only by the subpaths ${BOUNDARY_FILE} names for it`,
+      `optional peers against ${BOUNDARY_FILE}: ${boundaryProblems.join("; ")}`,
+    );
+  }
 }
 
 // 8. `files` covers every target; every top-level built entry is a declared target.

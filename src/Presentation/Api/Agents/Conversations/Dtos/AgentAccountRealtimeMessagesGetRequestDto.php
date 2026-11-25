@@ -14,8 +14,9 @@ use DDD\Presentation\Base\OpenApi\Attributes\Parameter;
 class AgentAccountRealtimeMessagesGetRequestDto extends RequestDto
 {
     /**
-     * @var string|null The id of the reading client (random per mount of the agent window); a message addressed to one
-     * client reaches only that client
+     * @var string|null The id of the reading client (random per mount of the agent window; 8 to 64 letters, digits and
+     * `-`, the same value as on the run-state read); a message addressed to one client reaches only that client, and
+     * a read that states it counts the client as listening for the account while the read is repeated
      */
     #[Parameter(in: Parameter::QUERY, required: false)]
     public ?string $clientId = null;

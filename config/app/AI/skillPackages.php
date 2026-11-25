@@ -11,6 +11,7 @@ use DDD\Presentation\Mcp\Client\Agents\AgentTaskSchedulesMCPPackage;
 use DDD\Presentation\Mcp\Client\Agents\AgentUIMCPPackage;
 use DDD\Presentation\Mcp\Client\Agents\AgentUIWindowMCPPackage;
 use DDD\Presentation\Mcp\Client\Agents\WebSearchMCPPackage;
+use DDD\Presentation\Mcp\Client\Voice\AgentVoiceCallsMCPPackage;
 use DDD\Presentation\Mcp\Admin\System\SystemCronsMCPPackage;
 use DDD\Presentation\Mcp\Admin\System\SystemHealthMCPPackage;
 use DDD\Presentation\Mcp\Admin\System\SystemIssuesMCPPackage;
@@ -20,6 +21,7 @@ use DDD\Presentation\Mcp\Admin\System\SystemWorkersMCPPackage;
  * The package's default skill → MCP-package binding, read as `Config::get('AI.skillPackages')` by
  * {@see AISkill::getPackageClassesBySkillName()}. It lists only the skills whose MCP packages ship with this package,
  * bound by class; their skill files ship in `config/app/AI/Skills/Agent/` and `config/app/AI/Skills/System/`.
+ * A skill of a feature that is switched off stays bound here and is not offered: its package is not available.
  *
  * An application ships its own `config/app/AI/skillPackages.php`, which REPLACES this file whole (application config
  * roots are searched first): it must list these skills itself when it wants them offered.
@@ -37,6 +39,9 @@ return [
     // the user's client: requests over the realtime channel (AI.agentRealtimeChannel); the window-mode package only
     // while AI.agentUI.windowModeRequests is on (AgentUIWindowMCPPackage::isAvailable())
     AISkill::AGENT_UI => [AgentUIMCPPackage::class, AgentUIWindowMCPPackage::class],
+    // offered only while the voice channel can run: AI.agentVoice.enabled, and the session worker's WebSocket library
+    // is installed (AgentVoiceCallsMCPPackage::isAvailable())
+    AISkill::AGENT_VOICE => [AgentVoiceCallsMCPPackage::class],
     // Core's features for the platform operators: offered and callable only with the right operatePlatform
     // (AI.accountRights maps it to the superadmins) and an account with access to every resource
     AISkill::SYSTEM_HEALTH => [SystemHealthMCPPackage::class],

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DDD\Domain\AI\Services\Installation;
 
+use DDD\Domain\AI\Entities\Conversations\Entitlements\AgentDeclaredAccountRight;
 use DDD\Domain\AI\Entities\Conversations\Entitlements\AgentRoleMappedAccountRights;
 use DDD\Domain\AI\Entities\Discovery\AgentSourceRoot;
 use DDD\Domain\AI\Entities\Installation\AgentFeatureTableConditions;
@@ -55,7 +56,8 @@ use Throwable;
  * - `unboundPackageSkills` (WARNING): a skill file a package ships that `AI.skillPackages` does not bind — never offered;
  * - `skillBindings` (BLOCKING): a binding names a class that does not exist or is no MCP package, or an id no package has;
  * - `rightsHeldByNobody` (WARNING): a right a package declares that `AI.accountRights` maps to no role, no `'*'` and no
- *   delegation — held by nobody unless the application's rights object holds it;
+ *   delegation — held by nobody unless the application's rights object holds it; a right only the tools of a
+ *   switched-off feature require (every MCP package that declares it is unavailable) is not reported;
  * - `accountRightsMapping` (WARNING): the application answers rights with its own object and ships no
  *   `AI.accountRights` of its own — every package right its object does not hold is held by nobody (fail closed; the
  *   package's default mapping grants nothing then);
@@ -378,7 +380,8 @@ class AgentInstallationCheckService extends Service
 
     /**
      * `rightsHeldByNobody`: a right an installed package declares that the mapping `AI.accountRights` gives to no role,
-     * not to `'*'` and to no application right (WARNING; accepted names: `acceptedUnmappedRights`).
+     * not to `'*'` and to no application right (WARNING; accepted names: `acceptedUnmappedRights`). A right of a
+     * switched-off feature needs no holder and is not reported ({@see isRightOfUnavailablePackagesOnly()}).
      */
     protected function addRightsHeldByNobodyFindings(AgentInstallationFindings $agentInstallationFindings): void
     {
@@ -394,6 +397,7 @@ class AgentInstallationCheckService extends Service
             if (in_array($rightName, $acceptedRightNames, true)
                 || $agentRoleMappedAccountRights->getRoleNamesOfRight($rightName) !== []
                 || $agentRoleMappedAccountRights->findDelegatedRightName($rightName) !== null
+                || $this->isRightOfUnavailablePackagesOnly($agentDeclaredAccountRight)
             ) {
                 continue;
             }
@@ -406,6 +410,32 @@ class AgentInstallationCheckService extends Service
                 "Map it in config/app/AI/accountRights.php (roles, '*', or ['right' => '<application right>']), or list it in acceptedUnmappedRights of config/app/AI/installationCheck.php when the application's rights object answers it."
             );
         }
+    }
+
+    /**
+     * Whether only MCP packages that are not available declare the right ({@see MCPPackage::isAvailable()}: their
+     * feature is switched off, so none of their tools is offered or callable and the right needs no holder yet). The
+     * right is reported once the feature is switched on. A right a rights constant class lists is never left out,
+     * and neither is one whose package cannot say whether it is available.
+     */
+    protected function isRightOfUnavailablePackagesOnly(AgentDeclaredAccountRight $agentDeclaredAccountRight): bool
+    {
+        if ($agentDeclaredAccountRight->declaringClassNames === []) {
+            return false;
+        }
+        foreach ($agentDeclaredAccountRight->declaringClassNames as $declaringClassName) {
+            if (!is_a($declaringClassName, MCPPackage::class, true)) {
+                return false;
+            }
+            try {
+                if ($declaringClassName::isAvailable()) {
+                    return false;
+                }
+            } catch (Throwable) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**

@@ -1,6 +1,6 @@
 ---
 name: ddd-module-agents-specialist
-description: "Installs, wires and runs the agent of mgamadeus/ddd-agents in a DDD host and routes to the eight agent topic skills. Covers the installation checklist, chat controller traits, the agent space (agentSpaceId, account level, its host entity), same-path overrides, entitlements, listeners, the config files, host wording, persona and egress, the six Messenger transports, the usage envelope middleware, workers and stop grace, the package's console commands (schedules, purges, diagnosis, chat replay, evaluation), the installation check app:agent:check-installation, host duties, the cron list, table names, persisted class names, the package suite, source ownership. Use when adding the agent to an application, checking an installation after an update, wiring agent transports or workers, schedules never fire, a crashed turn never answers, agent event tables grow, overriding an agent service, naming agent tables, or asking which agent skill explains a file."
+description: "Installs, wires and runs the agent of mgamadeus/ddd-agents in a DDD host and routes to the nine agent topic skills. Covers the installation checklist, chat controller traits, the agent space (agentSpaceId, account level, its host entity), same-path overrides, entitlements, listeners, the config files, host wording, persona and egress, the six Messenger transports, the usage envelope middleware, workers and stop grace, the package's console commands (schedules, purges, diagnosis, chat replay, evaluation), the installation check app:agent:check-installation, host duties, the cron list, table names, persisted class names, the package suite, source ownership. Use when adding the agent to an application, checking an installation after an update, wiring agent transports or workers, schedules never fire, a crashed turn never answers, agent event tables grow, overriding an agent service, naming agent tables, or asking which agent skill explains a file."
 metadata:
   author: mgamadeus
   version: "0.2.0"
@@ -11,7 +11,7 @@ metadata:
 
 The agent of `mgamadeus/ddd-agents`: conversations, turns, tools, skills, purposes, widgets, delegation and schedules
 on top of `mgamadeus/ddd-ai`. This skill answers **how a host installs, wires and runs it, and what the host must
-provide**, and routes every other question to one of eight topic skills.
+provide**, and routes every other question to one of nine topic skills.
 
 > Base patterns: the core skills of `mgamadeus/ddd` (services, entities, endpoints, message handlers, console
 > commands). Models, prompts, usage envelopes and the language-model trait: `mgamadeus/ddd-ai`. Argus repositories:
@@ -20,7 +20,8 @@ provide**, and routes every other question to one of eight topic skills.
 ## Scope
 
 This skill owns the module class, agent spaces, entitlements and their interfaces, the scope filter, the read rights
-of the agent tables, environments, the voice-channel override point, source-root discovery, the customer's model choice,
+of the agent tables, environments, the seam the core asks about live calls (the voice channel itself is the voice
+skill's), source-root discovery, the customer's model choice,
 transports and handler routing, the worker state resetter, listeners, table names, the chat controller traits and
 their DTOs, the naming, wording, persona and egress configs, and `examples/`. The full file list is the manifest
 [references/source-ownership.tsv](references/source-ownership.tsv).
@@ -147,11 +148,13 @@ an application copies its `src/` and `config/` as a model and writes its own boo
 | How does the agent work without the owner? Delegation, schedules and their fire contract, eligibility, mandates, the supervisor, owner reports | `ddd-module-agents-autonomy-specialist` |
 | How do the decision layer and the guards work? Decision sites, injection screening, owner consent, circuit breaker | `ddd-module-agents-decisions-and-guards-specialist` |
 | How do I watch, debug, record and replay, and evaluate a run? A turn that never answers, diagnostics, trace and turn events | `ddd-module-agents-observability-specialist` |
+| How does the owner talk to the agent, and how does the agent ring the owner? The optional voice channel: its switch and suggested library, calls and their store, admission, the session worker and its transports, the routes, the ring, the admin list of calls | `ddd-module-agents-voice-specialist` |
 
 A topic two skills touch has one owner: firing schedules and eligibility are explained in the autonomy skill (here:
 the command and its cron line only); parallel tool calls in child processes in the tools skill (here: the package's
 child-process command and the host's console script); a turn that never answers in the observability skill (here:
-the recovery commands).
+the recovery commands); a voice call a dead worker left running in the voice skill (here: the reap command that
+closes it).
 
 ## Task or symptom → reference
 
@@ -197,7 +200,7 @@ with the same name.
 | `app:agent:turn-events-purge` | deletes turn events older than `--days` (default 180), then the snapshots no event references | daily | yes |
 | `app:agent:close-schedules-for-inactive-agent-spaces` | the schedule state sweep: closes, pauses or re-arms schedules whose space or account changed its automation state | hourly | yes |
 | `app:agent:deliver-owed-reports-and-resume-owed-turns` | delivers owed reports late, resumes owed turns and inbound messages left idle; override points for the host's own passes | every five minutes | yes |
-| `app:agent:reap` | wakes or expires runs whose worker died, times out sub-agent groups, wakes parents of settled groups, settles purposed conversations closed without an owner turn, re-sends lost run-end notifications | every five minutes | yes |
+| `app:agent:reap` | wakes or expires runs whose worker died, times out sub-agent groups, closes voice calls a dead worker left running (only while voice is switched on), wakes parents of settled groups, settles purposed conversations closed without an owner turn, re-sends lost run-end notifications | every five minutes | yes |
 | `app:agent:chat` | the console chat with the agent (ephemeral or stored, `--conversationId` resumes, turns file, slash commands); `--record-run-for-comparison` / `--replay-run-and-compare` record a run and compare a replay with it (observability skill, console-commands reference) | no | yes (makes model calls) |
 | `app:agent:chat-tui` | the full-screen chat (suggested `php-tui/php-tui`; without it one line names the library) | no | yes (makes model calls) |
 | `app:agent:inspect` | prints one conversation: header, summary, transcript, request snapshots | no | no |

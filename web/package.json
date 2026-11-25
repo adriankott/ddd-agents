@@ -82,6 +82,14 @@
       "types": "./dist/types/entries/ui.d.ts",
       "import": "./dist/ui.js"
     },
+    "./voice": {
+      "types": "./dist/types/entries/voice.d.ts",
+      "import": "./dist/voice.js"
+    },
+    "./voice/admin": {
+      "types": "./dist/types/entries/voice-admin.d.ts",
+      "import": "./dist/voice-admin.js"
+    },
     "./styles.css": "./dist/styles.css",
     "./kit/ComposedViewConversationWidget.md": "./dist/files/kit/ComposedViewConversationWidget.md",
     "./widgets/ClockConversationWidget/ClockConversationWidget.md": "./dist/files/widgets/ClockConversationWidget/ClockConversationWidget.md",
@@ -159,6 +167,7 @@
   "files": [
     "dist",
     "public-api.json",
+    "boundary.json",
     "README.md",
     "LICENSE"
   ],
@@ -173,11 +182,14 @@
     "node": ">=20"
   },
   "peerDependencies": {
+    "@mgamadeus/ddd-admin-ui": ">=0.7.0 <1",
+    "@mgamadeus/ddd-web": ">=0.13.0 <1",
     "@types/google.maps": "^3.55.0",
     "apexcharts": "^3.41.0",
     "dompurify": "^3.4.0",
     "highlight.js": "^11.12.0",
     "katex": "^0.19.0",
+    "lucide-react": ">=0.550.0 <2",
     "mermaid": "^12.2.0",
     "react": "^19.2.0",
     "react-apexcharts": ">=1.4.0 <1.6.0",
@@ -189,7 +201,20 @@
     "unified": "^11.0.5",
     "unist-util-visit": "^5.0.0"
   },
+  "peerDependenciesMeta": {
+    "@mgamadeus/ddd-admin-ui": {
+      "optional": true
+    },
+    "@mgamadeus/ddd-web": {
+      "optional": true
+    },
+    "lucide-react": {
+      "optional": true
+    }
+  },
   "devDependencies": {
+    "@mgamadeus/ddd-admin-ui": "^0.8.2",
+    "@mgamadeus/ddd-web": "^0.17.0",
     "@reduxjs/toolkit": "1.9.7",
     "@testing-library/dom": "10.4.0",
     "@testing-library/jest-dom": "6.9.1",
@@ -203,6 +228,7 @@
     "highlight.js": "^11.12.0",
     "jsdom": "29.1.1",
     "katex": "^0.19.0",
+    "lucide-react": "^1.55.0",
     "mdast-util-directive": "3.1.0",
     "mermaid": "^12.2.0",
     "react": "^19.2.0",

@@ -362,8 +362,7 @@ trait AgentConversationControllerHooksTrait
             return;
         }
         try {
-            /** @var AgentClientPresenceService $agentClientPresenceService */
-            $agentClientPresenceService = DDDService::instance()->getService(AgentClientPresenceService::class);
+            $agentClientPresenceService = $this->getAgentClientPresenceService();
             $agentClientPresenceService->recordClientStatement(
                 (int)($conversation->rootConversationId ?? $conversation->id),
                 (int)($conversation->accountId ?? 0),
@@ -374,6 +373,35 @@ trait AgentConversationControllerHooksTrait
         } catch (Throwable $throwable) {
             DDDService::instance()->getLogger()->warning('[AgentUI] client statement skipped', ['conversationId' => $conversation->id, 'reason' => $throwable->getMessage()]);
         }
+    }
+
+    /**
+     * Records the statement of a client that repeats the account-level realtime read without showing a conversation:
+     * only that a client of account `$accountId` is there
+     * ({@see AgentClientPresenceService::recordClientStatementWithoutConversation()}, shared cache, no table), so the
+     * realtime port counts it as listening for the account audience and a message to the account's clients (a call's
+     * ring) is sent while only such a client is open. A read that states no client id states nothing. Never fails the
+     * read it rides on: a missing cache, a refused write or a bad value is logged and skipped.
+     */
+    protected function stampUIClientOfAccount(int $accountId, ?string $clientId): void
+    {
+        if ($clientId === null || $clientId === '') {
+            return;
+        }
+        try {
+            $agentClientPresenceService = $this->getAgentClientPresenceService();
+            $agentClientPresenceService->recordClientStatementWithoutConversation($accountId, $clientId);
+        } catch (Throwable $throwable) {
+            DDDService::instance()->getLogger()->warning('[AgentUI] client statement skipped', ['accountId' => $accountId, 'reason' => $throwable->getMessage()]);
+        }
+    }
+
+    /** The presence of the user's clients the reads and sends of the traits state into (from the container) */
+    protected function getAgentClientPresenceService(): AgentClientPresenceService
+    {
+        /** @var AgentClientPresenceService $agentClientPresenceService */
+        $agentClientPresenceService = DDDService::instance()->getService(AgentClientPresenceService::class);
+        return $agentClientPresenceService;
     }
 
     /**

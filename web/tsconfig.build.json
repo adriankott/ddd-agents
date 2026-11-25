@@ -30,6 +30,8 @@
     "src/entries/preview.ts",
     "src/entries/ui.ts",
     "src/entries/image-render.ts",
-    "src/entries/provider.ts"
+    "src/entries/provider.ts",
+    "src/entries/voice.ts",
+    "src/entries/voice-admin.ts"
   ]
 }

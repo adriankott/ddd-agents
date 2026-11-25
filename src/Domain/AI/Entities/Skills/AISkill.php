@@ -78,6 +78,12 @@ class AISkill extends Entity
     // client executes the requests (client tool request channel).
     public const string AGENT_UI = 'Agent.UI';
 
+    // VOICE CALLS between the agent and the owner in the application's window: calling the owner now (the app rings
+    // on every open client of the owner), the calls ringing or running, ending one, the call log. Offered only while
+    // the voice channel can run (AI.agentVoice.enabled, and the session worker's WebSocket library is installed). A
+    // TIMED call is a task of Agent.Tasks whose text says to call.
+    public const string AGENT_VOICE = 'Agent.Voice';
+
     // ===== Core's features, shipped with this package (provider `ddd.`; platform operators only) =====
 
     // Platform health at a glance: workers, crons, error groups and the application's sections; parent of the three.

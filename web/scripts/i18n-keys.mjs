@@ -15,6 +15,12 @@
 //     literal, both sides of a condition, the elements of an array.
 // A text that reaches the translate function another way is wrapped in `textKey("…")` (`src/provider/text-key.ts`).
 //
+// The admin screens (`src/voice/admin/`) stand on the blocks of `@mgamadeus/ddd-admin-ui`, whose status maps, filters
+// and badges translate through that package's own text store. In a file that imports from its `i18n` entry a key is
+// the first argument of the marker `m(…)` and of the `t(…)` that `useTranslate()` hands out, its context the `context`
+// of the options object beside it. Such a key is listed here like every other, with its contexts; `usedIn` tells which
+// store asks for it.
+//
 // Usage: node scripts/i18n-keys.mjs           (prints the manifest)
 //        node scripts/i18n-keys.mjs --write   (writes src/i18n-keys.json)
 //        node scripts/i18n-keys.mjs --check   (fails when src/i18n-keys.json is not what the sources give)
@@ -38,6 +44,8 @@ const PROP_TRANSLATING_COMPONENTS = {
   TextInput: ["label"],
   TextArea: ["label"],
 };
+/** The text entry of the admin UI package: its marker `m` and the `t` of its `useTranslate()` carry text keys. */
+const ADMIN_UI_I18N_MODULE = "@mgamadeus/ddd-admin-ui/i18n";
 const SKIPPED_FILE = /(?:^|[./_-])(?:spec|test|stories|story)\.|spec-helper|story-helper|\.d\.ts$|\/client\/testing\//;
 const RESOLVE_DEPTH = 4;
 
@@ -121,6 +129,29 @@ const extractKeysOfFile = (ast) => {
     }
   });
 
+  // The names this file calls the admin UI's text functions by: the imported marker `m`, and the `t` destructured from
+  // a `useTranslate()` call. Both take `(key, { context })`.
+  const adminUiTextFunctions = new Set();
+  const adminUiTranslateHooks = new Set();
+  walk(ast, (node) => {
+    if (node.type !== "ImportDeclaration" || node.source?.value !== ADMIN_UI_I18N_MODULE) return;
+    for (const specifier of node.specifiers) {
+      if (specifier.type !== "ImportSpecifier") continue;
+      if (specifier.imported?.name === "m") adminUiTextFunctions.add(specifier.local.name);
+      if (specifier.imported?.name === "useTranslate") adminUiTranslateHooks.add(specifier.local.name);
+    }
+  });
+  walk(ast, (node) => {
+    if (node.type !== "VariableDeclarator" || node.id?.type !== "ObjectPattern") return;
+    if (node.init?.type !== "CallExpression" || node.init.callee.type !== "Identifier") return;
+    if (!adminUiTranslateHooks.has(node.init.callee.name)) return;
+    for (const property of node.id.properties) {
+      if (property.type === "Property" && readPropertyName(property) === "t" && property.value?.type === "Identifier") {
+        adminUiTextFunctions.add(property.value.name);
+      }
+    }
+  });
+
   const found = [];
   /** The strings an expression can be, following variables. */
   const collectStrings = (node, isResolved, depth, sink) => {
@@ -177,6 +208,11 @@ const extractKeysOfFile = (ast) => {
   walk(ast, (node) => {
     if (node.type !== "CallExpression") return;
     const { callee } = node;
+    if (callee.type === "Identifier" && adminUiTextFunctions.has(callee.name)) {
+      // `t(key, { context })` and `m(key, { context })` of the admin UI.
+      addKeys(node.arguments[0], readJsxProps(node.arguments[1]).get("context"));
+      return;
+    }
     const isTranslateCall =
       (callee.type === "Identifier" && TRANSLATE_FUNCTIONS.has(callee.name)) ||
       (callee.type === "MemberExpression" && !callee.computed && callee.property?.name === "translate");
@@ -208,7 +244,7 @@ export const buildI18nKeysManifest = async (sourceDir = path.join(packageDir, "s
   const entriesByKey = new Map();
   for (const file of readSourceFiles(sourceDir)) {
     const code = fs.readFileSync(path.join(sourceDir, file), "utf-8");
-    if (!/translate|textKey|<[A-Z]/.test(code)) continue;
+    if (!/translate|textKey|<[A-Z]/.test(code) && !code.includes(ADMIN_UI_I18N_MODULE)) continue;
     const transformed = await transformWithEsbuild(code, file, {
       loader: file.endsWith(".tsx") ? "tsx" : "ts",
       jsx: "transform",

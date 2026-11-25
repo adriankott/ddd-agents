@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 import { AGENTS_CLIENT_CONTEXT_LIMITS, AgentsClientError } from "../../contract/conversation";
 import { mapClientContextToWire } from "./agents-http-mappers";
+import { createAccountRealtimePoll } from "../../ui/account-realtime";
 import { createAgentsHttpConversationClient, type AgentsHttpConversationClientOptions } from "./createAgentsHttpConversationClient";
 
 /**
@@ -434,3 +435,99 @@ describe("createAgentsHttpConversationClient", () => {
     expect(onSignal).toHaveBeenCalledWith({ changeCounter: 0, lastMessageId: 41, runStatus: "idle", summaryUpdatedAt: 0 });
   });
 });
+
+describe("the client id of the account read", () => {
+  const boundUIClient = () => ({ clientId: "client-a", readUIState: () => null, acceptClientToolRequest: vi.fn() });
+  const accountReadClientIdOf = (request: RecordedRequest) => {
+    expect(request.url.pathname).toBe("/api/agents/conversations/realtimeMessages");
+    return request.url.searchParams.get("clientId");
+  };
+
+  test("is the bound UI client's id", async () => {
+    const { client, requests } = buildClient([], { uiClient: boundUIClient() });
+    await client.getAccountRealtimeMessages?.();
+    await client.getAccountRealtimeMessages?.("");
+
+    expect(requests.map(accountReadClientIdOf)).toEqual(["client-a", "client-a"]);
+  });
+
+  test("without a UI client is an id the client creates once and keeps; another client instance creates another", async () => {
+    const { client, requests } = buildClient([]);
+    const { client: otherClient, requests: otherRequests } = buildClient([]);
+    await client.getAccountRealtimeMessages?.();
+    await client.getAccountRealtimeMessages?.();
+    await otherClient.getAccountRealtimeMessages?.();
+
+    const [firstId, secondId] = requests.map(accountReadClientIdOf);
+    const otherId = accountReadClientIdOf(otherRequests[0]);
+    expect(firstId).toMatch(/^ui-.+/);
+    expect(secondId).toBe(firstId);
+    expect(otherId).toMatch(/^ui-.+/);
+    expect(otherId).not.toBe(firstId);
+  });
+
+  test("is the id the caller hands in, over the bound UI client's and over the created one; an empty id counts as none", async () => {
+    const bound = buildClient([], { uiClient: boundUIClient() });
+    await bound.client.getAccountRealtimeMessages?.("client-given");
+
+    const unbound = buildClient([]);
+    await unbound.client.getAccountRealtimeMessages?.();
+    await unbound.client.getAccountRealtimeMessages?.("client-given");
+    await unbound.client.getAccountRealtimeMessages?.("");
+
+    expect(accountReadClientIdOf(bound.requests[0])).toBe("client-given");
+    const [createdId, givenId, emptyId] = unbound.requests.map(accountReadClientIdOf);
+    expect(givenId).toBe("client-given");
+    expect(createdId).toMatch(/^ui-.+/);
+    expect(emptyId).toBe(createdId);
+  });
+
+  test("is the poll's clientId option, which the poll hands to the read", async () => {
+    vi.useFakeTimers();
+    try {
+      const { client, requests } = buildClient([], { uiClient: boundUIClient() });
+      const readAccountRealtime = client.getAccountRealtimeMessages;
+      if (readAccountRealtime === undefined) throw new Error("the HTTP client has no account read");
+      const poll = createAccountRealtimePoll({ readAccountRealtime, clientId: "client-of-the-poll", isTransportBound: () => true });
+      await vi.advanceTimersByTimeAsync(0);
+      await poll.readNow();
+      poll.stop();
+
+      expect(requests.map(accountReadClientIdOf)).toEqual(["client-of-the-poll", "client-of-the-poll"]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("does not reach the conversation routes without a UI client, also after the account read created it", async () => {
+    const { client, requests } = buildClient([
+      { body: {} },
+      { body: { id: 7, runState: "IDLE", lastMessageId: 41, title: null, summary: null, updated: "u" } },
+      { body: { aiConversation: { id: 7 } } },
+      { body: { messages: { elements: [] }, hasMoreOlder: false } },
+      { body: { aiConversation: { id: 7, messages: [] } } },
+      { body: {} },
+    ]);
+    await client.getAccountRealtimeMessages?.();
+    await client.getConversationRunState?.(7);
+    await client.getConversationMetadata(7);
+    await client.getNewestMessagesPage(7, 20);
+    await client.postMessage(7, { text: "x" });
+    await client.injectSignal(7, { text: "Opened the ticket" });
+
+    expect(accountReadClientIdOf(requests[0])).toMatch(/^ui-.+/);
+    for (const request of requests.slice(1)) {
+      expect(request.url.searchParams.has("clientId"), request.url.pathname).toBe(false);
+      expect(JSON.stringify(request.body ?? {}), request.url.pathname).not.toContain("clientId");
+    }
+    expect(requests).toHaveLength(6);
+  });
+
+  test("reaches the wrapped client through the polling default", async () => {
+    const { client, requests } = buildClient([], { polling: { documentVisibility: null } });
+    await client.getAccountRealtimeMessages?.("client-given");
+
+    expect(accountReadClientIdOf(requests[0])).toBe("client-given");
+  });
+});
+

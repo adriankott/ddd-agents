@@ -13,6 +13,9 @@ use DDD\Domain\Base\Entities\ValueObject;
  * ({@see \DDD\Domain\AI\Services\ClientTools\AgentClientPresenceService}), never in a table. A client counts as present
  * while its statement is fresh ({@see self::isFresh()}); a client tool request goes to one of them, and the newest
  * one's UI state is the `[SIGNAL:ui]` note of the model.
+ *
+ * A client that shows no conversation states only that it is there, with its account-level realtime read: its
+ * statement carries the account, the client id and the time, and `conversationId` 0.
  */
 class AgentClientPresence extends ValueObject
 {

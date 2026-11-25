@@ -2,12 +2,12 @@
 
 **Reader:** package maintainer
 
-Contents: why a manifest · the format · first match wins · the nine skill ids · how the check reads it · the
+Contents: why a manifest · the format · first match wins · the ten skill ids · how the check reads it · the
 maintenance rule · changing the manifest.
 
 ## Why a manifest
 
-The package's developer knowledge is cut like its code: nine skills, each explaining one part. Several folders mix
+The package's developer knowledge is cut like its code: ten skills, each explaining one part. Several folders mix
 parts (the agent entity folder, the agent service folder, the top-level conversation services), so a folder cannot be
 the unit. `source-ownership.tsv`, next to this file, gives **every file under `src/` and `config/` exactly one owning
 skill**. It is the single input of the ownership check, of the framework's skill gate for this module and of a host's
@@ -39,14 +39,15 @@ A pattern is anchored at both ends: it matches the whole path, never a part of i
 
 The rules are read top to bottom; the first rule whose pattern matches a file owns it. Every named exception therefore
 stands **above** the folder pattern it pierces. The groups are ordered so that the skills whose classes sit inside
-mixed folders come first (observability, decisions and guards, autonomy, widgets, skills and purposes, context,
-tools, entry) and the loop, the default owner of the mixed loop folders, comes last.
+mixed folders come first (voice, whose `Voice/` folders lie below every layer, then observability, decisions and
+guards, autonomy, widgets, skills and purposes, context, tools, entry) and the loop, the default owner of the mixed
+loop folders, comes last.
 
 Example: `config/app/AI/agentToolCallChildProcess.php` matches the tools rule
 `config/app/AI/agentToolCallChildProcess.php` and the entry rule `config/app/AI/agent*.php`; the tools rule stands
 higher, so the tools skill owns it.
 
-## The nine skill ids
+## The ten skill ids
 
 | Id | Skill |
 |---|---|
@@ -59,6 +60,7 @@ higher, so the tools skill owns it.
 | "autonomy" | `ddd-module-agents-autonomy-specialist` |
 | "decisions-and-guards" | `ddd-module-agents-decisions-and-guards-specialist` |
 | "observability" | `ddd-module-agents-observability-specialist` |
+| "voice" | `ddd-module-agents-voice-specialist` |
 
 An unknown id in the second field is a format error.
 

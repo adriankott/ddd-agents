@@ -34,6 +34,7 @@ class DeveloperSkillFiles
         'autonomy' => 'ddd-module-agents-autonomy-specialist',
         'decisions-and-guards' => 'ddd-module-agents-decisions-and-guards-specialist',
         'observability' => 'ddd-module-agents-observability-specialist',
+        'voice' => 'ddd-module-agents-voice-specialist',
     ];
 
     /** Path of the ownership manifest inside the entry skill */

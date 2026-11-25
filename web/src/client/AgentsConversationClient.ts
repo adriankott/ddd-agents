@@ -54,8 +54,11 @@ export interface AgentsConversationClient {
    * The account-level realtime read of the signed-in account: the open realtime messages addressed to the account
    * (not to a conversation; for every client of the account or this one) and the listener credential without a
    * conversation. Optional: `createAccountRealtimePoll` (`/ui`) polls it for a client that shows no conversation.
+   * The read states a client id, by which the server knows a client that only polls: `clientId` when the caller
+   * hands one in (the `clientId` option of the poll), else the binding's own (the HTTP binding: its `uiClient`'s,
+   * else one it creates once and keeps while it lives).
    */
-  getAccountRealtimeMessages?: () => Promise<AccountRealtimeRead>;
+  getAccountRealtimeMessages?: (clientId?: string) => Promise<AccountRealtimeRead>;
 
   /** The newest page, each message with its delegated children's `{ id, runState }`. */
   getNewestMessagesPage: (conversationId: number, pageSize: number) => Promise<ConversationMessagesPage>;

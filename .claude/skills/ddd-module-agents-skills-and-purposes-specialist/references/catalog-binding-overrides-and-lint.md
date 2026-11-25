@@ -102,7 +102,8 @@ test can pin the host's intended overrides.
 ## Skill name constants
 
 `AISkill` carries constants for the names the package knows. With a file and a package: `Agent.Mandates`,
-`Agent.Tasks`, `Agent.TaskRunReports`, `Agent.Memory`, `Agent.Images`, `Agent.Web.Search`, `Agent.UI`, `System.Health`,
+`Agent.Tasks`, `Agent.TaskRunReports`, `Agent.Memory`, `Agent.Images`, `Agent.Web.Search`, `Agent.UI`, `Agent.Voice`
+(offered only while the voice channel can run), `System.Health`,
 `System.Issues`, `System.Workers`, `System.Crons`. Names a host fills with its own file and package:
 `Agent.Settings`, `Agent.Budget`, `Agent.Web.Images`, `Agent.Communication.Messages`,
 `Agent.Communication.VoiceCalls`, `Money.CurrencyConversion`; package code reads only

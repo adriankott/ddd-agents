@@ -2,6 +2,14 @@
 # First match wins. '**/' = zero or more path segments, '**' at the end = anything, '*' = anything but '/'.
 # The groups are ordered so that every named exception stands above the folder pattern it pierces: the skills whose
 # classes sit inside mixed folders come first, the loop (the default of the mixed loop folders) comes last.
+# voice (ddd-module-agents-voice-specialist): the voice channel; its Voice folders pierce the trace-event, installation, API, MCP, skill and config rules below, the enum of the call's signal sources pierces the widgets' signal source folder
+src/Domain/AI/**/Voice/**	voice
+src/Presentation/**/Voice/**	voice
+config/app/AI/agentVoice.php	voice
+config/app/AI/Prompts/AI/Voice/**	voice
+config/app/AI/Prompts/AI/VoiceCalls.md	voice
+config/app/AI/Skills/Agent/Voice.md	voice
+src/Domain/AI/Entities/Conversations/SignalSources/PhoneConversationSignalSource.php	voice
 # observability (ddd-module-agents-observability-specialist): watch, debug, record and replay, evaluate a run
 src/Domain/AI/Entities/Conversations/AIConversationDrive*	observability
 src/Domain/AI/Entities/Conversations/Agent/AgentEvalResult.php	observability

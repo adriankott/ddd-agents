@@ -503,7 +503,10 @@ trait AgentConversationReadsTrait
      * while no transport is bound: the open messages of the realtime port addressed to the account
      * ({@see \DDD\Domain\AI\Entities\Conversations\Realtime\AgentRealtimeAudience::forAccount()}; for every client of
      * the account or the reading `clientId`; expired ones left out) and the listener credential without a conversation.
-     * The same gate and delivery as the run-state read; a message of another account is never read.
+     * The same gate and delivery as the run-state read; a message of another account is never read. A read that states
+     * its `clientId` (the query parameter of the run-state read) also states that client's presence for the account
+     * ({@see self::stampUIClientOfAccount()}), so a message to the account's clients is sent while only a polling
+     * client is open; a read without one states nothing.
      *
      * @param AgentAccountRealtimeMessagesGetRequestDto $requestDto
      * @return AgentAccountRealtimeMessagesGetResponseDto
@@ -528,6 +531,7 @@ trait AgentConversationReadsTrait
             throw new ForbiddenException('No authenticated account');
         }
         $accountId = (int)$authAccount->id;
+        $this->stampUIClientOfAccount($accountId, $requestDto->clientId ?? null);
         $responseDto = new AgentAccountRealtimeMessagesGetResponseDto();
         $responseDto->realtimeMessages = $this->findRealtimeMessageDeliveriesOfAccountClient($accountId, $requestDto->clientId ?? null);
         $responseDto->realtimeListenerCredential = $this->findRealtimeListenerCredentialOfAccount($accountId);

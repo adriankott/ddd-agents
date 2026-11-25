@@ -4,16 +4,17 @@ declare(strict_types=1);
 
 namespace DDD\Tests\Agents\Domain\AI\Services\Installation;
 
+use DDD\Domain\AI\Entities\AgentSpaces\AgentSpace;
 use DDD\Domain\AI\Entities\Conversations\Entitlements\AgentAccountRights;
 use DDD\Domain\AI\Entities\Conversations\Entitlements\AgentRoleMappedAccountRights;
-use DDD\Domain\AI\Entities\Installation\AgentInstallationFinding;
-use DDD\Domain\AI\Entities\Installation\AgentInstallationFindings;
-use DDD\Domain\AI\Entities\AgentSpaces\AgentSpace;
 use DDD\Domain\AI\Entities\Installation\AgentFeatureTableCondition;
 use DDD\Domain\AI\Entities\Installation\AgentFeatureTableConditions;
+use DDD\Domain\AI\Entities\Installation\AgentInstallationFinding;
+use DDD\Domain\AI\Entities\Installation\AgentInstallationFindings;
 use DDD\Domain\AI\Entities\Installation\AgentPackageRenames;
 use DDD\Domain\AI\Entities\Mandates\AgentMandate;
 use DDD\Domain\AI\Entities\Skills\AISkill;
+use DDD\Domain\AI\Entities\Voice\AgentVoiceAccountRights;
 use DDD\Domain\AI\Services\Installation\AgentInstallationCheckService;
 use DDD\Domain\Common\Entities\Roles\Role;
 use DDD\Infrastructure\Libs\Config;
@@ -21,6 +22,7 @@ use DDD\Presentation\Mcp\Client\Agents\AgentTaskSchedulesMCPPackage;
 use DDD\Presentation\Mcp\Client\Agents\WebSearchMCPPackage;
 use DDD\Symfony\Commands\Agents\AgentCheckInstallationCommand;
 use DDD\Tests\Agents\Support\UnitTestCase;
+use DDD\Tests\Agents\Voice\Support\AgentVoiceTestConfiguration;
 use ReflectionProperty;
 use Symfony\Component\Console\Application;
 
@@ -114,6 +116,19 @@ class AgentInstallationCheckServiceTest extends UnitTestCase
         self::assertNotContains(AgentAccountRights::USE_UI, $reportedRightNames, 'an accepted right is not reported');
         self::assertSame(0, $findings->countBlockingFindings());
         self::assertStringContainsString("unless the application's rights object holds it", $findings->getElements()[0]->message);
+    }
+
+    public function testARightOnlyTheToolsOfASwitchedOffFeatureRequireIsReportedOnceTheFeatureIsSwitchedOn(): void
+    {
+        $reportedWhileVoiceIsOff = $this->runOnlyCheck(AgentInstallationCheckService::CHECK_RIGHTS_HELD_BY_NOBODY)->getSubjects();
+
+        self::assertNotContains(AgentVoiceAccountRights::USE_VOICE, $reportedWhileVoiceIsOff, 'no tool of a switched-off feature is offered: its right needs no holder');
+
+        AgentVoiceTestConfiguration::declareAgentVoiceConfiguration(AgentVoiceTestConfiguration::buildSwitchedOnConfiguration());
+        $findingsWhileVoiceIsOn = $this->runOnlyCheck(AgentInstallationCheckService::CHECK_RIGHTS_HELD_BY_NOBODY);
+
+        self::assertSame([AgentVoiceAccountRights::USE_VOICE], $findingsWhileVoiceIsOn->getSubjects(), 'the default mapping names every other right; nobody holds the voice right until the application maps it');
+        self::assertSame(0, $findingsWhileVoiceIsOn->countBlockingFindings());
     }
 
     public function testAnApplicationRightsObjectWithoutAMappingOfItsOwnNamesThePackageRightsHeldByNobody(): void

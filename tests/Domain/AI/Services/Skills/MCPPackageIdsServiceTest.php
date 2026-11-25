@@ -18,6 +18,7 @@ use DDD\Presentation\Mcp\Admin\System\SystemHealthMCPPackage;
 use DDD\Presentation\Mcp\Admin\System\SystemIssuesMCPPackage;
 use DDD\Presentation\Mcp\Admin\System\SystemWorkersMCPPackage;
 use DDD\Presentation\Mcp\Client\Agents\WebSearchMCPPackage;
+use DDD\Presentation\Mcp\Client\Voice\AgentVoiceCallsMCPPackage;
 use LogicException;
 use PHPUnit\Framework\TestCase;
 
@@ -72,6 +73,7 @@ class MCPPackageIdsServiceTest extends TestCase
                 AISkill::AGENT_IMAGES => [AgentImagesMCPPackage::class],
                 AISkill::AGENT_WEB_SEARCH => [WebSearchMCPPackage::class],
                 AISkill::AGENT_UI => [AgentUIMCPPackage::class, AgentUIWindowMCPPackage::class],
+                AISkill::AGENT_VOICE => [AgentVoiceCallsMCPPackage::class],
                 AISkill::SYSTEM_HEALTH => [SystemHealthMCPPackage::class],
                 AISkill::SYSTEM_ISSUES => [SystemIssuesMCPPackage::class],
                 AISkill::SYSTEM_WORKERS => [SystemWorkersMCPPackage::class],

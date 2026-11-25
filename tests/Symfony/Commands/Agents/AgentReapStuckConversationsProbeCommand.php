@@ -8,14 +8,15 @@ use DDD\Domain\AI\Services\Conversations\Agent\AIConversationDelegationNotificat
 use DDD\Domain\AI\Services\Conversations\AIConversationAgentService;
 use DDD\Domain\AI\Services\Conversations\AIConversationDelegationBatchesService;
 use DDD\Domain\AI\Services\Conversations\AIConversationsService;
+use DDD\Domain\AI\Services\Voice\AgentVoiceCallsService;
 use DDD\Symfony\Commands\Agents\AgentReapStuckConversationsCommand;
 use RuntimeException;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
  * The reaper with its services handed in and its dispatch recorded instead of sent: the methods overridden are the
- * command's own accessors, its dispatch and the application's channel-session hook (which records its turn in the
- * pass log, or throws when the test asks for it).
+ * command's own accessors, its dispatch and the channel-session hook (which records its turn in the pass log, throws
+ * when the test asks for it, and then runs the module's own sweep as an application's override does).
  */
 class AgentReapStuckConversationsProbeCommand extends AgentReapStuckConversationsCommand
 {
@@ -28,6 +29,9 @@ class AgentReapStuckConversationsProbeCommand extends AgentReapStuckConversation
 
     /** @var string[] The purposes the settle pass sweeps */
     public array $purposeNamesClosedWithoutAnOwnerTurn = [];
+
+    /** @var AgentVoiceCallsService|null The voice calls service of the stale voice-call sweep; null = the container's */
+    public ?AgentVoiceCallsService $agentVoiceCallsServiceDouble = null;
 
     public function __construct(
         protected RecoveryPassLog $recoveryPassLog,
@@ -45,6 +49,12 @@ class AgentReapStuckConversationsProbeCommand extends AgentReapStuckConversation
         if ($this->channelSessionsSweepThrows) {
             throw new RuntimeException(self::CHANNEL_SESSIONS_FAILURE_MESSAGE);
         }
+        parent::closeStaleChannelSessions($aIConversationsService, $output);
+    }
+
+    protected function getAgentVoiceCallsService(): AgentVoiceCallsService
+    {
+        return $this->agentVoiceCallsServiceDouble ?? parent::getAgentVoiceCallsService();
     }
 
     protected function dispatchResumeOfConversation(int $conversationId): void

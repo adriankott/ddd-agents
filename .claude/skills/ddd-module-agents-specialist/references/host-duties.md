@@ -61,7 +61,7 @@ registers its cron line. Every row that names no package command is a duty of th
 | An admin endpoint or panel for the control panel and the decision statistics | the read services exist, no route | optional (needed to watch the fleet) | `ddd-module-agents-observability-specialist`, `ddd-module-agents-decisions-and-guards-specialist` |
 | Send a report by e-mail; write a quality scorecard | package defaults do nothing | optional, by same-path subclass | [override-points.md](override-points.md) |
 | Recover a failed settled-turn listener | exceptions are swallowed | the host's own duty when it registers one | [override-points.md](override-points.md) |
-| Agent skills for tasks and schedules, settings, budget, memory, web, messages, voice | names declared, two skill files ship | the host writes its own | `ddd-module-agents-skills-and-purposes-specialist` |
+| Agent skills for tasks and schedules, settings, budget, memory, web, messages | names declared, two skill files ship | the host writes its own | `ddd-module-agents-skills-and-purposes-specialist` |
 | Tools that create, change or delete a schedule | the scheduled-run purpose names them, none ships | the host writes them | `ddd-module-agents-autonomy-specialist` |
 | Evaluation runner, judge, suite | only the safety guard and recorded runs ship | the host builds | `ddd-module-agents-observability-specialist` |
 | Frontend | the web part of the package is a placeholder | not yet | `ddd-module-agents-widgets-specialist` (wire contract) |
@@ -165,7 +165,7 @@ answers": `ddd-module-agents-observability-specialist`.
 
 | | |
 |---|---|
-| Command | `AgentReapStuckConversationsCommand`, `app:agent:reap` (package); override point `closeStaleChannelSessions()` (runs between the group timeouts and the settle pass) |
+| Command | `AgentReapStuckConversationsCommand`, `app:agent:reap` (package); override point `closeStaleChannelSessions()` (runs between the group timeouts and the settle pass; its default closes the voice calls a dead worker left running while `AI.agentVoice.enabled` is on, so an override calls the parent: `ddd-module-agents-voice-specialist`) |
 | When | every five minutes (the hung threshold `AIConversationRunClaimsService::RUN_HUNG_AFTER_SECONDS` is 300 s) |
 | Calls | `AIConversationsService::expireStuckConversationsPastMaxAge()`, `findStuckConversationIds()` (each: a fresh `AIConversationResumeMessage` dispatched as the conversation's account); `AIConversationDelegationBatchesService::findTimedOutUnfinishedBatchIds()` and `timeoutBatch()` (wake the returned parent); `AIConversationPurpose::getPurposeNamesClosedWithoutAnOwnerTurn()` with `findQuietIdlePurposedConversationIds()` and `AIConversationAgentService::settlePurposeConversationIfGoalReached()`; `findParentConversationIdsWithUnreadChildResults()` (wake each); `findEndedUnreportedSubAgentRunDeadlineIds()` with `AIConversationDelegationNotificationsService::notifyParentOfSubAgentRunEndOfDeadline()` |
 | Account | the conversation's own account per dispatch; for a batch or a deadline its parent's |

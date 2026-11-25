@@ -1,0 +1,136 @@
+/*
+ * The incoming call: top centre, over every page. Custom properties, each read with its default:
+ *
+ *   --agents-voice-incoming-call-top, --agents-voice-incoming-call-z-index
+ *   --agents-voice-card-surface, --agents-voice-card-text, --agents-voice-card-action-surface,
+ *   --agents-voice-card-padding, --agents-voice-card-radius, --agents-voice-card-shadow
+ *   --agents-voice-accept, --agents-voice-on-accept        Accept
+ *   --agents-voice-surface, --agents-voice-on-surface      the mark of the voice chat
+ *   --agents-voice-focus-ring, --agents-voice-font-size, --agents-voice-caption-font-size
+ */
+.incomingCall {
+  position: fixed;
+  top: var(--agents-voice-incoming-call-top, 1.5rem);
+  left: 50%;
+  z-index: var(--agents-voice-incoming-call-z-index, 2147483000);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  max-width: calc(100vw - 2rem);
+  padding: var(--agents-voice-card-padding, 1rem);
+  border-radius: var(--agents-voice-card-radius, 1rem);
+  background: var(--agents-voice-card-surface, #ffffff);
+  color: var(--agents-voice-card-text, #1f2329);
+  box-shadow: var(
+    --agents-voice-card-shadow,
+    0 0.125rem 0.125rem rgba(0, 0, 0, 0.08),
+    0 0.25rem 0.5rem rgba(0, 0, 0, 0.05),
+    0 0.5rem 1.5rem rgba(0, 0, 0, 0.03)
+  );
+  font-size: var(--agents-voice-font-size, 0.875rem);
+  line-height: 1.4;
+  transform: translateX(-50%);
+  animation: incomingCallIn 400ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.spot {
+  flex: none;
+  animation: ringPulse 1.5s ease-in-out infinite;
+}
+
+.mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  background: var(--agents-voice-surface, #00495d);
+  color: var(--agents-voice-on-surface, #ffffff);
+}
+
+.caller {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.label {
+  font-weight: 700;
+}
+
+.detail {
+  font-size: var(--agents-voice-caption-font-size, 0.75rem);
+}
+
+.actions {
+  display: flex;
+  flex: none;
+  gap: 0.5rem;
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  height: 2.5rem;
+  padding: 0 1rem 0 0.75rem;
+  border: none;
+  border-radius: 1.25rem;
+  background: var(--agents-voice-card-action-surface, #f4f5f7);
+  color: inherit;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: transform 150ms ease;
+}
+
+.action[data-variant="accept"] {
+  background: var(--agents-voice-accept, #2563eb);
+  color: var(--agents-voice-on-accept, #ffffff);
+}
+
+.action:active {
+  transform: scale(0.97);
+}
+
+.action:focus-visible {
+  outline: 0.125rem solid var(--agents-voice-focus-ring, #2563eb);
+  outline-offset: 0.125rem;
+}
+
+.action:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+@media (max-width: 480px) {
+  .incomingCall {
+    flex-wrap: wrap;
+  }
+
+  .actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+@keyframes incomingCallIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+}
+
+@keyframes ringPulse {
+  50% {
+    transform: scale(1.08);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .incomingCall,
+  .spot {
+    animation: none;
+  }
+}

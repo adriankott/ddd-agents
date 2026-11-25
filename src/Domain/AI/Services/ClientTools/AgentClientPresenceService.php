@@ -20,6 +20,10 @@ use Throwable;
  * newest statements of the clients of a conversation, and the newest statement per account, live in the shared cache
  * of the realtime channel ({@see AgentRealtimeChannelService::getSharedCache()}) for {@see PRESENCE_TTL_SECONDS}.
  *
+ * A client that shows no conversation states only that it is there, with its account-level realtime read
+ * ({@see recordClientStatementWithoutConversation()}). That statement has a key of its own per account, so it never
+ * replaces what a client that shows a conversation stated; {@see findNewestPresenceOfAccount()} reads both.
+ *
  * A client tool request goes to the client {@see findTargetPresence()} picks; no fresh statement = no client. Without
  * a shared cache nothing is stated and every read answers "no client".
  */
@@ -28,8 +32,11 @@ class AgentClientPresenceService extends Service
     /** @var string The prefix of a conversation's statements */
     public const string CONVERSATION_KEY_PREFIX = 'agent-client-presence-conversation-';
 
-    /** @var string The prefix of an account's newest statement */
+    /** @var string The prefix of an account's newest statement of a client that shows a conversation */
     public const string ACCOUNT_KEY_PREFIX = 'agent-client-presence-account-';
+
+    /** @var string The prefix of an account's newest statement of a client that shows no conversation */
+    public const string ACCOUNT_WITHOUT_CONVERSATION_KEY_PREFIX = 'agent-client-presence-without-conversation-';
 
     /** @var int How long statements are kept after the last one */
     public const int PRESENCE_TTL_SECONDS = 900;
@@ -102,6 +109,45 @@ class AgentClientPresenceService extends Service
         }
     }
 
+    /**
+     * Records that a client of the account is there although it shows no conversation: the statement of the
+     * account-level realtime read. It carries the client id and the time, nothing else, under a key of its own per
+     * account ({@see ACCOUNT_WITHOUT_CONVERSATION_KEY_PREFIX}); the statements of the clients that show a conversation
+     * stay as they are. Written when the account has no such statement yet, or its newest one is at least
+     * {@see STATEMENT_THROTTLE_SECONDS} old, whichever client stated it: a read in between costs one cache read and no
+     * write, however many clients repeat the read (only reads that arrive in the same instant can both write). A
+     * client that repeats the read at least every {@see AgentClientPresence::FRESH_FOR_SECONDS} keeps the statement
+     * fresh. A value that is no client id is ignored. Never throws.
+     *
+     * @param int $accountId the signed-in account that read
+     * @param string|null $clientId the id the reading client states for itself
+     */
+    public function recordClientStatementWithoutConversation(int $accountId, ?string $clientId): void
+    {
+        if ($accountId <= 0 || !AgentClientPresence::isValidClientId($clientId)) {
+            return;
+        }
+        $sharedCache = $this->getSharedCache();
+        if ($sharedCache === null) {
+            return;
+        }
+        try {
+            $now = (new DateTime())->getTimestamp();
+            $statementCacheKey = static::ACCOUNT_WITHOUT_CONVERSATION_KEY_PREFIX . $accountId;
+            $newestStatedPresence = AgentClientPresence::fromCacheEntry($this->readSharedCacheValue($statementCacheKey));
+            if ($newestStatedPresence !== null && $now - $newestStatedPresence->lastSeenAt < static::STATEMENT_THROTTLE_SECONDS) {
+                return;
+            }
+            $agentClientPresence = new AgentClientPresence();
+            $agentClientPresence->accountId = $accountId;
+            $agentClientPresence->clientId = (string)$clientId;
+            $agentClientPresence->lastSeenAt = $now;
+            $sharedCache->set($statementCacheKey, $agentClientPresence->toCacheEntry(), static::PRESENCE_TTL_SECONDS);
+        } catch (Throwable $presenceFailure) {
+            DDDService::instance()->getLogger()->warning('[AgentUI] client statement skipped', ['accountId' => $accountId, 'reason' => $presenceFailure->getMessage()]);
+        }
+    }
+
     /** The stored form of a normalized UI state: one JSON object, the same for the same state */
     public static function encodeUIState(AgentUIState $agentUIState): string
     {
@@ -133,11 +179,21 @@ class AgentClientPresenceService extends Service
         return $this->findPresencesOfConversation($conversationId)->filterFresh(new DateTime())->pickTargetPresence();
     }
 
-    /** The newest statement of any client of the account, when it is fresh */
+    /**
+     * A fresh statement of a client of the account ({@see AgentClientPresence::isFresh()}): the newest one of a client
+     * that shows a conversation, else the newest one of a client that shows none
+     * ({@see recordClientStatementWithoutConversation()}; its `conversationId` is 0); null when neither is fresh.
+     */
     public function findNewestPresenceOfAccount(int $accountId): ?AgentClientPresence
     {
-        $agentClientPresence = AgentClientPresence::fromCacheEntry($this->readSharedCacheValue(static::ACCOUNT_KEY_PREFIX . $accountId));
-        return $agentClientPresence !== null && $agentClientPresence->isFresh(new DateTime()) ? $agentClientPresence : null;
+        $now = new DateTime();
+        foreach ([static::ACCOUNT_KEY_PREFIX, static::ACCOUNT_WITHOUT_CONVERSATION_KEY_PREFIX] as $accountKeyPrefix) {
+            $agentClientPresence = AgentClientPresence::fromCacheEntry($this->readSharedCacheValue($accountKeyPrefix . $accountId));
+            if ($agentClientPresence !== null && $agentClientPresence->isFresh($now)) {
+                return $agentClientPresence;
+            }
+        }
+        return null;
     }
 
     public static function compareNewestFirst(AgentClientPresence $firstPresence, AgentClientPresence $secondPresence): int

@@ -11,11 +11,15 @@ use DDD\Domain\AI\Services\Conversations\Agent\AIConversationDelegationNotificat
 use DDD\Domain\AI\Services\Conversations\AIConversationAgentService;
 use DDD\Domain\AI\Services\Conversations\AIConversationDelegationBatchesService;
 use DDD\Domain\AI\Services\Conversations\AIConversationRunClaimsService;
+use DDD\Domain\AI\Entities\Voice\AgentVoiceConfiguration;
+use DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceCall;
 use DDD\Domain\AI\Services\Conversations\AIConversationsService;
+use DDD\Domain\AI\Services\Voice\AgentVoiceCallsService;
 use DDD\Domain\Common\Entities\Accounts\Account;
 use DDD\Infrastructure\Services\DDDService;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Command\LockableTrait;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -34,9 +38,10 @@ use Throwable;
  * without the bound the cron would wake an unrecoverable conversation forever.
  *
  * The passes, in this order: expiry; stuck conversations; timed-out delegation batches; the stale sessions of the
- * application's own channels ({@see closeStaleChannelSessions()}, nothing in the module); the settle pass over idle
- * purposed conversations whose goal is reached; settled batches whose parent never folded the result; sub-agent runs
- * that ended without their notification. A pass that fails is reported and the next one runs.
+ * channels ({@see closeStaleChannelSessions()}: the voice calls that lost their session worker, while the voice
+ * channel is switched on; an application adds the sessions of its own channels); the settle pass over idle purposed
+ * conversations whose goal is reached; settled batches whose parent never folded the result; sub-agent runs that
+ * ended without their notification. A pass that fails is reported and the next one runs.
  *
  * Every resume carries the conversation's OWN account, so the worker restores the right rights context: the command
  * acts as that account around each dispatch ({@see actAsAccount()}) and skips a conversation whose account it cannot
@@ -53,6 +58,14 @@ use Throwable;
 )]
 class AgentReapStuckConversationsCommand extends AgentConsoleCommand
 {
+    use LockableTrait;
+
+    /**
+     * @var string The lock of the stale voice-call sweep: one sweep at a time, whichever run of the reaper holds it.
+     * The other passes take no lock (each is safe against a second run through its own claim).
+     */
+    public const string STALE_VOICE_CALLS_LOCK_NAME = 'app:agent:reap:stale-voice-calls';
+
     /**
      * @var int A purposed conversation must have been IDLE this long before the settle pass runs its settled-turn close
      * path again — long enough that a turn's own settle (which runs the same path) had its chance.
@@ -160,9 +173,10 @@ class AgentReapStuckConversationsCommand extends AgentConsoleCommand
     }
 
     /**
-     * Closes the stale sessions of the application's own channels (a call whose session worker died, for example):
-     * runs after the batch timeouts and before the settle pass, with the entity rights lifted. A failure that escapes
-     * is reported by the caller and the next pass runs. The default: the module has no channel sessions — nothing.
+     * Closes the stale sessions of the channels: runs after the batch timeouts and before the settle pass, with the
+     * entity rights lifted. A failure that escapes is reported by the caller and the next pass runs. The default: the
+     * voice calls that lost their session worker ({@see closeStaleVoiceCalls()}). An application with channel sessions
+     * of its own closes them in an override that calls the parent.
      *
      * @param AIConversationsService $aIConversationsService
      * @param OutputInterface $output
@@ -171,6 +185,71 @@ class AgentReapStuckConversationsCommand extends AgentConsoleCommand
      */
     protected function closeStaleChannelSessions(AIConversationsService $aIConversationsService, OutputInterface $output): void
     {
+        $this->closeStaleVoiceCalls($output);
+    }
+
+    /**
+     * The sweep of the voice calls that lost their session worker
+     * ({@see AgentVoiceCallsService::closeStaleRunningCalls()}): a call still marked running
+     * {@see AgentVoiceCallsService::getRunningCallStaleAfterMinutes()} minutes after its answer is hung up at its
+     * provider and ended as {@see AgentVoiceCallsService::END_REASON_REAPED_STALE}. Prints one line per closed call
+     * and one line with the count.
+     *
+     * While the voice channel is switched off (`AI.agentVoice.enabled`) nothing is read and nothing is printed: the
+     * call table is not required then. The switch alone is asked, not whether voice can run in the installation: the
+     * sweep needs the call store and the provider's control request, never the session worker's library, and a call
+     * left running is closed in a process without the library as well.
+     *
+     * One sweep at a time ({@see self::STALE_VOICE_CALLS_LOCK_NAME}): the end of a call is written without a claim,
+     * so two sweeps over the same calls would write each call end twice. A run that finds the lock held says so and
+     * goes on with the next pass.
+     *
+     * @param OutputInterface $output
+     * @return void
+     * @throws Throwable a sweep that fails; the calls closed before the failure stay closed, the next run takes the rest
+     */
+    protected function closeStaleVoiceCalls(OutputInterface $output): void
+    {
+        if (!AgentVoiceConfiguration::current()->enabled) {
+            return;
+        }
+        if (!$this->lock(static::STALE_VOICE_CALLS_LOCK_NAME)) {
+            $output->writeln('Reaper: stale voice-call sweep skipped (a previous run is still closing calls).');
+            return;
+        }
+        try {
+            $agentVoiceCallsService = $this->getAgentVoiceCallsService();
+            $closedVoiceCalls = $agentVoiceCallsService->closeStaleRunningCalls();
+            foreach ($closedVoiceCalls as $closedVoiceCall) {
+                $output->writeln($this->buildClosedStaleVoiceCallLine($closedVoiceCall));
+            }
+            $output->writeln(sprintf(
+                'Reaper: closed %d stale voice call(s) (still marked running %d minutes after their answer).',
+                count($closedVoiceCalls),
+                $agentVoiceCallsService->getRunningCallStaleAfterMinutes()
+            ));
+        } finally {
+            $this->release();
+        }
+    }
+
+    /**
+     * The line of one call the stale voice-call sweep closed: its id, its conversation, its provider session and the
+     * moment it was answered, in UTC whatever the time zone of the process.
+     *
+     * @param AgentVoiceCall $closedVoiceCall
+     * @return string
+     */
+    protected function buildClosedStaleVoiceCallLine(AgentVoiceCall $closedVoiceCall): string
+    {
+        $answeredAt = $closedVoiceCall->startedAt ?? null;
+        return sprintf(
+            'Reaper: closed stale voice call %s (conversation %s, provider session %s, answered %s)',
+            $closedVoiceCall->id ?? 'unknown',
+            $closedVoiceCall->aiConversationId ?? 'none',
+            $closedVoiceCall->providerCallId ?? 'none',
+            $answeredAt !== null ? gmdate('Y-m-d\TH:i:s\Z', $answeredAt->getTimestamp()) : 'unknown'
+        );
     }
 
     /**
@@ -436,6 +515,14 @@ class AgentReapStuckConversationsCommand extends AgentConsoleCommand
     protected function dispatchResumeOfConversation(int $conversationId): void
     {
         (new AIConversationResumeMessage($conversationId))->dispatch();
+    }
+
+    /** @return AgentVoiceCallsService the voice calls service the container returns */
+    protected function getAgentVoiceCallsService(): AgentVoiceCallsService
+    {
+        /** @var AgentVoiceCallsService $agentVoiceCallsService */
+        $agentVoiceCallsService = DDDService::instance()->getService(AgentVoiceCallsService::class);
+        return $agentVoiceCallsService;
     }
 
     /** @return AIConversationsService the conversations service the container returns (the application's class, when it replaces it) */

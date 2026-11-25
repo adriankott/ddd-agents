@@ -1,0 +1,32 @@
+/*
+ * The input glow: over the input's whole box, under the field. The field's own surface covers the canvases' middle,
+ * so only what is past its edge shows. The canvases reach 200px past the box (CANVAS_PADDING_PX in the component).
+ * The glow's shades are the custom properties --agents-voice-glow-color-1 … --agents-voice-glow-color-4, read by the
+ * canvases with their defaults.
+ */
+.glow {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.halo,
+.edge {
+  position: absolute;
+  inset: -200px;
+  width: calc(100% + 400px);
+  height: calc(100% + 400px);
+}
+
+/* The wide light, far and faint. */
+.halo {
+  filter: blur(18px) saturate(1.4);
+  opacity: 0.55;
+}
+
+/* The glow close to the field, soft but holding the wave's shape. */
+.edge {
+  filter: blur(6px) saturate(1.3);
+  opacity: 0.75;
+}

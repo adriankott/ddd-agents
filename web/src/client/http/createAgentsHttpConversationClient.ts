@@ -23,7 +23,7 @@ import {
   type SelectableModel,
   type StartedConversation,
 } from "../../contract/conversation";
-import type { AgentUIState } from "../../ui/agent-ui-state";
+import { type AgentUIState, createAgentUIClientId } from "../../ui/agent-ui-state";
 import type { AgentUIClientBinding } from "../../ui/AgentUIClient";
 import type { ClientToolAnswer } from "../../ui/client-tools";
 import {
@@ -104,7 +104,8 @@ export interface AgentsHttpConversationClientOptions extends AgentsConversationC
   /**
    * The UI side of `Agent.UI` (`AgentUIClient` of `@mgamadeus/ddd-agents/ui`): its client id and UI state ride on every
    * write and every run-state read; a client tool request the run-state read delivers goes to it, and the binding
-   * posts its answer (`POST /{conversationId}/clientToolRequests/{requestId}/answer`). Default: none.
+   * posts its answer (`POST /{conversationId}/clientToolRequests/{requestId}/answer`). Default: none; the account
+   * read alone then states a client id the binding creates once (`getAccountRealtimeMessages`).
    */
   uiClient?: AgentUIClientBinding;
   /**
@@ -144,6 +145,9 @@ const quoteFilterValue = (value: number | string): string => `'${String(value).r
 class AgentsHttpConversationClient implements AgentsConversationClient {
   readonly getSelectableModels?: () => Promise<SelectableModel[]>;
 
+  /** The client id this client created for its account read (no `uiClient` bound): once, kept while it lives. */
+  protected ownAccountReadClientId: string | undefined;
+
   constructor(protected readonly options: AgentsHttpConversationClientOptions) {
     if (options.hasSelectableModelsRoute) this.getSelectableModels = this.readSelectableModels;
   }
@@ -182,22 +186,37 @@ class AgentsHttpConversationClient implements AgentsConversationClient {
   };
 
   /**
-   * The account-level realtime read (`GET /realtimeMessages`): the messages addressed to the signed-in account for this
-   * client (the `uiClient`'s id when bound) and the listener credential without a conversation. Arrival is the
-   * caller's (`createAccountRealtimePoll` of `/ui`).
+   * The account-level realtime read (`GET /realtimeMessages?clientId=…`): the messages addressed to the signed-in
+   * account for this client and the listener credential without a conversation. It always states a client id
+   * (`resolveAccountReadClientId`), so the server knows a client that only polls. Arrival is the caller's
+   * (`createAccountRealtimePoll` of `/ui`).
+   *
+   * @param clientId the client id the caller wants stated (the `clientId` option of the poll)
    */
-  getAccountRealtimeMessages = async (): Promise<AccountRealtimeRead> => {
+  getAccountRealtimeMessages = async (clientId?: string): Promise<AccountRealtimeRead> => {
     const response = await this.request<WireAccountRealtimeMessagesResponse>({
       operation: "getAccountRealtimeMessages",
       method: "GET",
       path: "/realtimeMessages",
-      query: this.options.uiClient ? { clientId: this.options.uiClient.clientId } : undefined,
+      query: { clientId: this.resolveAccountReadClientId(clientId) },
     });
     return {
       messages: readWireSetElements(response.realtimeMessages),
       listenerCredential: response.realtimeListenerCredential ?? null,
     };
   };
+
+  /**
+   * The client id the account read states, decided here and nowhere else: the caller's, else the bound `uiClient`'s,
+   * else one this client creates once and keeps while it lives. Only the account read asks: every other request
+   * states a client id only with a `uiClient`.
+   */
+  protected resolveAccountReadClientId(clientId: string | undefined): string {
+    if (clientId) return clientId;
+    if (this.options.uiClient) return this.options.uiClient.clientId;
+    this.ownAccountReadClientId ??= createAgentUIClientId();
+    return this.ownAccountReadClientId;
+  }
 
   /** Posts the answer of the UI client to a client tool request (`Agent.UI`); a refused answer is the server's word. */
   answerClientToolRequest = async (conversationId: number, requestId: number, answer: ClientToolAnswer): Promise<void> => {

@@ -22,6 +22,11 @@ handler binds to its transport with `AsMessageHandler(fromTransport: …)` and e
 The message classes are persisted names: a message waiting in a queue during a deploy carries its class name
 ([tables-and-persisted-names.md](tables-and-persisted-names.md)).
 
+The optional voice channel has two transports of its own, `voice_live_session` and `voice_ring_deadline`
+(`AgentVoiceMessengerTransports`), which only an application that switches voice on copies; their pools have other
+rules than the six above (one process per running call, a stop grace above the longest call):
+`ddd-module-agents-voice-specialist`.
+
 ## What the host writes
 
 The framework registers no transport and no routing for the agent. The host copies both into its `messenger.yaml`:

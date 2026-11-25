@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace DDD\Modules\Agents;
 
 use DDD\Infrastructure\Modules\DDDModule;
+use Ratchet\Client\Connector;
 
 /**
  * The agents module: the agentic loop on top of `ddd-ai` (conversations, messages, compaction, the task plan, skills
- * and MCP metadata, purposes and criteria, widgets and signal sources, delegation, the supervisor, run claims).
+ * and MCP metadata, purposes and criteria, widgets and signal sources, delegation, the supervisor, run claims), and the
+ * agent's voice channel (calls between the owner and the agent: the call and its store, admission, ring, the provider
+ * adapters, the session worker, the routes, the admin list and the tools), switched off by default.
  *
  * The module shares the `DDD\Domain\AI\` and `DDD\Presentation\` roots with `ddd-ai` and the framework, but never a
  * directory: every class sits below one of the namespaces it owns, and no other package has a file there. Owned
@@ -17,18 +20,21 @@ use DDD\Infrastructure\Modules\DDDModule;
  * - `DDD\Domain\AI\Entities\AgentSpaces\`, `…\Entities\ClientTools\`, `…\Entities\Conversations\`, `…\Entities\Discovery\`, `…\Entities\Documents\`,
  *   `…\Entities\Drives\`, `…\Entities\Environment\`,
  *   `…\Entities\Evals\`, `…\Entities\Installation\`, `…\Entities\MCPPackages\`, `…\Entities\Mandates\`, `…\Entities\Models\CustomerSelection\`,
- *   `…\Entities\RecordedRuns\`, `…\Entities\Skills\`, `…\Entities\SystemHealth\`, `…\Entities\Texts\Embeddings\`, `…\Entities\WebSearch\`;
- * - `DDD\Domain\AI\Exceptions\Conversations\`, `…\Exceptions\Evals\`, `…\Exceptions\Texts\Embeddings\`;
+ *   `…\Entities\RecordedRuns\`, `…\Entities\Skills\`, `…\Entities\SystemHealth\`, `…\Entities\Texts\Embeddings\`, `…\Entities\Voice\`,
+ *   `…\Entities\WebSearch\`;
+ * - `DDD\Domain\AI\Exceptions\Conversations\`, `…\Exceptions\Evals\`, `…\Exceptions\Texts\Embeddings\`, `…\Exceptions\Voice\`;
  * - `DDD\Domain\AI\Interfaces\`, `DDD\Domain\AI\MessageHandlers\`;
  * - `DDD\Domain\AI\Libs\RecordedRuns\`, `DDD\Domain\AI\Listeners\Conversations\`,
  *   `DDD\Domain\AI\Messenger\Conversations\`, `DDD\Domain\AI\Traits\Conversations\`;
  * - `DDD\Domain\AI\Repo\Argus\Conversations\`, `…\Repo\Argus\Guard\`, `…\Repo\Argus\Mandates\`, `…\Repo\Argus\WebSearch\`,
- *   `…\Repo\DB\AgentSpaces\`, `…\Repo\DB\Conversations\`, `…\Repo\DB\Evals\`, `…\Repo\DB\Mandates\`;
+ *   `…\Repo\DB\AgentSpaces\`, `…\Repo\DB\Conversations\`, `…\Repo\DB\Evals\`, `…\Repo\DB\Mandates\`, `…\Repo\DB\Voice\`;
  * - `DDD\Domain\AI\Services\AgentSpaces\`, `…\Services\ClientTools\`, `…\Services\Conversations\`, `…\Services\Decisions\`, `…\Services\Documents\`,
  *   `…\Services\Drives\`, `…\Services\Eval\`, `…\Services\Installation\`, `…\Services\Mandates\`,
- *   `…\Services\Skills\`, `…\Services\SystemHealth\`, `…\Services\SystemPrompts\`, `…\Services\Texts\Embeddings\`, `…\Services\WebSearch\`;
- * - `DDD\Modules\Agents\`, `DDD\Presentation\Api\Agents\`, `DDD\Presentation\Mcp\` (the MCP / JSON-RPC wire DTOs,
- *   the tool executor, the console printer and the JSON-RPC base controller);
+ *   `…\Services\Skills\`, `…\Services\SystemHealth\`, `…\Services\SystemPrompts\`, `…\Services\Texts\Embeddings\`, `…\Services\Voice\`,
+ *   `…\Services\WebSearch\`;
+ * - `DDD\Modules\Agents\`, `DDD\Presentation\Api\Admin\Voice\` (the admin list of calls), `DDD\Presentation\Api\Agents\`,
+ *   `DDD\Presentation\Mcp\` (the MCP / JSON-RPC wire DTOs, the tool executor, the console printer and the JSON-RPC
+ *   base controller);
  * - `DDD\Symfony\Commands\Agents\` (the console commands of the module, their shared base, the option traits and the
  *   progress reporter).
  * - `DDD\Testing\Agents\` (the test hooks an application's suite extends, e.g. the surface snapshot test case; they
@@ -41,6 +47,13 @@ use DDD\Infrastructure\Modules\DDDModule;
  * `new`), the trace log trait (`Traits\Conversations`) and the console commands (`Symfony\Commands\Agents`, reached
  * through the console tag their `#[AsCommand]` attribute gives them; an application command of the same name
  * replaces one, as for every command below `DDD\Symfony\Commands\`).
+ *
+ * One part works only with a library the package suggests and does not require
+ * ({@see getNamespacesRequiringClasses()}): the session worker of a voice call, which holds a WebSocket to the voice
+ * provider for the length of the call. Its classes sit in folders of their own
+ * ({@see self::VOICE_SESSION_WORKER_NAMESPACES}); without the library they are no services and nothing loads them, and
+ * the voice channel reads as unavailable
+ * ({@see \DDD\Domain\AI\Services\Voice\AgentVoiceCallAdmissionService::canVoiceRunHere()}).
  *
  * An application overrides a class by a same-path subclass under its own root namespace.
  */
@@ -64,10 +77,12 @@ class AgentsModule extends DDDModule
         'DDD\\Domain\\AI\\Entities\\Skills\\',
         'DDD\\Domain\\AI\\Entities\\SystemHealth\\',
         'DDD\\Domain\\AI\\Entities\\Texts\\Embeddings\\',
+        'DDD\\Domain\\AI\\Entities\\Voice\\',
         'DDD\\Domain\\AI\\Entities\\WebSearch\\',
         'DDD\\Domain\\AI\\Exceptions\\Conversations\\',
         'DDD\\Domain\\AI\\Exceptions\\Evals\\',
         'DDD\\Domain\\AI\\Exceptions\\Texts\\Embeddings\\',
+        'DDD\\Domain\\AI\\Exceptions\\Voice\\',
         'DDD\\Domain\\AI\\Interfaces\\',
         'DDD\\Domain\\AI\\Libs\\RecordedRuns\\',
         'DDD\\Domain\\AI\\Listeners\\Conversations\\',
@@ -81,6 +96,7 @@ class AgentsModule extends DDDModule
         'DDD\\Domain\\AI\\Repo\\DB\\Conversations\\',
         'DDD\\Domain\\AI\\Repo\\DB\\Evals\\',
         'DDD\\Domain\\AI\\Repo\\DB\\Mandates\\',
+        'DDD\\Domain\\AI\\Repo\\DB\\Voice\\',
         'DDD\\Domain\\AI\\Services\\AgentSpaces\\',
         'DDD\\Domain\\AI\\Services\\ClientTools\\',
         'DDD\\Domain\\AI\\Services\\Conversations\\',
@@ -94,14 +110,32 @@ class AgentsModule extends DDDModule
         'DDD\\Domain\\AI\\Services\\SystemPrompts\\',
         'DDD\\Domain\\AI\\Services\\SystemHealth\\',
         'DDD\\Domain\\AI\\Services\\Texts\\Embeddings\\',
+        'DDD\\Domain\\AI\\Services\\Voice\\',
         'DDD\\Domain\\AI\\Services\\WebSearch\\',
         'DDD\\Domain\\AI\\Traits\\Conversations\\',
         'DDD\\Modules\\Agents\\',
+        'DDD\\Presentation\\Api\\Admin\\Voice\\',
         'DDD\\Presentation\\Api\\Agents\\',
         'DDD\\Presentation\\Mcp\\',
         'DDD\\Symfony\\Commands\\Agents\\',
         'DDD\\Testing\\Agents\\',
     ];
+
+    /**
+     * @var string[] The namespaces of the voice session worker: the worker itself, and the message handler that
+     * hands a call to it with its message. They need the WebSocket library ({@see self::VOICE_SESSION_WORKER_LIBRARY_CLASS});
+     * each ends with a backslash.
+     */
+    public const array VOICE_SESSION_WORKER_NAMESPACES = [
+        'DDD\\Domain\\AI\\MessageHandlers\\Voice\\SessionWorker\\',
+        'DDD\\Domain\\AI\\Services\\Voice\\SessionWorker\\',
+    ];
+
+    /**
+     * @var string A class of the WebSocket library the voice session worker opens its connection to the voice
+     * provider with (`ratchet/pawl`, which runs on `react/event-loop`; both are suggested, not required)
+     */
+    public const string VOICE_SESSION_WORKER_LIBRARY_CLASS = Connector::class;
 
     /** @return string[] {@see self::OWNED_NAMESPACES}: Core checks that no other package ships a class below them */
     public static function getOwnedNamespaces(): array
@@ -144,8 +178,24 @@ class AgentsModule extends DDDModule
             'DDD\\Domain\\AI\\Services\\SystemHealth\\',
             // the installation check (app:agent:check-installation) and its checks port
             'DDD\\Domain\\AI\\Services\\Installation\\',
+            // the voice channel: call life, admission, start and ring, the call store port, the briefing, the provider
+            // adapters and the session worker (the routes, the tools, the handlers and the reaper fetch them)
+            'DDD\\Domain\\AI\\Services\\Voice\\',
             'DDD\\Presentation\\Mcp\\Services\\',
         ];
+    }
+
+    /**
+     * The voice session worker ({@see self::VOICE_SESSION_WORKER_NAMESPACES}) needs the WebSocket library
+     * ({@see self::VOICE_SESSION_WORKER_LIBRARY_CLASS}). Without it the classes below these prefixes are no services
+     * and are never loaded; every other voice class registers and loads as usual, and the voice channel reads as
+     * unavailable.
+     *
+     * @return array<string, string> namespace prefix => the class that must exist
+     */
+    public static function getNamespacesRequiringClasses(): array
+    {
+        return array_fill_keys(static::VOICE_SESSION_WORKER_NAMESPACES, static::VOICE_SESSION_WORKER_LIBRARY_CLASS);
     }
 
     /**

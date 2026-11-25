@@ -1,5 +1,13 @@
 {
  "files": 518,
  "filesLeaving": 0,
- "targets": []
+ "targets": [],
+ "optionalPeerImports": {
+  "./voice": [],
+  "./voice/admin": [
+   "@mgamadeus/ddd-admin-ui",
+   "@mgamadeus/ddd-web",
+   "lucide-react"
+  ]
+ }
 }

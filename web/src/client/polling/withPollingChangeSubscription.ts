@@ -41,7 +41,7 @@ class PollingAgentsConversationClient implements AgentsConversationClientWithCha
   readonly composeSentMessageText?: (text: string, attachments: ConversationAttachmentReference[] | undefined) => string;
   readonly getMessageSentPayload?: (conversationId: number, messageId: number) => Promise<ConversationMessageSentPayload>;
   readonly getConversationRunState?: (conversationId: number) => Promise<ConversationRunStateRead>;
-  readonly getAccountRealtimeMessages?: () => Promise<AccountRealtimeRead>;
+  readonly getAccountRealtimeMessages?: (clientId?: string) => Promise<AccountRealtimeRead>;
 
   constructor(
     protected readonly binding: AgentsConversationClient,

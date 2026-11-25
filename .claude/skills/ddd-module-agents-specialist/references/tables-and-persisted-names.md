@@ -7,7 +7,7 @@ leave the process.
 
 ## The database entities
 
-Sixteen entities of the package have a database repository; every other entity is a value object, a config file or
+Seventeen entities of the package have a database repository; every other entity is a value object, a config file or
 an Argus load.
 
 | Entity (set) | What a row is | Skill that explains it |
@@ -27,12 +27,14 @@ an Argus load.
 | `AIConversationTurnEvent` (`AIConversationTurnEvents`), `AIConversationTurnEventSnapshot` (`AIConversationTurnEventSnapshots`) | the timed events of one turn | `ddd-module-agents-observability-specialist` |
 | `AgentEvalSuiteRun` (`AgentEvalSuiteRuns`) | one finished evaluation run: command, label, host, times, counts, options, result folder | `ddd-module-agents-observability-specialist` |
 | `AgentEvalSuiteCase` (`AgentEvalSuiteCases`) | one case of a stored evaluation run with its verdict and figures | `ddd-module-agents-observability-specialist` |
+| `AgentVoiceCall` (`AgentVoiceCalls`) | one voice call: its account, its conversation, the provider's session, its times, its end reason, its booked seconds (required only while `AI.agentVoice.enabled` is on and the call store is `entity`) | `ddd-module-agents-voice-specialist` |
 
 Conversations, schedules, mandates and memories carry `accountId` and `agentSpaceId`. The read rights of the conversation,
 message, schedule, memory, batch, event and embedding repositories run through `DDD\Domain\AI\Services\Conversations\Rights\AgentAccountRightsService`; the space and the
 mandate repositories keep their own rule (the row's own account, or an admin with access to all resources). The
 stored evaluation runs and their cases are read by an admin only: an admin reads every row, every other account none
 (a host narrows or widens the rule in `isAuthenticatedAccountReaderOfEveryRow()` of its same-path repositories).
+A voice call is read under the read rights of its conversation.
 
 ## How a table is named
 
@@ -82,7 +84,7 @@ creates one ([agent-space.md](agent-space.md)).
 | Group | Where | Rule |
 |---|---|---|
 | `objectType` values in stored JSON | every value object stored in a JSON column (the conversation's working state, a message's tool call, a widget) carries its class name | never move or rename such a class without a `Common.objectTypeMigrations` entry (old name to new) |
-| Messenger message classes | the nine classes of `AgentMessengerTransports::ROUTING_BY_MESSAGE_CLASS`, in a broker queue during a deploy | a rename needs drained queues or a `class_alias` of the old name in the host |
+| Messenger message classes | the nine classes of `AgentMessengerTransports::ROUTING_BY_MESSAGE_CLASS` and the two of `AgentVoiceMessengerTransports::ROUTING_BY_MESSAGE_CLASS`, in a broker queue during a deploy | a rename needs drained queues or a `class_alias` of the old name in the host |
 | Stored kinds and wire names | a state note kind (`agentSpaceContextStateKind` of the wording), signal sources, widget wire names | a host that changes one no longer reads the rows stored under the earlier value |
 
 Package maintainer: a rename of a persisted class ships with its migration entry in the same release, and the

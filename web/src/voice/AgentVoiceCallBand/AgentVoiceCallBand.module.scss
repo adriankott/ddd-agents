@@ -1,0 +1,207 @@
+/*
+ * The band over the chat input: the agent's dark colour, rising from behind the input, which overlaps its lower edge
+ * by the tuck. Same width as the input (it follows the chat's own side inset). Every colour and size an application
+ * may want to change is a custom property read with its default here; set it on any ancestor (`:root`, the chat):
+ *
+ *   --agents-voice-surface, --agents-voice-on-surface      the band (also the start button and the incoming call's mark)
+ *   --agents-voice-end, --agents-voice-on-end              End and Decline
+ *   --agents-voice-font-size, --agents-voice-caption-font-size
+ *   --agents-voice-band-side-inset, --agents-voice-band-max-width, --agents-voice-band-tuck,
+ *   --agents-voice-band-radius, --agents-voice-band-z-index
+ *   --agents-voice-action-height, --agents-voice-action-radius
+ */
+.band {
+  --agents-voice-band-tuck-size: var(--agents-voice-band-tuck, 1.5rem);
+  --agents-voice-band-glide: cubic-bezier(0.32, 0.72, 0, 1);
+  position: relative;
+  z-index: var(--agents-voice-band-z-index, 9);
+  flex: none;
+  width: calc(100% - 2 * var(--agents-voice-band-side-inset, var(--agents-chat-input-side-inset, 1.5rem)));
+  max-width: var(--agents-voice-band-max-width, 50rem);
+  margin-bottom: calc(-1 * var(--agents-voice-band-tuck-size));
+  overflow: hidden;
+  border-radius: var(--agents-voice-band-radius, 1.5rem) var(--agents-voice-band-radius, 1.5rem) 0 0;
+  background: var(--agents-voice-surface, #00495d);
+  color: var(--agents-voice-on-surface, #ffffff);
+  font-size: var(--agents-voice-font-size, 0.875rem);
+  line-height: 1.4;
+  container-name: voiceCallBand;
+  container-type: inline-size;
+  /* The buttons' translucent fills blend with the band, not with the chat behind it. */
+  isolation: isolate;
+  animation: bandRise 640ms var(--agents-voice-band-glide) both;
+}
+
+@keyframes bandRise {
+  from {
+    transform: translateY(100%);
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    transform: none;
+    clip-path: inset(0);
+  }
+}
+
+.content {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem 0.5rem calc(0.5rem + var(--agents-voice-band-tuck-size)) 1.25rem;
+}
+
+.content > * {
+  animation: bandContentIn 520ms cubic-bezier(0.23, 1, 0.32, 1) 180ms backwards;
+}
+
+.content > :last-child {
+  animation-delay: 260ms;
+}
+
+@keyframes bandContentIn {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+}
+
+.spot {
+  flex: none;
+  display: flex;
+  align-items: center;
+}
+
+.who {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+/* The title and the time keep one line; only the status may take a second one. */
+.who > :not(.status) {
+  flex: none;
+  white-space: nowrap;
+}
+
+.title {
+  font-weight: 500;
+}
+
+.time {
+  font-size: var(--agents-voice-caption-font-size, 0.75rem);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.72;
+}
+
+.status {
+  min-width: 0;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  font-size: var(--agents-voice-caption-font-size, 0.75rem);
+  opacity: 0.72;
+}
+
+.actions {
+  flex: none;
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* A pill on the dark band. */
+.action {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  height: var(--agents-voice-action-height, 2rem);
+  padding: 0 0.875rem 0 0.75rem;
+  border: none;
+  border-radius: var(--agents-voice-action-radius, 1rem);
+  background: color-mix(in srgb, var(--agents-voice-on-surface, #ffffff) 16%, transparent);
+  color: var(--agents-voice-on-surface, #ffffff);
+  font: inherit;
+  font-size: var(--agents-voice-caption-font-size, 0.75rem);
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    transform 150ms ease;
+}
+
+.action:hover {
+  background: color-mix(in srgb, var(--agents-voice-on-surface, #ffffff) 24%, transparent);
+}
+
+.action:active {
+  transform: scale(0.97);
+}
+
+.action:focus-visible {
+  outline: 0.125rem solid var(--agents-voice-on-surface, #ffffff);
+  outline-offset: 0.125rem;
+}
+
+.action:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.action[aria-pressed="true"],
+.action[data-variant="accept"] {
+  background: var(--agents-voice-on-surface, #ffffff);
+  color: var(--agents-voice-surface, #00495d);
+}
+
+.action[data-variant="end"] {
+  background: var(--agents-voice-end, #dc2626);
+  color: var(--agents-voice-on-end, #ffffff);
+}
+
+.action[data-icon-only] {
+  width: var(--agents-voice-action-height, 2rem);
+  padding: 0;
+  justify-content: center;
+}
+
+.action[data-icon-only] .actionLabel {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* A narrow chat (a compact window, a phone): the buttons are their icons alone, their labels still naming them. */
+@container voiceCallBand (max-width: 520px) {
+  .action {
+    width: var(--agents-voice-action-height, 2rem);
+    padding: 0;
+    justify-content: center;
+  }
+
+  .action .actionLabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .status {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .band,
+  .content > * {
+    animation: none;
+  }
+}

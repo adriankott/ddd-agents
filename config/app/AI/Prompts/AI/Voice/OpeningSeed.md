@@ -1,0 +1,1 @@
+Start of the call: you speak first, right now, before the caller says anything — confirm briefly and warmly that they are connected and ask what this is about, in one or two short sentences. {%LANGUAGE_INSTRUCTION%} Then stop and listen.

@@ -19,8 +19,9 @@ loop's own signals are `ddd-module-agents-loop-specialist`.
 `AIConversationMessage::$signalSource` is a string (it also carries markers on text rows and a tool name on tool rows),
 read through `ConversationSignalSources::tryFrom()`, which returns the case of a `DDD\Domain\AI\Entities\Conversations\SignalSources\ConversationSignalSource` enum or null.
 The package declares its own in `AIConversationSignalSource` (with `SIGNAL_SOURCE_*` constants on
-`AIConversationMessage`) and the phone channel's in `PhoneConversationSignalSource`. A host declares its own sources in
-its own enum; its writer passes the typed case's value.
+`AIConversationMessage`) and the call sources of the voice channel in `PhoneConversationSignalSource`, in the same
+folder (what each case means and which voice service writes it: `ddd-module-agents-voice-specialist`). A host declares
+its own sources in its own enum; its writer passes the typed case's value.
 
 ## The questions every source answers
 
