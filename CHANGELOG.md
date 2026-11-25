@@ -21,6 +21,8 @@ Drive files open in the canvas. Web package only; no PHP change.
   `referenceOfCanvasInstanceId(instanceId)`, `isCanvasReference(value)` — a viewer per object of a store
   (`driveFile:reference:drive/812`); only a store reference passes (no path with `..`, no URL, no markup).
   `isPackageCanvasId`, `canvasKindOpenerWidgetNamesOf`.
+- **Default icons:** `visibility` (the open-in-the-canvas button of a `DriveFiles` row) and `details` draw a glyph
+  (`◎`, `⋯`) instead of the fallback dot.
 
 ## 0.3.13
 
