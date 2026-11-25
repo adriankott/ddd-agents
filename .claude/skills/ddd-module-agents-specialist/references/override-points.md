@@ -129,7 +129,7 @@ opaque strings only the host interprets; null wherever the module holds one mean
 |---|---|---|
 | `DDD\Domain\AI\Entities\Conversations\Entitlements\AgentFeatureFlagsInterface` | `hasAllAvailableFeatureFlags()`, `hasAnyAvailableFeatureFlag()` | `findFeatureFlagsOfConversation()`, `findFeatureFlagsOfAgentSpace()`, `findFeatureFlagsOfAccount()` |
 | `DDD\Domain\AI\Entities\Conversations\Entitlements\AgentAccountRightsInterface` | `getMissingRightNames()` | `findAccountRightsOfConversation()`, `findAccountRightsOfCurrentAccount()` |
-| `DDD\Domain\AI\Entities\Conversations\Entitlements\AgentAccountRightsAnsweringInterface` (optional, beside the rights interface) | `answersRightName()` — the names the host decides alone; every other package right is held when the host object OR the mapping `AI.accountRights` holds it (`AgentComposedAccountRights`, `findComposedAccountRightsOfConversation()`) | the same two methods |
+| `DDD\Domain\AI\Entities\Conversations\Entitlements\AgentAccountRightsAnsweringInterface` (optional, beside the rights interface) | `answersRightName()` — the names the host decides alone; every other package right is held when the host object OR the host's own mapping `AI.accountRights` holds it (`AgentComposedAccountRights`, `findComposedAccountRightsOfConversation()`); without a host mapping nothing of the package's default file is granted (fail closed) | the same two methods |
 
 `AIConversationEntitlement` (built by `AIConversation::getEntitlement()`) applies both axes to skills and tool
 definitions. One rule a host must keep: a caller that gates a tool on a flag refuses when `findFeatureFlagsOfAccount()`

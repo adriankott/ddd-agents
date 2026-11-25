@@ -7,7 +7,6 @@ namespace DDD\Tests\Agents\Domain\AI\Entities\Conversations\Entitlements;
 use DDD\Domain\AI\Entities\Conversations\Entitlements\AgentAccountRights;
 use DDD\Domain\AI\Entities\Conversations\Entitlements\AgentComposedAccountRights;
 use DDD\Domain\AI\Entities\Conversations\Entitlements\AgentRoleMappedAccountRights;
-use DDD\Domain\AI\Services\Conversations\Entitlements\AIConversationEntitlementsService;
 use DDD\Domain\Common\Entities\Roles\Role;
 use DDD\Tests\Agents\Support\UnitTestCase;
 
@@ -88,7 +87,7 @@ class AgentComposedAccountRightsTest extends UnitTestCase
 
     public function testThePackagesOwnObjectsAreNotComposedAgain(): void
     {
-        $aIConversationEntitlementsService = new AIConversationEntitlementsService();
+        $aIConversationEntitlementsService = new ApplicationRightsEntitlementsServiceDouble(new ApplicationKnownRightsDouble(), true);
         $roleMappedRights = AgentRoleMappedAccountRights::forRoleNames([], $this->buildMapping());
         $composedRights = $aIConversationEntitlementsService->composeAccountRights(new ApplicationKnownRightsDouble(), null);
 

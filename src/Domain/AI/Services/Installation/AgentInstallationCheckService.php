@@ -18,6 +18,7 @@ use DDD\Domain\AI\Entities\MCPPackages\MCPToolOverlays;
 use DDD\Domain\AI\Entities\Skills\AISkill;
 use DDD\Domain\AI\Services\Conversations\Discovery\AgentSourceRootsService;
 use DDD\Domain\AI\Services\Conversations\Entitlements\AgentDeclaredAccountRightsService;
+use DDD\Domain\AI\Services\Conversations\Entitlements\AIConversationEntitlementsService;
 use DDD\Domain\AI\Services\Conversations\Memories\AgentMemoriesService;
 use DDD\Domain\AI\Services\Conversations\Memories\AgentMemoryStoreService;
 use DDD\Domain\AI\Services\Skills\AISkillFilesLintService;
@@ -51,6 +52,9 @@ use Throwable;
  * - `skillBindings` (BLOCKING): a binding names a class that does not exist or is no MCP package, or an id no package has;
  * - `rightsHeldByNobody` (WARNING): a right a package declares that `AI.accountRights` maps to no role, no `'*'` and no
  *   delegation — held by nobody unless the application's rights object holds it;
+ * - `accountRightsMapping` (WARNING): the application answers rights with its own object and ships no
+ *   `AI.accountRights` of its own — every package right its object does not hold is held by nobody (fail closed; the
+ *   package's default mapping grants nothing then);
  * - `skillRights` (WARNING): a bound package requires a right on the class whose skill does not name it in
  *   `requiredAccountRights` — the skill is offered to accounts that may call none of its tools;
  * - `toolOverlays` (WARNING): an entry of `AI.toolOverlays` with a key the overlay does not read, or for a tool name no
@@ -80,6 +84,9 @@ class AgentInstallationCheckService extends Service
 
     public const string CHECK_RIGHTS_HELD_BY_NOBODY = 'rightsHeldByNobody';
 
+    /** @var string The check of an application rights object without an application mapping */
+    public const string CHECK_ACCOUNT_RIGHTS_MAPPING = 'accountRightsMapping';
+
     public const string CHECK_SKILL_RIGHTS = 'skillRights';
 
     public const string CHECK_MISSING_TABLES = 'missingTables';
@@ -99,6 +106,7 @@ class AgentInstallationCheckService extends Service
         self::CHECK_SKILL_BINDINGS => 'addSkillBindingFindings',
         self::CHECK_UNBOUND_PACKAGE_SKILLS => 'addUnboundPackageSkillFindings',
         self::CHECK_RIGHTS_HELD_BY_NOBODY => 'addRightsHeldByNobodyFindings',
+        self::CHECK_ACCOUNT_RIGHTS_MAPPING => 'addAccountRightsMappingFindings',
         self::CHECK_SKILL_RIGHTS => 'addSkillRightsFindings',
         self::CHECK_TOOL_OVERLAYS => 'addToolOverlayFindings',
         self::CHECK_MISSING_TABLES => 'addMissingTableFindings',
@@ -323,6 +331,9 @@ class AgentInstallationCheckService extends Service
      */
     protected function addRightsHeldByNobodyFindings(AgentInstallationFindings $agentInstallationFindings): void
     {
+        if ($this->isApplicationRightsObjectWithoutApplicationMapping()) {
+            return; // the package's default mapping grants nothing then: accountRightsMapping reports it
+        }
         /** @var AgentDeclaredAccountRightsService $agentDeclaredAccountRightsService */
         $agentDeclaredAccountRightsService = DDDService::instance()->getService(AgentDeclaredAccountRightsService::class);
         $agentRoleMappedAccountRights = AgentRoleMappedAccountRights::forRoleNamesUnderConfiguredMapping([]);
@@ -344,6 +355,49 @@ class AgentInstallationCheckService extends Service
                 "Map it in config/app/AI/accountRights.php (roles, '*', or ['right' => '<application right>']), or list it in acceptedUnmappedRights of config/app/AI/installationCheck.php when the application's rights object answers it."
             );
         }
+    }
+
+    /**
+     * `accountRightsMapping`: the application answers rights with its own object
+     * ({@see AIConversationEntitlementsService::isAccountRightsAnsweredByTheApplication()}) and ships no mapping of its
+     * own ({@see AIConversationEntitlementsService::isAccountRightsMappingShippedByTheApplication()}): the package
+     * rights its object does not hold are held by nobody. One WARNING naming them.
+     */
+    protected function addAccountRightsMappingFindings(AgentInstallationFindings $agentInstallationFindings): void
+    {
+        if (!$this->isApplicationRightsObjectWithoutApplicationMapping()) {
+            return;
+        }
+        /** @var AgentDeclaredAccountRightsService $agentDeclaredAccountRightsService */
+        $agentDeclaredAccountRightsService = DDDService::instance()->getService(AgentDeclaredAccountRightsService::class);
+        $acceptedRightNames = $this->readConfiguredNames('acceptedUnmappedRights');
+        $packageRightNames = [];
+        foreach ($agentDeclaredAccountRightsService->findDeclaredAccountRights()->getElements() as $agentDeclaredAccountRight) {
+            if (!in_array($agentDeclaredAccountRight->rightName, $acceptedRightNames, true)) {
+                $packageRightNames[] = $agentDeclaredAccountRight->rightName;
+            }
+        }
+        if ($packageRightNames === []) {
+            return;
+        }
+        sort($packageRightNames);
+        $agentInstallationFindings->addFinding(
+            static::CHECK_ACCOUNT_RIGHTS_MAPPING,
+            AgentInstallationFinding::SEVERITY_WARNING,
+            'AI.accountRights',
+            'The application answers rights with its own object and ships no config/app/AI/accountRights.php of its own: the package rights '
+            . implode(', ', $packageRightNames) . ' are held by nobody unless its rights object holds them (the package\'s default mapping grants nothing then).',
+            "Hold them in the application's rights object, or ship config/app/AI/accountRights.php mapping them (roles, '*', or ['right' => '<application right>']); list a right its object answers in acceptedUnmappedRights of config/app/AI/installationCheck.php."
+        );
+    }
+
+    /** Whether the application answers rights with its own object and has no mapping of its own */
+    protected function isApplicationRightsObjectWithoutApplicationMapping(): bool
+    {
+        /** @var AIConversationEntitlementsService $aIConversationEntitlementsService */
+        $aIConversationEntitlementsService = DDDService::instance()->getService(AIConversationEntitlementsService::class);
+        return $aIConversationEntitlementsService->isAccountRightsAnsweredByTheApplication()
+            && !$aIConversationEntitlementsService->isAccountRightsMappingShippedByTheApplication();
     }
 
     /**

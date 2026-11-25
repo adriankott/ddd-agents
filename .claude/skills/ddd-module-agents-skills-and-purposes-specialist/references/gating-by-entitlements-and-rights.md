@@ -36,7 +36,10 @@ rights as constants (`AgentAccountRights` here, the drive's rights class in ddd-
 `findComposedAccountRightsOfCurrentAccount()`): per right name, a host object that implements
 `AgentAccountRightsAnsweringInterface` and answers the name decides alone (held or not); otherwise the right is held
 when the host object holds it OR the mapping holds it. So a host object that knows only its own right names leaves the
-package rights to `AI.accountRights`. A mapping entry is a role list (`'*'` = every account) or a delegation
+package rights to `AI.accountRights`. **Only a mapping the host ships is composed** (its own
+`config/app/AI/accountRights.php`; `isAccountRightsMappingShippedByTheApplication()`): without one the host object is
+checked as it is and a package right it does not hold is not held (fail closed) — the package's default file grants a
+host with its own object nothing. `app:agent:check-installation` warns (`accountRightsMapping`). A mapping entry is a role list (`'*'` = every account) or a delegation
 `['right' => '<host right>']`, which asks the host object for that right. A right the host withholds is left out of
 its own mapping or answered through the interface. `AgentDeclaredAccountRightsService::getDeclaredAccountRightNames()`
 lists every right the installed packages declare (their `*AccountRights::RIGHTS` lists and the rights on their

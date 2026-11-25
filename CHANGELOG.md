@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.4.1
+
+**Security fix for 0.4.0 adopters: composed rights no longer open a fail-closed host.** In 0.4.0 a host that answers
+rights with its own rights object (it overrides `findAccountRightsOfConversation()` / `findAccountRightsOfCurrentAccount()`
+of `AIConversationEntitlementsService`) and ships no `config/app/AI/accountRights.php` of its own got, for every package
+right its object did not hold, the grant of the PACKAGE's default mapping: `scheduleAgentTasks`, `useAgentMemory`,
+`useWeb`, `useUI` and `useDrive` for every account, the operator rights (`operatePlatform`, `manageTexts`, `useSandbox`,
+`useBrowser`) for superadmins — without any change on the host's side.
+
+- **Fixed:** the package composes a host's rights object only with a mapping the host ships (its own
+  `config/app/AI/accountRights.php`, in an application config root;
+  `AIConversationEntitlementsService::isAccountRightsMappingShippedByTheApplication()`). Without one the host object is
+  checked as it is: a package right it does not hold is not held, as before 0.4.0. Hosts on the package's role-mapped
+  rights (no own rights object) keep the default mapping unchanged.
+- **New check** `accountRightsMapping` of `app:agent:check-installation` (WARNING): the host answers with its own
+  rights object and ships no mapping — it names the package rights held by nobody therefore. `rightsHeldByNobody` stays
+  silent in that case (the default mapping it would read grants nothing then).
+- **Host steps:** a host with its own rights object that relied on 0.4.0 granting package rights through the package's
+  default mapping copies `config/app/AI/accountRights.php` into its own config and keeps the rights it means to grant,
+  or holds them in its rights object. Check the access 0.4.0 gave meanwhile (schedules created, memories written, UI
+  and drive tool calls of accounts that should not have had them).
+- The comment of the package's `config/app/AI/accountRights.php` said a host with its own rights model does not read
+  the file; it now states the rule above.
+
 ## 0.4.0
 
 Host adaptability: a host adapts the package through config and small overrides, never by copying package code or

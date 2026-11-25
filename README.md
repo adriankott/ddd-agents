@@ -70,8 +70,9 @@ section 5.
 ## Rights, tool texts and names a host sets by config
 
 - **Rights.** The package asks the host's own rights object (`AIConversationEntitlementsService`) composed with the
-  mapping `AI.accountRights` (`AgentComposedAccountRights`): a package right the host object does not hold is still held
-  through the mapping (roles, `'*'`, or `['right' => '<host right>']`). A host object that implements
+  host's own mapping `AI.accountRights` (`AgentComposedAccountRights`): a package right the host object does not hold is
+  still held through that mapping (roles, `'*'`, or `['right' => '<host right>']`). Without a mapping of the host's own,
+  the package's default file grants nothing to a host with its own rights object (fail closed). A host object that implements
   `AgentAccountRightsAnsweringInterface` decides the names it answers alone. `AgentDeclaredAccountRightsService`
   lists every right the installed packages declare.
 - **Per tool, by name** (`config/app/AI/toolOverlays.php`): `accountRights` (replaces the attributes, `[]` = none),

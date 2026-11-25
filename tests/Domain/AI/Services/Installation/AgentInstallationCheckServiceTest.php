@@ -106,6 +106,23 @@ class AgentInstallationCheckServiceTest extends UnitTestCase
         self::assertStringContainsString("unless the application's rights object holds it", $findings->getElements()[0]->message);
     }
 
+    public function testAnApplicationRightsObjectWithoutAMappingOfItsOwnNamesThePackageRightsHeldByNobody(): void
+    {
+        $findings = $this->runOnlyCheck(
+            AgentInstallationCheckService::CHECK_ACCOUNT_RIGHTS_MAPPING,
+            new ApplicationRightsWithoutMappingInstallationCheckServiceDouble(),
+            ['acceptedUnmappedRights' => [AgentAccountRights::USE_WEB]]
+        );
+
+        self::assertCount(1, $findings->getElements());
+        self::assertSame(AgentInstallationFinding::SEVERITY_WARNING, $findings->getElements()[0]->severity);
+        self::assertStringContainsString(AgentAccountRights::USE_UI, $findings->getElements()[0]->message);
+        self::assertStringContainsString(AgentAccountRights::SCHEDULE_AGENT_TASKS, $findings->getElements()[0]->message);
+        self::assertStringNotContainsString(AgentAccountRights::USE_WEB . ',', $findings->getElements()[0]->message . ',');
+        self::assertSame([], $this->runOnlyCheck(AgentInstallationCheckService::CHECK_RIGHTS_HELD_BY_NOBODY, new ApplicationRightsWithoutMappingInstallationCheckServiceDouble())->getElements());
+        self::assertSame([], $this->runOnlyCheck(AgentInstallationCheckService::CHECK_ACCOUNT_RIGHTS_MAPPING)->getElements(), 'the package rights model is not reported');
+    }
+
     public function testASkillThatDoesNotNameTheClassLevelRightOfItsPackageIsReportedUnlessAccepted(): void
     {
         $this->setAIConfigValue('skillPackages', [

@@ -14,7 +14,9 @@ use DDD\Domain\AI\Entities\Conversations\Entitlements\AgentRoleMappedAccountRigh
 use DDD\Domain\AI\Entities\Conversations\Entitlements\AgentFeatureFlagsInterface;
 use DDD\Infrastructure\Exceptions\BadRequestException;
 use DDD\Infrastructure\Exceptions\InternalErrorException;
+use DDD\Infrastructure\Libs\Config;
 use DDD\Infrastructure\Services\AuthService;
+use DDD\Modules\Agents\AgentsModule;
 use DDD\Infrastructure\Services\Service;
 use Psr\Cache\InvalidArgumentException;
 use ReflectionException;
@@ -83,9 +85,9 @@ class AIConversationEntitlementsService extends Service
      * The rights of the account the conversation acts for — the application's override point. The default: the rights
      * the config `AI.accountRights` maps to the account's roles ({@see AgentRoleMappedAccountRights}); null (ungated)
      * for a conversation without an account. An application returns its own {@see AgentAccountRightsInterface}; the
-     * package never reads this method directly but composes its answer with the mapping
-     * ({@see findComposedAccountRightsOfConversation()}), so package rights the application does not know stay
-     * mapped.
+     * package never reads this method directly but composes its answer with the application's own mapping
+     * ({@see findComposedAccountRightsOfConversation()}): package rights the application does not know follow the
+     * application's `AI.accountRights`; without an application mapping they are not held.
      *
      * @param AIConversation $conversation
      * @return AgentAccountRightsInterface|null
@@ -140,10 +142,16 @@ class AIConversationEntitlementsService extends Service
         return $this->composeAccountRights($accountRights, AuthService::instance()->getAccount());
     }
 
+    /** @var string The mapping file of `AI.accountRights`, relative to a config root */
+    public const string ACCOUNT_RIGHTS_MAPPING_FILE = 'AI/accountRights.php';
+
     /**
      * `$accountRights` as the package checks them: the package's own objects ({@see AgentRoleMappedAccountRights},
      * {@see AgentComposedAccountRights}) as they are; an application's object composed with the mapping of `$account`
-     * (its roles; without an account only `'*'` and delegations hold) — {@see AgentComposedAccountRights}.
+     * (its roles; without an account only `'*'` and delegations hold) — {@see AgentComposedAccountRights} — but only
+     * when the APPLICATION ships the mapping ({@see isAccountRightsMappingShippedByTheApplication()}). Without one the
+     * application's object is answered as it is: a package right it does not hold is not held (fail closed). The
+     * package's default mapping never grants a right to an application that answers with its own object.
      *
      * @param AgentAccountRightsInterface $accountRights
      * @param Account|null $account
@@ -154,10 +162,43 @@ class AIConversationEntitlementsService extends Service
         if ($accountRights instanceof AgentRoleMappedAccountRights || $accountRights instanceof AgentComposedAccountRights) {
             return $accountRights;
         }
+        if (!$this->isAccountRightsMappingShippedByTheApplication()) {
+            return $accountRights;
+        }
         $agentRoleMappedAccountRights = $account instanceof Account
             ? AgentRoleMappedAccountRights::forAccount($account)
             : AgentRoleMappedAccountRights::forRoleNamesUnderConfiguredMapping([]);
         return AgentComposedAccountRights::compose($accountRights, $agentRoleMappedAccountRights);
+    }
+
+    /**
+     * Whether the mapping `AI.accountRights` that is read comes from the application (its own
+     * `config/app/AI/accountRights.php`, in an application config root or any root other than this package's), not
+     * from the package's default file. Overridable for a host that keeps its mapping elsewhere.
+     */
+    public function isAccountRightsMappingShippedByTheApplication(): bool
+    {
+        $packageConfigRoot = realpath((string)AgentsModule::getConfigPath());
+        foreach (Config::getConfigRootDirectories() as $configRootDirectory) {
+            if (is_file($configRootDirectory . '/' . static::ACCOUNT_RIGHTS_MAPPING_FILE)) {
+                return realpath($configRootDirectory) !== $packageConfigRoot;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether the application answers rights with an object of its own: a subclass of this service that overrides
+     * {@see findAccountRightsOfConversation()} or {@see findAccountRightsOfCurrentAccount()}.
+     */
+    public function isAccountRightsAnsweredByTheApplication(): bool
+    {
+        foreach (['findAccountRightsOfConversation', 'findAccountRightsOfCurrentAccount'] as $methodName) {
+            if ((new \ReflectionMethod($this, $methodName))->getDeclaringClass()->getName() !== self::class) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
