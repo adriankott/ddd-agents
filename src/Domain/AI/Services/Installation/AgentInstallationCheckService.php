@@ -7,6 +7,7 @@ namespace DDD\Domain\AI\Services\Installation;
 use DDD\Domain\AI\Entities\Conversations\Entitlements\AgentDeclaredAccountRight;
 use DDD\Domain\AI\Entities\Conversations\Entitlements\AgentRoleMappedAccountRights;
 use DDD\Domain\AI\Entities\Discovery\AgentSourceRoot;
+use DDD\Domain\AI\Entities\Conversations\Subjects\AIConversationSubjectBinding;
 use DDD\Domain\AI\Entities\Installation\AgentFeatureTableConditions;
 use DDD\Domain\AI\Entities\Installation\AgentInstallationDatabaseProbe;
 use DDD\Domain\AI\Entities\Installation\AgentInstallationFinding;
@@ -69,7 +70,8 @@ use Throwable;
  *   is no MCP package (a bundle, a controller) — never read there;
  * - `toolOverlays` (WARNING): an entry of `AI.toolOverlays` with a key the overlay does not read, or for a tool name no
  *   bound package has;
- * - `missingTables` (BLOCKING): a table of a package entity the schema lacks (DB unreachable: one WARNING; the tables
+ * - `missingTables` (BLOCKING; WARNING for a table the code works without,
+ *   {@see getEntityClassesWhoseMissingTableTheCodeTolerates()}): a table of a package entity the schema lacks (DB unreachable: one WARNING; the tables
  *   are read over a probe connection of its own with a short connect timeout, {@see findDatabaseProbe()});
  * - `renamedConfigKeys` (WARNING): a config key a package renamed (`renames.json`, kind `configKey`) or removed
  *   ({@see REMOVED_CONFIG_KEYS_BY_VERSION}) still set;
@@ -768,6 +770,17 @@ class AgentInstallationCheckService extends Service
             if (isset($liveTableNamesInLowerCase[strtolower($tableName)])) {
                 continue;
             }
+            if (in_array($entityClassName, $this->getEntityClassesWhoseMissingTableTheCodeTolerates(), true)
+                || in_array(get_parent_class($entityClassName) ?: '', $this->getEntityClassesWhoseMissingTableTheCodeTolerates(), true)) {
+                $agentInstallationFindings->addFinding(
+                    static::CHECK_MISSING_TABLES,
+                    AgentInstallationFinding::SEVERITY_WARNING,
+                    $tableName,
+                    "The table '$tableName' of $entityClassName does not exist: the code works without it, the feature it stores is off until it exists.",
+                    "Create it when the feature is wanted (php bin/console app:entity:show-sql " . (new ReflectionClass($entityClassName))->getShortName() . "; the schema diff of the database models), or list it in acceptedMissingTables of config/app/AI/installationCheck.php."
+                );
+                continue;
+            }
             $agentInstallationFindings->addFinding(
                 static::CHECK_MISSING_TABLES,
                 AgentInstallationFinding::SEVERITY_BLOCKING,
@@ -776,6 +789,18 @@ class AgentInstallationCheckService extends Service
                 "Create it (php bin/console app:entity:show-sql " . (new ReflectionClass($entityClassName))->getShortName() . "; the schema diff of the database models), exclude it in Base.Repo.database.excludedTables, or list it in acceptedMissingTables of config/app/AI/installationCheck.php."
             );
         }
+    }
+
+    /**
+     * The entity classes whose table the code checks before it reads it and works without (the feature it stores is
+     * off until the table exists): a missing table of one of them is a WARNING, not BLOCKING. An application adds its
+     * own optional tables here.
+     *
+     * @return string[]
+     */
+    protected function getEntityClassesWhoseMissingTableTheCodeTolerates(): array
+    {
+        return [AIConversationSubjectBinding::class];
     }
 
     /**

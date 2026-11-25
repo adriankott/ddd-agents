@@ -7,6 +7,8 @@ namespace DDD\Tests\Agents\Presentation\Api\Agents\Conversations;
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Entities\Conversations\AIConversationSummary;
 use DDD\Infrastructure\Base\DateTime\DateTime;
+use DDD\Presentation\Api\Agents\Conversations\Controller\AgentConversationPurposeStartTrait;
+use DDD\Presentation\Api\Agents\Conversations\Controller\AgentConversationWritesTrait;
 use DDD\Presentation\Api\Agents\Conversations\Dtos\AIConversationRunStateGetResponseDto;
 use DDD\Presentation\Base\Router\Routes\Delete;
 use DDD\Presentation\Base\Router\Routes\Get;
@@ -43,6 +45,16 @@ class AgentConversationControllerTraitsTest extends TestCase
         'delete' => ['DELETE', '/{aiConversationId}'],
         'getSelectableAgentModels' => ['GET', '/selectable-models'],
     ];
+
+    public function testThePurposedStartRouteComesOnlyWithItsOwnTrait(): void
+    {
+        $writesTraitMethodNames = array_map(
+            static fn (ReflectionMethod $reflectionMethod): string => $reflectionMethod->getName(),
+            (new ReflectionClass(AgentConversationWritesTrait::class))->getMethods()
+        );
+        self::assertNotContains('startPurpose', $writesTraitMethodNames, 'an update must not mount a new client route in a controller that uses the write routes');
+        self::assertTrue((new ReflectionClass(AgentConversationPurposeStartTrait::class))->hasMethod('startPurpose'));
+    }
 
     public function testAControllerUsingTheTraitsGetsTheChatRoutesAndTheStartStaysUnrouted(): void
     {

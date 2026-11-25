@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.6.11
+
+**The purposed start route is opt-in; its subject classes are listed by the application; the optional subject table
+is a warning.** Corrections to 0.6.9. No web change; npm `@mgamadeus/ddd-agents` 0.6.11 in lockstep.
+
+- **Changed: `POST …/startPurpose` comes with its own trait, `AgentConversationPurposeStartTrait`.** 0.6.9 put it into
+  `AgentConversationWritesTrait`, so an update alone mounted a new client route in every application that uses the
+  write routes, without the quota or envelope attributes an application puts on its redeclared routes. A controller now
+  adds the trait on purpose (`use AgentConversationPurposeStartTrait;`); an application that redeclares its routes
+  redeclares this one too (body `buildPurposeStartedResponse()`). An application that adopted 0.6.9 and calls the
+  route adds the trait.
+- **Changed: `isSubjectEntityClassAllowedForPurposeStart()` answers no class by default** (0.6.9: every entity class).
+  A start that names a subject answers 404 until the application lists the classes its purposes work on; a start
+  without a subject is not affected. Every entity class by default made the route a probe for which ids exist wherever
+  an entity class carries no read rights.
+- **Changed: `app:agent:check-installation` reports a missing `AIConversationSubjectBindings` as a WARNING,** not
+  BLOCKING: the code works without it (a subject is ignored until the table exists). New protected
+  `AgentInstallationCheckService::getEntityClassesWhoseMissingTableTheCodeTolerates(): string[]` lists such tables; an
+  application adds its own. An application that listed the table in `acceptedMissingTables` may keep or drop the line.
+- Tests: the write routes no longer carry `startPurpose`, the new trait does; a subject without a listed class answers
+  404; the missing subject table is a warning while a table the code reads stays blocking.
+
 ## 0.6.10
 
 **`app:mcp:clear-cache` rebuilds the container in a child process; the Agent.UI picture keeps the columns of a wide

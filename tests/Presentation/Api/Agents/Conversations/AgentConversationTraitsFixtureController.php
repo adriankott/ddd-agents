@@ -6,6 +6,7 @@ namespace DDD\Tests\Agents\Presentation\Api\Agents\Conversations;
 
 use DDD\Domain\AI\Entities\AgentSpaces\AgentSpace;
 use DDD\Domain\AI\Services\Conversations\AIConversationAgentService;
+use DDD\Presentation\Api\Agents\Conversations\Controller\AgentConversationPurposeStartTrait;
 use DDD\Presentation\Api\Agents\Conversations\Controller\AgentConversationReadsTrait;
 use DDD\Presentation\Api\Agents\Conversations\Controller\AgentConversationStartTrait;
 use DDD\Presentation\Api\Agents\Conversations\Controller\AgentConversationWritesTrait;
@@ -18,7 +19,7 @@ use DDD\Presentation\Api\Agents\Conversations\Dtos\AIConversationStartWithMessag
 /** A consuming application's controller that only mounts the traits. */
 class AgentConversationTraitsFixtureController
 {
-    use AgentConversationReadsTrait, AgentConversationWritesTrait, AgentConversationStartTrait, AgentSelectableModelsTrait;
+    use AgentConversationReadsTrait, AgentConversationWritesTrait, AgentConversationStartTrait, AgentConversationPurposeStartTrait, AgentSelectableModelsTrait;
 
     public function callHideAgentForensicsUnlessImpersonating(): void
     {
@@ -53,12 +54,12 @@ class AgentConversationTraitsFixtureController
         return $this->findAgentSpaceOfPurposeStartRequest($requestDto);
     }
 
-    /** @var string|null The only subject class a purposed start may name; null = every entity class (the default) */
-    public ?string $onlyAllowedSubjectEntityClass = null;
+    /** @var string[]|null The subject classes a purposed start may name; null = the trait's default (none) */
+    public ?array $allowedSubjectEntityClasses = null;
 
     protected function isSubjectEntityClassAllowedForPurposeStart(string $purposeName, string $subjectEntityClass): bool
     {
-        return $this->onlyAllowedSubjectEntityClass === null || $subjectEntityClass === $this->onlyAllowedSubjectEntityClass;
+        return $this->allowedSubjectEntityClasses !== null && in_array($subjectEntityClass, $this->allowedSubjectEntityClasses, true);
     }
 
     public function callBuildPurposeStartedResponse(

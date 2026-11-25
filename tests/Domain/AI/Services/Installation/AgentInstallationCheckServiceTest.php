@@ -285,6 +285,28 @@ class AgentInstallationCheckServiceTest extends UnitTestCase
         self::assertNull(AgentFeatureTableCondition::create(AgentSpace::class, 'the spaces', true, 'Demo.NotBound')->findReasonTableIsNotRequired(['Demo.NotBound']));
     }
 
+    public function testAMissingTableTheCodeWorksWithoutIsAWarningNotBlocking(): void
+    {
+        $agentInstallationCheckService = new AgentInstallationCheckWithFixtureTablesDouble();
+        $agentInstallationCheckService->fixtureLiveTableNames = [];
+        $agentInstallationCheckService->setAgentFeatureTableConditionProviders([]);
+
+        $findings = $this->runOnlyCheck(AgentInstallationCheckService::CHECK_MISSING_TABLES, $agentInstallationCheckService);
+
+        $subjectBindingsFindings = array_values(array_filter(
+            $findings->getElements(),
+            static fn (AgentInstallationFinding $agentInstallationFinding): bool => $agentInstallationFinding->subject === 'AIConversationSubjectBindings'
+        ));
+        self::assertCount(1, $subjectBindingsFindings);
+        self::assertSame(AgentInstallationFinding::SEVERITY_WARNING, $subjectBindingsFindings[0]->severity);
+        self::assertStringContainsString('the code works without it', $subjectBindingsFindings[0]->message);
+        $spacesFindings = array_values(array_filter(
+            $findings->getElements(),
+            static fn (AgentInstallationFinding $agentInstallationFinding): bool => $agentInstallationFinding->subject === 'AgentSpaces'
+        ));
+        self::assertSame(AgentInstallationFinding::SEVERITY_BLOCKING, $spacesFindings[0]->severity, 'a table the code reads stays blocking');
+    }
+
     public function testTheRenamesRecordIsFoundInAParentDirectoryUpToTheRepositoryRootOrAtTheConfiguredPath(): void
     {
         $this->fixtureDirectory = sys_get_temp_dir() . '/agent-installation-check-' . bin2hex(random_bytes(4));

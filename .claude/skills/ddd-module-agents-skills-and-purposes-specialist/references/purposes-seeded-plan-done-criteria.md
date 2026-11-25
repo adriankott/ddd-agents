@@ -134,14 +134,19 @@ A purpose that works on one record at a time (one support ticket, one order) sta
 
 ### The route
 
-`POST …/startPurpose` (`AgentConversationWritesTrait::startPurpose()`, body `buildPurposeStartedResponse()`), body
-`purposeId`, `agentSpaceId` (optional), `subject` (optional; `subjectEntityClass`, `subjectEntityId`), `prefill` (optional, ≤ 4,000 characters, the
-kickoff appendix of a new conversation). Answer: `aiConversationId`, `resumedExistingConversation`, `prefillDelivered`.
-Scope CUSTOMER, so `startableViaApi` and `requiredFeatureFlags` apply exactly as with the PHP starter. The space comes
-from `findAgentSpaceOfPurposeStartRequest()` (default: the body's `agentSpaceId` under read rights, 400 without one);
-a host with one personal space per account overrides it. Web: `AgentsConversationClient.startPurpose(request)` (optional on the port) →
-`StartedPurposeConversation` (`conversationId`, `resumedExisting`, `prefillDelivered`); the host opens the conversation
-by its id.
+`POST …/startPurpose` comes with its own trait, `AgentConversationPurposeStartTrait` (`startPurpose()`, body
+`buildPurposeStartedResponse()`): a controller adds it on purpose; an update never mounts the route in a controller
+that uses the other chat traits. Body: `purposeId`, `agentSpaceId` (optional), `subject` (optional;
+`subjectEntityClass`, `subjectEntityId`), `prefill` (optional, ≤ 4,000 characters, the kickoff appendix of a new
+conversation). Answer: `aiConversationId`, `resumedExistingConversation`, `prefillDelivered`. Scope CUSTOMER, so
+`startableViaApi` and `requiredFeatureFlags` apply exactly as with the PHP starter. The space comes from
+`findAgentSpaceOfPurposeStartRequest()` (default: the body's `agentSpaceId` under read rights, 400 without one); a host
+with one personal space per account overrides it. The subject classes a client may name come from
+`isSubjectEntityClassAllowedForPurposeStart()` (default: none, so a start with a subject answers 404 until the host
+lists its classes; a start without a subject is not affected). A host that redeclares its routes to add a quota or an
+envelope attribute redeclares this one too. Web: `AgentsConversationClient.startPurpose(request)` (optional on the
+port) → `StartedPurposeConversation` (`conversationId`, `resumedExisting`, `prefillDelivered`); the host opens the
+conversation by its id.
 
 ## The hooks of the purpose class
 

@@ -9,7 +9,7 @@ use DDD\Presentation\Base\Dtos\RequestDto;
 use DDD\Presentation\Base\OpenApi\Attributes\Parameter;
 
 /**
- * The start of a purposed conversation by the client ({@see \DDD\Presentation\Api\Agents\Conversations\Controller\AgentConversationWritesTrait::startPurpose()}).
+ * The start of a purposed conversation by the client ({@see \DDD\Presentation\Api\Agents\Conversations\Controller\AgentConversationPurposeStartTrait::startPurpose()}).
  */
 class AIConversationStartPurposePostRequestDto extends RequestDto
 {

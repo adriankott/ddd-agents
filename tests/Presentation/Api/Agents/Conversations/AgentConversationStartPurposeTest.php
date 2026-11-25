@@ -19,7 +19,7 @@ use DDD\Tests\Agents\Support\IntegrationTestCase;
 use ReflectionClass;
 
 /**
- * The purposed start route `POST …/startPurpose` ({@see \DDD\Presentation\Api\Agents\Conversations\Controller\AgentConversationWritesTrait::startPurpose()}):
+ * The purposed start route `POST …/startPurpose` ({@see \DDD\Presentation\Api\Agents\Conversations\Controller\AgentConversationPurposeStartTrait::startPurpose()}):
  * the space it runs in, the subject check before anything starts (400 malformed, 404 unreadable), the hand-over to
  * the PHP starter with scope CUSTOMER, and the answer the client opens.
  *
@@ -50,6 +50,21 @@ class AgentConversationStartPurposeTest extends IntegrationTestCase
 
         // the subject is a space the space service does not answer: unknown or not readable, one answer for both
         $requestDto = $this->buildRequestDto(self::AGENT_SPACE_ID, AIConversationSubject::of(AgentSpace::class, 999));
+        $fixtureController = new AgentConversationTraitsFixtureController();
+        $fixtureController->allowedSubjectEntityClasses = [AgentSpace::class];
+
+        $this->expectException(NotFoundException::class);
+        $fixtureController->callBuildPurposeStartedResponse($requestDto, $aIConversationAgentService);
+    }
+
+    public function testByDefaultNoSubjectClassIsAllowedSoASubjectAnswers404(): void
+    {
+        $this->replaceService(AgentSpacesService::class, $this->buildSpacesServiceWithTheSpace());
+        $aIConversationAgentService = $this->createMock(AIConversationAgentService::class);
+        $aIConversationAgentService->expects(self::never())->method('startOrResumePurposedConversationOfSubject');
+
+        // a readable record, but the application has listed no subject class
+        $requestDto = $this->buildRequestDto(self::AGENT_SPACE_ID, AIConversationSubject::of(AgentSpace::class, self::AGENT_SPACE_ID));
 
         $this->expectException(NotFoundException::class);
         (new AgentConversationTraitsFixtureController())->callBuildPurposeStartedResponse($requestDto, $aIConversationAgentService);
@@ -61,7 +76,7 @@ class AgentConversationStartPurposeTest extends IntegrationTestCase
         $aIConversationAgentService = $this->createMock(AIConversationAgentService::class);
         $aIConversationAgentService->expects(self::never())->method('startOrResumePurposedConversationOfSubject');
         $fixtureController = new AgentConversationTraitsFixtureController();
-        $fixtureController->onlyAllowedSubjectEntityClass = AIConversation::class;
+        $fixtureController->allowedSubjectEntityClasses = [AIConversation::class];
 
         // a readable record of a class the application does not list for its purposes
         $requestDto = $this->buildRequestDto(self::AGENT_SPACE_ID, AIConversationSubject::of(AgentSpace::class, self::AGENT_SPACE_ID));
@@ -112,7 +127,9 @@ class AgentConversationStartPurposeTest extends IntegrationTestCase
             ->willReturn(AgentPurposedConversationStart::started($startedConversation));
 
         $requestDto = $this->buildRequestDto(self::AGENT_SPACE_ID, AIConversationSubject::of('\\' . AgentSpace::class, self::AGENT_SPACE_ID), 'Ticket #13082');
-        $responseDto = (new AgentConversationTraitsFixtureController())->callBuildPurposeStartedResponse($requestDto, $aIConversationAgentService);
+        $fixtureController = new AgentConversationTraitsFixtureController();
+        $fixtureController->allowedSubjectEntityClasses = [AgentSpace::class];
+        $responseDto = $fixtureController->callBuildPurposeStartedResponse($requestDto, $aIConversationAgentService);
 
         self::assertSame(4711, $responseDto->aiConversationId);
         self::assertFalse($responseDto->resumedExistingConversation);

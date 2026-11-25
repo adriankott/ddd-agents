@@ -94,7 +94,7 @@ trait AgentConversationControllerHooksTrait
     }
 
     /**
-     * The space a purposed start ({@see AgentConversationWritesTrait::startPurpose()}) runs in. A purpose always runs
+     * The space a purposed start ({@see AgentConversationPurposeStartTrait::startPurpose()}) runs in. A purpose always runs
      * in a space (its singleton is kept per space), so there is no account-level answer.
      *
      * The default reads the request's `agentSpaceId` under the caller's read rights like
@@ -117,10 +117,11 @@ trait AgentConversationControllerHooksTrait
 
     /**
      * Whether a client may name a record of `$subjectEntityClass` as the subject of a purposed start of `$purposeName`
-     * ({@see AgentConversationWritesTrait::startPurpose()}). The record itself is read under the caller's read rights
+     * ({@see AgentConversationPurposeStartTrait::startPurpose()}). The record itself is read under the caller's read rights
      * afterwards; this hook narrows which entity classes a client may name at all, so a class without read rights is
-     * no probe for which ids exist. Default: every entity class. An application lists the classes its purposes work on
-     * (e.g. the support ticket class for a ticket purpose); a refused class answers 404 like an unknown record.
+     * no probe for which ids exist. Default: no class, so a start that names a subject answers 404 until the application
+     * lists the classes its purposes work on (e.g. the support ticket class for a ticket purpose); a refused class
+     * answers 404 like an unknown record. A start without a subject is not affected.
      *
      * @param string $purposeName
      * @param string $subjectEntityClass fully qualified, without a leading backslash
@@ -128,7 +129,7 @@ trait AgentConversationControllerHooksTrait
      */
     protected function isSubjectEntityClassAllowedForPurposeStart(string $purposeName, string $subjectEntityClass): bool
     {
-        return true;
+        return false;
     }
 
     /**
