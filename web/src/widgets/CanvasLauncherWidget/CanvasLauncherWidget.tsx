@@ -43,6 +43,11 @@ export interface CanvasLauncherWidgetProps {
   /** Optional leading icon (a glyph hinting what the canvas holds). Falls back to a generic panel glyph. */
   icon?: AgentsIconName;
   /**
+   * A drawing of the caller for the leading badge (e.g. a folder), in place of the `icon` glyph: for a widget whose
+   * subject has no name among the package icons. Decorative; it inherits the badge's colour and box.
+   */
+  leading?: ReactNode;
+  /**
    * A preview of the picture the canvas opens with. Set → the RICH card: the thumbnail replaces the icon badge, the
    * title gets more weight, and the hover is the component library's `GlobalStateComponent` layer (e.g. an app's closing summary
    * card with a hero picture).
@@ -100,6 +105,7 @@ export const CanvasLauncherWidget = ({
   subtitleReplacements,
   translateSubtitle = true,
   icon,
+  leading,
   thumbnail,
   justDelivered = false,
   canvas,
@@ -195,7 +201,7 @@ export const CanvasLauncherWidget = ({
     : renderCard(
         <>
           <span className={styles.leadingIconBadge}>
-            <Icon name={icon ?? DEFAULT_ICON} />
+            {leading ?? <Icon name={icon ?? DEFAULT_ICON} />}
           </span>
           <div className={styles.body}>
             <Text

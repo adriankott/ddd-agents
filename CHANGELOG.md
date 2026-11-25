@@ -23,6 +23,8 @@ Drive files open in the canvas. Web package only; no PHP change.
   `isPackageCanvasId`, `canvasKindOpenerWidgetNamesOf`.
 - **Default icons:** `visibility` (the open-in-the-canvas button of a `DriveFiles` row) and `details` draw a glyph
   (`◎`, `⋯`) instead of the fallback dot.
+- **`CanvasLauncherWidget`: `leading`** (optional node): the caller's own drawing in the leading badge in place of the
+  `icon` glyph, for a subject without a package icon name (the folder of ddd-clouddrive's `DriveFolder` block).
 
 ## 0.3.13
 
