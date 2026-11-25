@@ -139,7 +139,8 @@ class AIConversationScheduleTransitionTest extends UnitTestCase
             self::KIND_ONE_TIME => [self::TO_PAUSED, self::NO, self::NO, self::NO, self::NO, self::NO],
         ],
         // only a PAUSED schedule the owner paused resumes; a one-time one only while its moment lies ahead; one whose
-        // lifetime is over is closed by the resume; a schedule the platform transitioned names that state in every status
+        // lifetime is over is closed by the resume; a schedule the platform paused or cancelled names that state, any
+        // other status with a reason left in the row is refused for its status
         AIConversationScheduleTransition::OPERATION_RESUME => [
             self::KIND_RECURRING => [self::NO, self::TO_ACTIVE_RE_ARMED, self::NO, self::NO, self::NO, self::NO],
             self::KIND_RECURRING_EXPIRED => [self::NO, self::TO_EXPIRED, self::NO, self::NO, self::NO, self::NO],
@@ -147,8 +148,8 @@ class AIConversationScheduleTransitionTest extends UnitTestCase
             self::KIND_ONE_TIME => [self::NO, self::TO_ACTIVE_RE_ARMED, self::NO, self::NO, self::NO, self::NO],
             self::KIND_ONE_TIME_PAST => [self::NO, self::NO_MOMENT_PASSED, self::NO, self::NO, self::NO, self::NO],
             self::KIND_ONE_TIME_NOW => [self::NO, self::NO_MOMENT_PASSED, self::NO, self::NO, self::NO, self::NO],
-            self::KIND_RECURRING_CLOSED_BY_PLATFORM_STATE => [self::NO_PLATFORM, self::NO_PLATFORM, self::NO_PLATFORM, self::NO_PLATFORM, self::NO_PLATFORM, self::NO_PLATFORM],
-            self::KIND_ONE_TIME_PAST_CLOSED_BY_PLATFORM_STATE => [self::NO_PLATFORM, self::NO_PLATFORM, self::NO_PLATFORM, self::NO_PLATFORM, self::NO_PLATFORM, self::NO_PLATFORM],
+            self::KIND_RECURRING_CLOSED_BY_PLATFORM_STATE => [self::NO, self::NO_PLATFORM, self::NO, self::NO, self::NO_PLATFORM, self::NO],
+            self::KIND_ONE_TIME_PAST_CLOSED_BY_PLATFORM_STATE => [self::NO, self::NO_PLATFORM, self::NO, self::NO, self::NO_PLATFORM, self::NO],
         ],
         // a live schedule cancels; a final status stays
         AIConversationScheduleTransition::OPERATION_CANCEL => [

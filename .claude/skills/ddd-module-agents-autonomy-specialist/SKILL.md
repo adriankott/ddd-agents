@@ -66,10 +66,10 @@ Not here: the conversation tree, run claims and the release of a child's run (lo
 
 ## Traps
 
-- **Overriding only the find methods of eligibility.** The turn start and the state sweep act on the find result
-  itself, so turns of a SUSPENDED scope are released and its schedules paused. But the fire step, the tool executor,
-  the workers and the report mail ask the refusal methods, whose default refuses nothing: schedules still fire, tools
-  still execute, workers still run, mails still go. Override all three refusal methods.
+- **Overriding only the find methods of eligibility.** The turn start acts on the find result itself, so turns of a
+  SUSPENDED scope are released. But the state sweep, the fire step, the resume, the tool executor, the workers and the
+  report mail ask the refusal methods, whose default refuses nothing: the sweep pauses nothing, schedules still fire,
+  tools still execute, workers still run, mails still go. Override all three refusal methods.
 - **Fire command without the expiry step.** `spawnRunConversationForClaimedSchedule()` does not expire a schedule; the
   command checks `AIConversationScheduleTransition::OPERATION_EXPIRE` before it claims.
 - **Schedule tools without the provenance guard.** The package's schedule tools (`AgentTaskSchedulesMCPPackage`) have

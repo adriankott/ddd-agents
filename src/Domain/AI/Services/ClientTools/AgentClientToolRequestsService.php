@@ -387,13 +387,20 @@ class AgentClientToolRequestsService extends Service
         return $agentClientToolAnswer;
     }
 
+    /** Whether an answer of the request is stored (the cache answers a miss with `false`, some doubles with null: both are no answer) */
     protected function hasAnswer(int $requestId): bool
     {
         try {
-            return $this->getSharedCache()?->get($this->buildAnswerKey($requestId)) !== null;
+            return !static::isCacheMiss($this->getSharedCache()?->get($this->buildAnswerKey($requestId)));
         } catch (Throwable) {
             return false;
         }
+    }
+
+    /** Whether a value read from the cache is a miss: Core's `Cache::get()` answers a miss with `false`, not null */
+    public static function isCacheMiss(mixed $cachedValue): bool
+    {
+        return $cachedValue === false || $cachedValue === null;
     }
 
     /**
@@ -409,7 +416,7 @@ class AgentClientToolRequestsService extends Service
         try {
             return $sharedCache->increment(static::ANSWER_CLAIM_KEY_PREFIX . $requestId, 1, $ttlSeconds) === 1;
         } catch (\BadMethodCallException) {
-            return $sharedCache->get($this->buildAnswerKey($requestId)) === null;
+            return static::isCacheMiss($sharedCache->get($this->buildAnswerKey($requestId)));
         }
     }
 

@@ -162,6 +162,13 @@ class AIConversationScheduleTransition extends ValueObject
     /** @var bool Whether the fire anchor is recomputed from now (a row that enters or stays ACTIVE with new timing). */
     public bool $reArmsFireAnchor = false;
 
+    /**
+     * @var bool Whether the transition is applied only when the application refuses automation for the scope (a pause
+     * or a close of the state sweep: {@see \DDD\Domain\AI\Services\Conversations\Eligibility\AgentAutomationEligibilityService::refusesAutomation()},
+     * the same answer that decides the fire and the resume). A re-arming is no refusal and never asks.
+     */
+    public bool $appliesOnlyWhenTheApplicationRefuses = false;
+
     /** @var int|null Seconds until a manual fire is allowed again ({@see REFUSAL_MANUAL_FIRE_INTERVAL}). */
     public ?int $secondsUntilManualFireIsAllowed = null;
 
@@ -211,6 +218,7 @@ class AIConversationScheduleTransition extends ValueObject
         $this->refusalReason = $refusalReason;
         $this->targetStatus = null;
         $this->reArmsFireAnchor = false;
+        $this->appliesOnlyWhenTheApplicationRefuses = false;
     }
 
     /** Whether the row is still live (ACTIVE or PAUSED) — every other status is final. */
@@ -231,8 +239,9 @@ class AIConversationScheduleTransition extends ValueObject
 
     /**
      * Only a PAUSED row the OWNER paused resumes — a row the platform paused for a locked agent space / account is
-     * re-armed by the sweep when the state clears, never by hand. A refused row the platform
-     * transitioned names that state, whatever its status. A one-time row resumes only while its moment lies ahead:
+     * re-armed by the sweep when the state clears, never by hand. A refused row the platform paused or closed (PAUSED
+     * or CANCELLED with a state reason) names that state; any other status is refused for its status, even with a
+     * reason left in the row (a row the owner archived after a platform pause, say). A one-time row resumes only while its moment lies ahead:
      * re-arming a past moment fired it at the next due scan or had it expired. A row past its ttl or its runs is
      * closed: the resume moves it to EXPIRED (told before the scope). Given the scope's eligibility, the scope must be
      * eligible.
@@ -240,7 +249,9 @@ class AIConversationScheduleTransition extends ValueObject
     protected function decideResume(AIConversationSchedule $schedule, ?AgentAutomationEligibility $eligibility, DateTime $now): void
     {
         if ($schedule->status !== AIConversationScheduleStatus::PAUSED || $schedule->isClosedByPlatformState()) {
-            $this->refuseFor($schedule->isClosedByPlatformState() ? self::REFUSAL_CLOSED_BY_PLATFORM_STATE : self::REFUSAL_STATUS);
+            $isPausedOrClosedByThePlatform = $schedule->isClosedByPlatformState()
+                && in_array($schedule->status, [AIConversationScheduleStatus::PAUSED, AIConversationScheduleStatus::CANCELLED], true);
+            $this->refuseFor($isPausedOrClosedByThePlatform ? self::REFUSAL_CLOSED_BY_PLATFORM_STATE : self::REFUSAL_STATUS);
             return;
         }
         if ($schedule->isOneTime() && $schedule->oneTimeAt->getTimestamp() <= $now->getTimestamp()) {
@@ -476,9 +487,11 @@ class AIConversationScheduleTransition extends ValueObject
             if ($eligibility->isEnded() || $eligibility->isErased()) {
                 $this->allowTo(AIConversationScheduleStatus::CANCELLED);
                 $this->stateReason = $terminalReason;
+                $this->appliesOnlyWhenTheApplicationRefuses = true;
             } elseif ($eligibility->isSuspended()) {
                 $this->allowTo(AIConversationScheduleStatus::PAUSED);
                 $this->stateReason = $terminalReason;
+                $this->appliesOnlyWhenTheApplicationRefuses = true;
             }
             return;
         }
@@ -488,6 +501,7 @@ class AIConversationScheduleTransition extends ValueObject
         if ($eligibility->isEnded() || $eligibility->isErased()) {
             $this->allowTo(AIConversationScheduleStatus::CANCELLED);
             $this->stateReason = $terminalReason;
+            $this->appliesOnlyWhenTheApplicationRefuses = true;
             return;
         }
         if ($schedule->isClosedByPlatformState() && $eligibility->isEligible()) {

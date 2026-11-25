@@ -301,14 +301,20 @@ const useElementWidth = (): [number | null, (element: HTMLElement | null) => voi
  * While the side pane covers the main pane: it takes the full width of the split, sits in its own stacking context
  * above the main pane's layers with an opaque background, the covered main pane is inert (no Tab, hidden from
  * assistive technology), the focus moves into the side pane and back to where it was in the main pane when the side
- * pane stops covering it, and the toggle floats over the side pane's top end. Side by side the toggle is the strip on
- * the divider. The toggle carries a translated name (`Close canvas` / `Re-open canvas`) and an icon.
+ * pane stops covering it, and the toggle floats over the side pane's top end. Below `coversBelowWidth` with the side
+ * pane closed there is no divider: the toggle floats over the main pane's top end as the re-open control, unless the
+ * main pane shows its own (`sideToggle.mainPaneShowsReopen`). Side by side the toggle is the strip on the divider. The
+ * toggle carries a translated name (`Close canvas` / `Re-open canvas`) and an icon.
  */
 const DefaultSplitView = (props: AgentsSplitViewProps) => {
   const { isSideOpen, coversBelowWidth, main, side, sideToggle } = props;
   const [splitViewWidth, observeSplitView] = useElementWidth();
   const coversMain = coversBelowWidth !== undefined && splitViewWidth !== null && splitViewWidth < coversBelowWidth;
   const isMainCovered = isSideOpen && coversMain;
+  // Narrow and closed: no divider to carry the toggle, so it floats over the chat — the only way back to the canvas
+  // unless the chat shows its own re-open control.
+  const floatsReopenOverMain = coversMain && !isSideOpen && !sideToggle?.mainPaneShowsReopen;
+  const togglesFloat = isMainCovered || floatsReopenOverMain;
   const toggleLabel = useTranslatedText(isSideOpen ? "Close canvas" : "Re-open canvas");
   const sidePaneRef = useRef<HTMLDivElement>(null);
   const lastFocusedInMainRef = useRef<HTMLElement | null>(null);
@@ -330,12 +336,12 @@ const DefaultSplitView = (props: AgentsSplitViewProps) => {
   const toggleButton = sideToggle ? (
     <button
       type="button"
-      className={classNames("agents-split-view__toggle", isMainCovered && "agents-split-view__toggle--floating")}
+      className={classNames("agents-split-view__toggle", togglesFloat && "agents-split-view__toggle--floating")}
       onClick={sideToggle.onToggle}
       aria-expanded={isSideOpen}
       aria-label={toggleLabel}
       title={toggleLabel}
-      style={isMainCovered ? { position: "absolute", top: 8, insetInlineEnd: 8, zIndex: 21 } : undefined}
+      style={togglesFloat ? { position: "absolute", top: 8, insetInlineEnd: 8, zIndex: 21 } : undefined}
     >
       <DefaultIcon name={isSideOpen ? "closeCanvas" : "maximize"} size="small" />
     </button>
@@ -395,7 +401,7 @@ const DefaultSplitView = (props: AgentsSplitViewProps) => {
           {side.content}
         </div>
       ) : null}
-      {isMainCovered ? toggleButton : null}
+      {togglesFloat ? toggleButton : null}
     </div>
   );
 };

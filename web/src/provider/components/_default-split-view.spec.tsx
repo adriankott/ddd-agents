@@ -54,13 +54,18 @@ describe("DefaultSplitView", () => {
     expect(sidePane.style.width).toBe("100%");
   });
 
-  const renderSplitView = (isSideOpen: boolean, onToggle = vi.fn()) => {
+  const renderSplitView = (
+    isSideOpen: boolean,
+    onToggle = vi.fn(),
+    toggleOptions: { withToggle?: boolean; mainPaneShowsReopen?: boolean } = {},
+  ) => {
     const { SplitView } = DEFAULT_AGENTS_COMPONENTS;
+    const { withToggle = true, mainPaneShowsReopen } = toggleOptions;
     return render(
       <SplitView
         isSideOpen={isSideOpen}
         coversBelowWidth={850}
-        sideToggle={{ onToggle, verticalPositionPercent: 50 }}
+        sideToggle={withToggle ? { onToggle, verticalPositionPercent: 50, mainPaneShowsReopen } : undefined}
         main={{
           width: "100%",
           narrowedWidth: "60%",
@@ -170,5 +175,63 @@ describe("DefaultSplitView", () => {
 
     act(() => rerenderWith(false));
     expect(document.activeElement).toBe(screen.getByTestId("main-control"));
+  });
+  test("narrow and closed with a canvas to re-open: the named toggle floats over the chat and re-opens", () => {
+    const reportWidth = installManualResizeObserver();
+    const onToggle = vi.fn();
+    renderSplitView(false, onToggle);
+    act(() => reportWidth(480));
+
+    const toggle = screen.getByRole("button", { name: "Re-open canvas" });
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(toggle.querySelector("[data-icon='maximize']")).not.toBeNull();
+    expect(toggle.classList.contains("agents-split-view__toggle--floating")).toBe(true);
+    expect(toggle.style.position).toBe("absolute");
+    const mainPane = screen.getByTestId("main-control").parentElement as HTMLElement;
+    expect(mainPane.contains(toggle)).toBe(false);
+    expect(mainPane.hasAttribute("inert")).toBe(false);
+    expect(screen.queryByText("canvas")).toBeNull();
+
+    toggle.click();
+    expect(onToggle).toHaveBeenCalledTimes(1);
+  });
+
+  test("narrow and closed without a canvas to re-open: no toggle", () => {
+    const reportWidth = installManualResizeObserver();
+    renderSplitView(false, vi.fn(), { withToggle: false });
+    act(() => reportWidth(480));
+    expect(screen.queryByRole("button", { name: "Re-open canvas" })).toBeNull();
+    expect(document.querySelector(".agents-split-view__toggle")).toBeNull();
+  });
+
+  test("narrow and closed while the chat shows its own re-open control: no second toggle", () => {
+    const reportWidth = installManualResizeObserver();
+    renderSplitView(false, vi.fn(), { mainPaneShowsReopen: true });
+    act(() => reportWidth(480));
+    expect(screen.queryByRole("button", { name: "Re-open canvas" })).toBeNull();
+    expect(document.querySelector(".agents-split-view__toggle")).toBeNull();
+  });
+
+  test("narrow and open: the chat's own re-open control does not hide the close toggle", () => {
+    const reportWidth = installManualResizeObserver();
+    renderSplitView(true, vi.fn(), { mainPaneShowsReopen: true });
+    act(() => reportWidth(480));
+    expect(screen.getByRole("button", { name: "Close canvas" }).style.position).toBe("absolute");
+  });
+
+  test("wide: the divider toggle is unchanged, open or closed, with or without the chat's own re-open control", () => {
+    const reportWidth = installManualResizeObserver();
+    const closedView = renderSplitView(false, vi.fn(), { mainPaneShowsReopen: true });
+    act(() => reportWidth(1200));
+    const reopenToggle = screen.getByRole("button", { name: "Re-open canvas" });
+    expect(reopenToggle.style.position).toBe("");
+    expect(reopenToggle.classList.contains("agents-split-view__toggle--floating")).toBe(false);
+    closedView.unmount();
+
+    renderSplitView(true);
+    act(() => reportWidth(1200));
+    const closeToggle = screen.getByRole("button", { name: "Close canvas" });
+    expect(closeToggle.style.position).toBe("");
+    expect(closeToggle.classList.contains("agents-split-view__toggle--floating")).toBe(false);
   });
 });

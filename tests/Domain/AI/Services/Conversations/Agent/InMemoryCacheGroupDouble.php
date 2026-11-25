@@ -40,10 +40,14 @@ class InMemoryCacheGroupDouble extends Cache
         throw new LogicException('The in-memory cache group has no adapter.');
     }
 
+    /** Core's semantics: a miss of a single key is `false`, never null */
     public function get(string ...$keys): mixed
     {
         $hits = $this->getMultiple($keys);
-        return count($keys) === 1 ? ($hits[$keys[0]] ?? null) : $hits;
+        if (count($keys) === 1) {
+            return array_key_exists($keys[0], $hits) ? $hits[$keys[0]] : false;
+        }
+        return $hits;
     }
 
     public function set(string $key, mixed $value, ?int $ttl = null, bool $deferred = false): void

@@ -34,9 +34,10 @@ class SimulatedClientRequestsServiceDouble extends AgentClientToolRequestsServic
 
     public ?Throwable $clientFailure = null;
 
-    public function __construct()
+    /** @param SharedCacheWithCountersDouble|null $sharedCache the shared cache; null: one with an atomic counter */
+    public function __construct(?SharedCacheWithCountersDouble $sharedCache = null)
     {
-        $this->sharedCache = new SharedCacheWithCountersDouble();
+        $this->sharedCache = $sharedCache ?? new SharedCacheWithCountersDouble();
         $this->channel = new RecordingTransportChannelServiceDouble($this->sharedCache);
         $this->channel->hasTransport = false;
         $this->presenceService = new SharedCachePresenceServiceDouble($this->sharedCache);

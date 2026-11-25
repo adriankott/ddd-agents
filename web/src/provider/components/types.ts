@@ -170,8 +170,12 @@ export interface AgentsSplitViewProps {
   coversBelowWidth?: number;
   main: AgentsSplitViewPane;
   side: AgentsSplitViewPane;
-  /** The toggle button on the divider. */
-  sideToggle?: { onToggle: () => void; verticalPositionPercent?: number };
+  /**
+   * The toggle button on the divider. While the side pane covers the main pane it floats over the top end; below
+   * `coversBelowWidth` with the side pane closed it floats over the main pane as the re-open control, unless
+   * `mainPaneShowsReopen` says the main pane shows a re-open control of its own.
+   */
+  sideToggle?: { onToggle: () => void; verticalPositionPercent?: number; mainPaneShowsReopen?: boolean };
 }
 
 /** The change of a figure as an arrow and a signed amount, coloured by whether it is good. */

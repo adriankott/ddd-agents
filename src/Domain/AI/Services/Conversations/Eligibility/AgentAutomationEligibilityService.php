@@ -15,7 +15,8 @@ use ReflectionException;
 
 /**
  * Whether the platform may run automated AI work for a space or an account right now — asked before a schedule fires,
- * a worker runs, a report is delivered and a tool executes — and the audited support override that lifts the refusal
+ * is resumed, or is paused or closed by the state sweep, before a worker runs, a report is delivered and a tool
+ * executes — and the audited support override that lifts the refusal
  * for one run.
  *
  * Every default answers "eligible", "never refuses" and "no override": an application without account states runs
@@ -63,7 +64,8 @@ class AgentAutomationEligibilityService extends Service
      * lifts the refusal in the application's implementation). The default never refuses.
      *
      * @param AgentAutomationEligibility $eligibility
-     * @param string $operation e.g. `scheduleFire`, `reportDelivery`, `toolCall`
+     * @param string $operation e.g. `scheduleFire`, `scheduleResume`, `scheduleStateSweep:PAUSED`, `reportDelivery`, `toolCall`
+     *     (the state sweep asks only for a pause or a close it would apply, never in a dry run)
      * @param AgentEligibilityLogContext $logContext
      * @return bool
      */

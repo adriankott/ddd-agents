@@ -14,6 +14,7 @@ use DDD\Infrastructure\Exceptions\ConflictException;
 use DDD\Infrastructure\Exceptions\ForbiddenException;
 use DDD\Infrastructure\Exceptions\NotFoundException;
 use DDD\Tests\Agents\Domain\AI\Services\Conversations\Agent\ToolPictureFixtures;
+use DDD\Tests\Agents\Domain\AI\Services\Conversations\Realtime\SharedCacheWithoutAtomicCounterDouble;
 use DDD\Tests\Agents\Support\UnitTestCase;
 
 /**
@@ -53,6 +54,59 @@ class AgentClientToolRequestsWithoutTablesTest extends UnitTestCase
         foreach (array_keys($requestsService->sharedCache->valuesByKey) as $cacheKey) {
             self::assertStringStartsNotWith(AgentClientToolRequestsService::ANSWER_KEY_PREFIX . $answer->requestId, $cacheKey, 'the answer is forgotten once read');
         }
+    }
+
+    /**
+     * The delivery to a real client goes through {@see AgentClientToolRequestsService::findDeliveryForClient()}, over a
+     * cache that answers a miss with `false` (Core's semantics): an unanswered request is delivered, an answered one
+     * is not.
+     */
+    public function testAnUnansweredRequestIsDeliveredAndAnAnsweredOneIsNotOverACacheThatAnswersAMissWithFalse(): void
+    {
+        $requestsService = new SimulatedClientRequestsServiceDouble();
+        self::assertFalse($requestsService->sharedCache->get('a-key-never-written'), 'the cache answers a miss with false, like Core');
+        $requestsService->presenceService->recordClientStatement(self::CONVERSATION_ID, self::ACCOUNT_ID, self::CLIENT_ID, null);
+        $deliveriesSeen = [];
+        $requestsService->simulatedClient = static function (SimulatedClientRequestsServiceDouble $requestsService) use (&$deliveriesSeen): void {
+            $delivery = $requestsService->findDeliveryForClient(self::CONVERSATION_ID, self::ACCOUNT_ID, self::CLIENT_ID);
+            $deliveriesSeen[] = $delivery === null ? 'none' : 'delivered';
+            if ($delivery === null) {
+                return;
+            }
+            $requestsService->answerRequest(self::CONVERSATION_ID, $delivery->id, self::CLIENT_ID, 'OK', 'answered', null);
+            $deliveriesSeen[] = $requestsService->findDeliveryForClient(self::CONVERSATION_ID, self::ACCOUNT_ID, self::CLIENT_ID) === null ? 'none' : 'delivered';
+        };
+
+        $answer = $requestsService->requestAndWait(self::CONVERSATION_ID, self::ACCOUNT_ID, null, AgentClientToolRequest::TYPE_READ_SCREEN, [], 3);
+
+        self::assertNull($requestsService->clientFailure);
+        self::assertSame(['delivered', 'none'], $deliveriesSeen, 'the unanswered request is delivered, the answered one no more');
+        self::assertSame('answered', $answer->text);
+    }
+
+    public function testWithoutAnAtomicCounterTheFirstAnswerStillWinsOverACacheThatAnswersAMissWithFalse(): void
+    {
+        $requestsService = new SimulatedClientRequestsServiceDouble(new SharedCacheWithoutAtomicCounterDouble());
+        $requestsService->presenceService->recordClientStatement(self::CONVERSATION_ID, self::ACCOUNT_ID, self::CLIENT_ID, null);
+        $secondAnswerFailures = [];
+        $requestsService->simulatedClient = static function (SimulatedClientRequestsServiceDouble $requestsService) use (&$secondAnswerFailures): void {
+            $delivery = $requestsService->findDeliveryForClient(self::CONVERSATION_ID, self::ACCOUNT_ID, self::CLIENT_ID);
+            if ($delivery === null) {
+                return;
+            }
+            $requestsService->answerRequest(self::CONVERSATION_ID, $delivery->id, self::CLIENT_ID, 'OK', 'first', null);
+            try {
+                $requestsService->answerRequest(self::CONVERSATION_ID, $delivery->id, self::CLIENT_ID, 'OK', 'second', null);
+            } catch (ConflictException) {
+                $secondAnswerFailures[] = 'conflict';
+            }
+        };
+
+        $answer = $requestsService->requestAndWait(self::CONVERSATION_ID, self::ACCOUNT_ID, null, AgentClientToolRequest::TYPE_LIST_TARGETS, [], 3);
+
+        self::assertNull($requestsService->clientFailure);
+        self::assertSame('first', $answer->text, 'the first answer is let in (a miss is false, not null)');
+        self::assertSame(['conflict'], $secondAnswerFailures);
     }
 
     public function testTheFirstAnswerWinsAndAWrongClientOrConversationIsNotFound(): void

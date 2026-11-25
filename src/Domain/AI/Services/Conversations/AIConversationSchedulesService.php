@@ -69,6 +69,9 @@ class AIConversationSchedulesService extends EntitiesService
 {
     use AITraceLogTrait;
 
+    /** @var string The operation prefix of the state sweep's question to the application; the target status follows (`scheduleStateSweep:PAUSED`). */
+    public const string STATE_SWEEP_REFUSAL_OPERATION_PREFIX = 'scheduleStateSweep:';
+
     public const string DEFAULT_ENTITY_CLASS = AIConversationSchedule::class;
 
     /** Per-pass candidate cap for the fire cron — bounded like every cron pass. */
@@ -1642,14 +1645,21 @@ class AIConversationSchedulesService extends EntitiesService
      * Fire an EVAL schedule now, as often as the evaluation asks (the structure of the
      * reports across runs of one schedule is measured by firing it several times in a row). Only a schedule whose run
      * settings mark it an eval schedule (`evalRun` — its runs mail nothing) bypasses the once-per-hour rule of a manual
-     * fire; the arm, claim and spawn are the cron's ({@see armClaimAndSpawnNow()}).
+     * fire; every other rule of a manual fire holds ({@see AIConversationScheduleTransition::OPERATION_RUN_NOW}: ACTIVE,
+     * recurring, not expired), checked before anything is written — a refused schedule keeps its fire anchor. The arm,
+     * claim and spawn are the cron's ({@see armClaimAndSpawnNow()}).
      *
-     * @throws BadRequestException the schedule is no eval schedule
+     * @throws BadRequestException the schedule is no eval schedule, or the run-now rule refuses it (its words:
+     *     {@see assertScheduleMayRunNow()})
      */
     public function fireEvalScheduleNow(AIConversationSchedule $schedule): ?AIConversation
     {
         if (!isset($schedule->id) || !(isset($schedule->runSettings) && $schedule->runSettings->evalRun === true)) {
             throw new BadRequestException('Only an eval schedule (runSettings.evalRun) fires without the manual fire interval.');
+        }
+        $runNowTransition = $schedule->buildTransitionTo(AIConversationScheduleTransition::OPERATION_RUN_NOW, new DateTime());
+        if (!$runNowTransition->isAllowed && $runNowTransition->refusalReason !== AIConversationScheduleTransition::REFUSAL_MANUAL_FIRE_INTERVAL) {
+            $this->assertScheduleMayRunNow($schedule);
         }
         return $this->armClaimAndSpawnNow($schedule);
     }
@@ -1686,6 +1696,9 @@ class AIConversationSchedulesService extends EntitiesService
      * of an owner or platform status change (the fire command's expiry and the pot skip's EXPIRED included);
      * only the state sweep writes its status with its reason ({@see transitionStatusForAutomationState()}). RESUME
      * (→ ACTIVE) recomputes the fire anchor from NOW so a long pause never fires a backlog of missed occurrences.
+     * A state reason left in the row is cleared in the same write (`stateReason` joins the written columns only then):
+     * a status written here is no platform state, so a row the owner archives or cancels after a platform pause is not
+     * told "closed by the platform" afterwards, and a row that becomes ACTIVE carries no stale reason.
      */
     public function transitionStatus(AIConversationSchedule $schedule, string $status): void
     {
@@ -1693,12 +1706,16 @@ class AIConversationSchedulesService extends EntitiesService
             return;
         }
         $schedule->status = $status;
+        $writtenColumnNames = ['status'];
         if ($status === AIConversationScheduleStatus::ACTIVE) {
             $schedule->nextRunAt = $schedule->computeNextRunAt(new DateTime());
-            $schedule->updatePartialIgnoringRights('status', 'nextRunAt');
-            return;
+            $writtenColumnNames[] = 'nextRunAt';
         }
-        $schedule->updatePartialIgnoringRights('status');
+        if ($schedule->isClosedByPlatformState()) {
+            $schedule->stateReason = null;
+            $writtenColumnNames[] = 'stateReason';
+        }
+        $schedule->updatePartialIgnoringRights(...$writtenColumnNames);
     }
 
     /**
@@ -1766,10 +1783,19 @@ class AIConversationSchedulesService extends EntitiesService
      * for a schedule without a space — {@see findEligibilityOfSchedule()}), let the entity decide
      * ({@see AIConversationSchedule::decideTransitionForAutomationState()} — the four-row rule table), apply the
      * transition, and on a CLOSE cancel the schedule's in-flight runs and close their owed report obligations with
-     * the same reason. Returns the transition that was applied (or would be, on `$dryRun`), null when the row stays as it is.
+     * the same reason. A pause or a close is applied only when the application refuses automation for the scope
+     * ({@see AgentAutomationEligibilityService::refusesAutomation()} under `scheduleStateSweep:<status>`, see
+     * {@see STATE_SWEEP_REFUSAL_OPERATION_PREFIX}) — the same answer that decides the fire and the resume, so a host
+     * whose answer lets the scope run (its guard off, a support override) keeps its schedules running. A re-arming is
+     * no refusal and asks nothing.
+     *
+     * A dry run asks the application nothing (an application that logs its refusals would log one for a row the dry run
+     * leaves alone): it answers the transition the state of the scope leads to, and a pause or a close carries
+     * {@see AIConversationScheduleTransition::$appliesOnlyWhenTheApplicationRefuses} — it would be applied only on a
+     * refusal. Returns the transition that was applied (or would be, on `$dryRun`), null when the row stays as it is.
      *
      * @param AIConversationSchedule $schedule
-     * @param bool $dryRun true = decide only, write nothing
+     * @param bool $dryRun true = decide only, write nothing, ask the application nothing
      * @return AIConversationScheduleTransition|null
      */
     public function applyAutomationStateSweepToSchedule(AIConversationSchedule $schedule, bool $dryRun = false): ?AIConversationScheduleTransition
@@ -1786,16 +1812,18 @@ class AIConversationSchedulesService extends EntitiesService
         }
         $targetStatus = (string)$stateSweepTransition->targetStatus;
         $stateReason = $stateSweepTransition->stateReason;
-        if (!$stateSweepTransition->reArmsFireAnchor) {
-            // a pause / close goes through the ONE decision point, so it is logged like every other refusal
-            $agentAutomationEligibilityService->refusesAutomation(
-                $eligibility,
-                'scheduleStateSweep:' . $targetStatus,
-                AgentEligibilityLogContext::forSchedule($this->getScheduleIdForLog($schedule))
-            );
-        }
         if ($dryRun) {
             return $stateSweepTransition;
+        }
+        if ($stateSweepTransition->appliesOnlyWhenTheApplicationRefuses
+            && !$agentAutomationEligibilityService->refusesAutomation(
+                $eligibility,
+                static::STATE_SWEEP_REFUSAL_OPERATION_PREFIX . $targetStatus,
+                AgentEligibilityLogContext::forSchedule($this->getScheduleIdForLog($schedule))
+            )
+        ) {
+            // the application lets the scope run (as the fire path would): the row stays as it is
+            return null;
         }
         $this->transitionStatusForAutomationState($schedule, $targetStatus, $stateReason);
         if ($targetStatus === AIConversationScheduleStatus::CANCELLED && $stateReason !== null) {
@@ -1844,8 +1872,9 @@ class AIConversationSchedulesService extends EntitiesService
     }
 
     /**
-     * The RESUME guard of every resume path: a row the platform paused refuses ("closed by the
-     * platform"; a CANCELLED one says it never comes back), a one-time row whose moment has passed refuses (re-arming it would fire a past moment), and
+     * The RESUME guard of every resume path: a row the platform paused refuses ("paused by the platform", resumes by
+     * itself); a row the platform CANCELLED says it never comes back ("closed by the platform") — only a CANCELLED row
+     * with a platform reason, any other status is refused for its status; a one-time row whose moment has passed refuses (re-arming it would fire a past moment), and
      * a resumable row on an agent space / account that is not eligible refuses naming the STATE, never "budget" — an owner
      * must not re-arm a task on a locked agent space from the automations tab.
      *
@@ -1870,7 +1899,8 @@ class AIConversationSchedulesService extends EntitiesService
                         placeholders: $refusalPlaceholders
                     ));
                 }
-                // a final status (CANCELLED for an ended or erased scope): the sweep never re-arms it
+                // CANCELLED for an ended or erased scope (the rule names the platform state only for PAUSED and
+                // CANCELLED): the sweep never re-arms it
                 throw new BadRequestException($this->translateScheduleRefusalText(
                     'Schedule %scheduleId% was closed by the platform (%reason%) and is %status% — it does not resume and '
                     . 'never fires again. Once the ' . AgentApplicationWording::current()->billingEntityName

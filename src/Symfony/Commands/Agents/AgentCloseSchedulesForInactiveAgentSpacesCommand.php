@@ -143,12 +143,16 @@ class AgentCloseSchedulesForInactiveAgentSpacesCommand extends AgentConsoleComma
         $stateReason = $stateSweepTransition->stateReason;
         $this->decidedCountsByTargetStatus[$targetStatus] = ($this->decidedCountsByTargetStatus[$targetStatus] ?? 0) + 1;
         $output->writeln(sprintf(
-            '%s: schedule %d (%s) → %s%s',
+            '%s: schedule %d (%s) → %s%s%s',
             $dryRun ? 'Would transition (dry-run)' : 'Transitioned',
             $candidateScheduleId,
             $this->describeScheduleScope($schedule),
             $targetStatus,
-            $stateReason !== null ? " ({$stateReason})" : ' (re-armed, reason cleared)'
+            $stateReason !== null ? " ({$stateReason})" : ' (re-armed, reason cleared)',
+            // a dry run asks the application nothing: a pause or a close is applied only when it refuses
+            $dryRun && $stateSweepTransition->appliesOnlyWhenTheApplicationRefuses
+                ? ' — would ask the application (' . AIConversationSchedulesService::STATE_SWEEP_REFUSAL_OPERATION_PREFIX . $targetStatus . '), applied only if it refuses'
+                : ''
         ));
     }
 

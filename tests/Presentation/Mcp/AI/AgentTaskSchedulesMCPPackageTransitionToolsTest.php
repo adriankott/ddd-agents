@@ -454,6 +454,34 @@ class AgentTaskSchedulesMCPPackageTransitionToolsTest extends IntegrationTestCas
     }
 
     /**
+     * Only a CANCELLED row with a platform reason is told "closed by the platform": a reason left in a row of another
+     * status (a row archived before an owner's status change cleared the reason, a host's own write) gets the status
+     * answer.
+     */
+    #[DataProvider('provideStatusesWithAReasonLeftInTheRow')]
+    public function testAReasonLeftInARowThatIsNeitherPausedNorCancelledGetsTheStatusAnswer(string $status): void
+    {
+        $this->installEligibilityService();
+        $schedule = static::buildSchedule(self::KIND_RECURRING_RAN, $status);
+        $schedule->stateReason = AgentAutomationStateReason::ACCOUNT_SUSPENDED;
+
+        $this->assertRefusedWithoutAWrite('Schedule 4430 cannot be resumed in status ' . $status . '.', 'resumeTaskSchedule', static::buildIdRequest(), $schedule);
+    }
+
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function provideStatusesWithAReasonLeftInTheRow(): array
+    {
+        return [
+            'archived by the owner after a platform pause' => [AIConversationScheduleStatus::ARCHIVED],
+            'active with a leftover reason' => [AIConversationScheduleStatus::ACTIVE],
+            'expired with a leftover reason' => [AIConversationScheduleStatus::EXPIRED],
+            'done with a leftover reason' => [AIConversationScheduleStatus::DONE],
+        ];
+    }
+
+    /**
      * @return array<string, array{0: string, 1: string, 2: string}>
      */
     public static function provideReasonsOfACancellationByThePlatform(): array
@@ -1108,7 +1136,7 @@ class AgentTaskSchedulesMCPPackageTransitionToolsTest extends IntegrationTestCas
 
     // ------------------------------------------------------------------ a schedule the platform paused
 
-    public function testAScheduleThePlatformPausedIsEditedAndDeletedLikeAnyPausedOne(): void
+    public function testAScheduleThePlatformPausedIsEditedAndDeletedLikeAnyPausedOneAndItsArchiveClearsTheReason(): void
     {
         $editedSchedule = static::buildSchedule(self::KIND_RECURRING_RAN, AIConversationScheduleStatus::PAUSED);
         $editedSchedule->stateReason = AgentAutomationStateReason::ACCOUNT_SUSPENDED;
@@ -1127,8 +1155,9 @@ class AgentTaskSchedulesMCPPackageTransitionToolsTest extends IntegrationTestCas
             static::buildSchedulesService($deletedSchedule),
             static::buildProvenanceOfAChatTurn()
         );
-        self::assertSame(['status'], $deletedSchedule->recordedWrites);
+        self::assertSame(['status,stateReason'], $deletedSchedule->recordedWrites, 'the owner archived it: the platform reason goes in the same write');
         self::assertSame(AIConversationScheduleStatus::ARCHIVED, $deletedSchedule->status);
+        self::assertNull($deletedSchedule->stateReason);
         self::assertSame(AIConversationSchedule::DELETE_ACTION_ARCHIVE, $responseDto->actionTaken);
 
         $pausedSchedule = static::buildSchedule(self::KIND_RECURRING_RAN, AIConversationScheduleStatus::PAUSED);

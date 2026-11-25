@@ -1,5 +1,52 @@
 # Changelog
 
+## 0.5.13
+
+**Agent.UI requests reach a real client again; the state sweep lets the application's answer decide; the resume text
+"closed by the platform" only for a schedule the platform cancelled; the eval fire checks the status before it writes;
+the narrow split view keeps a way back to a closed canvas; package tests of the service methods that move a schedule
+outside its tools.** The schedule service tests were contributed by an application team. npm `@mgamadeus/ddd-agents`
+0.5.13 in lockstep.
+
+- **Agent.UI (critical):** Core's `Cache::get()` answers a miss with `false`, not null.
+  `AgentClientToolRequestsService::hasAnswer()` compared with null, so every unanswered request counted as answered and
+  `findDeliveryForClient()` delivered none to a real client (the scripted evaluation client does not go through it).
+  `hasAnswer()` and the fallback of `claimAnswer()` (a cache without an atomic counter) treat `false` and null as a miss
+  (new `AgentClientToolRequestsService::isCacheMiss()`); `AgentClientPresenceService::readSharedCacheValue()` answers a
+  miss as null. Every other cache read of the package already checks the type of the value. The package's cache double
+  (`InMemoryCacheGroupDouble`) now answers a miss with `false` like Core; new cases: an unanswered request is delivered
+  through `findDeliveryForClient()` and an answered one is not, and the first answer wins on a cache without a counter.
+- **State sweep:** `applyAutomationStateSweepToSchedule()` asked `refusesAutomation()` under
+  `scheduleStateSweep:<status>` and dropped the answer: a scope the application lets run (its guard off, a support
+  override) had its schedules paused or cancelled all the same, while the fire and the resume ran. A pause or a close
+  is now applied only when the application refuses (`AIConversationSchedulesService::STATE_SWEEP_REFUSAL_OPERATION_PREFIX`
+  followed by the target status); without a refusal the row stays as it is and no run is cancelled. A re-arming asks
+  nothing. **Hosts** that override only the find methods of `AgentAutomationEligibilityService` and rely on the sweep to
+  pause: override `refusesAutomation()` as well (the package's default refuses nothing).
+- **Dry run of the sweep:** it asks the application nothing any more (a host that logs refusals logged one for a row the
+  dry run left alone). It answers the transition the state leads to; a pause or a close carries the new
+  `AIConversationScheduleTransition::$appliesOnlyWhenTheApplicationRefuses`, and the command's dry-run line adds
+  "— would ask the application (scheduleStateSweep:PAUSED), applied only if it refuses". The port is unchanged.
+- **Resume text:** the RESUME rule names the platform state (`REFUSAL_CLOSED_BY_PLATFORM_STATE`) only for a PAUSED or
+  CANCELLED row with a `stateReason`; an ARCHIVED, ACTIVE, EXPIRED or DONE row with a reason left in it gets "Schedule 42
+  cannot be resumed in status ARCHIVED." (before: "was closed by the platform (account suspended) and is archived — …").
+  `transitionStatus()` (the owner's pause, resume, cancel, archive and the platform's expire, done) clears a reason left
+  in the row in the same write (`status,stateReason`, `status,nextRunAt,stateReason`); a row without a reason is
+  written as before.
+- **Eval fire:** `fireEvalScheduleNow()` moved `nextRunAt` to now before the claim, also for a PAUSED, CANCELLED or
+  expired eval schedule whose claim is then lost. It now checks the run-now rule first (the manual fire interval is the
+  only rule it skips) and throws the run-now refusal (`assertScheduleMayRunNow()`) without a write.
+- **Split view (web):** in a narrow split with the canvas closed, the split view's "Re-open canvas" toggle now floats over
+  the chat whenever a canvas exists to reopen; before, only the chat's own button could reopen it and a host did not
+  show that button in that state. New optional `sideToggle.mainPaneShowsReopen` (`AgentsSplitViewProps`): the chat sets
+  it while its own reopen button is shown, so there is no second toggle. Cases in `_default-split-view.spec.tsx`.
+- New package tests: `AIConversationSchedulesServiceManualFireTest` (run-now guard, fire now, eval fire, start now),
+  `AIConversationSchedulesServiceRunTerminalTest` (failure streak, close of a one-time task, done criteria, the turn
+  path), `AIConversationSchedulesServiceStateSweepTest` (pause, close, re-arming, rows left alone, scope, dry run) with
+  their doubles; cases for the four fixes added. `AIConversationScheduleTransitionTest`: RESUME rows of a row with a
+  platform reason per status.
+- Autonomy skill (eligibility, schedules), entry skill trap on cache misses.
+
 ## 0.5.12
 
 **The schedule tools tell the model what happens: a cancelled schedule is not "resumed by itself", a paused schedule

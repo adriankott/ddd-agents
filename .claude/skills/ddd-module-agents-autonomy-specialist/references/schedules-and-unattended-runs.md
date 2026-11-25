@@ -70,7 +70,8 @@ infrastructure failure). Every skip of a recurring schedule that started no run 
 schedule with `maxRuns` loses no run to a skip.
 
 Manual fires go through the same tail: `fireScheduleNow()` (a recurring schedule, at most once per hour),
-`startScheduleNow()` (a due one-time schedule that never fired), `fireEvalScheduleNow()` (eval schedules only).
+`startScheduleNow()` (a due one-time schedule that never fired), `fireEvalScheduleNow()` (eval schedules only; without the hour, but every other run-now rule is checked before the
+anchor is written: a PAUSED, CANCELLED or expired eval schedule is refused and keeps its `nextRunAt`).
 
 **Prefetching for runs that fire soon.** `findAgentSpacesWithRunDueBetween()` returns each (account, agent space)
 pair that holds an ACTIVE schedule with `nextRunAt` inside a time window, once, as `AIConversationScheduleDueAgentSpace`
@@ -133,7 +134,13 @@ paused. Again the package has the steps:
    `buildAutomationStateSweepSqlFilter()` adds (default: nothing — then only platform-paused rows are seen). A host
    overrides that method on its same-path `AIConversationSchedulesService` to join its own account and space tables.
 2. `applyAutomationStateSweepToSchedule()` per row (`dryRun` available) — eligibility read fresh, the pure decision
-   `AIConversationSchedule::decideTransitionForAutomationState()`:
+   `AIConversationSchedule::decideTransitionForAutomationState()`; a pause or a close is applied only when the
+   application refuses (`refusesAutomation()` under `STATE_SWEEP_REFUSAL_OPERATION_PREFIX` followed by the target
+   status, the answer that also decides the
+   fire and the resume — a support override or a guard switched off keeps the schedules running). A re-arming asks
+   nothing. A dry run asks nothing either (a host that logs refusals would log one for a row the dry run leaves): it
+   answers the transition the state leads to with `appliesOnlyWhenTheApplicationRefuses`, and the command prints
+   "would ask the application (scheduleStateSweep:…), applied only if it refuses":
 
 | Row | Scope | Result |
 |---|---|---|
@@ -143,10 +150,13 @@ paused. Again the package has the steps:
 | PAUSED by the owner (no reason) | SUSPENDED or ELIGIBLE | untouched |
 | PAUSED by the platform (reason set) | ELIGIBLE | ACTIVE, reason cleared, next firing from now (a one-time row whose moment passed: EXPIRED) |
 
-`transitionStatusForAutomationState()` is the only writer of `stateReason`. `assertScheduleMayBeResumed()` refuses an
-owner's resume of a platform-paused row ("resumes by itself once … active again") and of a row whose scope is not
-eligible; a row the sweep CANCELLED (ended or erased scope) is told it never comes back and that a new schedule is
-needed once the scope is active again.
+`transitionStatusForAutomationState()` is the only writer of a `stateReason`; `transitionStatus()` (every owner or
+platform status change without a reason: pause, resume, cancel, archive, expire, done) clears a reason left in the
+row in the same write. `assertScheduleMayBeResumed()` refuses an owner's resume of a platform-paused row ("resumes by
+itself once … active again") and of a row whose scope is not eligible; a CANCELLED row with a platform reason (ended
+or erased scope) is told it never comes back and that a new schedule is needed once the scope is active again. Any
+other status with a reason left in the row (stored before the clearing write) gets the status answer ("cannot be
+resumed in status …").
 
 **Resume = `resumeSchedule()`.** It runs the guard and writes the status the RESUME transition leads to: ACTIVE with
 the anchor from now, or EXPIRED for an owner-paused row past its `ttlAt` or its `maxIterations` (decided before the

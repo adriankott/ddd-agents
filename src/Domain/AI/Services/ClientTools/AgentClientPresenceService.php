@@ -152,10 +152,12 @@ class AgentClientPresenceService extends Service
             return null;
         }
         try {
-            return $sharedCache->get($cacheKey);
+            $sharedCacheValue = $sharedCache->get($cacheKey);
         } catch (Throwable) {
             return null;
         }
+        // Core's cache answers a miss with false: a miss is null here
+        return $sharedCacheValue === false ? null : $sharedCacheValue;
     }
 
     protected function getSharedCache(): ?Cache

@@ -332,6 +332,8 @@ export const ConversationView = (props: ConversationViewProps) => {
                 onToggle: toggleCanvas,
                 // Centered vertically on the divider.
                 verticalPositionPercent: 50,
+                // The chat's own re-open control is shown: the split view adds no second one while it covers.
+                mainPaneShowsReopen: showsNarrowReopenControl,
               }
             : undefined
         }

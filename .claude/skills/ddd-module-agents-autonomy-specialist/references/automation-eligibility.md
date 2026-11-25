@@ -35,8 +35,8 @@ A host with other reasons replaces `AgentAutomationStateReason` by its same-path
 
 | Method | Asked by |
 |---|---|
-| `findEligibilityForAgentSpace()`, `findEligibilityForAccountId()` | every point below; the turn start and the state sweep act on the result itself |
-| `refusesAutomation()` | the refusal decision over a find result: the schedule fire step (`scheduleFire`), the workers (through `AIConversationsService::refusesAutomationForConversation()`), the report delivery (`reportDelivery`), the resume guard of a schedule; the sweep calls it only to log |
+| `findEligibilityForAgentSpace()`, `findEligibilityForAccountId()` | every point below; the turn start acts on the result itself |
+| `refusesAutomation()` | the refusal decision over a find result: the schedule fire step (`scheduleFire`), the workers (through `AIConversationsService::refusesAutomationForConversation()`), the report delivery (`reportDelivery`), the resume guard of a schedule (`scheduleResume`), the state sweep before a pause or a close (`AIConversationSchedulesService::STATE_SWEEP_REFUSAL_OPERATION_PREFIX` followed by the target status, PAUSED or CANCELLED; not on a re-arming, not in a dry run) |
 | `refusesAutomationForAgentSpace()`, `refusesAutomationForAccountId()` | the tool executor only |
 | `activateSupportOverride()`, `restoreSupportOverride()`, `isSupportOverrideActive()`, `getActiveSupportOverrideNote()` | an audited override that lifts the refusal for one run; the host holds it as process state. The turn start reads its own exemption from the run settings (`supportOverride`), not from these methods |
 
@@ -51,7 +51,7 @@ honour it.
 | Point | Outcome |
 |---|---|
 | schedule fire (refusal method) | no run; a recurring occurrence is refunded; no failure counted (schedules reference) |
-| state sweep (on the find result) | the schedule is paused or cancelled with a stamped reason |
+| state sweep (refusal method) | the schedule is paused or cancelled with a stamped reason; without a refusal it stays as it is. A dry run asks nothing and reports the transition the state leads to, marked "would ask the application" (`AIConversationScheduleTransition::$appliesOnlyWhenTheApplicationRefuses`) |
 | tool call (`MCPToolExecutorService`, refusal method) | the call is refused before the mandate gate |
 | turn start (on `isEligible()` of the find result, not a refusal method) | the run is released without a model call; a scope gone for good also stamps `suppressionReason` |
 | workers (refusal method) | the job is a no-op |
@@ -66,8 +66,8 @@ Full class names of what a host extends or calls here: `DDD\Domain\AI\Services\C
 2. Read only the host's **local** states (the account, the space, a pending deletion, a local subscription row) —
    never call a billing system at fire time. Unknown states deny.
 3. Override **all three** refusal methods, not only the two find methods. With only the find methods overridden, turns
-   of a SUSPENDED scope are released and the sweep pauses its schedules, but schedules still fire, tools still
-   execute, workers still run and report mails still go, because those points ask the refusal methods.
+   of a SUSPENDED scope are released, but the sweep pauses nothing, schedules still fire, tools still execute,
+   workers still run and report mails still go, because those points ask the refusal methods.
 4. Override `buildAutomationStateSweepSqlFilter()` on the same-path `AIConversationSchedulesService` so the sweep sees
    the schedules of scopes that stopped being eligible (schedules reference).
 5. Clear the host's cache when an account or space changes state, or accept the cache's lifetime as the delay.

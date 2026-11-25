@@ -60,6 +60,10 @@ their DTOs, the naming, wording, persona and egress configs, and `examples/`. Th
 
 ## Traps
 
+- **Core's `Cache::get()` answers a miss with `false`, not null** (package maintainers). A read that compares with
+  null takes every miss for a hit; read with a type check (`is_array`, `is_numeric`, `instanceof`) or treat `false`
+  and null as a miss (`AgentClientToolRequestsService::isCacheMiss()`). The package's cache double
+  (`InMemoryCacheGroupDouble`) answers a miss with `false` as well.
 - **Model regeneration is the host's script.** A host with `DATABASE_TABLE_PREFIX` or `tableNames` entries adds
   `app:generate-doctrine-models-for-entities` to its own Composer `post-install-cmd` and `post-update-cmd` (no package
   declares a script) and never runs Composer with `--no-scripts`: the vendor models keep the shipped names, and every
