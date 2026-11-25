@@ -938,7 +938,9 @@ class AgentEvalToolsCommand extends AgentEvalConsoleCommand
                 // an infrastructure error says nothing about the agent: the task runs once more, at the head of the queue
                 $infrastructureError = $this->findRetriedInfrastructureErrorOfRow($agentEvalCaseRow);
                 if ($infrastructureError !== null && $retriedCases->getByTaskId($finishedTask->taskId) === null) {
-                    $retriedCases->add(AgentEvalSuiteRetriedCase::forFirstAttempt($finishedTask->taskId, $infrastructureError, $agentEvalCaseRow));
+                    // ObjectSet::add() takes its elements by reference: a variable, never a call result
+                    $retriedCase = AgentEvalSuiteRetriedCase::forFirstAttempt($finishedTask->taskId, $infrastructureError, $agentEvalCaseRow);
+                    $retriedCases->add($retriedCase);
                     $queuedTasks->prependTask($finishedTask);
                     $this->writeRetryLine($runSettings, $output, $finishedTask->caseId, $infrastructureError);
                     continue;

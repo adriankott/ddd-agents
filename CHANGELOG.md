@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.6.5
+
+**Voice: the seconds since the last booking are booked when the worker ends a call; eval-tools survives a retry.** Bug
+fixes. No web change; npm `@mgamadeus/ddd-agents` 0.6.5 in lockstep.
+
+- **Fixed: a call the worker ended lost the seconds since its last booking.** Seconds are booked once
+  `usageBookingMinimumSeconds` built up or on the provider's final report (`session.closed`); a goodbye hang-up, a
+  refusal, the silence stop and the SIGTERM end hang up without waiting for that report, so up to 29 s per call (all of
+  a short call) were never booked. The teardown now books what is left (`bookSecondsNotYetBookedAtTheTeardown()`): the
+  last reported cumulative seconds plus the seconds since that report, minus what is booked, also under the minimum.
+  After a final report nothing is left; before the first report the initialisation charge applies as before.
+- **Fixed: `app:ai-agent:eval-tools` died on the retry after an infrastructure error** ("Only variables should be
+  passed by reference": a call result handed to `ObjectSet::add()`). The same pattern is fixed in the surface comparer
+  and the working state's cold capability drops.
+- Tests: the rest booked at the teardown (reported seconds under the minimum plus the time since the report), nothing
+  more after a final report, the reported seconds of a short call booked.
+
 ## 0.6.4
 
 **An application's subclasses are reached: the spoken answer of a voice call and the gates of a subclassed tools

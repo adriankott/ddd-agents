@@ -359,7 +359,8 @@ class AgentWorkingState extends ValueObject
         if ($this->findColdCapabilityDropOfEpoch($epochStartIndex) !== null) {
             return;
         }
-        $this->getColdCapabilityDrops()->add(AgentColdCapabilityDrop::create($epochStartIndex, $afterMessageIndex, $capabilityNames));
+        $agentColdCapabilityDrop = AgentColdCapabilityDrop::create($epochStartIndex, $afterMessageIndex, $capabilityNames);
+        $this->getColdCapabilityDrops()->add($agentColdCapabilityDrop);
     }
 
     public function isOwnerMessageSecurityFiltered(?int $messageIndex): bool

@@ -358,6 +358,15 @@ class AgentLiveVoiceSessionsService extends Service
     /** @var bool At least one usage event arrived — the initialisation charge is then inside the counter. */
     protected bool $usageEventReceived = false;
 
+    /**
+     * @var int The cumulative session seconds of the last usage report, booked or not (a report under
+     *          `usageBookingMinimumSeconds` waits): what the teardown books when no final report comes.
+     */
+    protected int $lastReportedSessionSeconds = 0;
+
+    /** @var int|null When the last usage report arrived (unix time); the teardown adds the seconds since then. */
+    protected ?int $lastSessionUsageReportedAtUnixTime = null;
+
     /** @var bool The call row was ended by this worker or read as ended — every exit path checks it once. */
     protected bool $callFinished = false;
 
@@ -571,6 +580,8 @@ class AgentLiveVoiceSessionsService extends Service
         $this->foreignTurnObservedRunning = false;
         $this->sessionStartedReceived = false;
         $this->usageEventReceived = false;
+        $this->lastReportedSessionSeconds = 0;
+        $this->lastSessionUsageReportedAtUnixTime = null;
         $this->callFinished = false;
         $this->traceEventBuffer = [];
         $this->traceEventSequence = 0;
@@ -2139,6 +2150,8 @@ class AgentLiveVoiceSessionsService extends Service
             }
             $this->usageEventReceived = true;
             $cumulativeSessionSeconds = (int)($usageObject['seconds'] ?? 0);
+            $this->lastReportedSessionSeconds = max($this->lastReportedSessionSeconds, $cumulativeSessionSeconds);
+            $this->lastSessionUsageReportedAtUnixTime = time();
             $secondsToBill = $cumulativeSessionSeconds - $this->billedSessionSeconds;
             if ($secondsToBill <= 0 || (!$final && $secondsToBill < AgentVoiceConfiguration::current()->usageBookingMinimumSeconds)) {
                 return;
@@ -2178,6 +2191,37 @@ class AgentLiveVoiceSessionsService extends Service
         $this->bookedSecondsOwedToTheCall += $secondsToBill;
         $this->advanceBilledSecondsBaseline((string)$agentVoiceCall->providerCallId, $secondsToBill);
         $this->addOwedBookedSecondsToTheCall($agentVoiceCall);
+    }
+
+    /**
+     * The seconds the session ran since the last booking, booked at the teardown even under
+     * `usageBookingMinimumSeconds`: the last reported cumulative seconds plus the seconds since that report, minus
+     * what is booked. A call ended by the worker (a goodbye hang-up, a refusal, the silence stop, a SIGTERM) gets no
+     * final report from the provider, and the slice since the last booking was lost. After a final report
+     * (`session.closed`) nothing is left to book. Nothing before the first report (the initialisation charge covers
+     * it). Never throws.
+     */
+    protected function bookSecondsNotYetBookedAtTheTeardown(AgentVoiceCall $agentVoiceCall): void
+    {
+        if (!$this->usageEventReceived || $this->lastSessionUsageReportedAtUnixTime === null) {
+            return;
+        }
+        $secondsSinceTheLastReport = max(0, time() - $this->lastSessionUsageReportedAtUnixTime);
+        $estimatedSessionSeconds = $this->lastReportedSessionSeconds + $secondsSinceTheLastReport;
+        $secondsToBill = $estimatedSessionSeconds - $this->billedSessionSeconds;
+        if ($secondsToBill <= 0) {
+            return;
+        }
+        try {
+            $this->bookLiveSessionSeconds($agentVoiceCall, $secondsToBill, $estimatedSessionSeconds);
+            $this->lastSessionUsageReportedAtUnixTime = time();
+            $this->lastReportedSessionSeconds = $estimatedSessionSeconds;
+        } catch (Throwable $usageAccountingError) {
+            $this->appendToVoiceLog(
+                "LIVE {$agentVoiceCall->providerCallId} booking of the last {$secondsToBill}s at the teardown failed: "
+                . $usageAccountingError->getMessage()
+            );
+        }
     }
 
     /**
@@ -2476,6 +2520,7 @@ class AgentLiveVoiceSessionsService extends Service
         $this->persistCompletedSentences($agentVoiceCall, $this->liveTranscriptAssembler->closeAllSentences());
         $this->finishApplicationPartOfTheCall($agentVoiceCall);
         $this->bookInitialisationChargeWhenNothingWasBooked($agentVoiceCall);
+        $this->bookSecondsNotYetBookedAtTheTeardown($agentVoiceCall);
         $this->addOwedBookedSecondsToTheCallAtTheTeardown($agentVoiceCall);
         $this->persistCallEndIfStillRunning($agentVoiceCall, $endReason);
         $this->bufferTraceFlushedMarker($agentVoiceCall);

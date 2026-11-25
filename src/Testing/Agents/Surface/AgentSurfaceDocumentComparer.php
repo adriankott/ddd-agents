@@ -37,11 +37,13 @@ class AgentSurfaceDocumentComparer
                 if ($referenceValue === [] && $this->hasValueBelowPath($comparedValuesByPath, $path)) {
                     continue;
                 }
-                $agentSurfaceDifferences->add(new AgentSurfaceDifference(AgentSurfaceDifference::KIND_REMOVED, $path, $referenceValue, null));
+                $agentSurfaceDifference = new AgentSurfaceDifference(AgentSurfaceDifference::KIND_REMOVED, $path, $referenceValue, null);
+                $agentSurfaceDifferences->add($agentSurfaceDifference);
                 continue;
             }
             if ($comparedValuesByPath[$path] !== $referenceValue) {
-                $agentSurfaceDifferences->add(new AgentSurfaceDifference(AgentSurfaceDifference::KIND_CHANGED, $path, $referenceValue, $comparedValuesByPath[$path]));
+                $agentSurfaceDifference = new AgentSurfaceDifference(AgentSurfaceDifference::KIND_CHANGED, $path, $referenceValue, $comparedValuesByPath[$path]);
+                $agentSurfaceDifferences->add($agentSurfaceDifference);
             }
         }
         foreach ($comparedValuesByPath as $path => $comparedValue) {
@@ -49,7 +51,8 @@ class AgentSurfaceDocumentComparer
                 if ($comparedValue === [] && $this->hasValueBelowPath($referenceValuesByPath, $path)) {
                     continue;
                 }
-                $agentSurfaceDifferences->add(new AgentSurfaceDifference(AgentSurfaceDifference::KIND_ADDED, $path, null, $comparedValue));
+                $agentSurfaceDifference = new AgentSurfaceDifference(AgentSurfaceDifference::KIND_ADDED, $path, null, $comparedValue);
+                $agentSurfaceDifferences->add($agentSurfaceDifference);
             }
         }
         return $agentSurfaceDifferences;

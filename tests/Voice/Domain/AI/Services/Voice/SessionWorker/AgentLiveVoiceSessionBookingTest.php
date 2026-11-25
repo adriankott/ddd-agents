@@ -61,15 +61,49 @@ class AgentLiveVoiceSessionBookingTest extends AgentLiveVoiceSessionWorkerTestCa
         static::assertSame(15, $worker->getWorkerState('billedSessionSeconds'));
     }
 
-    public function testNoInitialisationChargeOnceTheProviderReportedUsage(): void
+    public function testNoInitialisationChargeOnceTheProviderReportedUsageButTheReportedSecondsAreBooked(): void
     {
         $worker = $this->buildWorkerWithConversation();
         $agentVoiceCall = static::buildRunningCall();
         $worker->receiveSessionEvent($agentVoiceCall, new RecordingSidebandWebSocket(), static::buildUsageReport(10));
+        $worker->setWorkerState('lastSessionUsageReportedAtUnixTime', time() + 60); // no second passed since the report
 
         $worker->runWorkerStep('finishCall', $agentVoiceCall, AgentVoiceCall::END_REASON_COMPLETED);
 
-        static::assertSame([], $worker->agentVoiceCallStoreService->bookedSecondsRequests);
+        static::assertSame([10.0], $worker->aISessionUsageService->getRecordedSeconds(), 'the reported seconds, no initialisation charge');
+        static::assertSame([['callId' => static::CALL_ID, 'seconds' => 10]], $worker->agentVoiceCallStoreService->bookedSeconds);
+    }
+
+    public function testAnEndByTheWorkerBooksTheSecondsSinceTheLastBookingAndSinceTheLastReport(): void
+    {
+        $worker = $this->buildWorkerWithConversation();
+        $agentVoiceCall = static::buildRunningCall();
+        $sidebandWebSocket = new RecordingSidebandWebSocket();
+        $worker->receiveSessionEvent($agentVoiceCall, $sidebandWebSocket, static::buildUsageReport(30));
+        $worker->receiveSessionEvent($agentVoiceCall, $sidebandWebSocket, static::buildUsageReport(48));
+        $worker->setWorkerState('lastSessionUsageReportedAtUnixTime', time() - 16);
+
+        $worker->runWorkerStep('finishCall', $agentVoiceCall, AgentVoiceCall::END_REASON_COMPLETED);
+        $worker->runWorkerStep('finishCall', $agentVoiceCall, AgentVoiceCall::END_REASON_COMPLETED);
+
+        $recordedSeconds = $worker->aISessionUsageService->getRecordedSeconds();
+        static::assertCount(2, $recordedSeconds, 'the slice of 30 s, then once the rest at the teardown');
+        static::assertSame(30.0, $recordedSeconds[0]);
+        static::assertGreaterThanOrEqual(34.0, $recordedSeconds[1], '18 s reported under the minimum plus at least 16 s since the report');
+        static::assertLessThanOrEqual(35.0, $recordedSeconds[1]);
+        static::assertSame(30 + (int)$recordedSeconds[1], array_sum(array_column($worker->agentVoiceCallStoreService->bookedSeconds, 'seconds')));
+    }
+
+    public function testAFinalReportLeavesNothingForTheTeardown(): void
+    {
+        $worker = $this->buildWorkerWithConversation();
+        $agentVoiceCall = static::buildRunningCall();
+        $sidebandWebSocket = new RecordingSidebandWebSocket();
+        $worker->receiveSessionEvent($agentVoiceCall, $sidebandWebSocket, static::buildUsageReport(30));
+
+        $worker->receiveSessionEvent($agentVoiceCall, $sidebandWebSocket, ['type' => 'session.closed', 'reason' => 'client_closed', 'usage' => ['seconds' => 44]]);
+
+        static::assertSame([30.0, 14.0], $worker->aISessionUsageService->getRecordedSeconds(), 'the final report books the rest, the teardown nothing more');
     }
 
     public function testAFailedInitialisationChargeIsLogged(): void
