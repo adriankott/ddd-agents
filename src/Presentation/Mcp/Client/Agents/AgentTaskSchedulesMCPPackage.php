@@ -1101,8 +1101,9 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
      * e.g. the owner of the space when an account outside the owner's account family works in it — overrides this
      * one method; the lists and the targets of a call stay scoped to the acting account.
      *
-     * Only the tools read through it. The pot a scheduled run is checked against when it fires is the pot of the
-     * account the schedule is stored for ({@see AIConversationSchedulesService::createSchedule()}).
+     * Only the tools read through it. The pot a scheduled run is checked against when it fires is the pot of
+     * {@see AIConversationSchedulesService::findBudgetPayerOfSchedule()} (default: the account the schedule is stored
+     * for); an application that overrides this method overrides that one with the same rule.
      *
      * @param AgentSpace|null $agentSpace the space of the call; null = account level
      * @param Account $actingAccount the account the call acts for

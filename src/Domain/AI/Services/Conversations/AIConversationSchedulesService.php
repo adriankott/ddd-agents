@@ -503,16 +503,53 @@ class AIConversationSchedulesService extends EntitiesService
             $monthlyCostEstimate->perScheduleEstimates[] = $perScheduleEstimate;
         }
 
-        // Budget + display policy from the owning account (direct read fires the lazy loads on purpose).
-        $owningAccount = $activeRecurringSchedules[0]->account;
-        if ($owningAccount !== null) {
-            /** @var ScheduleBudgetPotsService $scheduleBudgetPotsService */
-            $scheduleBudgetPotsService = DDDService::instance()->getService(ScheduleBudgetPotsService::class);
-            $monthlyCostEstimate->monthlyBudgetUsd = $scheduleBudgetPotsService->findMonthlyBudgetForAccount($owningAccount);
-            $monthlyCostEstimate->hideExactFigures = $scheduleBudgetPotsService->hidesExactFiguresForAccount($owningAccount);
-        }
+        $this->applyBudgetOfPayerToMonthlyCostEstimate($monthlyCostEstimate, $activeRecurringSchedules[0]);
 
         return $monthlyCostEstimate;
+    }
+
+    /**
+     * Sets the budget and the display policy of a monthly cost estimate from the payer of the schedules
+     * ({@see findBudgetPayerOfSchedule()} of one of them; the schedules of one partition share their payer). Without a
+     * payer the estimate stays without a budget.
+     *
+     * @param RecurringScheduleMonthlyCostEstimate $monthlyCostEstimate
+     * @param AIConversationSchedule $scheduleOfPartition an active recurring schedule of the estimated partition
+     * @return void
+     */
+    protected function applyBudgetOfPayerToMonthlyCostEstimate(
+        RecurringScheduleMonthlyCostEstimate $monthlyCostEstimate,
+        AIConversationSchedule $scheduleOfPartition
+    ): void {
+        $budgetPayerAccount = $this->findBudgetPayerOfSchedule($scheduleOfPartition);
+        if ($budgetPayerAccount === null) {
+            return;
+        }
+        /** @var ScheduleBudgetPotsService $scheduleBudgetPotsService */
+        $scheduleBudgetPotsService = DDDService::instance()->getService(ScheduleBudgetPotsService::class);
+        $monthlyCostEstimate->monthlyBudgetUsd = $scheduleBudgetPotsService->findMonthlyBudgetForAccount($budgetPayerAccount);
+        $monthlyCostEstimate->hideExactFigures = $scheduleBudgetPotsService->hidesExactFiguresForAccount($budgetPayerAccount);
+    }
+
+    /**
+     * The account whose schedule budget pot a STORED schedule spends: the pot its run is checked against when it
+     * fires ({@see spawnRunConversationForClaimedSchedule()}) and the budget of the monthly cost estimate
+     * ({@see applyBudgetOfPayerToMonthlyCostEstimate()}). Default: the account the schedule is stored for (direct
+     * read: the lazy load is wanted; the fire cron runs rights-deactivated). The run itself always runs as that
+     * account; only the pot moves.
+     *
+     * An application whose task tools name another payer
+     * ({@see \DDD\Presentation\Mcp\Client\Agents\AgentTaskSchedulesMCPPackage::findBudgetPayerOfCall()}) overrides
+     * this one with the same rule, so the tools and the fire step read the same pot. The space of the schedule, when
+     * the rule needs it, is read only then: {@see findAgentSpaceOfSchedule()} (an attached space as it is, else read
+     * with the read rights lifted; null = no space or a space that no longer exists).
+     *
+     * @param AIConversationSchedule $schedule
+     * @return Account|null null = no account is known: no pot is read (nothing is capped)
+     */
+    protected function findBudgetPayerOfSchedule(AIConversationSchedule $schedule): ?Account
+    {
+        return $schedule->account;
     }
 
     /**
@@ -1129,10 +1166,13 @@ class AIConversationSchedulesService extends EntitiesService
         // pot-blocked too, so the stamp never blocks a fire that could have run).
         // Direct property read on purpose — the lazy-load is wanted (the fire cron runs rights-deactivated).
         $owningAccount = $schedule->account;
-        if ($owningAccount !== null) {
+        // the pot is the payer's ({@see findBudgetPayerOfSchedule()}, default the schedule's account); the run below
+        // runs as the schedule's account either way
+        $budgetPayerAccount = $this->findBudgetPayerOfSchedule($schedule);
+        if ($budgetPayerAccount !== null) {
             /** @var ScheduleBudgetPotsService $scheduleBudgetPotsService */
             $scheduleBudgetPotsService = DDDService::instance()->getService(ScheduleBudgetPotsService::class);
-            if ($scheduleBudgetPotsService->findScheduleBudgetPotStatusForAccount($owningAccount)->isExhausted()) {
+            if ($scheduleBudgetPotsService->findScheduleBudgetPotStatusForAccount($budgetPayerAccount)->isExhausted()) {
                 try {
                     $this->notifyOwnerOncePerMonthThatScheduleBudgetPotIsExhausted($schedule);
                 } catch (\Throwable $budgetNoticeError) {

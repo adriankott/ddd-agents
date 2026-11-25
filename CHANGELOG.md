@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.5.3
+
+**The payer of the schedule budget pot at run time** (`AIConversationSchedulesService`), the counterpart of 0.5.2's
+tool hook. npm `@mgamadeus/ddd-agents` 0.5.3 in lockstep; no web change.
+
+- New protected `findBudgetPayerOfSchedule(AIConversationSchedule $schedule): ?Account` — the account whose pot a
+  stored schedule spends. Default: the schedule's account (unchanged behaviour); null = no account, no pot read.
+- Read at the pot check of a firing run (`spawnRunConversationForClaimedSchedule()`) and for the budget and display
+  policy of the monthly cost estimate (new protected `applyBudgetOfPayerToMonthlyCostEstimate()`). The run still runs
+  as the schedule's account; only the pot moves.
+- A host that overrides `AgentTaskSchedulesMCPPackage::findBudgetPayerOfCall()` overrides this one with the same rule
+  (the schedule's space through `findAgentSpaceOfSchedule()`, read only when the rule needs it), so the tools and the
+  fire step read the same pot. The spend still counts by the run conversations' account; pool it into the payer's pot
+  with `ScheduleBudgetPotsService::findAccountIdsPoolingBudgetWithAccount()`.
+
 ## 0.5.2
 
 **A host hook for the payer of the schedule budget pot in the task tools** (`agent.tasks`,

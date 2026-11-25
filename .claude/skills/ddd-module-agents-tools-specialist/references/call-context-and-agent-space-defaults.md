@@ -108,7 +108,9 @@ tool never grants a budget bypass; the grant and the budget are the loop skill's
 A tool that reads a budget for the call names its payer in one protected method that gets the space, the acting
 account and the provenance, instead of reading the acting account inline: the task tools' `findBudgetPayerOfCall()`
 (`AgentTaskSchedulesMCPPackage`, default the acting account; the start-time check of `startBackgroundTask` and every
-schedule budget line read it), like `WebSearchHostService::findPayer()` for the web research (web-research.md).
+schedule budget line read it; a host overriding it overrides `AIConversationSchedulesService::findBudgetPayerOfSchedule()`,
+the payer at the fire step, with the same rule), like `WebSearchHostService::findPayer()` for the web research
+(web-research.md).
 
 ## Time
 
