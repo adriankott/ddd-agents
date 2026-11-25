@@ -144,7 +144,17 @@ paused. Again the package has the steps:
 | PAUSED by the platform (reason set) | ELIGIBLE | ACTIVE, reason cleared, next firing from now (a one-time row whose moment passed: EXPIRED) |
 
 `transitionStatusForAutomationState()` is the only writer of `stateReason`. `assertScheduleMayBeResumed()` refuses an
-owner's resume of a platform-paused row and of a row whose scope is not eligible.
+owner's resume of a platform-paused row ("resumes by itself once … active again") and of a row whose scope is not
+eligible; a row the sweep CANCELLED (ended or erased scope) is told it never comes back and that a new schedule is
+needed once the scope is active again.
+
+**Resume = `resumeSchedule()`.** It runs the guard and writes the status the RESUME transition leads to: ACTIVE with
+the anchor from now, or EXPIRED for an owner-paused row past its `ttlAt` or its `maxIterations` (decided before the
+scope's eligibility; re-armed, such a row would only expire at the next fire scan and never run). It returns the
+transition; `targetStatus` tells the caller which of the two happened. `resumeTaskSchedule` answers an EXPIRED outcome
+with "it has ended … a new schedule is needed" and no next firing. An edit of a PAUSED row (`updateTaskSchedule`)
+names no next firing either: the anchor a pause leaves in the row is none; the note gives the firing after a resume
+(the one-time moment, or the next cron slot after the resume).
 
 ## The budget pot and cost estimates
 
@@ -319,7 +329,8 @@ Full class names of what a host extends or calls here: `DDD\Domain\AI\Services\C
 ## Traps
 
 - Firing without the expiry step: a schedule over its quota keeps being claimed.
-- Resuming with `transitionStatus()` alone. Call `assertScheduleMayBeResumed()` first: without it a platform-paused row
+- Resuming with `transitionStatus()` alone. Call `resumeSchedule()` (or `assertScheduleMayBeResumed()` first and
+  then the transition's `targetStatus`): without the guard a platform-paused row
   goes ACTIVE with its `stateReason` still set — the owner's resume skips the platform-pause rule, and the row stays a
   candidate of every state sweep. (The fire step still asks eligibility, so an ended scope does not run.)
 - Raw statements of the schedule service use backtick quoting; check them on PostgreSQL before relying on a host there.

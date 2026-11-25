@@ -644,8 +644,9 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
      * RESUMES a PAUSED schedule — the user wants a suspended task to run again: the next firing is computed from NOW (a
      * long pause never fires a backlog). Refused with the reason when the platform paused the schedule for the state of
      * the space or the account (it resumes by itself once that state is active again) — relay that reason, never offer a
-     * workaround. A one-time task whose moment has passed does not resume — schedule a new one. Find the id via
-     * `getTaskSchedules`; confirm WHEN it fires next.
+     * workaround. A one-time task whose moment has passed does not resume — schedule a new one. A schedule whose
+     * lifetime is over (ttl passed or runs used up) is closed as EXPIRED instead — tell the user it has ended. Find the
+     * id via `getTaskSchedules`; confirm WHEN it fires next.
      *
      * @example {"scheduleId": 42}
      */
@@ -661,11 +662,16 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
     ): TaskScheduleUpdateMcpResponseDto {
         $this->refuseScheduleAdministrationFromScheduledRun($callProvenance, 'resumeTaskSchedule');
         $schedule = $this->findScheduleOfActingAccount((int)$requestDto->scheduleId, $aIConversationSchedulesService, $callProvenance);
-        $aIConversationSchedulesService->assertScheduleMayBeResumed($schedule);
-        $aIConversationSchedulesService->transitionStatus($schedule, AIConversationScheduleStatus::ACTIVE);
+        $resumeTransition = $aIConversationSchedulesService->resumeSchedule($schedule);
 
         $responseDto = new TaskScheduleUpdateMcpResponseDto();
         $responseDto->scheduleId = (int)$schedule->id;
+        if ($resumeTransition->targetStatus === AIConversationScheduleStatus::EXPIRED) {
+            // its lifetime was over: the resume closed it, it never fires again
+            $responseDto->nextRunAt = null;
+            $responseDto->note = static::composeEndedOnResumeNote($schedule);
+            return $responseDto;
+        }
         $responseDto->nextRunAt = $schedule->nextRunAt ?? null;
         $responseDto->note = 'Schedule resumed. ' . static::composeNextFiringNote($schedule) . 'Confirm to the user in ONE short sentence when it fires next.';
         return $responseDto;
@@ -757,8 +763,14 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
 
         $responseDto = new TaskScheduleUpdateMcpResponseDto();
         $responseDto->scheduleId = (int)$schedule->id;
-        $responseDto->nextRunAt = $schedule->nextRunAt ?? null;
-        $responseDto->note = 'Schedule updated IN PLACE (same id, run history preserved). ' . static::composeNextFiringNote($schedule);
+        if ($schedule->status === AIConversationScheduleStatus::PAUSED) {
+            // the anchor a pause leaves in the row is no firing: the resume computes the next one
+            $responseDto->nextRunAt = null;
+            $responseDto->note = 'Schedule updated IN PLACE (same id, run history preserved). ' . static::composePausedScheduleFiringNote($schedule);
+        } else {
+            $responseDto->nextRunAt = $schedule->nextRunAt ?? null;
+            $responseDto->note = 'Schedule updated IN PLACE (same id, run history preserved). ' . static::composeNextFiringNote($schedule);
+        }
         if (in_array('oneTimeAt', $editedColumnNames, true)) {
             $responseDto->note .= static::composeOneTimeMomentNote($schedule->oneTimeAt, $this->findTimezoneIdentifierForMomentEdit($schedule, $requestDto), $now)
                 . 'VERIFY this matches what the user asked (wrong day → fix it with updateTaskSchedule). ';
@@ -787,6 +799,43 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
             default => $resolvedLocal->format('l'),
         };
         return 'One-time task scheduled for ' . $resolvedLocal->format('Y-m-d H:i') . " local time — that is {$relativeDayLabel}. ";
+    }
+
+    /**
+     * The note of a PAUSED schedule after an edit: it names no next firing (the anchor a pause leaves in the row is
+     * none), only the firing it will have once resumed — the moment of a one-time task, the next slot of the cron
+     * after the resume for a recurring one.
+     *
+     * @param AIConversationSchedule $schedule
+     * @return string
+     */
+    public static function composePausedScheduleFiringNote(AIConversationSchedule $schedule): string
+    {
+        $pausedNote = 'It is PAUSED and does not fire until resumed (resumeTaskSchedule); ';
+        if ($schedule->isOneTime() && isset($schedule->oneTimeAt)) {
+            $scheduleTimezone = new \DateTimeZone($schedule->getCronTimezoneIdentifier());
+            $momentLocal = (clone $schedule->oneTimeAt)->setTimezone($scheduleTimezone);
+            return $pausedNote . 'once resumed, it fires at ' . $schedule->oneTimeAt->formatForModel($scheduleTimezone)
+                . ' (' . $momentLocal->format('l') . '). ';
+        }
+        return $pausedNote . 'once resumed, it fires at the next slot of its cron after the resume. ';
+    }
+
+    /**
+     * The note of a resume that closed the schedule: its ttl passed or its runs are used up, so it is EXPIRED and a new
+     * schedule is needed if the user still wants the task.
+     *
+     * @param AIConversationSchedule $schedule
+     * @return string
+     */
+    public static function composeEndedOnResumeNote(AIConversationSchedule $schedule): string
+    {
+        $endedBecause = isset($schedule->ttlAt) && $schedule->ttlAt->getTimestamp() <= (new DateTime())->getTimestamp()
+            ? 'its lifetime (ttl) has passed'
+            : 'its runs are used up (' . (int)$schedule->iterationsUsed . ' of ' . (int)$schedule->maxIterations . ')';
+        return "Schedule {$schedule->id} was not resumed: it has ended — {$endedBecause} — and is now EXPIRED; it never fires again. "
+            . 'Tell the user so in ONE short sentence; if they still want the task, a new schedule is needed '
+            . '(scheduleOneTimeTask or createRecurringTaskSchedule).';
     }
 
     /**

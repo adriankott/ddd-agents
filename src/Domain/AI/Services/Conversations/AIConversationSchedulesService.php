@@ -1828,8 +1828,24 @@ class AIConversationSchedulesService extends EntitiesService
     }
 
     /**
+     * Resumes an owner-PAUSED schedule through its guard ({@see assertScheduleMayBeResumed()}) and writes the status
+     * the resume leads to: ACTIVE with the fire anchor computed from now, or EXPIRED for a row past its ttl or its
+     * runs (re-armed, it would only expire at the next fire scan and never run). Returns the transition so the caller
+     * tells which of the two happened ({@see AIConversationScheduleTransition::$targetStatus}).
+     *
+     * @throws BadRequestException naming the state that refuses
+     */
+    public function resumeSchedule(AIConversationSchedule $schedule): AIConversationScheduleTransition
+    {
+        $this->assertScheduleMayBeResumed($schedule);
+        $resumeTransition = $schedule->buildTransitionTo(AIConversationScheduleTransition::OPERATION_RESUME, new DateTime());
+        $this->transitionStatus($schedule, $resumeTransition->targetStatus ?? AIConversationScheduleStatus::ACTIVE);
+        return $resumeTransition;
+    }
+
+    /**
      * The RESUME guard of every resume path: a row the platform paused refuses ("closed by the
-     * platform"), a one-time row whose moment has passed refuses (re-arming it would fire a past moment), and
+     * platform"; a CANCELLED one says it never comes back), a one-time row whose moment has passed refuses (re-arming it would fire a past moment), and
      * a resumable row on an agent space / account that is not eligible refuses naming the STATE, never "budget" — an owner
      * must not re-arm a task on a locked agent space from the automations tab.
      *
@@ -1841,13 +1857,25 @@ class AIConversationSchedulesService extends EntitiesService
         $resumeTransition = $schedule->buildTransitionTo(AIConversationScheduleTransition::OPERATION_RESUME, $now);
         if (!$resumeTransition->isAllowed) {
             if ($resumeTransition->refusalReason === AIConversationScheduleTransition::REFUSAL_CLOSED_BY_PLATFORM_STATE) {
+                $refusalPlaceholders = [
+                    'scheduleId' => (string)($schedule->id ?? '?'),
+                    'reason' => strtolower(str_replace('_', ' ', (string)$schedule->stateReason)),
+                    'status' => strtolower((string)$schedule->status),
+                ];
+                if ($schedule->status === AIConversationScheduleStatus::PAUSED) {
+                    // a suspension: the state sweep re-arms the row once the scope is eligible again
+                    throw new BadRequestException($this->translateScheduleRefusalText(
+                        'Schedule %scheduleId% was paused by the platform (%reason%) and resumes by itself once the '
+                        . AgentApplicationWording::current()->billingEntityName . ' or account is active again.',
+                        placeholders: $refusalPlaceholders
+                    ));
+                }
+                // a final status (CANCELLED for an ended or erased scope): the sweep never re-arms it
                 throw new BadRequestException($this->translateScheduleRefusalText(
-                    'Schedule %scheduleId% was paused by the platform (%reason%) and resumes by itself once the '
-                    . AgentApplicationWording::current()->billingEntityName . ' or account is active again.',
-                    placeholders: [
-                        'scheduleId' => (string)($schedule->id ?? '?'),
-                        'reason' => strtolower(str_replace('_', ' ', (string)$schedule->stateReason)),
-                    ]
+                    'Schedule %scheduleId% was closed by the platform (%reason%) and is %status% — it does not resume and '
+                    . 'never fires again. Once the ' . AgentApplicationWording::current()->billingEntityName
+                    . ' or account is active again, a new schedule is needed.',
+                    placeholders: $refusalPlaceholders
                 ));
             }
             if ($resumeTransition->refusalReason === AIConversationScheduleTransition::REFUSAL_ONE_TIME_MOMENT_PASSED) {

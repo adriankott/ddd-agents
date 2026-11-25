@@ -48,6 +48,9 @@ class AIConversationScheduleTransitionTest extends UnitTestCase
     /** A recurring schedule whose ttl passed. */
     protected const string KIND_RECURRING_EXPIRED = 'recurringExpired';
 
+    /** A recurring schedule whose runs are used up (three of three). */
+    protected const string KIND_RECURRING_RUNS_USED_UP = 'recurringRunsUsedUp';
+
     /** A recurring schedule fired ten minutes ago. */
     protected const string KIND_RECURRING_RECENTLY_FIRED = 'recurringRecentlyFired';
 
@@ -135,10 +138,12 @@ class AIConversationScheduleTransitionTest extends UnitTestCase
             self::KIND_RECURRING => [self::TO_PAUSED, self::NO, self::NO, self::NO, self::NO, self::NO],
             self::KIND_ONE_TIME => [self::TO_PAUSED, self::NO, self::NO, self::NO, self::NO, self::NO],
         ],
-        // only a PAUSED schedule the owner paused resumes; a one-time one only while its moment lies ahead; a
-        // schedule the platform transitioned names that state in every status
+        // only a PAUSED schedule the owner paused resumes; a one-time one only while its moment lies ahead; one whose
+        // lifetime is over is closed by the resume; a schedule the platform transitioned names that state in every status
         AIConversationScheduleTransition::OPERATION_RESUME => [
             self::KIND_RECURRING => [self::NO, self::TO_ACTIVE_RE_ARMED, self::NO, self::NO, self::NO, self::NO],
+            self::KIND_RECURRING_EXPIRED => [self::NO, self::TO_EXPIRED, self::NO, self::NO, self::NO, self::NO],
+            self::KIND_RECURRING_RUNS_USED_UP => [self::NO, self::TO_EXPIRED, self::NO, self::NO, self::NO, self::NO],
             self::KIND_ONE_TIME => [self::NO, self::TO_ACTIVE_RE_ARMED, self::NO, self::NO, self::NO, self::NO],
             self::KIND_ONE_TIME_PAST => [self::NO, self::NO_MOMENT_PASSED, self::NO, self::NO, self::NO, self::NO],
             self::KIND_ONE_TIME_NOW => [self::NO, self::NO_MOMENT_PASSED, self::NO, self::NO, self::NO, self::NO],
@@ -272,6 +277,7 @@ class AIConversationScheduleTransitionTest extends UnitTestCase
             'an erased scope' => [self::KIND_RECURRING, AIConversationScheduleStatus::PAUSED, AgentAutomationEligibility::STATE_ERASED, $refusedForTheScope],
             'the status is told before the scope' => [self::KIND_RECURRING, AIConversationScheduleStatus::ACTIVE, AgentAutomationEligibility::STATE_SUSPENDED, self::NO],
             'the passed moment is told before the scope' => [self::KIND_ONE_TIME_PAST, AIConversationScheduleStatus::PAUSED, AgentAutomationEligibility::STATE_SUSPENDED, self::NO_MOMENT_PASSED],
+            'the end of its lifetime is told before the scope' => [self::KIND_RECURRING_EXPIRED, AIConversationScheduleStatus::PAUSED, AgentAutomationEligibility::STATE_SUSPENDED, self::TO_EXPIRED],
             'the platform state is told on an eligible scope too' => [
                 self::KIND_RECURRING_CLOSED_BY_PLATFORM_STATE,
                 AIConversationScheduleStatus::PAUSED,
@@ -512,6 +518,10 @@ class AIConversationScheduleTransitionTest extends UnitTestCase
         }
         if (in_array($kind, [self::KIND_RECURRING_RAN, self::KIND_ONE_TIME_RAN, self::KIND_RECURRING_RECENTLY_FIRED], true)) {
             $schedule->iterationsUsed = 1;
+        }
+        if ($kind === self::KIND_RECURRING_RUNS_USED_UP) {
+            $schedule->maxIterations = 3;
+            $schedule->iterationsUsed = 3;
         }
         if ($kind === self::KIND_RECURRING_EXPIRED) {
             $schedule->ttlAt = new DateTime('2020-01-01 00:00:00');

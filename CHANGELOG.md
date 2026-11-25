@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.5.12
+
+**The schedule tools tell the model what happens: a cancelled schedule is not "resumed by itself", a paused schedule
+has no next firing, a resume of a schedule whose lifetime is over closes it; a package test of the four tools that
+change a schedule.** The tools test was contributed by an application team. npm `@mgamadeus/ddd-agents` 0.5.12 in
+lockstep (no web change).
+
+- `resumeTaskSchedule` on a schedule the state sweep CANCELLED for an ended or erased scope: before, "Schedule 42 was
+  paused by the platform (agent space ended) and resumes by itself once the <billing entity> or account is active
+  again" — the sweep never re-arms a final status. Now (`assertScheduleMayBeResumed()`): "Schedule 42 was closed by the
+  platform (agent space ended) and is cancelled — it does not resume and never fires again. Once the <billing entity>
+  or account is active again, a new schedule is needed." A PAUSED schedule the platform paused keeps its text.
+- `updateTaskSchedule` on a PAUSED schedule: before, "Next firing: …" from the anchor the pause leaves in the row (for
+  a paused one-time task whose moment moved: the old moment). Now `nextRunAt` is null and the note says "It is PAUSED
+  and does not fire until resumed (resumeTaskSchedule); once resumed, it fires at <the one-time moment> (<weekday>)" or
+  "… at the next slot of its cron after the resume". The stored state is unchanged.
+- RESUME of an owner-PAUSED schedule past its `ttlAt` or its `maxIterations`: `AIConversationScheduleTransition` now
+  answers "allowed → EXPIRED" (decided after the passed one-time moment, before the scope's eligibility; no re-arm).
+  Before, the resume re-armed it, answered "Schedule resumed. Next firing: …" and the first fire scan expired it
+  without a run. New `AIConversationSchedulesService::resumeSchedule()` runs the guard and writes the status the
+  transition leads to (ACTIVE with the anchor from now, or EXPIRED, one `status` write), and returns the transition.
+  `resumeTaskSchedule` answers the EXPIRED outcome with `nextRunAt` null and "Schedule 42 was not resumed: it has
+  ended — its lifetime (ttl) has passed | its runs are used up (3 of 3) — and is now EXPIRED; it never fires again. …
+  a new schedule is needed (scheduleOneTimeTask or createRecurringTaskSchedule)." **Hosts** whose own resume
+  endpoints call `assertScheduleMayBeResumed()` and then `transitionStatus(…, ACTIVE)` keep the old behaviour; switch
+  them to `resumeSchedule()`. `canBeResumed()` is true for such a row (the resume closes it).
+- The tool description of `resumeTaskSchedule` names the EXPIRED outcome; `agent-package-surface.json` regenerated
+  (host surface snapshots change once for that description).
+- New test `AgentTaskSchedulesMCPPackageTransitionToolsTest` (131 cases) with `TaskScheduleRecordingWritesDouble`
+  and `ResumeRecordingEligibilityServiceDouble`: pause, resume, delete and update called as the loop calls them on a
+  schedule in each status — refusal texts, written columns, answers; cases added on ingest for the three answers above.
+  `AIConversationScheduleTransitionTest`: RESUME rows for a schedule past its ttl and one whose runs are used up, and
+  the end of the lifetime told before the scope.
+
 ## 0.5.11
 
 **Core floor `mgamadeus/ddd ^3.47.1`; a schedule expires only while ACTIVE; a package test of the transition table of

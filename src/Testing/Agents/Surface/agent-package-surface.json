@@ -825,7 +825,7 @@
                 },
                 "resumeTaskSchedule": {
                     "annotations": [],
-                    "description": "#ede4913d57a3 (496 characters)",
+                    "description": "#28ad340edb6a (618 characters)",
                     "effect": {
                         "effect": "WRITE",
                         "identicalRepeatDoesNewWork": true,
@@ -858,7 +858,7 @@
                         "MCPToolSummary": "#7271f832b045 (135 characters)"
                     },
                     "wire": {
-                        "description": "#ede4913d57a3 (496 characters)",
+                        "description": "#28ad340edb6a (618 characters)",
                         "parameters": {
                             "scheduleId": "#a8c60395cadd (74 characters)"
                         },

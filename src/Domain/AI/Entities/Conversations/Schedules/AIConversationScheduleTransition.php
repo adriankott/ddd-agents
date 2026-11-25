@@ -22,7 +22,8 @@ use InvalidArgumentException;
  *
  * The rules in short:
  * - pause: ACTIVE only; cancel: ACTIVE or PAUSED;
- * - resume: an owner-PAUSED row on an eligible scope, and a one-time row only while its moment lies ahead;
+ * - resume: an owner-PAUSED row on an eligible scope, and a one-time row only while its moment lies ahead; a row
+ *   past its ttl or its runs is closed by the resume (→ EXPIRED, whatever the scope);
  * - delete: the archive policy (never ran → removed; recurring that ran → ARCHIVED; one-time that ran → kept);
  * - every edit: ACTIVE or PAUSED only; a cron belongs to a recurring row, a moment to a one-time row that has not run,
  *   and a one-time row's zone moves only together with a new moment;
@@ -232,8 +233,9 @@ class AIConversationScheduleTransition extends ValueObject
      * Only a PAUSED row the OWNER paused resumes — a row the platform paused for a locked agent space / account is
      * re-armed by the sweep when the state clears, never by hand. A refused row the platform
      * transitioned names that state, whatever its status. A one-time row resumes only while its moment lies ahead:
-     * re-arming a past moment fired it at the next due scan or had it expired. Given the scope's eligibility, the
-     * scope must be eligible.
+     * re-arming a past moment fired it at the next due scan or had it expired. A row past its ttl or its runs is
+     * closed: the resume moves it to EXPIRED (told before the scope). Given the scope's eligibility, the scope must be
+     * eligible.
      */
     protected function decideResume(AIConversationSchedule $schedule, ?AgentAutomationEligibility $eligibility, DateTime $now): void
     {
@@ -243,6 +245,12 @@ class AIConversationScheduleTransition extends ValueObject
         }
         if ($schedule->isOneTime() && $schedule->oneTimeAt->getTimestamp() <= $now->getTimestamp()) {
             $this->refuseFor(self::REFUSAL_ONE_TIME_MOMENT_PASSED);
+            return;
+        }
+        if ($schedule->isExpired($now)) {
+            // its lifetime is over (ttl passed or runs used up): the resume closes it instead of re-arming a row that
+            // would only expire at the next fire scan; the scope's eligibility does not matter for an end
+            $this->allowTo(AIConversationScheduleStatus::EXPIRED);
             return;
         }
         if ($eligibility !== null && !$eligibility->isEligible()) {
@@ -397,9 +405,10 @@ class AIConversationScheduleTransition extends ValueObject
     /**
      * Only an ACTIVE row expires; the status is told before the expiry. A final row (EXPIRED, DONE, CANCELLED,
      * ARCHIVED) never moves. A PAUSED row does not expire either: the pause is the owner's (or the platform's, with
-     * its reason) and stands as the other transitions keep it. The fire path is where a row expires and it reads ACTIVE
-     * rows only: a paused row past its ttl or its runs is closed by the first fire scan after a resume, and a
-     * platform-paused one-time row whose moment passed is closed by the state sweep.
+     * its reason) and stands as the other transitions keep it. The fire path is where an ACTIVE row expires; an
+     * owner-paused row past its ttl or its runs is closed by its resume (RESUME → EXPIRED), a platform-paused row
+     * re-armed by the sweep at the next fire scan, and a platform-paused one-time row whose moment passed by the
+     * state sweep.
      */
     protected function decideExpiry(AIConversationSchedule $schedule, DateTime $now): void
     {
