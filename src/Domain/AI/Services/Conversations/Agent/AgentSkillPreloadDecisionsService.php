@@ -625,7 +625,15 @@ class AgentSkillPreloadDecisionsService extends Service
             $this->decisionCallsService()->closeCircuitBreakerAfter($decisionCallOutcome, $argusDecision?->decided === true);
             $elapsedMs = $decisionCallOutcome->elapsedMs;
             $requestId = bin2hex(random_bytes(8));
-            $this->applySkillPreloadDecision($conversation, $followUpQuestion, $argusDecision, $decidedBy, $decisionModelSettings, $runToken, $requestId, $elapsedMs, $transportFailureReason, $agentRun);
+            try {
+                $this->applySkillPreloadDecision($conversation, $followUpQuestion, $argusDecision, $decidedBy, $decisionModelSettings, $runToken, $requestId, $elapsedMs, $transportFailureReason, $agentRun);
+            } catch (AgentRunClaimLostException $claimLost) {
+                throw $claimLost;
+            } catch (Throwable $applicationError) {
+                // the request was sent: its own event below is recorded whether or not its answer could be applied
+                DDDService::instance()->getLogger()->warning('[AgentDecisionModel] skill-preload application failed', ['conversationId' => $conversation->id ?? null, 'reason' => $applicationError::class . ': ' . mb_substr($applicationError->getMessage(), 0, 200)]);
+                $this->aiTrace('turn.skillPreload.followUpFailed', ['conversationId' => $conversation->id ?? null, 'message' => $applicationError->getMessage()]);
+            }
             $this->turnEventsService()->recordEventOfConversation($conversation, AIConversationTurnEvent::KIND_REQUEST, 'turnStart', $followUpQuestion->initiatorMessageIndex, null, $requestId, [
                 'sites' => ['skillPreload'],
                 'batchId' => $decisionBatch?->batchId,
@@ -724,7 +732,17 @@ class AgentSkillPreloadDecisionsService extends Service
                 };
                 $subSkillFailureReason = $requestRefused ? $decisionCallOutcome->failureReason : $argusSubSkillDecision->transportFailureReason;
                 $subSkillRequestId = bin2hex(random_bytes(8));
-                $this->applySkillPreloadDecision($conversation, $subSkillQuestion, $argusSubSkillDecision, $subSkillDecidedBy, $decisionModelSettings, $runToken, $subSkillRequestId, $elapsedMs, $subSkillFailureReason, $agentRun);
+                $subSkillApplied = true;
+                try {
+                    $this->applySkillPreloadDecision($conversation, $subSkillQuestion, $argusSubSkillDecision, $subSkillDecidedBy, $decisionModelSettings, $runToken, $subSkillRequestId, $elapsedMs, $subSkillFailureReason, $agentRun);
+                } catch (AgentRunClaimLostException $claimLost) {
+                    throw $claimLost;
+                } catch (Throwable $applicationError) {
+                    $subSkillApplied = false;
+                    // the request was sent: its own event below is recorded whether or not its answer could be applied
+                    DDDService::instance()->getLogger()->warning('[AgentDecisionModel] skill-preload application failed', ['conversationId' => $conversation->id ?? null, 'reason' => $applicationError::class . ': ' . mb_substr($applicationError->getMessage(), 0, 200)]);
+                    $this->aiTrace('turn.skillPreload.modelLoadFailed', ['conversationId' => $conversation->id ?? null, 'message' => $applicationError->getMessage()]);
+                }
                 $this->turnEventsService()->recordEventOfConversation($conversation, AIConversationTurnEvent::KIND_REQUEST, 'turnStart', $subSkillQuestion->initiatorMessageIndex, null, $subSkillRequestId, [
                     'sites' => ['skillPreload'],
                     'batchId' => $decisionBatch->batchId,
@@ -735,6 +753,9 @@ class AgentSkillPreloadDecisionsService extends Service
                     'transportFailureReason' => $subSkillFailureReason,
                     'modelVersion' => $argusSubSkillDecision->modelVersion,
                 ], $runToken, $elapsedMs, $subSkillQuestion->arm, $subSkillRequestId);
+                if (!$subSkillApplied) {
+                    continue; // the stamp in memory may be an earlier pass's
+                }
                 $appliedDecision = $conversation->getAgentWorkingState()?->skillPreloadDecision;
                 if ($appliedDecision !== null && $appliedDecision->unlockedByRootSkillName === $loadedSkillName && $appliedDecision->admittedSkillNames !== []) {
                     $sentences[] = implode(', ', $appliedDecision->admittedSkillNames) . ' (sub-skill of ' . $loadedSkillName . ')';

@@ -31,7 +31,9 @@ use DDD\Domain\Base\Entities\ValueObject;
  *   authoritative; propagated by OR so a mixed roll-up can never claim excerpt completeness.
  *
  * SUCCESS = status COMPLETED (never merely "not FAILED"), excluding refused duplicates ({@see ToolCall::$wasRefusedAsDuplicate})
- * and the meta tools (load_skills, load_tool, delegate, check_delegations, the plan tools). Pure value logic — the same predicates the
+ * and the meta tools that do no work of their own ({@see AgentMetaTools::isExcludedFromCompactionWorkCounts()}: load_skills,
+ * load_tool, delegate, check_delegations, wait_for_sub_agents, message_sub_agent, update_task_plan, set_task_status,
+ * askOwner, findWidgets; `get_task_plans` and `send_owner_report` count). Pure value logic — the same predicates the
  * supervisor applies to the raw tail live here so cover and tail can never disagree.
  *
  * @phpstan-consistent-constructor

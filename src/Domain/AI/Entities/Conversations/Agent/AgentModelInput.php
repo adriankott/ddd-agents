@@ -17,6 +17,7 @@ use DDD\Domain\AI\Entities\Conversations\Agent\Tools\DelegateTool;
 use DDD\Domain\AI\Entities\Conversations\Agent\Tools\FindWidgetsTool;
 use DDD\Domain\AI\Entities\Conversations\Agent\Tools\LoadSkillsTool;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
+use DDD\Domain\AI\Entities\Conversations\Messages\ToolCall;
 use DDD\Domain\AI\Entities\Conversations\Messages\LoadedCapabilities;
 use DDD\Domain\AI\Entities\Conversations\Variants\AIConversationVariants;
 use DDD\Domain\AI\Entities\MCPPackages\MCPPackageDocumentation;
@@ -1113,10 +1114,12 @@ class AgentModelInput extends ValueObject
     }
 
     /**
-     * The condensed ACTION line for a WRITE tool-call message in the summary input, or null when the
-     * message is not one. A write = a COMPLETED/FAILED tool call that is neither a reusable read
-     * ({@see ToolCall::isReusableRead()}) nor one of the meta tools (load_skills / load_tool /
-     * delegate / check_delegations / wait_for_sub_agents) — the same read-vs-write split the per-turn read reuse keys on. Args are capped so a bulky payload never bloats the summary input.
+     * The condensed ACTION line for a tool-call message in the summary input, or null when the message is none: a
+     * COMPLETED or FAILED call of {@see isSummaryActionCall()}. The summary prompt reads an ACTION line as executed, so a
+     * call that is not finished (or was cancelled) gets no line; the summary's coverage marker stays before an unfinished
+     * one, so the refresh after it finished carries its line
+     * ({@see \DDD\Domain\AI\Entities\Conversations\AIConversation::getDisplaySummaryCoverageIndex()}). Args are capped so
+     * a bulky payload never bloats the summary input.
      */
     protected function buildSummaryActionLine(AIConversationMessage $message): ?string
     {
@@ -1124,23 +1127,33 @@ class AgentModelInput extends ValueObject
             return null;
         }
         $toolCall = isset($message->toolCall) ? $message->toolCall : null;
-        if ($toolCall === null) {
-            return null;
-        }
-        $toolName = (string)($toolCall->name ?? '');
-        if ($toolName === '' || $toolCall->isReusableRead()) {
-            return null;
-        }
-        // `wait_for_sub_agents` ends a turn without a text, `findWidgets` searches the widget catalog — no
-        // action of the agent's work
-        if (in_array($toolName, [LoadSkillsTool::NAME, DelegateTool::NAME, 'load_tool', 'check_delegations', 'wait_for_sub_agents', 'message_sub_agent', FindWidgetsTool::NAME], true)
-            || in_array($toolName, TaskPlan::PLAN_TOOL_NAMES, true)
+        if ($toolCall === null
+            || !in_array($toolCall->status, [AIConversationMessage::STATUS_COMPLETED, AIConversationMessage::STATUS_FAILED], true)
+            || !self::isSummaryActionCall($toolCall)
         ) {
             return null;
         }
         $argumentsJson = (string)json_encode($toolCall->arguments, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-        return 'ACTION: ' . $toolName . '(' . mb_substr($argumentsJson, 0, 400) . ')'
-            . ' — ' . strtolower((string)($toolCall->status ?? 'pending'));
+        return 'ACTION: ' . $toolCall->name . '(' . mb_substr($argumentsJson, 0, 400) . ')'
+            . ' — ' . strtolower($toolCall->status);
+    }
+
+    /**
+     * Whether a finished `$toolCall` is an action of the agent's work for the summary: neither a reusable read
+     * ({@see ToolCall::isReusableRead()}) nor one of the meta tools (load_skills / load_tool / delegate /
+     * check_delegations / wait_for_sub_agents / message_sub_agent / findWidgets / the plan tools) — the same read-vs-write
+     * split the per-turn read reuse keys on.
+     */
+    public static function isSummaryActionCall(ToolCall $toolCall): bool
+    {
+        $toolName = (string)($toolCall->name ?? '');
+        if ($toolName === '' || $toolCall->isReusableRead()) {
+            return false;
+        }
+        // `wait_for_sub_agents` ends a turn without a text, `findWidgets` searches the widget catalog — no
+        // action of the agent's work
+        return !in_array($toolName, [LoadSkillsTool::NAME, DelegateTool::NAME, 'load_tool', 'check_delegations', 'wait_for_sub_agents', 'message_sub_agent', FindWidgetsTool::NAME], true)
+            && !in_array($toolName, TaskPlan::PLAN_TOOL_NAMES, true);
     }
 
     /**

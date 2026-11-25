@@ -68,6 +68,11 @@ batch. The batch is classified once (`AgentTurnStartBatchResult`) and every site
   widget, reply language, turn-start line, the owner-message injection check.
 - Applied in this order: owner-message injection, reply language, skill preload (with its follow-up passes), reasoning
   effort, plan dynamics, direct widget, turn-start line, each sub-skill pass, then the request's own turn event.
+- Each application is isolated: one that throws is logged as a warning (`[AgentDecisionModel] turn-start application
+  failed`, trace `turn.decisions.applicationFailed`) and leaves its site as without the decision; the later sites are
+  applied, and every request sent gets its request event (cost, latency) whether or not its answer could be applied. The
+  follow-up pass and the pass after a chat-model load keep the request event the same way. Only
+  `AgentRunClaimLostException` leaves the turn start: no slice and no collected event is written then.
 - The working-state slices the sites stamp are collected and written once at the end, then the turn events.
 - Nothing asked (every site ineligible) = no request at all. An open breaker = no request; every site gets
   `fallback:breaker`.

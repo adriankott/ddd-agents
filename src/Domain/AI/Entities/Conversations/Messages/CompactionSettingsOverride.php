@@ -95,6 +95,7 @@ class CompactionSettingsOverride extends ValueObject
         $compactionSettings = $baseCompactionSettings !== null ? clone $baseCompactionSettings : CompactionSettings::newInstance();
         if ($this->triggerTokens !== null) {
             $compactionSettings->triggerTokens = $this->triggerTokens;
+            $compactionSettings->triggerTokensStampedByPurpose = null; // the operator's value, not the purpose's
         }
         if ($this->keepRecentMessages !== null) {
             $compactionSettings->keepRecentMessages = $this->keepRecentMessages;

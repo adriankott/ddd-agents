@@ -3565,8 +3565,8 @@ class AIConversation extends Entity
     public function buildCompactionThresholdBreakdown(): CompactionThresholdBreakdown
     {
         $compactionModelLimits = $this->findCompactionModelLimits();
-        // The PURPOSE CONTEXT BUDGET candidate: the purposed start stamps the purpose's budget (window-clamped)
-        // as the conversation's triggerTokens — so an override EQUAL to that clamped budget is the purpose's.
+        // The PURPOSE CONTEXT BUDGET candidate under the CURRENT model's window. The stamped trigger may have been clamped
+        // to another model's window: its source is the stamp's record (CompactionSettings), not this value.
         $purposeContextBudgetTokens = null;
         $declaredPurposeBudget = $this->findPurpose()?->contextBudgetTokens;
         if ($declaredPurposeBudget !== null && $declaredPurposeBudget > 0) {
@@ -3740,6 +3740,29 @@ class AIConversation extends Entity
         // contains the newest message on every settle/load path — see loadMessagesForDerive).
         $highestMessageIndex = $this->messages->getNextIndex() - 1;
         return $highestMessageIndex > ($this->summary->coveredUpToMessageIndex ?? -1);
+    }
+
+    /**
+     * The message index a display summary generated now covers: the newest index (on a fully compacted conversation the
+     * cover edge) — but before an action call of the newest turn that is still pending or running: its ACTION line exists
+     * only once it finished, and the next incremental refresh reads only the rows past this index. An unfinished call of
+     * an earlier turn (left behind by a crash) does not hold the index back.
+     */
+    public function getDisplaySummaryCoverageIndex(): int
+    {
+        $coverageIndex = max($this->messages->getNextIndex() - 1, $this->getCompactionCoveredUpToIndex() ?? -1);
+        foreach (array_reverse($this->getSortedMessages()) as $message) {
+            if (($message->role ?? null) === AIConversationMessage::ROLE_USER) {
+                break;
+            }
+            $toolCall = isset($message->toolCall) ? $message->toolCall : null;
+            if ($toolCall !== null && isset($message->indexInConversation)
+                && !$toolCall->isResolved() && AgentModelInput::isSummaryActionCall($toolCall)
+            ) {
+                $coverageIndex = min($coverageIndex, $message->indexInConversation - 1);
+            }
+        }
+        return $coverageIndex;
     }
 
     /**

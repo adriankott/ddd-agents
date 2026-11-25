@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.5.14
+
+**A failing decision site no longer takes the later sites and the request rows with it; the display summary names only
+finished actions; the compaction breakdown knows a purpose's budget by its stamp.** Package tests of the decision sites'
+outcomes, the compaction threshold, the consistency report and the compaction telemetry, contributed by an application
+team. npm `@mgamadeus/ddd-agents` 0.5.14 in lockstep (no web change).
+
+- **Turn start:** `applyTurnStartDecisions()` isolates every site's application. A throw is logged as a warning (trace
+  `turn.decisions.applicationFailed`) and leaves that site as without the decision; before, one catch around all of them
+  skipped the later sites and the request events of requests that were sent and billed. The order is the new
+  `AgentTurnStartDecisionBatchService::SITES_IN_APPLICATION_ORDER`, the application `applySiteAnswer()`. A lost run claim
+  leaves the method as before (no slice, no collected event).
+- **Sub-skill passes:** a sub-skill child, the follow-up pass and the pass after the chat model loaded a skill keep their
+  request event when the application of the answer throws; after a chat-model load the other skills' passes go on and
+  a failed one is not announced as loaded.
+- **Display summary:** an ACTION line is written only for a COMPLETED or FAILED call; PENDING, RUNNING, cancelled and
+  status-less calls got one too, while the summary prompt reads an ACTION line as executed. An action still unfinished
+  in the newest turn holds the summary's coverage marker before it (`AIConversation::getDisplaySummaryCoverageIndex()`), so the
+  next incremental refresh carries its line.
+- **Compaction breakdown:** the purposed start records its trigger on the settings
+  (`CompactionSettings::$triggerTokensStampedByPurpose`, in the stored JSON, hidden on the API), so a budget stamped under
+  another model's window is reported as `purposeContextBudget`, not as an override nobody set. Settings without the stamp
+  are matched by value as before. The applied threshold and the wire fields are unchanged.
+- Docblocks: `modelEffectiveContextTokens` is the model's own value, not the applied one; the fallback is 100000; the
+  telemetry's list of meta tools.
+- New package tests below `tests/Domain/AI/Services/Decisions/SiteOutcomes/` and three in `CompactionCharacterization/`,
+  with cases for each fix.
+- Decision and observability skills.
+
 ## 0.5.13
 
 **Agent.UI requests reach a real client again; the state sweep lets the application's answer decide; the resume text

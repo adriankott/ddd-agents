@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DDD\Domain\AI\Entities\Conversations\Messages;
 
 use DDD\Domain\Base\Entities\ValueObject;
+use DDD\Infrastructure\Traits\Serializer\Attributes\HideProperty;
 
 /**
  * Per-conversation OVERRIDE of the compaction knobs — so the threshold, the model, and the shape can be
@@ -43,6 +44,14 @@ class CompactionSettings extends ValueObject
     /** @var int|null The ABSOLUTE compaction threshold in tokens (override of the model's effectiveContextTokens). The ONLY threshold knob — set it low (e.g. 2000) to force compaction on a short test chat. Null = use the model's effectiveContextTokens. */
     public ?int $triggerTokens = null;
 
+    /**
+     * @var int|null The trigger the purpose's `contextBudgetTokens` was resolved to when it was stamped
+     *      ({@see setTriggerTokensOfPurpose()}): the record of where {@see $triggerTokens} comes from. Null = not recorded
+     *      (an operator's value, or a conversation stored before the record existed). Persisted, never on the API.
+     */
+    #[HideProperty]
+    public ?int $triggerTokensStampedByPurpose = null;
+
     /** @var int|null How many recent user turns to keep verbatim after the anchor (override of COMPACTION_KEEP_RECENT_TURNS). */
     public ?int $keepRecentTurns = null;
 
@@ -75,6 +84,22 @@ class CompactionSettings extends ValueObject
      * overhead). Decoupled from `triggerTokens` on purpose.
      */
     public ?int $debugLeafSegmentTokensOverride = null;
+
+    /** Stamp the purpose's context budget (clamped by the caller) as the trigger, with the record that the purpose set it. */
+    public function setTriggerTokensOfPurpose(int $triggerTokens): void
+    {
+        $this->triggerTokens = $triggerTokens;
+        $this->triggerTokensStampedByPurpose = $triggerTokens;
+    }
+
+    /**
+     * Whether the trigger in effect is the one a purpose stamped; null when no purpose stamp is recorded. A trigger
+     * written over the stamp afterwards is not the purpose's.
+     */
+    public function isTriggerStampedByPurpose(): ?bool
+    {
+        return $this->triggerTokensStampedByPurpose === null ? null : $this->triggerTokens === $this->triggerTokensStampedByPurpose;
+    }
 
     /** Whether compaction is enabled for this conversation (default true when unset). */
     public function isEnabled(): bool

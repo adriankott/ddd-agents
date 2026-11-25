@@ -99,10 +99,10 @@ class AIConversationPurposeRunsService extends Service
         // Keep the conversation's OTHER compaction knobs (the degenerate-fallback message counts) if any are stored —
         // only the trigger is the purpose's.
         $compactionSettings = isset($conversation->compactionSettings) ? $conversation->compactionSettings : new CompactionSettings();
-        if ($compactionSettings->triggerTokens === $effectiveContextBudgetTokens) {
+        if ($compactionSettings->triggerTokens === $effectiveContextBudgetTokens && $compactionSettings->isTriggerStampedByPurpose() === true) {
             return;
         }
-        $compactionSettings->triggerTokens = $effectiveContextBudgetTokens;
+        $compactionSettings->setTriggerTokensOfPurpose($effectiveContextBudgetTokens);
         $conversation->compactionSettings = $compactionSettings;
         $aIConversationsService->persistCompactionSettings($conversation);
         $this->aiTrace('purpose.contextBudget.applied', [

@@ -39,6 +39,17 @@ class AgentTurnStartDecisionBatchService extends Service
     /** The batch key of the primary request. */
     public const string PRIMARY_REQUEST_KEY = 'turnStart';
 
+    /** @var string[] the sites the batch's answers are applied to, in the persisted order (the sub-skill passes follow) */
+    public const array SITES_IN_APPLICATION_ORDER = [
+        AgentDecisionModelSettings::SITE_OWNER_MESSAGE_INJECTION,
+        AgentDecisionModelSettings::SITE_REPLY_LANGUAGE,
+        AgentDecisionModelSettings::SITE_SKILL_PRELOAD,
+        AgentDecisionModelSettings::SITE_REASONING_EFFORT,
+        AgentDecisionModelSettings::SITE_PLAN_DYNAMICS,
+        AgentDecisionModelSettings::SITE_DIRECT_WIDGET,
+        AgentDecisionModelSettings::SITE_TURN_START_LINE,
+    ];
+
     /**
      * The turn-start decisions of the current owner turn, before step 1: the sites'
      * questions in their order (the skill-preload roots pass, the sub-skill passes of the skills loaded before the turn,
@@ -183,7 +194,8 @@ class AgentTurnStartDecisionBatchService extends Service
      * The second half of {@see decideTurnStart()}: wait for the answers of {@see sendTurnStartDecisions()} and apply them
      * in the persisted order. The working-state slices the sites stamp land in ONE write at the end, not one per site
      * and decision record, and the turn events the sites and the requests record follow it
-     * ({@see writeCollectedSlicesThenEvents()}). Nothing when nothing was sent.
+     * ({@see writeCollectedSlicesThenEvents()}). A site whose application fails is logged and skipped; the later sites
+     * and the event of every request follow. Nothing when nothing was sent.
      *
      * @throws AgentRunClaimLostException the run claim was lost while a claim-fenced write ran
      */
@@ -207,35 +219,22 @@ class AgentTurnStartDecisionBatchService extends Service
         try {
             $batchResult = $this->receiveBatch($agentTurnStartDecisionsInFlight);
             $agentRun->stampPreFirstStepPart('decisionWait');
-            $decidedBy = $batchResult->decidedBy;
-            $primaryDecision = $batchResult->primaryDecision;
             $elapsedMs = $batchResult->elapsedMs;
-            $transportFailureReason = $batchResult->transportFailureReason;
-
+            $requestId = bin2hex(random_bytes(8));
             // The sites apply in the persisted order: owner-message injection, reply language, preload, reasoning
             // effort, plan dynamics, the direct widget, the turn-start line, then per sub-skill its application followed by its event, then the
-            // request event.
-            if ($siteInputs->ownerMessageForInjectionCheck !== null) {
-                $this->ownerMessageScreeningService()->applyDecision($conversation, $siteInputs->ownerMessageForInjectionCheck, $batchResult->ownerMessageInjectionDecision, $decisionModelSettings, $elapsedMs, $batchResult->refused);
-            }
-            $requestId = bin2hex(random_bytes(8));
-            if ($siteInputs->replyLanguageQuestion !== null) {
-                $this->replyLanguageDecisionsService()->applyDecision($conversation, $siteInputs->replyLanguageQuestion, $primaryDecision, $decidedBy, $decisionModelSettings, $elapsedMs, $transportFailureReason, $batchResult->rawResponseExcerpt);
-            }
-            if ($skillPreloadQuestion !== null) {
-                $this->skillPreloadDecisionsService()->applySkillPreloadDecision($conversation, $skillPreloadQuestion, $primaryDecision, $decidedBy, $decisionModelSettings, $runToken, $requestId, $elapsedMs, $transportFailureReason, $agentRun);
-            }
-            if ($siteInputs->reasoningEffortQuestion !== null) {
-                $this->reasoningEffortDecisionsService()->applyReasoningEffortDecision($conversation, $siteInputs->reasoningEffortQuestion, $primaryDecision, $decidedBy, $decisionModelSettings, $runToken, $elapsedMs, $transportFailureReason);
-            }
-            if ($siteInputs->planDynamicsQuestion !== null) {
-                $this->planDynamicsDecisionsService()->applyDecision($conversation, $siteInputs->planDynamicsQuestion, $primaryDecision, $decidedBy, $runToken, $elapsedMs, $transportFailureReason);
-            }
-            if ($siteInputs->directWidgetQuestion !== null) {
-                $this->directWidgetDecisionsService()->applyDecision($conversation, $siteInputs->directWidgetQuestion, $primaryDecision, $decidedBy, $runToken, $elapsedMs, $transportFailureReason);
-            }
-            if ($siteInputs->turnStartLineQuestion !== null) {
-                $turnStartLineAnnounced = $this->turnStartLineDecisionsService()->applyDecision($conversation, $siteInputs->turnStartLineQuestion, $primaryDecision, $decidedBy, $runToken, $elapsedMs, $transportFailureReason);
+            // request event. Each application is isolated: one that fails is logged and leaves its site as without the
+            // decision, the later sites and the request events follow. Only a lost claim ends the stretch.
+            foreach (static::SITES_IN_APPLICATION_ORDER as $site) {
+                try {
+                    if ($this->applySiteAnswer($site, $agentTurnStartDecisionsInFlight, $requestId)) {
+                        $turnStartLineAnnounced = true;
+                    }
+                } catch (AgentRunClaimLostException $claimLost) {
+                    throw $claimLost;
+                } catch (Throwable $applicationError) {
+                    $this->logFailedSiteApplication($conversation, $site, null, $applicationError);
+                }
             }
             // the sub-skills of the skills loaded BEFORE this turn: each child parses its answer and admits on its own
             foreach ($siteInputs->loadedSkillSubSkillQuestions->getElements() as $turnStartSubSkillQuestion) {
@@ -250,9 +249,9 @@ class AgentTurnStartDecisionBatchService extends Service
                 } catch (AgentRunClaimLostException $claimLost) {
                     throw $claimLost;
                 } catch (Throwable $subSkillError) {
-                    $this->aiTrace('turn.skillPreload.loadedSkillFailed', ['conversationId' => $conversation->id ?? null, 'loadedSkillName' => $loadedSkillName, 'message' => $subSkillError->getMessage()]);
-                    continue;
+                    $this->logFailedSiteApplication($conversation, AgentDecisionModelSettings::SITE_SKILL_PRELOAD, $loadedSkillName, $subSkillError);
                 }
+                // the request was sent whether or not its answer could be applied
                 $this->turnEventsService()->recordEventOfConversation($conversation, AIConversationTurnEvent::KIND_REQUEST, self::PRIMARY_REQUEST_KEY, $loadedSkillSubSkillQuestion->initiatorMessageIndex, null, $subSkillRequestId, [
                     'sites' => ['skillPreload'],
                     'batchId' => $batchResult->batchId,
@@ -273,7 +272,7 @@ class AgentTurnStartDecisionBatchService extends Service
             $writesCollectedSlices = false;
             throw $claimLost; // the loop's one claim-lost exit — never a swallowed failure
         } catch (Throwable $decisionError) {
-            $this->aiTrace('turn.replyLanguage.failed', ['conversationId' => $conversation->id ?? null, 'message' => $decisionError->getMessage()]);
+            $this->aiTrace('turn.decisions.applyFailed', ['conversationId' => $conversation->id ?? null, 'message' => $decisionError->getMessage()]);
         } finally {
             $this->writeCollectedSlicesThenEvents($conversation, $writesCollectedSlices);
         }
@@ -281,6 +280,73 @@ class AgentTurnStartDecisionBatchService extends Service
         if ($turnStartLineAnnounced) {
             $this->turnStartLineDecisionsService()->publishTurnStartLineSignal($conversation);
         }
+    }
+
+    /**
+     * Apply the received answers to one site of {@see SITES_IN_APPLICATION_ORDER}; nothing when the site asked nothing.
+     * True only when the turn-start line site announces a line for this turn.
+     *
+     * @throws AgentRunClaimLostException the run claim was lost while a claim-fenced write ran
+     */
+    protected function applySiteAnswer(string $site, AgentTurnStartDecisionsInFlight $agentTurnStartDecisionsInFlight, string $requestId): bool
+    {
+        $conversation = $agentTurnStartDecisionsInFlight->conversation;
+        $runToken = $agentTurnStartDecisionsInFlight->runToken;
+        $decisionModelSettings = $agentTurnStartDecisionsInFlight->decisionModelSettings;
+        $siteInputs = $agentTurnStartDecisionsInFlight->siteInputs;
+        $batchResult = $agentTurnStartDecisionsInFlight->batchResult;
+        $decidedBy = $batchResult->decidedBy;
+        $primaryDecision = $batchResult->primaryDecision;
+        $elapsedMs = $batchResult->elapsedMs;
+        $transportFailureReason = $batchResult->transportFailureReason;
+        switch ($site) {
+            case AgentDecisionModelSettings::SITE_OWNER_MESSAGE_INJECTION:
+                if ($siteInputs->ownerMessageForInjectionCheck !== null) {
+                    $this->ownerMessageScreeningService()->applyDecision($conversation, $siteInputs->ownerMessageForInjectionCheck, $batchResult->ownerMessageInjectionDecision, $decisionModelSettings, $elapsedMs, $batchResult->refused);
+                }
+                return false;
+            case AgentDecisionModelSettings::SITE_REPLY_LANGUAGE:
+                if ($siteInputs->replyLanguageQuestion !== null) {
+                    $this->replyLanguageDecisionsService()->applyDecision($conversation, $siteInputs->replyLanguageQuestion, $primaryDecision, $decidedBy, $decisionModelSettings, $elapsedMs, $transportFailureReason, $batchResult->rawResponseExcerpt);
+                }
+                return false;
+            case AgentDecisionModelSettings::SITE_SKILL_PRELOAD:
+                if ($siteInputs->skillPreloadQuestion !== null) {
+                    $this->skillPreloadDecisionsService()->applySkillPreloadDecision($conversation, $siteInputs->skillPreloadQuestion, $primaryDecision, $decidedBy, $decisionModelSettings, $runToken, $requestId, $elapsedMs, $transportFailureReason, $agentTurnStartDecisionsInFlight->agentRun);
+                }
+                return false;
+            case AgentDecisionModelSettings::SITE_REASONING_EFFORT:
+                if ($siteInputs->reasoningEffortQuestion !== null) {
+                    $this->reasoningEffortDecisionsService()->applyReasoningEffortDecision($conversation, $siteInputs->reasoningEffortQuestion, $primaryDecision, $decidedBy, $decisionModelSettings, $runToken, $elapsedMs, $transportFailureReason);
+                }
+                return false;
+            case AgentDecisionModelSettings::SITE_PLAN_DYNAMICS:
+                if ($siteInputs->planDynamicsQuestion !== null) {
+                    $this->planDynamicsDecisionsService()->applyDecision($conversation, $siteInputs->planDynamicsQuestion, $primaryDecision, $decidedBy, $runToken, $elapsedMs, $transportFailureReason);
+                }
+                return false;
+            case AgentDecisionModelSettings::SITE_DIRECT_WIDGET:
+                if ($siteInputs->directWidgetQuestion !== null) {
+                    $this->directWidgetDecisionsService()->applyDecision($conversation, $siteInputs->directWidgetQuestion, $primaryDecision, $decidedBy, $runToken, $elapsedMs, $transportFailureReason);
+                }
+                return false;
+            case AgentDecisionModelSettings::SITE_TURN_START_LINE:
+                return $siteInputs->turnStartLineQuestion !== null
+                    && $this->turnStartLineDecisionsService()->applyDecision($conversation, $siteInputs->turnStartLineQuestion, $primaryDecision, $decidedBy, $runToken, $elapsedMs, $transportFailureReason);
+            default:
+                return false;
+        }
+    }
+
+    /** A site whose application failed: logged as a warning and traced, never rethrown. */
+    protected function logFailedSiteApplication(AIConversation $conversation, string $site, ?string $loadedSkillName, Throwable $applicationError): void
+    {
+        $context = ['conversationId' => $conversation->id ?? null, 'site' => $site];
+        if ($loadedSkillName !== null) {
+            $context['loadedSkillName'] = $loadedSkillName;
+        }
+        DDDService::instance()->getLogger()->warning('[AgentDecisionModel] turn-start application failed', $context + ['reason' => $applicationError::class . ': ' . mb_substr($applicationError->getMessage(), 0, 200)]);
+        $this->aiTrace('turn.decisions.applicationFailed', $context + ['message' => $applicationError->getMessage()]);
     }
 
     /**

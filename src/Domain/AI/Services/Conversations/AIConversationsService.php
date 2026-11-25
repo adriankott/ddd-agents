@@ -2199,7 +2199,7 @@ class AIConversationsService extends EntitiesService
      * a lazy-load gives no chance to thread the previous summary in): with an existing summary the summarizer runs
      * INCREMENTALLY over previous summary + the slice past the marker
      * ({@see AIConversation::buildDisplaySummaryDeltaInput}); first generation runs over the bounded full view. The
-     * marker is stamped to the conversation's highest message index at generation. The `bool $async` seam: async
+     * marker is {@see AIConversation::getDisplaySummaryCoverageIndex()} at generation. The `bool $async` seam: async
      * dispatches {@see AIConversationSummarizeMessage} (the HTTP/admin path); sync runs inline (worker / CLI / eval).
      * The spontaneous lazy-load path (a list read touching an unset `summary` column) keeps working unchanged — it
      * generates a full, marker-less summary that the next settle refresh stamps.
@@ -2239,10 +2239,7 @@ class AIConversationsService extends EntitiesService
         // Capture the marker BEFORE the model call: the summary covers what the input contained at build time.
         // On a FULLY compacted conversation (completion compaction landed) the raw tail is empty and the tail-based
         // marker would collapse to -1 — the cover edge is the true coverage there.
-        $highestCoveredMessageIndex = max(
-            $conversation->messages->getNextIndex() - 1,
-            $conversation->getCompactionCoveredUpToIndex() ?? -1
-        );
+        $highestCoveredMessageIndex = $conversation->getDisplaySummaryCoverageIndex();
 
         $summarizer = ArgusAIConversationSummary::newInstance();
         // setParent takes `?DefaultObject &$parent` BY-REF — a throwaway local keeps $conversation's type (the

@@ -473,7 +473,7 @@ class AIConversationPurpose extends Entity
             return null;
         }
         $compactionSettings = new CompactionSettings();
-        $compactionSettings->triggerTokens = $effectiveContextBudgetTokens;
+        $compactionSettings->setTriggerTokensOfPurpose($effectiveContextBudgetTokens);
         return $compactionSettings;
     }
 

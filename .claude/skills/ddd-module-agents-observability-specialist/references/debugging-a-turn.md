@@ -66,7 +66,9 @@ loaded skill block, the compaction summary, the tool schemas, each wire message)
 of a "what filled the context" view. `ModelCallComposition::unavailable()` marks a row without a snapshot;
 `keepSegmentTextsOnlyForTypes()` drops the texts of the other segment types before a response leaves.
 `AIConversation::buildCompactionThresholdBreakdown()` answers which compaction threshold applies and why
-(`CompactionThresholdBreakdown`).
+(`CompactionThresholdBreakdown`). `thresholdTokens` is the applied value; `modelEffectiveContextTokens` is the model's own
+value before the 100k ceiling. The source `purposeContextBudget` comes from the stamp the purposed start left on the
+settings (`CompactionSettings::isTriggerStampedByPurpose()`); only settings stored without a stamp are matched by value.
 
 ## The prompt-cache diff
 
