@@ -85,16 +85,19 @@ use DDD\Domain\AI\Entities\MCPPackages\MCPToolReturnsTrustedContent;
  * use a space reads that space's schedules and runs, also those that run as another account
  * ({@see isScopeReadWithoutEntityRights()}).
  *
- * Override points for an application (same-path subclass): the budget note ({@see composeScheduleBudgetPotNote()}),
+ * Override points for an application (same-path subclass): the payer whose budget pot the tools read
+ * ({@see findBudgetPayerOfCall()}), the budget note ({@see composeScheduleBudgetPotNoteOfCall()},
+ * {@see composeScheduleBudgetPotNote()}),
  * the monthly cost note ({@see composeMonthlyCostNote()}), the widget of the task list (`AI.agentTasks.taskListWidgetType`,
  * {@see findTaskListWidgetType()}, {@see composeTaskListWidgetNote()}), the phone note of the list
  * ({@see composeTaskListPhoneNote()}), the reads of a scope ({@see findRunConversationsOfScope()},
  * {@see findSchedulesOfScope()}), a schedule a retried call already produced ({@see findScheduleAlreadyProducedByCall()}).
- * The payer of scheduled runs (whose budget pot a schedule spends) is decided in a same-path subclass of
+ * The pot of an account (budget, share, spend) is computed in
  * {@see \DDD\Domain\AI\Services\Conversations\Schedules\ScheduleBudgetPotsService}
  * (`findScheduleBudgetPotStatusForAccount()`, read here through
- * {@see AIConversationSchedulesService::buildScheduleBudgetPotStatusForAccount()}), never in
- * {@see requireActingAccount()}: that one only scopes the lists and the targets of a call.
+ * {@see AIConversationSchedulesService::buildScheduleBudgetPotStatusForAccount()}); WHICH account's pot the tools read
+ * is {@see findBudgetPayerOfCall()}, never {@see requireActingAccount()}: that one only scopes the lists and the
+ * targets of a call.
  */
 #[MCPToolReturnsTrustedContent('the account\'s task schedules as the platform stores them')]
 class AgentTaskSchedulesMCPPackage extends MCPPackage
@@ -147,8 +150,11 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
     ): TaskScheduleCreateMcpResponseDto {
         $agentSpace = $this->findAgentSpaceOfCall($requestDto->agentSpaceId, $callProvenance);
         $actingAccount = $this->requireActingAccount($callProvenance);
-        // an immediate task spends NOW: refused on an exhausted pot instead of a row that fires after the reset
-        $scheduleBudgetPotStatus = $aIConversationSchedulesService->buildScheduleBudgetPotStatusForAccount($actingAccount);
+        // an immediate task spends NOW: refused on an exhausted pot (of the call's payer) instead of a row that fires
+        // after the reset
+        $scheduleBudgetPotStatus = $aIConversationSchedulesService->buildScheduleBudgetPotStatusForAccount(
+            $this->findBudgetPayerOfCall($agentSpace, $actingAccount, $callProvenance)
+        );
         if ($scheduleBudgetPotStatus !== null && $scheduleBudgetPotStatus->isExhausted()) {
             throw new BadRequestException(
                 $scheduleBudgetPotStatus->buildAgentFacingSummary() . ' Offer to handle anything urgent DIRECTLY in this chat instead.'
@@ -270,7 +276,7 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
         $responseDto->note = static::composeOneTimeMomentNote($oneTimeAt, $schedule->timezone ?? 'UTC', $now)
             . static::composeNextFiringNote($schedule)
             . 'VERIFY this matches what the user asked (wrong day → fix it with updateTaskSchedule), then confirm in ONE short sentence what runs and when.';
-        $scheduleBudgetPotNote = $this->composeScheduleBudgetPotNote($aIConversationSchedulesService, $actingAccount);
+        $scheduleBudgetPotNote = $this->composeScheduleBudgetPotNoteOfCall($aIConversationSchedulesService, $agentSpace, $actingAccount, $callProvenance);
         if ($scheduleBudgetPotNote !== '') {
             $responseDto->note .= ' ' . $scheduleBudgetPotNote;
         }
@@ -363,7 +369,7 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
             . 'Schedule created — confirm to the user in ONE short sentence what will run and when the first firing is.';
         foreach ([
             $this->composeMonthlyCostNote($aIConversationSchedulesService, $agentSpace, $actingAccount),
-            $this->composeScheduleBudgetPotNote($aIConversationSchedulesService, $actingAccount),
+            $this->composeScheduleBudgetPotNoteOfCall($aIConversationSchedulesService, $agentSpace, $actingAccount, $callProvenance),
         ] as $budgetNote) {
             if ($budgetNote !== '') {
                 $responseDto->note .= ' ' . $budgetNote;
@@ -454,7 +460,7 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
         $budgetNotes = [];
         foreach ([
             $this->composeMonthlyCostNote($aIConversationSchedulesService, $agentSpace, $actingAccount),
-            $this->composeScheduleBudgetPotNote($aIConversationSchedulesService, $actingAccount),
+            $this->composeScheduleBudgetPotNoteOfCall($aIConversationSchedulesService, $agentSpace, $actingAccount, $callProvenance),
         ] as $budgetNote) {
             if ($budgetNote !== '') {
                 $budgetNotes[] = $budgetNote;
@@ -1089,17 +1095,62 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
     }
 
     /**
-     * The schedule budget's line for a tool note (warn threshold reached or exhausted; '' below it and when the budget
-     * cannot be read — the budget is a brake, never an availability risk). An application without a schedule budget
-     * gets ''.
+     * The account whose schedule budget pot the call reads: the pot the start-time check of `startBackgroundTask`
+     * refuses on and the pot every budget line of these tools reports ({@see composeScheduleBudgetPotNoteOfCall()}).
+     * Default: the acting account ({@see requireActingAccount()}). An application whose payer is another account —
+     * e.g. the owner of the space when an account outside the owner's account family works in it — overrides this
+     * one method; the lists and the targets of a call stay scoped to the acting account.
+     *
+     * Only the tools read through it. The pot a scheduled run is checked against when it fires is the pot of the
+     * account the schedule is stored for ({@see AIConversationSchedulesService::createSchedule()}).
+     *
+     * @param AgentSpace|null $agentSpace the space of the call; null = account level
+     * @param Account $actingAccount the account the call acts for
+     * @param AgentToolCallProvenance $callProvenance the call's context (conversation, schedule, tool)
+     * @return Account the account whose pot is read
+     */
+    protected function findBudgetPayerOfCall(?AgentSpace $agentSpace, Account $actingAccount, AgentToolCallProvenance $callProvenance): Account
+    {
+        return $actingAccount;
+    }
+
+    /**
+     * The schedule budget's line for a tool note of this call: the pot of the call's payer
+     * ({@see findBudgetPayerOfCall()}), composed by {@see composeScheduleBudgetPotNote()}. Override this one when the
+     * line needs the space or the call; an override of {@see composeScheduleBudgetPotNote()} keeps working and
+     * receives the payer.
      *
      * @param AIConversationSchedulesService $aIConversationSchedulesService
-     * @param Account $actingAccount the account the schedule is stored for
+     * @param AgentSpace|null $agentSpace the space of the call; null = account level
+     * @param Account $actingAccount the account the call acts for
+     * @param AgentToolCallProvenance $callProvenance the call's context
      * @return string
      */
-    protected function composeScheduleBudgetPotNote(AIConversationSchedulesService $aIConversationSchedulesService, Account $actingAccount): string
+    protected function composeScheduleBudgetPotNoteOfCall(
+        AIConversationSchedulesService $aIConversationSchedulesService,
+        ?AgentSpace $agentSpace,
+        Account $actingAccount,
+        AgentToolCallProvenance $callProvenance
+    ): string {
+        return $this->composeScheduleBudgetPotNote(
+            $aIConversationSchedulesService,
+            $this->findBudgetPayerOfCall($agentSpace, $actingAccount, $callProvenance)
+        );
+    }
+
+    /**
+     * The schedule budget's line for a tool note (warn threshold reached or exhausted; '' below it and when the budget
+     * cannot be read — the budget is a brake, never an availability risk). An application without a schedule budget
+     * gets ''. The tools call it through {@see composeScheduleBudgetPotNoteOfCall()}.
+     *
+     * @param AIConversationSchedulesService $aIConversationSchedulesService
+     * @param Account $budgetPayerAccount the account whose pot is read ({@see findBudgetPayerOfCall()}; the acting
+     *                                    account unless an application decides otherwise)
+     * @return string
+     */
+    protected function composeScheduleBudgetPotNote(AIConversationSchedulesService $aIConversationSchedulesService, Account $budgetPayerAccount): string
     {
-        $scheduleBudgetPotStatus = $aIConversationSchedulesService->buildScheduleBudgetPotStatusForAccount($actingAccount);
+        $scheduleBudgetPotStatus = $aIConversationSchedulesService->buildScheduleBudgetPotStatusForAccount($budgetPayerAccount);
         return $scheduleBudgetPotStatus instanceof ScheduleBudgetPotStatus ? $scheduleBudgetPotStatus->buildAgentFacingSummary() : '';
     }
 

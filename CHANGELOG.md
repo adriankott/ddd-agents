@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.5.2
+
+**A host hook for the payer of the schedule budget pot in the task tools** (`agent.tasks`,
+`AgentTaskSchedulesMCPPackage`). npm `@mgamadeus/ddd-agents` 0.5.2 in lockstep; no web change.
+
+- New protected `findBudgetPayerOfCall(?AgentSpace $agentSpace, Account $actingAccount, AgentToolCallProvenance
+  $callProvenance): Account` — the account whose schedule budget pot the tools read. Default: the acting account
+  (unchanged behaviour). A host whose payer is another account (e.g. the owner of the space when an account outside the
+  owner's account family works in it) overrides this one method.
+- Every pot read of the tools goes through it: the start-time check of `startBackgroundTask` (refused on a used-up pot)
+  and the budget line of `startBackgroundTask`, `scheduleOneTimeTask`, `createRecurringTaskSchedule` and
+  `getTaskSchedules`.
+- New protected `composeScheduleBudgetPotNoteOfCall($aIConversationSchedulesService, ?AgentSpace, Account
+  $actingAccount, AgentToolCallProvenance)`: the budget line with the space and the call; the tools call it. It hands
+  the payer to `composeScheduleBudgetPotNote()`, whose signature is unchanged, so an override of it keeps working; its
+  account argument (renamed `$budgetPayerAccount`) is now the payer.
+- Not changed: the run-time pot check of a scheduled run reads the pot of the account the schedule is stored for (the
+  signed-in creator), and the spend counts by the run conversations' account. A host that moves the payer in the tools
+  moves it at run time through `ScheduleBudgetPotsService` (e.g. `findAccountIdsPoolingBudgetWithAccount()`).
+
 ## 0.5.1
 
 **The default split view works while the canvas covers the chat** (a split narrower than `coversBelowWidth`), so a host
