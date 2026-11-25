@@ -27,6 +27,7 @@ import { textKey } from "../../provider/text-key";
 import { VoiceBarsIcon } from "../../chat/ConversationMessage/ConversationCallMarkerChip/VoiceBarsIcon/VoiceBarsIcon";
 import { AgentVoiceCloseIcon, AgentVoiceHangUpIcon, AgentVoiceMicrophoneIcon } from "../AgentVoiceIcons/AgentVoiceIcons";
 import { useAgentVoiceTranslateText } from "../AgentVoiceCallProvider/agent-voice-call-context";
+import { agentVoicePartTestId } from "../agent-voice-part-test-id";
 import { agentVoiceCallOutcomeTitleTextKey } from "./agent-voice-call-outcome-title-text-key";
 import styles from "./AgentVoiceCallBand.module.scss";
 
@@ -51,6 +52,23 @@ interface AgentVoiceBandActionProps {
   variant?: "end" | "accept";
   disabled?: boolean;
 }
+
+/** The band's root test id while the application sets none. */
+const DEFAULT_TEST_ID = "agent-voice-call-band";
+
+/** Whether the application gave the band controls of its own: a node that renders something. */
+const hasApplicationActions = (actions: ReactNode): boolean => actions !== undefined && actions !== null && actions !== false;
+
+/** The application's own controls (`actions`), first in the band's row of buttons. */
+const AgentVoiceBandApplicationActions = (props: { actions: ReactNode; testId: string }) => {
+  const { actions, testId } = props;
+  if (!hasApplicationActions(actions)) return null;
+  return (
+    <div className={styles.applicationActions} data-testid={testId}>
+      {actions}
+    </div>
+  );
+};
 
 /** A pill on the dark band. */
 const AgentVoiceBandAction = (props: AgentVoiceBandActionProps) => {
@@ -93,6 +111,18 @@ export interface AgentVoiceCallBandViewProps {
   incoming?: AgentVoiceCallIncomingRing;
   /** The application's avatar of the agent, before the name (while a call runs or the agent rings). */
   agentSpot?: ReactNode;
+  /**
+   * The application's own controls (a button that opens the chat in a window), in the band's row of buttons before
+   * the band's own. Rendered only while the band shows something (a call, a ring, a refused answer, an outcome).
+   * Default: none.
+   */
+  actions?: ReactNode;
+  /**
+   * The test id of the band; its inner elements take `${testId}-<part>` (`-status`, `-mute`, `-end`,
+   * `-incoming-decline`, `-incoming-accept`, `-incoming-refusal`, `-ended-status`, `-failure`, `-start-again`, `-close`,
+   * `-actions`). Default: `agent-voice-call-band`, the inner elements their fixed `agent-voice-call-…` ids.
+   */
+  testId?: string;
 }
 
 /**
@@ -101,40 +131,48 @@ export interface AgentVoiceCallBandViewProps {
  * again. Driven only by its props: the band feeds it the live call, a test or a showcase feeds it fixtures.
  */
 export const AgentVoiceCallBandView = (props: AgentVoiceCallBandViewProps) => {
-  const { call, elapsedSeconds, onStartVoiceChat, incoming, agentSpot } = props;
+  const { call, elapsedSeconds, onStartVoiceChat, incoming, agentSpot, actions, testId } = props;
   const translateText = useAgentVoiceTranslateText();
   const duration = formatAgentVoiceCallDuration(elapsedSeconds);
   const agentName = getAgentDisplayName();
+  const bandTestId = testId ?? DEFAULT_TEST_ID;
+  const applicationActions = (
+    <AgentVoiceBandApplicationActions
+      actions={actions}
+      testId={agentVoicePartTestId(testId, "actions", "agent-voice-call-band-actions")}
+    />
+  );
   const spot = agentSpot === undefined || agentSpot === null ? null : <div className={styles.spot}>{agentSpot}</div>;
 
   if (isAgentVoiceCallActive(call.phase)) {
     return (
-      <div className={styles.band} data-testid="agent-voice-call-band" data-phase={call.phase}>
+      <div className={styles.band} data-testid={bandTestId} data-phase={call.phase}>
         {/* Keyed by the phase: the words and buttons come in again as the call connects. */}
         <div key={call.phase} className={styles.content}>
           {spot}
           <div className={styles.who} aria-live="polite">
             <span className={styles.title}>{agentName}</span>
             {call.phase === "live" && <span className={styles.time}>{duration}</span>}
-            <span className={styles.status} data-testid="agent-voice-call-status">
+            <span className={styles.status} data-testid={agentVoicePartTestId(testId, "status", "agent-voice-call-status")}>
               {translateText(TURN_STATUS_TEXT_KEYS[turnOfAgentVoiceCall(call)])}
             </span>
           </div>
           <div className={styles.actions}>
+            {applicationActions}
             <AgentVoiceBandAction
               label={call.isMuted ? translateText("Unmute") : translateText("Mute")}
               icon={<AgentVoiceMicrophoneIcon />}
               onClick={toggleAgentVoiceCallMute}
               pressed={call.isMuted}
               disabled={call.phase !== "live"}
-              testId="agent-voice-call-mute"
+              testId={agentVoicePartTestId(testId, "mute", "agent-voice-call-mute")}
             />
             <AgentVoiceBandAction
               label={translateText("End")}
               icon={<AgentVoiceHangUpIcon />}
               onClick={() => hangUpAgentVoiceCall()}
               variant="end"
-              testId="agent-voice-call-end"
+              testId={agentVoicePartTestId(testId, "end", "agent-voice-call-end")}
             />
           </div>
         </div>
@@ -145,7 +183,7 @@ export const AgentVoiceCallBandView = (props: AgentVoiceCallBandViewProps) => {
   if (incoming?.ring) {
     const callerLabel = incoming.callerLabel ?? buildAgentVoiceCallerLabel(incoming.ring, translateText, agentName);
     return (
-      <div className={styles.band} data-testid="agent-voice-call-band" data-phase="incoming">
+      <div className={styles.band} data-testid={bandTestId} data-phase="incoming">
         <div key="incoming" className={styles.content}>
           {spot}
           <div className={styles.who} role="alert">
@@ -153,13 +191,14 @@ export const AgentVoiceCallBandView = (props: AgentVoiceCallBandViewProps) => {
             {callerLabel.detail ? <span className={styles.status}>{callerLabel.detail}</span> : null}
           </div>
           <div className={styles.actions}>
+            {applicationActions}
             <AgentVoiceBandAction
               label={translateText("Decline")}
               icon={<AgentVoiceCloseIcon />}
               onClick={incoming.onDecline}
               variant="end"
               disabled={incoming.isAnswering}
-              testId="agent-voice-call-incoming-decline"
+              testId={agentVoicePartTestId(testId, "incoming-decline", "agent-voice-call-incoming-decline")}
             />
             <AgentVoiceBandAction
               label={translateText("Accept")}
@@ -167,7 +206,7 @@ export const AgentVoiceCallBandView = (props: AgentVoiceCallBandViewProps) => {
               onClick={incoming.onAccept}
               variant="accept"
               disabled={incoming.isAnswering}
-              testId="agent-voice-call-incoming-accept"
+              testId={agentVoicePartTestId(testId, "incoming-accept", "agent-voice-call-incoming-accept")}
             />
           </div>
         </div>
@@ -177,13 +216,17 @@ export const AgentVoiceCallBandView = (props: AgentVoiceCallBandViewProps) => {
 
   if (incoming?.refusal && call.phase === "idle") {
     return (
-      <div className={styles.band} data-testid="agent-voice-call-band" data-phase="refused">
+      <div className={styles.band} data-testid={bandTestId} data-phase="refused">
         <div key="refused" className={styles.content}>
           <div className={styles.who} role="status">
-            <span className={styles.status} data-testid="agent-voice-call-incoming-refusal">
+            <span
+              className={styles.status}
+              data-testid={agentVoicePartTestId(testId, "incoming-refusal", "agent-voice-call-incoming-refusal")}
+            >
               {translateText(AGENT_VOICE_ANSWER_REFUSAL_TEXT_KEYS[incoming.refusal])}
             </span>
           </div>
+          {hasApplicationActions(actions) ? <div className={styles.actions}>{applicationActions}</div> : null}
         </div>
       </div>
     );
@@ -195,36 +238,41 @@ export const AgentVoiceCallBandView = (props: AgentVoiceCallBandViewProps) => {
   const titleTextKey = agentVoiceCallOutcomeTitleTextKey(call);
 
   return (
-    <div className={styles.band} data-testid="agent-voice-call-band" data-phase={call.phase} data-end-reason={call.endReason}>
+    <div className={styles.band} data-testid={bandTestId} data-phase={call.phase} data-end-reason={call.endReason}>
       <div key={call.phase} className={styles.content}>
         <div className={styles.who} aria-live="polite">
           <span
             className={styles.title}
-            data-testid={call.phase === "ended" && wasConnected ? "agent-voice-call-ended-status" : undefined}
+            data-testid={
+              call.phase === "ended" && wasConnected
+                ? agentVoicePartTestId(testId, "ended-status", "agent-voice-call-ended-status")
+                : undefined
+            }
           >
             {translateText(titleTextKey)}
           </span>
           {call.phase === "ended" && wasConnected && <span className={styles.time}>{duration}</span>}
           {call.phase === "failed" && call.failureTextKey && (
-            <span className={styles.status} data-testid="agent-voice-call-failure">
+            <span className={styles.status} data-testid={agentVoicePartTestId(testId, "failure", "agent-voice-call-failure")}>
               {translateText(call.failureTextKey)}
             </span>
           )}
         </div>
         <div className={styles.actions}>
+          {applicationActions}
           <AgentVoiceBandAction
             label={call.phase === "failed" ? translateText("Try again") : translateText("Talk with %agentName% again")}
             icon={<VoiceBarsIcon size={16} />}
             onClick={onStartVoiceChat}
             variant="accept"
-            testId="agent-voice-call-start-again"
+            testId={agentVoicePartTestId(testId, "start-again", "agent-voice-call-start-again")}
           />
           <AgentVoiceBandAction
             label={translateText("Close")}
             icon={<AgentVoiceCloseIcon />}
             onClick={dismissAgentVoiceCallOutcome}
             iconOnly
-            testId="agent-voice-call-band-close"
+            testId={agentVoicePartTestId(testId, "close", "agent-voice-call-band-close")}
           />
         </div>
       </div>
@@ -242,6 +290,10 @@ export interface AgentVoiceCallBandProps {
    * and the incoming call shows its own card. Default true.
    */
   isPresented?: boolean;
+  /** The application's own controls in the band (see `AgentVoiceCallBandViewProps.actions`). Default: none. */
+  actions?: ReactNode;
+  /** The test id of the band and the prefix of its inner ids (see `AgentVoiceCallBandViewProps.testId`). */
+  testId?: string;
 }
 
 /**
@@ -250,7 +302,7 @@ export interface AgentVoiceCallBandProps {
  * again" starts a voice chat in the ended call's agent space and conversation.
  */
 export const AgentVoiceCallBand = (props: AgentVoiceCallBandProps) => {
-  const { renderAgentSpot, agentSpaceId, isPresented = true } = props;
+  const { renderAgentSpot, agentSpaceId, isPresented = true, actions, testId } = props;
   const liveCall = useAgentVoiceCallSnapshot();
   const call = isAgentVoiceCallShownInAgentSpace(liveCall, agentSpaceId) ? liveCall : IDLE_AGENT_VOICE_CALL;
   const elapsedSeconds = useAgentVoiceCallElapsedSeconds(call);
@@ -262,6 +314,8 @@ export const AgentVoiceCallBand = (props: AgentVoiceCallBandProps) => {
       call={call}
       elapsedSeconds={elapsedSeconds}
       agentSpot={renderAgentSpot?.(call)}
+      actions={actions}
+      testId={testId}
       onStartVoiceChat={() =>
         void startAgentVoiceCall({ agentSpaceId: call.agentSpaceId ?? agentSpaceId, conversationId: call.conversationId })
       }

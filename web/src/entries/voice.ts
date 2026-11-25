@@ -27,6 +27,7 @@ export {
   AgentVoiceApiError,
   type AgentVoiceBaseApi,
   type AgentVoiceFetchOptions,
+  type AgentVoiceOpenPathBuilder,
   type AgentVoiceRequest,
   buildAgentVoiceRequests,
   createAgentVoiceApi,
@@ -68,7 +69,10 @@ export {
   type AgentVoiceConversationChangeSubscription,
   useAgentVoiceCallServerEnd,
 } from "../voice/call/use-agent-voice-call-server-end";
-export type { AgentVoiceConversationOfCallChangedHandler } from "../voice/call/use-follow-agent-voice-call-conversation";
+export {
+  type AgentVoiceConversationOfCallChangedHandler,
+  useFollowAgentVoiceCallConversation,
+} from "../voice/call/use-follow-agent-voice-call-conversation";
 export {
   buildUnsavedAgentVoiceCallLines,
   type SavedAgentVoiceCallMessage,

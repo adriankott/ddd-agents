@@ -340,3 +340,71 @@ describe("createAgentVoiceFetchBaseApi", () => {
     }
   });
 });
+
+describe("the open path option of createAgentVoiceApi", () => {
+  const OPEN_ANSWER = { value: { agentVoiceCall: { id: 9 }, sdpAnswer: "v=0 answer", conversationId: 41 } };
+  const spacePath = (agentSpaceId: number | undefined) =>
+    agentSpaceId === undefined ? "/api/voiceSession/open" : `/api/spaces/${agentSpaceId}/voiceSession/open`;
+
+  it("sends open to the path the option builds for the start's agent space, the body unchanged", async () => {
+    const baseApi = new QueuedBaseApi();
+    baseApi.answers.push(OPEN_ANSWER);
+    const api = createAgentVoiceApi({ baseApi, apiPrefix: "/voice", buildOpenPath: spacePath });
+
+    await api.openSession({ agentSpaceId: 3, sdpOffer: "v=0 offer", conversationId: 41 });
+
+    expect(baseApi.requests).toStrictEqual([
+      {
+        url: "/api/spaces/3/voiceSession/open",
+        method: "POST",
+        body: { agentSpaceId: 3, sdpOffer: "v=0 offer", conversationId: 41, callId: undefined },
+      },
+    ]);
+  });
+
+  it("hands the option an absent agent space as undefined", async () => {
+    const baseApi = new QueuedBaseApi();
+    baseApi.answers.push(OPEN_ANSWER);
+    const api = createAgentVoiceApi({ baseApi, apiPrefix: "/voice", buildOpenPath: spacePath });
+
+    await api.openSession({ sdpOffer: "v=0 offer" });
+
+    expect(baseApi.requests[0]?.url).toBe("/api/voiceSession/open");
+  });
+
+  it("leaves the other five routes below the prefix", async () => {
+    const baseApi = new QueuedBaseApi();
+    const api = createAgentVoiceApi({ baseApi, apiPrefix: "/voice/", buildOpenPath: spacePath });
+
+    await api.hangUp({ callId: 9 });
+    await api.reportDeviceStatus({ callId: 9, status: "MEDIA_CONNECTED" });
+    await api.readCallState({ callId: 9 });
+    await api.answerRing({ callId: 9, answerToken: "token" });
+    await api.declineRing({ callId: 9, answerToken: "token" });
+
+    expect(baseApi.requests.map(request => request.url)).toStrictEqual([
+      "/voice/9/hangUp",
+      "/voice/9/deviceStatus",
+      "/voice/9",
+      "/voice/9/answer",
+      "/voice/9/decline",
+    ]);
+  });
+
+  it("without the option open stays ${apiPrefix}/open, with the agent space in the body", async () => {
+    const baseApi = new QueuedBaseApi();
+    baseApi.answers.push(OPEN_ANSWER);
+    const api = createAgentVoiceApi({ baseApi, apiPrefix: "/voice/" });
+
+    await api.openSession({ agentSpaceId: 3, sdpOffer: "v=0 offer" });
+
+    expect(baseApi.requests[0]).toMatchObject({ url: "/voice/open", method: "POST", body: { agentSpaceId: 3 } });
+  });
+
+  it("is the second argument of buildAgentVoiceRequests too", () => {
+    expect(buildAgentVoiceRequests("/voice", spacePath).openSession({ agentSpaceId: 7, sdpOffer: "v=0" }).url).toBe(
+      "/api/spaces/7/voiceSession/open",
+    );
+    expect(buildAgentVoiceRequests("/voice").openSession({ agentSpaceId: 7, sdpOffer: "v=0" }).url).toBe("/voice/open");
+  });
+});

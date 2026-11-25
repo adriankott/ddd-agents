@@ -112,6 +112,11 @@
   gap: 0.5rem;
 }
 
+/* The application's own controls (`actions`): part of the row, with the row's gap. */
+.applicationActions {
+  display: contents;
+}
+
 /* A pill on the dark band. */
 .action {
   position: relative;

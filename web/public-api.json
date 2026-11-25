@@ -1101,6 +1101,7 @@
       "useAgentVoiceRingCover",
       "useAgentVoiceRingTone",
       "useAgentVoiceTranslateText",
+      "useFollowAgentVoiceCallConversation",
       "useIsAgentVoiceCallActive"
     ],
     "types": [
@@ -1141,6 +1142,7 @@
       "AgentVoiceIncomingCallProps",
       "AgentVoiceIncomingRingSnapshot",
       "AgentVoiceInputGlowProps",
+      "AgentVoiceOpenPathBuilder",
       "AgentVoiceRequest",
       "AgentVoiceRing",
       "AgentVoiceRingSource",

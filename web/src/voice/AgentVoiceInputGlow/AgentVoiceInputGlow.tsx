@@ -37,7 +37,8 @@ const GLOW_COLOUR_PROPERTIES: readonly (readonly [property: string, defaultColou
  * the bottom edge; a slow breath while the agent thinks; a short even glow at rest. Clicking into the field bursts it
  * out. Two canvases behind the field: the glow close in, and a wider, fainter copy.
  */
-const AgentVoiceInputGlowCanvases = () => {
+const AgentVoiceInputGlowCanvases = (props: { testId: string }) => {
+  const { testId } = props;
   const voice = useAgentVoiceCallValue((call): AgentVoiceInputGlowVoice =>
     isAgentVoiceCallActive(call.phase) ? glowVoiceOfAgentVoiceCallTurn(turnOfAgentVoiceCall(call)) : "quiet",
   );
@@ -214,7 +215,7 @@ const AgentVoiceInputGlowCanvases = () => {
   }, []);
 
   return (
-    <div ref={boxRef} className={styles.glow} aria-hidden data-testid="agent-voice-input-glow">
+    <div ref={boxRef} className={styles.glow} aria-hidden data-testid={testId}>
       <canvas ref={haloCanvasRef} className={styles.halo} />
       <canvas ref={edgeCanvasRef} className={styles.edge} />
     </div>
@@ -224,6 +225,8 @@ const AgentVoiceInputGlowCanvases = () => {
 export interface AgentVoiceInputGlowProps {
   /** The chat's agent space, where the application has one: a voice chat running in another one glows nowhere here. */
   agentSpaceId?: number;
+  /** The test id of the glow's box (it has no inner element with a test id). Default: `agent-voice-input-glow`. */
+  testId?: string;
 }
 
 /**
@@ -233,7 +236,7 @@ export interface AgentVoiceInputGlowProps {
  * context.
  */
 export const AgentVoiceInputGlow = (props: AgentVoiceInputGlowProps) => {
-  const { agentSpaceId } = props;
+  const { agentSpaceId, testId = "agent-voice-input-glow" } = props;
   const isCallActiveHere = useIsAgentVoiceCallActive(agentSpaceId);
-  return isCallActiveHere ? <AgentVoiceInputGlowCanvases /> : null;
+  return isCallActiveHere ? <AgentVoiceInputGlowCanvases testId={testId} /> : null;
 };

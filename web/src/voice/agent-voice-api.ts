@@ -81,15 +81,28 @@ export interface CreateAgentVoiceApiOptions {
   baseApi: AgentVoiceBaseApi;
   /** Where the application mounts the voice session routes, without a trailing slash (`/api/agents/voiceSession`). */
   apiPrefix: string;
+  /**
+   * The whole path of `open`, for an application whose route names the agent space in its path:
+   * `(agentSpaceId) => "/api/spaces/" + agentSpaceId + "/voiceSession/open"`. `agentSpaceId` is what the start was
+   * given (undefined when it named none). The body is unchanged and still carries `agentSpaceId`; the other five routes
+   * stay below `apiPrefix`. Default: `${apiPrefix}/open`.
+   */
+  buildOpenPath?: AgentVoiceOpenPathBuilder;
 }
+
+/** The path of `open` for the agent space of the start (see `CreateAgentVoiceApiOptions.buildOpenPath`). */
+export type AgentVoiceOpenPathBuilder = (agentSpaceId: number | undefined) => string;
 
 /** Without trailing slashes (`/api/agents/voiceSession/` → `/api/agents/voiceSession`). */
 const trimApiPrefix = (apiPrefix: string): string => apiPrefix.replace(/\/+$/, "");
 
 const callPath = (callId: number): string => `/${encodeURIComponent(String(callId))}`;
 
-/** The request of every operation, on `apiPrefix`, with the routes' own field names. Pure: nothing is sent. */
-export const buildAgentVoiceRequests = (apiPrefix: string) => {
+/**
+ * The request of every operation, on `apiPrefix`, with the routes' own field names; `open` on `buildOpenPath` when
+ * given. Pure: nothing is sent.
+ */
+export const buildAgentVoiceRequests = (apiPrefix: string, buildOpenPath?: AgentVoiceOpenPathBuilder) => {
   const prefix = trimApiPrefix(apiPrefix);
   return {
     openSession: ({
@@ -98,7 +111,7 @@ export const buildAgentVoiceRequests = (apiPrefix: string) => {
       conversationId,
       callId,
     }: Parameters<AgentVoiceApi["openSession"]>[0]): AgentVoiceRequest => ({
-      url: `${prefix}/open`,
+      url: buildOpenPath === undefined ? `${prefix}/open` : buildOpenPath(agentSpaceId),
       method: "POST",
       body: { agentSpaceId, sdpOffer, conversationId, callId },
     }),
@@ -160,10 +173,10 @@ export const AGENT_VOICE_ERROR_CODE_INVALID_OPEN_ANSWER = "invalid_open_answer";
  * The adapter for an application whose routes are the voice trait's own paths below `apiPrefix`, with the agent space
  * in the body of `open`:
  * `export const agentVoiceApi = createAgentVoiceApi({ baseApi, apiPrefix: "/api/agents/voiceSession" });`
- * An application whose `open` names its space another way (in the path) writes the six functions itself.
+ * An application whose `open` names the space in its path adds `buildOpenPath`.
  */
-export const createAgentVoiceApi = ({ baseApi, apiPrefix }: CreateAgentVoiceApiOptions): AgentVoiceApi => {
-  const requests = buildAgentVoiceRequests(apiPrefix);
+export const createAgentVoiceApi = ({ baseApi, apiPrefix, buildOpenPath }: CreateAgentVoiceApiOptions): AgentVoiceApi => {
+  const requests = buildAgentVoiceRequests(apiPrefix, buildOpenPath);
   return {
     openSession: async (args) => {
       const openAnswer = await baseApi.request<AgentVoiceOpenAnswer | null>(requests.openSession(args));

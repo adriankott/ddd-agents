@@ -1,7 +1,7 @@
 /*
  * The incoming call: top centre, over every page. Custom properties, each read with its default:
  *
- *   --agents-voice-incoming-call-top, --agents-voice-incoming-call-z-index
+ *   --agents-voice-incoming-call-top, --agents-voice-incoming-call-z-index (the `zIndex` prop wins over it)
  *   --agents-voice-card-surface, --agents-voice-card-text, --agents-voice-card-action-surface,
  *   --agents-voice-card-padding, --agents-voice-card-radius, --agents-voice-card-shadow
  *   --agents-voice-accept, --agents-voice-on-accept        Accept

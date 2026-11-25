@@ -13,6 +13,7 @@ import {
   useAgentVoiceCallSnapshot,
 } from "../call/agent-voice-call-store";
 import { buildUnsavedAgentVoiceCallLines } from "../call/build-unsaved-agent-voice-call-lines";
+import { agentVoicePartTestId } from "../agent-voice-part-test-id";
 import { highestIndexInConversationOf, savedMessagesOfTheVoiceChat } from "./saved-messages-of-agent-voice-chat";
 import styles from "./AgentVoiceCallCaptions.module.scss";
 
@@ -22,11 +23,12 @@ const selectMessages = (state: AgentsChatState) => state.messages;
 interface AgentVoiceCallCaptionLinesProps {
   call: AgentVoiceCallSnapshot;
   ownerMessageTheme: ConversationMessageUserTheme | undefined;
+  testId: string | undefined;
 }
 
 /** The lines of one voice chat: mounted while it is connecting or live, so every voice chat starts with its own count. */
 const AgentVoiceCallCaptionLines = (props: AgentVoiceCallCaptionLinesProps) => {
-  const { call, ownerMessageTheme } = props;
+  const { call, ownerMessageTheme, testId } = props;
   const chatStore = useOptionalAgentsChatStore();
   const messages = useAgentsChatSelector(chatStore, selectMessages, null) ?? NO_MESSAGES;
   const [highestIndexBeforeVoiceChat, setHighestIndexBeforeVoiceChat] = useState<number | undefined>(undefined);
@@ -45,14 +47,22 @@ const AgentVoiceCallCaptionLines = (props: AgentVoiceCallCaptionLinesProps) => {
   );
 
   return (
-    <div className={styles.captions} data-testid="agent-voice-call-captions">
+    <div className={styles.captions} data-testid={testId ?? "agent-voice-call-captions"}>
       {unsavedLines.map((line) =>
         line.speaker === "agent" ? (
-          <div key={line.id} className={styles.line} data-testid="agent-voice-call-caption-agent">
+          <div
+            key={line.id}
+            className={styles.line}
+            data-testid={agentVoicePartTestId(testId, "caption-agent", "agent-voice-call-caption-agent")}
+          >
             <ConversationMessageWidgets message={line.text} interactive={false} justDelivered={false} hideAssistantMeta />
           </div>
         ) : (
-          <div key={line.id} className={styles.line} data-testid="agent-voice-call-caption-owner">
+          <div
+            key={line.id}
+            className={styles.line}
+            data-testid={agentVoicePartTestId(testId, "caption-owner", "agent-voice-call-caption-owner")}
+          >
             <ConversationMessageUser text={line.text} theme={ownerMessageTheme} />
           </div>
         ),
@@ -66,6 +76,12 @@ export interface AgentVoiceCallCaptionsProps {
   agentSpaceId?: number;
   /** The theme of the owner's line, as the chat renders the owner's messages. Default: the message component's own. */
   ownerMessageTheme?: ConversationMessageUserTheme;
+  /**
+   * The test id of the captions; the agent's and the owner's lines take `${testId}-caption-agent` and
+   * `${testId}-caption-owner`. Default: `agent-voice-call-captions`, the lines `agent-voice-call-caption-agent` and
+   * `agent-voice-call-caption-owner`.
+   */
+  testId?: string;
 }
 
 /**
@@ -76,8 +92,8 @@ export interface AgentVoiceCallCaptionsProps {
  * voice chat is connecting or live.
  */
 export const AgentVoiceCallCaptions = (props: AgentVoiceCallCaptionsProps) => {
-  const { agentSpaceId, ownerMessageTheme } = props;
+  const { agentSpaceId, ownerMessageTheme, testId } = props;
   const call = useAgentVoiceCallSnapshot();
   if (!isAgentVoiceCallActive(call.phase) || !isAgentVoiceCallShownInAgentSpace(call, agentSpaceId)) return null;
-  return <AgentVoiceCallCaptionLines call={call} ownerMessageTheme={ownerMessageTheme} />;
+  return <AgentVoiceCallCaptionLines call={call} ownerMessageTheme={ownerMessageTheme} testId={testId} />;
 };

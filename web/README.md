@@ -293,8 +293,10 @@ What the application passes to `AgentVoiceCallProvider`:
   application whose routes are the trait's own paths with the agent space in the body of `open`; `baseApi` is the
   application's request layer as one function (`request({ url, method, body })` answering a Promise), for which
   `createAgentVoiceFetchBaseApi()` is the binding over `fetch`. An application whose `open` names its space in the path
-  writes the six functions itself. A refused request rejects with the route's error code where
-  `readAgentVoiceErrorCode` finds it (`error`, `data.error`, `code` or the message).
+  adds `buildOpenPath: (agentSpaceId) => string` (`AgentVoiceOpenPathBuilder`), the whole path of `open` for the space
+  the start was given (undefined when it named none); the body still carries `agentSpaceId`, the other five routes stay
+  below `apiPrefix`, and without the option `open` is `${apiPrefix}/open`. A refused request rejects with the route's
+  error code where `readAgentVoiceErrorCode` finds it (`error`, `data.error`, `code` or the message).
 - **`ringSource`** (`AgentVoiceRingSource`): the stream of the `agent.voice.ring` messages.
   `createAgentVoiceRingSource(accountRealtimePoll)` listens to the account realtime poll of `/ui` while the incoming
   call is mounted: a ring message that arrives rings, and one a read finds gone (answered or declined on another
@@ -304,7 +306,9 @@ What the application passes to `AgentVoiceCallProvider`:
   backend rings an account only while it knows one of its clients: the account read of the poll states the client's id
   (see `/ui`), with or without a `uiClient`.
 - **`onConversationOfCallChanged(conversationId, agentSpaceId)`**: called once per call when the conversation the call
-  writes into is known; the application shows that conversation.
+  writes into is known; the application shows that conversation. The provider does it with
+  `useFollowAgentVoiceCallConversation(handler)`, which an application may also call itself in a component of its own
+  (a window that follows the call without the provider's handler).
 
 The call lives in a store at module level, so it goes on when the chat that shows it closes. `useAgentVoiceCall()`
 returns it: `phase` (`idle`, `connecting`, `live`, `ended`, `failed`), `callId`, `conversationId`, `lines` (what was
@@ -313,15 +317,27 @@ on every transcript delta. Actions: `startAgentVoiceCall({ agentSpaceId?, conver
 from the click: the microphone prompt needs the user's gesture), `hangUpAgentVoiceCall(reason?)`,
 `toggleAgentVoiceCallMute()`, `dismissAgentVoiceCallOutcome()`. The store asks for the microphone, opens the peer
 connection and the provider's event channel, reports the device status, and ends the call when the server says it ended.
+A start that fails before `open` answers (a refused microphone, a refusal of `open` such as `no_ai_budget`) is the
+store's `failed` phase with its `failureTextKey`, so every mounted band of that agent space shows it, inside a chat or
+not.
 
 | Component | Where it goes | Props |
 |---|---|---|
 | `AgentVoiceCallProvider` | once, above every voice component, below the conversation client (`AgentsProvider`) | `api`, `ringSource`, `onConversationOfCallChanged` |
-| `AgentVoiceChatStartButton` | the chat input's send spot while nothing is typed | `agentSpaceId?`, `conversationId?`, `disabled?`, `testId?` |
-| `AgentVoiceCallBand` | over the chat input | `renderAgentSpot?(call)`, `agentSpaceId?`, `isPresented?` |
-| `AgentVoiceCallCaptions` | after the chat's message list, inside the chat | `agentSpaceId?`, `ownerMessageTheme?` |
-| `AgentVoiceInputGlow` | the chat input's underlay | `agentSpaceId?` |
-| `AgentVoiceIncomingCall` | once, outside the chat | `resolveCallerLabel?(ring)`, `renderAgentSpot?()` |
+| `AgentVoiceChatStartButton` | the chat input's send spot while nothing is typed | `agentSpaceId?`, `conversationId?`, `disabled?`, `onStart?()`, `testId?` |
+| `AgentVoiceCallBand` | over the chat input | `renderAgentSpot?(call)`, `agentSpaceId?`, `isPresented?`, `actions?`, `testId?` |
+| `AgentVoiceCallCaptions` | after the chat's message list, inside the chat | `agentSpaceId?`, `ownerMessageTheme?`, `testId?` |
+| `AgentVoiceInputGlow` | the chat input's underlay | `agentSpaceId?`, `testId?` |
+| `AgentVoiceIncomingCall` | once, outside the chat | `resolveCallerLabel?(ring)`, `renderAgentSpot?()`, `zIndex?`, `testId?` |
+
+- `onStart` of the start button runs in the click, synchronously, before the microphone prompt and `open`: the place
+  for what needs the user's gesture (opening a window for the chat). The button's label shows through the
+  environment's `Tooltip` when the application replaces it (`AgentsEnvironment.components.Tooltip`, with the text key
+  `Talk to %agentName%`); otherwise it is the button's `title`.
+- `actions` of the band are the application's own controls, placed before the band's own buttons; they render only
+  while the band shows something (a call, a ring, a refused answer, an outcome).
+- `zIndex` of the incoming call sets its stacking order over the page; without it the custom property
+  `--agents-voice-incoming-call-z-index` does.
 
 - The band also shows the agent's ring while a chat is in sight (`isPresented`); the incoming call then keeps its own
   card away. A surface that covers the chats reports it with `useAgentVoiceRingCover(true)`.
@@ -335,7 +351,10 @@ connection and the provider's event channel, reports the device status, and ends
 - The styles are part of `styles.css`. Every colour and size is a custom property starting with `--agents-voice-`,
   read with its default (`--agents-voice-surface`, `--agents-voice-on-surface`, `--agents-voice-end`,
   `--agents-voice-accept`, `--agents-voice-band-max-width`, `--agents-voice-glow-color-1` … `-4`, …; each component's
-  SCSS module lists its own at the top). Test ids start with `agent-voice-`.
+  SCSS module lists its own at the top). Test ids start with `agent-voice-`; a component given `testId` takes it on its
+  root and `${testId}-<part>` on its inner elements (the band's `-mute`, `-end`, `-close`, …, the incoming call's
+  `-accept`, `-decline`, `-detail`, `-refusal`, the captions' `-caption-agent`, `-caption-owner`; the glow has no inner
+  test id), each component's docblock lists its parts.
 
 ### The admin screens of the calls (`/voice/admin`)
 

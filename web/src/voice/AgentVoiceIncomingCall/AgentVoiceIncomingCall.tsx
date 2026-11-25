@@ -16,6 +16,7 @@ import { useAgentVoiceRingTone } from "../ring/use-agent-voice-ring-tone";
 import { VoiceBarsIcon } from "../../chat/ConversationMessage/ConversationCallMarkerChip/VoiceBarsIcon/VoiceBarsIcon";
 import { AgentVoiceCloseIcon, AgentVoiceMicrophoneIcon } from "../AgentVoiceIcons/AgentVoiceIcons";
 import { useAgentVoiceRingSource, useAgentVoiceTranslateText } from "../AgentVoiceCallProvider/agent-voice-call-context";
+import { agentVoicePartTestId } from "../agent-voice-part-test-id";
 import styles from "./AgentVoiceIncomingCall.module.scss";
 
 export interface AgentVoiceIncomingCallProps {
@@ -27,6 +28,17 @@ export interface AgentVoiceIncomingCallProps {
   resolveCallerLabel?: (ring: AgentVoiceRing) => AgentVoiceCallerLabel | undefined;
   /** The application's avatar of the agent on the card. Default: the voice chat's mark. */
   renderAgentSpot?: () => ReactNode;
+  /**
+   * The stacking order of the card over the page, for an application whose layers need another one than the custom
+   * property sets. Default: `--agents-voice-incoming-call-z-index` (itself defaulting to 2147483000).
+   */
+  zIndex?: number;
+  /**
+   * The test id of the card; its inner elements take `${testId}-<part>` (`-detail`, `-decline`, `-accept`) and the card
+   * of a refused answer `${testId}-refusal`. Default: `agent-voice-incoming-call`, the inner elements their fixed
+   * `agent-voice-incoming-call-…` ids.
+   */
+  testId?: string;
 }
 
 /**
@@ -44,7 +56,7 @@ export interface AgentVoiceIncomingCallProps {
  * listens while the provider carries a ring source.
  */
 export const AgentVoiceIncomingCall = (props: AgentVoiceIncomingCallProps) => {
-  const { resolveCallerLabel, renderAgentSpot } = props;
+  const { resolveCallerLabel, renderAgentSpot, zIndex, testId } = props;
   const translateText = useAgentVoiceTranslateText();
   const ringSource = useAgentVoiceRingSource();
   const isCallActive = useAgentVoiceCallValue((call) => isAgentVoiceCallActive(call.phase));
@@ -72,12 +84,18 @@ export const AgentVoiceIncomingCall = (props: AgentVoiceIncomingCallProps) => {
   const card =
     ringSource !== undefined ? pickAgentVoiceIncomingCard({ ring, refusal, bandHostCount, ringCoverCount }) : undefined;
   const callerLabelId = useId();
+  const layerStyle = zIndex === undefined ? undefined : { zIndex };
 
   if (card === undefined) return null;
   if (ring === undefined) {
     if (refusal === undefined) return null;
     return (
-      <div className={styles.incomingCall} role="status" data-testid="agent-voice-incoming-call-refusal">
+      <div
+        className={styles.incomingCall}
+        style={layerStyle}
+        role="status"
+        data-testid={agentVoicePartTestId(testId, "refusal", "agent-voice-incoming-call-refusal")}
+      >
         <span className={styles.detail}>{translateText(AGENT_VOICE_ANSWER_REFUSAL_TEXT_KEYS[refusal])}</span>
       </div>
     );
@@ -90,7 +108,8 @@ export const AgentVoiceIncomingCall = (props: AgentVoiceIncomingCallProps) => {
       role="alertdialog"
       aria-live="assertive"
       aria-labelledby={callerLabelId}
-      data-testid="agent-voice-incoming-call"
+      style={layerStyle}
+      data-testid={testId ?? "agent-voice-incoming-call"}
     >
       <div className={styles.spot}>
         {renderAgentSpot ? (
@@ -104,7 +123,10 @@ export const AgentVoiceIncomingCall = (props: AgentVoiceIncomingCallProps) => {
       <div className={styles.caller} id={callerLabelId}>
         <span className={styles.label}>{shownCallerLabel.text}</span>
         {shownCallerLabel.detail ? (
-          <span className={styles.detail} data-testid="agent-voice-incoming-call-detail">
+          <span
+            className={styles.detail}
+            data-testid={agentVoicePartTestId(testId, "detail", "agent-voice-incoming-call-detail")}
+          >
             {shownCallerLabel.detail}
           </span>
         ) : null}
@@ -115,7 +137,7 @@ export const AgentVoiceIncomingCall = (props: AgentVoiceIncomingCallProps) => {
           className={styles.action}
           disabled={isAnswering}
           onClick={declineAgentVoiceIncomingRing}
-          data-testid="agent-voice-incoming-call-decline"
+          data-testid={agentVoicePartTestId(testId, "decline", "agent-voice-incoming-call-decline")}
         >
           <AgentVoiceCloseIcon />
           <span>{translateText("Decline")}</span>
@@ -126,7 +148,7 @@ export const AgentVoiceIncomingCall = (props: AgentVoiceIncomingCallProps) => {
           data-variant="accept"
           disabled={isAnswering}
           onClick={() => void acceptAgentVoiceIncomingRing()}
-          data-testid="agent-voice-incoming-call-accept"
+          data-testid={agentVoicePartTestId(testId, "accept", "agent-voice-incoming-call-accept")}
         >
           <AgentVoiceMicrophoneIcon />
           <span>{translateText("Accept")}</span>
