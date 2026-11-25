@@ -134,7 +134,7 @@ class AgentVoiceSettings extends ValueObject
     public const string VOICE_PROVIDER_FAMILY_LIVE = 'LIVE';
 
     /**
-     * @var string OpenAI GPT-Live (`gpt-live-1`), the first provider of the LIVE family, in the spelling a stored call
+     * @var string OpenAI GPT-Live (`gpt-live-1.1`), the first provider of the LIVE family, in the spelling a stored call
      * may carry. The adapter is registered as `openAiLive` in `AI.agentVoice.provider.adapters`; both spellings name
      * the same provider ({@see normalizeVoiceProviderName()}).
      */

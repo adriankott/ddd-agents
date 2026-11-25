@@ -6,6 +6,7 @@ namespace DDD\Tests\Agents\Voice\Domain\AI\Services\Voice\Admission;
 
 use DDD\Domain\AI\Entities\AgentSpaces\AgentSpace;
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
+use DDD\Domain\AI\Entities\Models\AIModel;
 use DDD\Domain\AI\Entities\Voice\AgentVoiceAccountRights;
 use DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceCall;
 use DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceCallRefusal;
@@ -424,7 +425,22 @@ class AgentVoiceCallAdmissionServiceTest extends AgentVoiceIntegrationTestCase
         static::assertNull($this->admissionService->findRefusalOfRunningCall($callWithoutAPinnedProvider));
         static::assertNull($this->admissionService->findRefusalOfCallStart($this->buildAccount(5), null, null));
 
-        static::assertSame(['gpt-live-2', 'gpt-live-1', 'gpt-live-1'], $this->modelsService->askedModelNames);
+        static::assertSame(['gpt-live-2', 'gpt-live-1.1', 'gpt-live-1.1'], $this->modelsService->askedModelNames);
+        static::assertSame(['gpt-live-2|AUDIO', 'gpt-live-1.1|AUDIO', 'gpt-live-1.1|AUDIO'], $this->modelsService->askedExternalIds);
+    }
+
+    public function testTheSessionModelIsFoundByTheProvidersModelIdWhenNoCatalogNameMatches(): void
+    {
+        $catalogModel = new AIModel();
+        $catalogModel->name = 'OPENAI.GPT_LIVE_1_1';
+        $catalogModel->type = AIModel::TYPE_AUDIO;
+        $this->modelsService->modelsByExternalId['gpt-live-1.1'] = $catalogModel;
+
+        $sessionModelCall = $this->admissionService->buildSessionModelCall($this->buildAccount(5), null);
+
+        static::assertSame('OPENAI.GPT_LIVE_1_1', $sessionModelCall->aiModel?->name);
+        static::assertSame(['gpt-live-1.1'], $this->modelsService->askedModelNames);
+        static::assertSame(['gpt-live-1.1|AUDIO'], $this->modelsService->askedExternalIds);
     }
 
     public function testAModelCallThatEnforcesNoBudgetIsNotAskedTheBudget(): void

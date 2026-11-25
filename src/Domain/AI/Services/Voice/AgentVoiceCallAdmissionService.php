@@ -489,7 +489,11 @@ class AgentVoiceCallAdmissionService extends Service
         }
     }
 
-    /** The catalog model the seconds of the session are priced by: the setting `model` of the call's provider. */
+    /**
+     * The catalog model the seconds of the session are priced by: the setting `model` of the call's provider, the
+     * catalog entry of that name, else the AUDIO entry whose `externalId` is that name (the provider's model id, e.g.
+     * `gpt-live-1.1` for ddd-ai's `OPENAI.GPT_LIVE_1_1`).
+     */
     protected function findSessionModel(?string $providerName): ?AIModel
     {
         $agentVoiceConfiguration = AgentVoiceConfiguration::current();
@@ -503,7 +507,7 @@ class AgentVoiceCallAdmissionService extends Service
         /** @var AIModelsService $aIModelsService */
         $aIModelsService = DDDService::instance()->getService(AIModelsService::class);
 
-        return $aIModelsService->getAIModelByName($modelName);
+        return $aIModelsService->getAIModelByName($modelName) ?? $aIModelsService->getAIModelByExternalId($modelName, AIModel::TYPE_AUDIO);
     }
 
     /** The prompt the usage of the session is recorded with; null when the application has no prompt of that name. */

@@ -31,8 +31,9 @@ return [
             // a provider project with a region of its own has its own host
             'apiHost' => 'api.openai.com',
             'apiKeyEnvironmentVariable' => 'API_OPENAI_REALTIME_API_KEY',
-            // also the catalog model the seconds of a session are priced by
-            'model' => 'gpt-live-1',
+            // also the catalog model the seconds of a session are priced by (found by its catalog name or by the
+            // provider's id, the catalog's `externalId`)
+            'model' => 'gpt-live-1.1',
             'defaultVoice' => 'marin',
             // the provider's storage and retention of a session
             'storeSessionAtProvider' => false,

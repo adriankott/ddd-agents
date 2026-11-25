@@ -18,7 +18,7 @@ use stdClass;
 use Throwable;
 
 /**
- * GPT-Live (`gpt-live-1`), the provider of the LIVE voice family. Everything this class knows is wire shape: the
+ * GPT-Live (`gpt-live-1.1`), the provider of the LIVE voice family. Everything this class knows is wire shape: the
  * request that creates a session, the URL of the sideband WebSocket, the control actions, the size limits.
  *
  * GPT-Live is driven by the model: it starts and ends its own turns, holds no tools and takes instructions
@@ -58,7 +58,7 @@ class OpenAILiveVoiceProviderAdapter extends RealtimeVoiceProviderAdapter
     public const string DEFAULT_API_KEY_ENVIRONMENT_VARIABLE = 'API_OPENAI_REALTIME_API_KEY';
 
     /** @var string The GPT-Live model when the settings name none (`model`) */
-    public const string LIVE_MODEL = 'gpt-live-1';
+    public const string LIVE_MODEL = 'gpt-live-1.1';
 
     /**
      * @var string The voice GPT-Live speaks with when the settings name none (`defaultVoice`): the documented default

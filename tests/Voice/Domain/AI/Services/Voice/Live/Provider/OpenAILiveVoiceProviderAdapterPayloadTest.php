@@ -34,7 +34,7 @@ class OpenAILiveVoiceProviderAdapterPayloadTest extends AgentVoiceUnitTestCase
 
         static::assertSame([
             'session' => [
-                'model' => 'gpt-live-1',
+                'model' => 'gpt-live-1.1',
                 'instructions' => 'Be brief.',
                 'audio' => ['output' => ['voice' => 'marin']],
                 'delegation' => ['type' => 'client'],
@@ -184,7 +184,7 @@ class OpenAILiveVoiceProviderAdapterPayloadTest extends AgentVoiceUnitTestCase
      */
     public function testTheRequestWithoutSeedRowsIsByteIdenticalToTheListShapedOne(): void
     {
-        $expectedRequest = '{"session":{"model":"gpt-live-1","instructions":"Be brief.","audio":{"output":{"voice":"marin"}},"delegation":{"type":"client"}},"transport":{"type":"webrtc","sdp":"v=0 offer"}}';
+        $expectedRequest = '{"session":{"model":"gpt-live-1.1","instructions":"Be brief.","audio":{"output":{"voice":"marin"}},"delegation":{"type":"client"}},"transport":{"type":"webrtc","sdp":"v=0 offer"}}';
 
         static::assertSame($expectedRequest, static::encodeRequest((new OpenAILiveVoiceProviderAdapter())->buildSessionCreationPayload('v=0 offer', 'Be brief.', null, null)));
         static::assertSame($expectedRequest, static::encodeRequest((new OpenAILiveVoiceProviderAdapter())->buildSessionCreationPayload('v=0 offer', 'Be brief.', null, new AgentVoiceSeedInputMessages())));
@@ -204,7 +204,7 @@ class OpenAILiveVoiceProviderAdapterPayloadTest extends AgentVoiceUnitTestCase
         ));
 
         static::assertSame(
-            '{"session":{"model":"gpt-live-1","instructions":"Be brief.","audio":{"output":{"voice":"marin"}},"delegation":{"type":"client"},"input":['
+            '{"session":{"model":"gpt-live-1.1","instructions":"Be brief.","audio":{"output":{"voice":"marin"}},"delegation":{"type":"client"},"input":['
             . '{"type":"message","role":"developer","content":[{"type":"input_text","text":"Opening"}]},'
             . '{"type":"message","role":"user","content":[{"type":"input_text","text":"Hello"}]},'
             . '{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Hi there — \"quoted\" / ünïcödé"}]}'

@@ -17,6 +17,12 @@ class RecordingAIModelsService extends AIModelsService
     /** @var string[] The model names asked for, in order */
     public array $askedModelNames = [];
 
+    /** @var string[] The provider model ids asked for when the name found no entry, in order */
+    public array $askedExternalIds = [];
+
+    /** @var AIModel[] The models the catalog answers by provider model id */
+    public array $modelsByExternalId = [];
+
     public ?string $failureMessage = null;
 
     public function getAIModelByName(string $aiModelName): ?AIModel
@@ -27,5 +33,12 @@ class RecordingAIModelsService extends AIModelsService
         }
 
         return null;
+    }
+
+    public function getAIModelByExternalId(string $externalId, ?string $type = null): ?AIModel
+    {
+        $this->askedExternalIds[] = $externalId . '|' . $type;
+
+        return $this->modelsByExternalId[$externalId] ?? null;
     }
 }

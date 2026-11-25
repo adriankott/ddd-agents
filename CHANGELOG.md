@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.6.12
+
+**Voice: GPT-Live 1.1 is the default voice model.** npm `@mgamadeus/ddd-agents` 0.6.12 in lockstep. Requires
+`mgamadeus/ddd-ai` ^3.8.3 (the GPT-Live catalog entries).
+
+- **Changed: the default model of the OpenAI live provider is `gpt-live-1.1`** (`provider.openAiLive.model` of
+  `agentVoice.php`, `OpenAILiveVoiceProviderAdapter::LIVE_MODEL`). Same events, voices and price as `gpt-live-1`; no
+  wire change. There is no fallback to `gpt-live-1`: an application that set the model in its own `agentVoice.php`
+  changes that line to `gpt-live-1.1`.
+- **Fixed: a session is priced when its model setting is the provider's id.** `AgentVoiceCallAdmissionService::findSessionModel()`
+  takes the catalog entry of the setting's name, else the `AUDIO` entry whose `externalId` is that name
+  (`AIModelsService::getAIModelByExternalId()`), so `gpt-live-1.1` finds ddd-ai's `OPENAI.GPT_LIVE_1_1`. Before, a wire
+  id never matched a catalog name and the session seconds went unpriced unless the application carried its own entry
+  under the wire id (it can drop that entry).
+- Tests: the session model found by the provider's id, the shipped default in the configuration, payload and
+  endpoint tests.
+
 ## 0.6.11
 
 **The purposed start route is opt-in; its subject classes are listed by the application; the optional subject table

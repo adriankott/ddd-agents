@@ -38,7 +38,7 @@ class AgentVoiceConfigurationTest extends AgentVoiceUnitTestCase
         $expectedValues['providerSettings'] = ['openAiLive' => [
             'apiHost' => 'api.openai.com',
             'apiKeyEnvironmentVariable' => 'API_OPENAI_REALTIME_API_KEY',
-            'model' => 'gpt-live-1',
+            'model' => 'gpt-live-1.1',
             'defaultVoice' => 'marin',
             'storeSessionAtProvider' => false,
         ]];

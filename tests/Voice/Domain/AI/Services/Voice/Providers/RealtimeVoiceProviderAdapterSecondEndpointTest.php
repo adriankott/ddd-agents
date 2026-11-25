@@ -56,7 +56,7 @@ class RealtimeVoiceProviderAdapterSecondEndpointTest extends AgentVoiceIntegrati
         static::assertSame('wss://b.live-provider.test/v1/live/sessions/live_1/attach', $secondEndpointAdapter->buildSidebandWebSocketUrl('live_1'));
         static::assertNotInstanceOf(SecondEndpointOpenAILiveVoiceProviderAdapter::class, $firstEndpointAdapter);
         static::assertSame('liveA', $firstEndpointAdapter->getProviderName());
-        static::assertSame('gpt-live-1', $firstEndpointAdapter->getModelName());
+        static::assertSame('gpt-live-1.1', $firstEndpointAdapter->getModelName());
         static::assertSame('wss://a.live-provider.test/v1/live/sessions/live_1/attach', $firstEndpointAdapter->buildSidebandWebSocketUrl('live_1'));
     }
 

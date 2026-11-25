@@ -88,7 +88,7 @@ An application whose calls are carried by a worker of its own, without the packa
 | `provider.adapters` | `openAiLive` → `OpenAILiveVoiceProviderAdapter` | the registry; an application adds its own adapters here. One class answers to ONE name and reads that name's settings; the same class under a second name is refused when a call resolves it |
 | `provider.openAiLive.apiHost` | `api.openai.com` | a provider project with a region of its own has its own host |
 | `provider.openAiLive.apiKeyEnvironmentVariable` | `API_OPENAI_REALTIME_API_KEY` | the variable that holds the key |
-| `provider.openAiLive.model` | `gpt-live-1` | also the catalog model the seconds are priced by |
+| `provider.openAiLive.model` | `gpt-live-1.1` | the provider's model id; also the catalog model the seconds are priced by, found by its catalog name or by its `externalId` (ddd-ai's catalog carries `gpt-live-1.1` and, for the price of earlier calls, `gpt-live-1`) |
 | `provider.openAiLive.defaultVoice` | `marin` | |
 | `provider.openAiLive.storeSessionAtProvider` | `false` | true sends the provider's documented storage field, false sends nothing |
 | `language` | `null` | null: the conversation's language |
