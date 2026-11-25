@@ -6,6 +6,7 @@ import {
   capAnswerText,
   formatScreenTargetList,
   isClientToolToken,
+  MAX_ANSWER_TEXT_CHARS,
   MIN_SECONDS_LEFT_TO_START,
   parseClientToolArguments,
   type ClientToolRequestType,
@@ -25,8 +26,12 @@ const PICTURE_SIZES: ScreenPictureSize[] = ['small', 'medium', 'large'];
 
 const RENDER_MODES: ScreenPictureRenderMode[] = ['colour', 'greyscale', 'machine'];
 
-/** The most characters of screen content in one answer (the server cuts at 8,000 again). */
-export const MAX_SCREEN_CHARS = 6000;
+/**
+ * The most characters of screen content in one answer: half the answer's cap ({@link MAX_ANSWER_TEXT_CHARS}), the
+ * same number as the server's cut (`AgentUIToolResponseDto::MAX_CONTENT_CHARS`, a contract test compares them). With
+ * 6,000 a list page was cut before its table; the reader's own caps (rows, cells, section text) keep a read short.
+ */
+export const MAX_SCREEN_CHARS = MAX_ANSWER_TEXT_CHARS / 2;
 
 /** How many request ids a runner remembers, so a redelivery never runs a request twice. */
 const REMEMBERED_REQUEST_IDS = 50;

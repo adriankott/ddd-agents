@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 import { createAgentsHttpConversationClient } from "../client/http/createAgentsHttpConversationClient";
 import { AgentUIClient } from "./AgentUIClient";
+import { createAgentWindowAdapter } from "./agent-window";
 import type { ScreenAdapters } from "./client-tools";
 
 /**
@@ -40,7 +41,12 @@ describe("AgentUIClient with the HTTP binding", () => {
     await uiClient.whenIdle();
 
     expect(requests[0].url.searchParams.get("clientId")).toBe("ui-client-0001");
-    expect(JSON.parse(requests[0].url.searchParams.get("uiStateJson") ?? "{}")).toEqual({ routePath: "/orders", unsavedFieldReferences: ["f.note"] });
+    expect(JSON.parse(requests[0].url.searchParams.get("uiStateJson") ?? "{}")).toEqual({
+      routePath: "/orders",
+      unsavedFieldReferences: ["f.note"],
+      viewportWidth: Math.round(window.innerWidth),
+      viewportHeight: Math.round(window.innerHeight),
+    });
     expect(requests[1].method).toBe("POST");
     expect(requests[1].url.pathname).toBe("/api/agents/conversations/7/clientToolRequests/31/answer");
     expect(requests[1].body).toMatchObject({ clientId: "ui-client-0001", outcome: "OK", text: "# Orders" });
@@ -59,5 +65,21 @@ describe("AgentUIClient with the HTTP binding", () => {
     await client.postMessage(7, { text: "Where do I change the address?" }).catch(() => undefined);
 
     expect(requests[0].body).toMatchObject({ clientId: "ui-client-0002", uiState: { routePath: "/orders/42", tab: "items" } });
+  });
+});
+
+describe("AgentUIClient UI state", () => {
+  test("adds the agent window's mode from the window adapter and keeps what the source reports itself", () => {
+    const agentWindow = createAgentWindowAdapter({ getMode: () => "full", applyMode: () => undefined, modes: ["full", "compact"] });
+    const uiClient = new AgentUIClient({ ...adapters, agentWindow }, { readUIState: () => ({ routePath: "/orders" }) }, "ui-client-0002");
+    expect(uiClient.readUIState()).toMatchObject({ routePath: "/orders", agentWindow: "full", viewportWidth: Math.round(window.innerWidth) });
+
+    const reportingClient = new AgentUIClient(
+      { ...adapters, agentWindow },
+      { readUIState: () => ({ routePath: "/orders", agentWindow: "compact", viewportWidth: 390, viewportHeight: 844 }) },
+      "ui-client-0003",
+    );
+    expect(reportingClient.readUIState()).toMatchObject({ agentWindow: "compact", viewportWidth: 390, viewportHeight: 844 });
+    expect(new AgentUIClient(adapters, null, "ui-client-0004").readUIState()).toBeNull();
   });
 });

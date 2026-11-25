@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.6.6
+
+**Agent.UI: the agent reads the whole screen and sees its own window.** Measured on a host list of 200 tickets: the
+read was cut at 6,000 characters inside 201 checkbox lines before the table, the main menu was never read, and a
+picture copied 8,000 elements with all computed styles (about 150 MB of SVG) and drew a blank table body. npm
+`@mgamadeus/ddd-agents` in lockstep.
+
+- **Screen read (`DomScreenReader`).** A row's selection checkbox is no field line (the row says `(selected)`, also on
+  cards); tables and cards come before the fields; at most 15 rows (`MAX_TABLE_ROWS`), cells cut at 60
+  (`MAX_CELL_CHARS`), columns empty in all shown rows left out; a `Text:` line per section with the plain text no other
+  line carries (`MAX_SECTION_TEXT_CHARS` 1,200); the main menu as `nav.<key>` references (`findNavigation`,
+  `data-nav-key`, `data-nav-group`; a closed group shows only itself), written after the page and never cut away; a
+  line with the agent window (`describeAgentWindow`) and the browser size after `Unsaved changes`.
+- **Budget.** `MAX_SCREEN_CHARS` is half the answer cap (12,000) and equals the server's cut
+  `AgentUIToolResponseDto::MAX_CONTENT_CHARS` (was 6,000 on the client, 8,000 on the server); a spec compares them.
+- **Picture (`createDomScreenPictureCapturer`).** Only elements in the browser window (clipped by their scroll
+  containers) are copied; a declaration is inlined only where it differs from the tag's browser default (an empty
+  frame, cached per tag: `createFrameDefaultStyleSource`) or from the parent; table parts never get their page height
+  (17,769 px for 200 rows stretched the copied rows: header and one row). `prepareScreenCloneForPicture(root, options)`
+  takes `visibleBox` (`null` = the whole page with scroll containers expanded) and `defaultStyles`; `false` as before.
+  `PICTURE_LIMITATIONS` (client and server): the last sentence now says only the browser window is shown.
+- **UI state.** `AgentUIState` carries `agentWindow` (a token), `viewportWidth`, `viewportHeight` (1 to 20,000);
+  `AgentUIClient` fills them from `AgentWindowAdapter.getMode()` (new, optional; `createAgentWindowAdapter` has it)
+  and the window. The `[SIGNAL:ui]` note adds `agent window <mode> · browser window narrow|medium|wide`
+  (`AgentUIState::describeWindows()`); the pixels stay out of the note.
+- Tests: `_DomScreenReader.spec.ts` (list, text, menu, window line), `_screen-picture.spec.ts` (window part, scroll
+  clip, table heights, size within elements × bytes, frame defaults), `_AgentUIClient.spec.ts` (window mode, size),
+  the budget contract; `AgentUIStateTest` (normalize, width classes, stored JSON).
+- **An application** that calls `prepareScreenCloneForPicture()` with a second argument passes the options object
+  (`{ visibleBox, defaultStyles }`) or `false` as before; a host wrapper that cut rows, budgeted the read or skipped
+  off-screen elements before a capture can go.
+
 ## 0.6.5
 
 **Voice: the seconds since the last booking are booked when the worker ends a call; eval-tools survives a retry.** Bug

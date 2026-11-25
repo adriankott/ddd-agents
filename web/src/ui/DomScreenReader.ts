@@ -8,6 +8,7 @@ import {
   formatFieldLine,
   formatTable,
   joinScreenParts,
+  MAX_SECTION_TEXT_CHARS,
   MAX_TABLE_ROWS,
   oneLine,
   ReferenceNames,
@@ -25,6 +26,10 @@ export const AGENT_ATTRIBUTES = {
   skip: 'data-agent-skip',
   /** The key of a table row (@mgamadeus/ddd-admin-ui) */
   rowKey: 'data-row-key',
+  /** The key of a main menu entry (@mgamadeus/ddd-admin-ui): `nav.<value>` */
+  navKey: 'data-nav-key',
+  /** The key of a main menu group (@mgamadeus/ddd-admin-ui): `nav.<value>`; its entries sit inside it */
+  navGroup: 'data-nav-group',
 } as const;
 
 /** Elements never read. */
@@ -36,6 +41,35 @@ const SECRET_FIELD_SELECTOR = `[${AGENT_ATTRIBUTES.secret}] , input[type="passwo
 const FIELD_SELECTOR = 'input:not([type="hidden"]):not([type="submit"]):not([type="button"]), textarea, select, [role="combobox"], [role="switch"], [role="checkbox"], [role="radiogroup"]';
 
 const BUTTON_SELECTOR = 'button, [role="button"], a[href]';
+
+const TABLE_SELECTOR = 'table, [role="grid"], [role="table"]';
+
+/**
+ * The selection checkbox of a row: a field of its own it is not. On a list of 200 rows the checkboxes gave 201 field
+ * lines ("Select ticket …") before any table, and the read was cut before the table; the row says `(selected)` instead.
+ */
+const ROW_CHECKBOX_SELECTOR = [TABLE_SELECTOR, `[${AGENT_ATTRIBUTES.rowKey}]`]
+  .flatMap(container => container.split(', ').flatMap(part => [`${part} input[type="checkbox"]`, `${part} [role="checkbox"]`]))
+  .join(', ');
+
+/**
+ * Text the read writes already (fields and their labels, tables, cards, buttons and links, headings, tabs, dialogs,
+ * messages) or never reads (the agent window, secrets, the menu, hidden parts): the `Text:` line leaves it out.
+ */
+const TEXT_SKIPPED_SELECTOR = [
+  SKIPPED_SELECTOR,
+  `[${AGENT_ATTRIBUTES.secret}]`,
+  'nav',
+  'input, textarea, select, label, [role="combobox"], [role="switch"], [role="checkbox"], [role="radiogroup"]',
+  '[contenteditable="true"]',
+  `${TABLE_SELECTOR}, [${AGENT_ATTRIBUTES.rowKey}]`,
+  'button, [role="button"], a[href], [role="tablist"], [role="tab"], [role="menu"], [role="listbox"]',
+  'h1, h2, h3, h4, [role="heading"]',
+  '[role="dialog"], [role="alertdialog"], [role="alert"], [role="status"]',
+].join(', ');
+
+/** The heading of the main menu part of a read. */
+export const MAIN_MENU_HEADING = '## Main menu (highlightOnScreen marks an entry by its nav. reference)';
 
 /** The most tabs of the page a read names. */
 const MAX_PAGE_TABS = 16;
@@ -78,6 +112,9 @@ const isRendered = (element: Element): boolean => {
   if (typeof htmlElement.getClientRects === 'function' && htmlElement.getClientRects().length === 0) return false;
   return true;
 };
+
+const isChecked = (checkbox: Element): boolean =>
+  checkbox instanceof HTMLInputElement ? checkbox.checked : checkbox.getAttribute('aria-checked') === 'true';
 
 const textOf = (element: Element | null | undefined): string => {
   if (!element) return '';
@@ -159,13 +196,27 @@ export interface DomScreenReaderOptions {
   /** Whether the open screen has unsaved changes: `no`, or `yes (<form> (<fields>))` */
   describeUnsavedChanges: () => string;
   registry: ScreenReferenceRegistry;
+  /**
+   * Optional: the application's main menu (outside the content root). Its entries (`data-nav-key`) and groups
+   * (`data-nav-group`) on the screen are read as `nav.<key>` references, so the agent can name and mark them.
+   */
+  findNavigation?: () => Element | null;
+  /**
+   * Optional: where the agent window is, e.g. `full screen: it covers the whole page`. The read writes it with the
+   * browser window's size (`Agent window: … · browser 1440×900 px`), so the agent knows what the user sees beside it.
+   */
+  describeAgentWindow?: () => string | null;
 }
 
 /**
- * Reads the open screen from the DOM: title and route, tabs, open dialogs, messages, then per section its fields,
- * tables and buttons. Never the agent window (`data-agent-skip`), never a secret's value.
+ * Reads the open screen from the DOM: title and route, the agent window and the browser size, tabs, open dialogs,
+ * messages, then per section its plain text (`Text: …`), tables, cards, fields and buttons, and the main menu. Never
+ * the agent window (`data-agent-skip`), never a secret's value.
  */
 export class DomScreenReader implements ScreenReader {
+  /** The containers whose text this read wrote already (a section before the page around it). */
+  protected textReadContainers = new Set<Element>();
+
   constructor(protected readonly options: DomScreenReaderOptions) {}
 
   read({ focus, maxChars }: { focus?: string; maxChars: number }): ScreenSnapshot {
@@ -188,9 +239,11 @@ export class DomScreenReader implements ScreenReader {
       return unique;
     };
 
+    this.textReadContainers = new Set<Element>();
     const parts: string[] = [`# ${capValue(location.title, 120)}`, `Route: ${location.route}`];
     const unsaved = this.options.describeUnsavedChanges();
     parts.push(`Unsaved changes: ${unsaved}`);
+    parts.push(this.describeWindow());
 
     const root = this.options.findRoot();
     const dialogs = Array.from(document.querySelectorAll('[role="dialog"], [role="alertdialog"]')).filter(isRendered);
@@ -225,8 +278,60 @@ export class DomScreenReader implements ScreenReader {
     if (anchors.length > 0) {
       parts.push(`Anchors: ${anchors.map(anchor => register(`a.${anchor.getAttribute(AGENT_ATTRIBUTES.anchor)}`, anchor)).join(' · ')}`);
     }
+    // the menu goes last and is never cut away by a long page: the page gets the characters the menu leaves
+    const menu = this.readNavigation(register).join('\n');
     this.options.registry.replace(elements);
-    return { markdown: joinScreenParts(parts, maxChars), route: location.route, title: location.title, references };
+    const page = joinScreenParts(parts, Math.max(maxChars - (menu === '' ? 0 : menu.length + 1), Math.floor(maxChars / 2)));
+    return { markdown: menu === '' ? page : `${page}\n${menu}`, route: location.route, title: location.title, references };
+  }
+
+  /** `Agent window: … · browser 1440×900 px`, or `Browser window: 1440×900 px` without a description of the window. */
+  protected describeWindow(): string {
+    const size = typeof window === 'undefined' ? 'unknown' : `${Math.round(window.innerWidth)}×${Math.round(window.innerHeight)} px`;
+    const agentWindow = this.options.describeAgentWindow?.() ?? null;
+    return agentWindow ? `Agent window: ${oneLine(agentWindow)} · browser ${size}` : `Browser window: ${size}`;
+  }
+
+  /**
+   * The main menu: its entries (`data-nav-key`) and groups (`data-nav-group`) on the screen, as `nav.<key>`
+   * references (the menu of a compact layout shows icons only: an entry's name is its aria-label). A closed group
+   * shows only itself.
+   */
+  protected readNavigation(register: (reference: string, element: Element) => string): string[] {
+    const navigation = this.options.findNavigation?.() ?? null;
+    if (!navigation) return [];
+    const groups = new Map<string, string[]>();
+    const readKeys = new Set<string>();
+    for (const mark of Array.from(navigation.querySelectorAll(`[${AGENT_ATTRIBUTES.navKey}], [${AGENT_ATTRIBUTES.navGroup}]`))) {
+      const groupKey = mark.getAttribute(AGENT_ATTRIBUTES.navGroup);
+      const key = mark.getAttribute(AGENT_ATTRIBUTES.navKey) ?? groupKey;
+      // a group of a list is the whole `<li>` with its entries: its row is the first child
+      const element = mark.tagName === 'LI' ? (mark.firstElementChild ?? mark) : mark;
+      if (key === null || readKeys.has(key) || !isRendered(element)) continue;
+      const label = labelOfElement(element);
+      if (label === '') continue;
+      readKeys.add(key);
+      const reference = register(`nav.${slugOf(key)}`, element);
+      const entry = `${reference} "${capValue(label, 40)}"${mark.getAttribute('aria-current') !== null ? ' (open)' : ''}`;
+      if (groupKey !== null) {
+        const isExpanded = Array.from(mark.querySelectorAll(`[${AGENT_ATTRIBUTES.navKey}]`)).some(isRendered);
+        groups.set(groupKey, [isExpanded ? `${capValue(label, 40)} (${reference}):` : `${entry} (closed group)`]);
+        continue;
+      }
+      const owningGroup = mark.parentElement?.closest(`[${AGENT_ATTRIBUTES.navGroup}]`)?.getAttribute(AGENT_ATTRIBUTES.navGroup) ?? '';
+      groups.set(owningGroup, [...(groups.get(owningGroup) ?? []), entry]);
+    }
+    if (readKeys.size === 0) return [];
+    const lines = [MAIN_MENU_HEADING];
+    for (const [groupKey, entries] of groups) {
+      if (groupKey === '') {
+        lines.push(`- ${entries.join(' · ')}`);
+        continue;
+      }
+      const [head, ...rest] = entries;
+      lines.push(rest.length > 0 ? `- ${head} ${rest.join(' · ')}` : `- ${head}`);
+    }
+    return lines;
   }
 
   protected readWhole(element: Element): string {
@@ -253,8 +358,17 @@ export class DomScreenReader implements ScreenReader {
     return lines;
   }
 
+  /**
+   * The plain text, tables, cards, fields and buttons of a container. Tables and cards go before the fields: a page's
+   * filters and forms never push its list out of the read.
+   */
   protected readElements(container: Element, register: (reference: string, element: Element) => string, seen: Set<Element>): string[] {
     const lines: string[] = [];
+    const text = this.readPlainText(container);
+    this.textReadContainers.add(container);
+    if (text !== '') lines.push(`Text: ${text}`);
+    for (const checkbox of Array.from(container.querySelectorAll(ROW_CHECKBOX_SELECTOR))) seen.add(checkbox);
+    lines.push(...this.readTablesAndCards(container, register, seen));
     for (const field of Array.from(container.querySelectorAll(FIELD_SELECTOR))) {
       if (seen.has(field) || !isRendered(field) || field.closest('[role="radiogroup"]') !== null && field.getAttribute('role') !== 'radiogroup') continue;
       seen.add(field);
@@ -271,24 +385,6 @@ export class DomScreenReader implements ScreenReader {
         isSecret: field.matches(SECRET_FIELD_SELECTOR) || field.closest(`[${AGENT_ATTRIBUTES.secret}]`) !== null,
       };
       lines.push(formatFieldLine(facts));
-    }
-    for (const table of Array.from(container.querySelectorAll('table, [role="grid"], [role="table"]'))) {
-      if (seen.has(table) || !isRendered(table)) continue;
-      seen.add(table);
-      lines.push(...formatTable(this.readTable(table, register)));
-    }
-    // the cards of a card grid (`EntityListGrid` sets `data-row-key` on each)
-    const cards = Array.from(container.querySelectorAll(`[${AGENT_ATTRIBUTES.rowKey}]`)).filter(
-      card => !seen.has(card) && !card.closest('table, [role="grid"], [role="table"]') && isRendered(card)
-    );
-    if (cards.length > 0) {
-      lines.push(`Cards: ${cards.length} on screen`);
-      for (const card of cards.slice(0, MAX_TABLE_ROWS)) {
-        seen.add(card);
-        for (const inner of Array.from(card.querySelectorAll(BUTTON_SELECTOR))) seen.add(inner);
-        lines.push(`- ${register(`row.${rowKeyOf(card, null, 0)}`, card)}: ${capValue(textOf(card), 160)}`);
-      }
-      if (cards.length > MAX_TABLE_ROWS) lines.push(`… ${cards.length - MAX_TABLE_ROWS} more cards on screen`);
     }
     const buttons: ButtonFacts[] = [];
     for (const button of Array.from(container.querySelectorAll(BUTTON_SELECTOR))) {
@@ -307,6 +403,72 @@ export class DomScreenReader implements ScreenReader {
     return lines;
   }
 
+  /** The tables of a container and the cards of a card grid (`EntityListGrid` sets `data-row-key` on each). */
+  protected readTablesAndCards(container: Element, register: (reference: string, element: Element) => string, seen: Set<Element>): string[] {
+    const lines: string[] = [];
+    for (const table of Array.from(container.querySelectorAll(TABLE_SELECTOR))) {
+      if (seen.has(table) || !isRendered(table)) continue;
+      seen.add(table);
+      lines.push(...formatTable(this.readTable(table, register)));
+    }
+    const cards = Array.from(container.querySelectorAll(`[${AGENT_ATTRIBUTES.rowKey}]`)).filter(
+      card => !seen.has(card) && !card.closest(TABLE_SELECTOR) && isRendered(card)
+    );
+    if (cards.length > 0) {
+      lines.push(`Cards: ${cards.length} on screen`);
+      for (const card of cards) seen.add(card);
+      for (const card of cards.slice(0, MAX_TABLE_ROWS)) {
+        for (const inner of Array.from(card.querySelectorAll(BUTTON_SELECTOR))) seen.add(inner);
+        const checkbox = card.querySelector('input[type="checkbox"], [role="checkbox"]');
+        const selected = checkbox !== null && isChecked(checkbox) ? ' (selected)' : '';
+        lines.push(`- ${register(`row.${rowKeyOf(card, null, 0)}`, card)}${selected}: ${capValue(textOf(card), 160)}`);
+      }
+      if (cards.length > MAX_TABLE_ROWS) lines.push(`… ${cards.length - MAX_TABLE_ROWS} more cards on screen`);
+    }
+    return lines;
+  }
+
+  /**
+   * The visible text of a container that no field, table, card or button line carries, its pieces joined with " · "
+   * (pieces of one block with a space), without the text of a section read before: a message, a record's facts or a
+   * dashboard figure the user reads.
+   */
+  protected readPlainText(container: Element): string {
+    // two headings in one section read it twice: its text goes once
+    if (this.textReadContainers.has(container)) return '';
+    let text = '';
+    let previousBlock: Element | null = null;
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node !== null && text.length < MAX_SECTION_TEXT_CHARS; node = walker.nextNode()) {
+      const piece = oneLine(node.textContent ?? '');
+      const parent = node.parentElement;
+      if (piece === '' || parent === null) continue;
+      // a dialog read as a container is not left out by its own role, only what sits inside it
+      const skipped = parent.closest(TEXT_SKIPPED_SELECTOR);
+      if (skipped !== null && skipped !== container && container.contains(skipped)) continue;
+      if (!isRendered(parent) || this.isInsideReadSection(parent, container)) continue;
+      const block = this.blockOf(parent, container);
+      text = text === '' ? piece : `${text}${block === previousBlock ? ' ' : ' · '}${piece}`;
+      previousBlock = block;
+    }
+    return text.length <= MAX_SECTION_TEXT_CHARS ? text : `${text.slice(0, MAX_SECTION_TEXT_CHARS - 1)}…`;
+  }
+
+  /** The nearest ancestor that is not laid out inline (the container at the latest). */
+  protected blockOf(element: Element, container: Element): Element {
+    for (let ancestor: Element | null = element; ancestor !== null && ancestor !== container; ancestor = ancestor.parentElement) {
+      if (!window.getComputedStyle(ancestor).display.startsWith('inline')) return ancestor;
+    }
+    return container;
+  }
+
+  protected isInsideReadSection(element: Element, container: Element): boolean {
+    for (let ancestor: Element | null = element; ancestor !== null && ancestor !== container; ancestor = ancestor.parentElement) {
+      if (this.textReadContainers.has(ancestor)) return true;
+    }
+    return false;
+  }
+
   protected readTable(table: Element, register: (reference: string, element: Element) => string): TableFacts {
     const headerCells = Array.from(table.querySelectorAll('thead th, [role="columnheader"]'));
     const columns = headerCells.map(cell => textOf(cell));
@@ -320,8 +482,14 @@ export class DomScreenReader implements ScreenReader {
         const secret = cell.closest(`[${AGENT_ATTRIBUTES.secret}]`) !== null || cell.querySelector(`[${AGENT_ATTRIBUTES.secret}]`) !== null;
         return secret ? '(hidden)' : textOf(cell);
       }),
-      selected: row.getAttribute('aria-selected') === 'true' || row.getAttribute('data-state') === 'selected',
+      selected: row.getAttribute('aria-selected') === 'true' || row.getAttribute('data-state') === 'selected' || this.isRowChecked(row),
     }));
     return { caption: textOf(table.querySelector('caption')) || table.getAttribute('aria-label'), columns, rows, totalRows: bodyRows.length };
+  }
+
+  /** Whether the row's selection checkbox is checked. */
+  protected isRowChecked(row: Element): boolean {
+    const checkbox = row.querySelector('input[type="checkbox"], [role="checkbox"]');
+    return checkbox !== null && isChecked(checkbox);
   }
 }

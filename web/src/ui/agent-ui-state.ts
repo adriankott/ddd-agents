@@ -17,6 +17,11 @@ export interface AgentUIState {
   invalidFieldReferences?: string[];
   /** The key of a dialog or drawer open on the screen */
   openDialogKey?: string | null;
+  /** The mode the agent window shows (`full`, `compact`, `closed`, … the application's modes); `AgentUIClient` fills it from the window adapter */
+  agentWindow?: string | null;
+  /** The size of the browser window in CSS pixels; `AgentUIClient` fills it */
+  viewportWidth?: number | null;
+  viewportHeight?: number | null;
   visible?: boolean | null;
   /** ISO time of the capture */
   capturedAt?: string | null;

@@ -27,7 +27,8 @@ use Throwable;
  *
  * The note is written by the server from the client's normalized UI state ({@see AgentUIState}) and the application's
  * screen catalog ({@see AgentUIScreenCatalogService}): area, record with the server's description, tab and view, the
- * count of unsaved fields and of validation messages, an open dialog. It carries no free text of the client and no
+ * count of unsaved fields and of validation messages, an open dialog, the agent window's mode and the browser window's
+ * width class ({@see AgentUIState::describeWindows()}). It carries no free text of the client and no
  * clock (an age that grows would be a new value on every call). Without a fresh client the note says so once.
  */
 class AgentUIStateNotesService extends Service
@@ -111,6 +112,10 @@ class AgentUIStateNotesService extends Service
         }
         if ($agentUIState->openDialogKey !== null) {
             $noteParts[] = 'dialog ' . $agentUIState->openDialogKey . ' open';
+        }
+        $windowsDescription = $agentUIState->describeWindows();
+        if ($windowsDescription !== null) {
+            $noteParts[] = $windowsDescription;
         }
         return static::SCREEN_NOTE_LEAD . ' ' . implode(' · ', $noteParts) . '. Values on it can be unsaved; read them with '
             . 'getCurrentScreen, stored values with the data tools. ' . AgentStateDeltaTexts::BACKGROUND_SUFFIX;

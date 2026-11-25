@@ -20,8 +20,12 @@ use DDD\Presentation\Base\OpenApi\Attributes\Parameter;
  */
 class AgentUIToolResponseDto extends RestResponseDto implements LlmMarkdownRenderable, MCPToolResponsePlatformNoteProvider, MCPToolResponseImageProvider
 {
-    /** @var int The most characters of client content in one result */
-    public const int MAX_CONTENT_CHARS = 8000;
+    /**
+     * @var int The most characters of client content in one result: half the answer's cap
+     * ({@see \DDD\Domain\AI\Entities\ClientTools\AgentClientToolRequest::MAX_ANSWER_TEXT_CHARS}), the client's
+     * `MAX_SCREEN_CHARS` (a contract spec compares them)
+     */
+    public const int MAX_CONTENT_CHARS = 12000;
 
     /** @var string The line that ends a cut content */
     public const string CONTENT_CUT_LINE = '… (cut at %d of %d characters; read one part with getCurrentScreen focus)';

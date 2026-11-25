@@ -180,6 +180,8 @@ export interface AgentWindowAdapter {
   setMode(mode: string): boolean | Promise<boolean>;
   /** Whether the window steps aside before a request of the type; default true for the three screen requests */
   shouldStepAsideBefore?(requestType: ClientToolRequestType): boolean;
+  /** The mode the window shows now: the UI state reports it, so the agent knows whether the user sees the page */
+  getMode?(): string;
 }
 
 /** Shows the user the way to a target before it opens (`createDomScreenPathGuide()` is the DOM default). */

@@ -12,7 +12,7 @@ shared cache of the realtime channel (`AI.agentRealtimeChannel.sharedCacheGroup`
 
 | Part | What it is | Where |
 |---|---|---|
-| Awareness | the `[SIGNAL:ui]` note: area, record with the server's description, tab, view, count of unsaved fields and validation messages, an open dialog; appended once when it changed (state delivery kind `ui`), a tail entry on a conversation without state delivery; no clock, no client text | `AgentUIStateNotesService`, `AgentStateDelta::KIND_UI` |
+| Awareness | the `[SIGNAL:ui]` note: area, record with the server's description, tab, view, count of unsaved fields and validation messages, an open dialog, the agent window's mode and the browser window's width class (narrow under 640 px, medium under 1024 px, wide; never the pixels, so a resize within a class is no new note); appended once when it changed (state delivery kind `ui`), a tail entry on a conversation without state delivery; no clock, no client text | `AgentUIStateNotesService`, `AgentStateDelta::KIND_UI` |
 | Presence | what a client states with a message (`clientId`, `uiState`), a run-state read (`clientId`, `uiStateJson`) and an answer (`uiStateJson`): normalized (`AgentUIState::normalize()`), kept per conversation (at most 5 clients) and per account for 15 minutes, fresh for 25 s, written at most every 10 s unless something changed. A client that shows no conversation states only that it is there, with the account-level realtime read (`clientId`): an entry of its own per account, never a target of a client tool request (the widgets skill, realtime and push) | `AgentClientPresenceService`, `AgentClientPresence(s)` |
 | Channel | a tool sends a request (random id below 2^53) through the realtime port and waits (≤ 20 s, heartbeat every second); the client gets it from the host's transport or with its run-state read (`clientToolRequest`, `realtimeMessages`); it posts `POST /{aiConversationId}/clientToolRequests/{requestId}/answer` (outcome, text, details, `pictureBase64`, `uiStateJson`); the answer is set if absent (an atomic counter: the first answer wins, 409 after) with a TTL of the wait window + 30 s, and forgotten once the tool read it | `AgentClientToolRequestsService`, `AgentClientToolRequest` (value object), `AgentRealtimeChannelService` |
 | Request types | open: the package's `READ_SCREEN`, `LIST_TARGETS`, `OPEN_TARGET`, `HIGHLIGHT`, `SET_WINDOW_MODE` (off unless `AI.agentUI.windowModeRequests`); a package or host adds its own through the tagged `AgentClientToolRequestTypeProvider`. A switched-off or unknown type answers `NOT_ENABLED` | `AgentUIClientToolRequestTypeProviderService` |
@@ -30,13 +30,22 @@ The host provides:
    path as the area and no record.
 3. The client side: `@mgamadeus/ddd-agents/ui` runs the requests (`ClientToolRequestRunner`) with its adapters
    (`ScreenTargetSource` — `createDomScreenTargetSource()` reads `data-agent-anchor` marks, optionally one
-   `groupKey` —, `ScreenNavigator`, `ScreenReader`, `ScreenHighlighter`); optional adapters: `picture`
+   `groupKey` —, `ScreenNavigator`, `ScreenReader`, `ScreenHighlighter`). `DomScreenReader` writes the agent window
+   and browser size (`describeAgentWindow`), per section a `Text:` line (plain text no other line carries, 1,200
+   characters), tables and cards before fields (15 rows, cells cut at 60, empty columns left out, a row's selection
+   checkbox as `(selected)`), and with `findNavigation` the main menu as `nav.<key>` references (`data-nav-key`,
+   `data-nav-group`) after the page, never cut away. A read has `MAX_SCREEN_CHARS` (12,000, half the answer cap),
+   the server's cut (`AgentUIToolResponseDto::MAX_CONTENT_CHARS`, a spec compares them). Optional adapters: `picture`
    (`createDomScreenPictureCapturer()`: presets small/medium/large with pixel and byte budgets, `colour` /
-   `greyscale` / `machine`, passwords as dots, `data-agent-secret` blanked, `data-agent-skip` left out, scroll
-   containers expanded; `PICTURE_LIMITATIONS` equals the server's), `pathGuide` (`createDomScreenPathGuide()`: Esc or
+   `greyscale` / `machine`, passwords as dots, `data-agent-secret` blanked, `data-agent-skip` left out; only the
+   elements in the browser window, clipped by their scroll containers, are copied, a declaration only where it
+   differs from the tag's browser default (an empty frame, cached per tag) or from the parent, and a table part never
+   gets its page height (a copy with fewer rows drew a blank body); `PICTURE_LIMITATIONS` equals the server's),
+   `pathGuide` (`createDomScreenPathGuide()`: Esc or
    a click cancels, skipped under reduced motion, on the target, or without a path element; `createGuideCounter()`
    guides a target twice), `agentWindow` (`createAgentWindowAdapter()`: steps aside before `OPEN_TARGET`, `HIGHLIGHT`
-   and a picture, restores after the picture, takes `SET_WINDOW_MODE`), `requestHandlers` (further request types).
+   and a picture, restores after the picture, takes `SET_WINDOW_MODE`, `getMode()` fills the UI state's
+   `agentWindow`; `AgentUIClient` adds `viewportWidth` / `viewportHeight`), `requestHandlers` (further request types).
    A host transport hands its messages to `acceptArrivedRealtimeMessage()`; `runClientToolRequestForDevelopment()`
    tries the adapters without a model. The answer carries `pictureBase64` and the UI state after the request.
    `@mgamadeus/ddd-admin-ui` brings the adapters of screens built from its blocks.

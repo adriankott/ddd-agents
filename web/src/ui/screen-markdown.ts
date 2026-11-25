@@ -10,10 +10,20 @@
  * - `s.<slug>` a section (its heading)
  * - `t.<slug>` a tab
  * - `a.<anchor>` an anchor the application set (`data-agent-anchor`)
+ * - `nav.<key>` an entry or group of the application's main menu (`data-nav-key`, `data-nav-group`)
  */
 
-/** The most rows of one table in a read. */
-export const MAX_TABLE_ROWS = 25;
+/**
+ * The most rows of one table (and cards of one grid) in a read. A list of 200 loaded rows filled the whole read with
+ * rows before; the rest of the page never reached the model. `focus` on a row reads it whole.
+ */
+export const MAX_TABLE_ROWS = 15;
+
+/** The most characters of one table cell in a read (a cell says how long it was; `focus` on the row reads it whole). */
+export const MAX_CELL_CHARS = 60;
+
+/** The most characters of the plain text of one section (`Text: …`). */
+export const MAX_SECTION_TEXT_CHARS = 1200;
 
 /** The most characters of one value in a read (a long text says how long it is; `focus` reads it whole). */
 export const MAX_VALUE_CHARS = 200;
@@ -89,14 +99,23 @@ export interface TableFacts {
   totalRows: number;
 }
 
-/** A table as `| … |` lines with the row reference first, at most {@link MAX_TABLE_ROWS} rows. */
+/**
+ * A table as `| … |` lines with the row reference first, at most {@link MAX_TABLE_ROWS} rows, cells cut to
+ * {@link MAX_CELL_CHARS}. A column without text in every shown row (a selection box, an actions menu) is left out: the
+ * selection shows as `(selected)` on the row.
+ */
 export const formatTable = (table: TableFacts, maxRows: number = MAX_TABLE_ROWS): string[] => {
   const lines: string[] = [];
   const shownRows = table.rows.slice(0, maxRows);
+  const columnCount = Math.max(table.columns.length, ...shownRows.map(row => row.cells.length));
+  const keptColumns: number[] = [];
+  for (let column = 0; column < columnCount; column += 1) {
+    if (shownRows.length === 0 || shownRows.some(row => (row.cells[column] ?? '').trim() !== '')) keptColumns.push(column);
+  }
   lines.push(`Table${table.caption ? ` "${capValue(table.caption, 80)}"` : ''}: ${table.totalRows} rows on screen`);
-  lines.push(`| ref | ${table.columns.map(column => capValue(column, 40) || '-').join(' | ')} |`);
+  lines.push(`| ref | ${keptColumns.map(column => capValue(table.columns[column] ?? '', 40) || '-').join(' | ')} |`);
   for (const row of shownRows) {
-    const cells = row.cells.map(cell => capValue(cell, 80).replace(/\|/g, '/'));
+    const cells = keptColumns.map(column => capValue(row.cells[column] ?? '', MAX_CELL_CHARS).replace(/\|/g, '/'));
     lines.push(`| ${row.reference}${row.selected ? ' (selected)' : ''} | ${cells.join(' | ')} |`);
   }
   if (table.totalRows > shownRows.length) lines.push(`… ${table.totalRows - shownRows.length} more rows on screen`);

@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, it } from "vitest";
 
-import { ClientToolRequestRunner } from "./ClientToolRequestRunner";
+import { ClientToolRequestRunner, MAX_SCREEN_CHARS } from "./ClientToolRequestRunner";
 import type { ClientToolAnswer, ScreenAdapters, ScreenNavigationBlocker, ScreenTarget } from "./client-tools";
 
 const ORDER_TARGET: ScreenTarget = {
@@ -219,5 +222,13 @@ describe('ClientToolRequestRunner', () => {
     const runner = new ClientToolRequestRunner(adapters);
     assert.equal((await runner.run(delivery('PLAY_SOUND', { sound: 'chime' }))).text, 'played chime');
     assert.equal((await runner.run(delivery('READ_SCREEN', {}))).text, '# Home');
+  });
+});
+
+describe('MAX_SCREEN_CHARS', () => {
+  it('is the server cut of a UI tool answer, half the answer cap', () => {
+    const dtoFile = resolve(dirname(fileURLToPath(import.meta.url)), '../../../src/Presentation/Mcp/Client/Agents/Dtos/AgentUIToolResponseDto.php');
+    const serverCut = Number(/MAX_CONTENT_CHARS = (\d+);/.exec(readFileSync(dtoFile, 'utf8'))?.[1]);
+    assert.equal(MAX_SCREEN_CHARS, serverCut);
   });
 });

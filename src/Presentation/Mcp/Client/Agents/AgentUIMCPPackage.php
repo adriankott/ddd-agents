@@ -146,7 +146,7 @@ class AgentUIMCPPackage extends MCPPackage
         'content of other origins (embedded frames, some images and fonts) can be blank or replaced',
         'video, canvas and WebGL content can be blank',
         'password fields show dots; fields the application marks secret or skipped are left out',
-        'scrolled-away parts of a scroll container are shown expanded, so the picture can be longer than the window',
+        'only what is in the browser window is shown; parts scrolled out of view are left out (the text read has them)',
     ];
 
     public const string PICTURE_LIMITATIONS_LINE = 'A picture cannot show: %s.';

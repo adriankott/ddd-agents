@@ -26,17 +26,33 @@ export class AgentUIClient implements AgentUIClientBinding {
 
   protected readonly uiStateSource: AgentUIStateSource | null;
 
+  protected readonly adapters: ScreenAdapters;
+
   protected acceptedClientToolRequestCount = 0;
 
   constructor(adapters: ScreenAdapters, uiStateSource: AgentUIStateSource | null = null, clientId: string = createAgentUIClientId()) {
     this.clientId = clientId;
+    this.adapters = adapters;
     this.runner = new ClientToolRequestRunner(adapters);
     this.uiStateSource = uiStateSource;
   }
 
+  /**
+   * The source's UI state with the agent window's mode (the window adapter) and the browser window's size, unless the
+   * source reports them itself: the agent learns whether its window covers the page and whether a panel fits beside it.
+   */
   readUIState(): AgentUIState | null {
     try {
-      return this.uiStateSource?.readUIState() ?? null;
+      const uiState = this.uiStateSource?.readUIState() ?? null;
+      if (uiState === null) return null;
+      const completedUIState: AgentUIState = { ...uiState };
+      const agentWindowMode = uiState.agentWindow ?? this.adapters.agentWindow?.getMode?.() ?? null;
+      if (agentWindowMode !== null) completedUIState.agentWindow = agentWindowMode;
+      if (typeof window !== 'undefined') {
+        completedUIState.viewportWidth = uiState.viewportWidth ?? Math.round(window.innerWidth);
+        completedUIState.viewportHeight = uiState.viewportHeight ?? Math.round(window.innerHeight);
+      }
+      return completedUIState;
     } catch {
       return null;
     }

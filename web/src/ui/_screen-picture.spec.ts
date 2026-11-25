@@ -2,13 +2,14 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterEach, describe, it } from "vitest";
+import { afterEach, describe, it, vi } from "vitest";
 
 import {
   computePictureByteBudget,
   computePictureDimensions,
   computeRetryScale,
   convertPixelsToGrey,
+  createFrameDefaultStyleSource,
   PICTURE_LIMITATIONS,
   prepareScreenCloneForPicture,
   SCREEN_PICTURE_PRESETS,
@@ -86,15 +87,109 @@ describe('prepareScreenCloneForPicture', () => {
     assert.ok(!html.includes('x()'));
   });
 
-  it('expands a scroll container', () => {
+  it('expands a scroll container when the whole page is copied, keeps it in the window part', () => {
     document.body.innerHTML = '<div id="list" style="height:100px;overflow-y:auto"><p>row</p></div>';
     const list = document.getElementById('list') as HTMLElement;
     Object.defineProperty(list, 'scrollHeight', { value: 900 });
     Object.defineProperty(list, 'clientHeight', { value: 100 });
-    const clone = prepareScreenCloneForPicture(document.body, false);
-    const listClone = clone.querySelector('#list') as HTMLElement;
+    const pageClone = prepareScreenCloneForPicture(document.body, { copyStyles: false, visibleBox: null });
+    const listClone = pageClone.querySelector('#list') as HTMLElement;
     assert.equal(listClone.style.overflowY, 'visible');
     assert.equal(listClone.style.height, 'auto');
+    const windowClone = prepareScreenCloneForPicture(document.body, false);
+    assert.equal((windowClone.querySelector('#list') as HTMLElement).style.overflowY, 'auto');
+  });
+
+  /** Places each `[data-top]` element at its top, 30 px high and 800 px wide (jsdom lays nothing out). */
+  const placeRows = (): void => {
+    for (const element of Array.from(document.querySelectorAll<HTMLElement>('[data-top]'))) {
+      const top = Number(element.dataset.top);
+      const height = Number(element.dataset.height ?? 30);
+      element.getBoundingClientRect = () => ({ top, bottom: top + height, left: 0, right: 800, width: 800, height, x: 0, y: top, toJSON: () => ({}) });
+    }
+  };
+
+  it('copies only the rows in the window and in the visible part of their scroll container', () => {
+    const rows = Array.from({ length: 200 }, (_, index) => `<tr data-top="${100 + index * 30}"><td>Ticket ${index + 1}</td></tr>`).join('');
+    document.body.innerHTML =
+      `<table data-top="100" data-height="6000"><tbody data-top="100" data-height="6000">${rows}</tbody></table>` +
+      '<div id="scroller" data-top="0" data-height="200" style="overflow-y:auto"><p data-top="50">in view</p><p data-top="400">clipped</p></div>';
+    placeRows();
+    const clone = prepareScreenCloneForPicture(document.body, { copyStyles: false, visibleBox: { top: 0, left: 0, bottom: 700, right: 1024 } });
+    // rows 1 to 20 start above 700 (the 20th at 670)
+    assert.equal(clone.querySelectorAll('tr').length, 20);
+    assert.ok(clone.textContent?.includes('Ticket 20'));
+    assert.ok(!clone.textContent?.includes('Ticket 21'));
+    assert.ok(clone.textContent?.includes('in view'));
+    assert.ok(!clone.textContent?.includes('clipped'));
+  });
+
+  it('never copies the height of a table part: the copied rows keep their own height', () => {
+    document.body.innerHTML =
+      '<table id="table" style="height:17769px"><tbody id="body" style="height:17721px"><tr id="row" style="height:30px"><td>Ticket</td></tr></tbody></table>' +
+      '<div id="box" style="height:40px">box</div>';
+    const clone = prepareScreenCloneForPicture(document.body, { visibleBox: null, defaultStyles: null });
+    const styleOf = (id: string): string => clone.querySelector(`#${id}`)?.getAttribute('style') ?? '';
+    for (const id of ['table', 'body', 'row']) assert.ok(!/(^|;)\s*height:/.test(styleOf(id)), `${id}: ${styleOf(id)}`);
+    assert.match(styleOf('box'), /(^|;)\s*height:\s*40px/);
+  });
+
+  it('copies a declaration only where it differs from the tag default or the parent: the copy stays within elements × bytes', () => {
+    const elementCount = 200;
+    document.body.innerHTML = `<div id="list">${Array.from({ length: elementCount - 1 }, (_, index) => `<p class="${index % 2 === 0 ? 'even' : 'odd'}">row ${index}</p>`).join('')}</div>`;
+    // a browser's computed style: ~350 properties, nearly all at their default
+    const propertyNames = Array.from({ length: 350 }, (_, index) => `property-${index}`);
+    const fakeStyleOf = (element: Element): CSSStyleDeclaration => {
+      const values = new Map(propertyNames.map(name => [name, 'initial-value']));
+      values.set('display', 'block');
+      values.set('color', element.classList.contains('odd') ? 'rgb(200, 0, 0)' : 'rgb(0, 0, 0)');
+      values.set('padding-left', '12px');
+      // a page's design tokens: inherited by every element, never needed by a copy of resolved values
+      for (let index = 0; index < 50; index += 1) values.set(`--tw-token-${index}`, `token value ${index}`);
+      const names = [...values.keys()];
+      return {
+        length: names.length,
+        display: 'block',
+        overflowX: 'visible',
+        overflowY: 'visible',
+        position: 'static',
+        item: (index: number) => names[index],
+        getPropertyValue: (name: string) => values.get(name) ?? '',
+      } as unknown as CSSStyleDeclaration;
+    };
+    const getComputedStyle = vi.spyOn(window, 'getComputedStyle').mockImplementation(element => fakeStyleOf(element));
+    const defaultStyles = { valueOf: (_tag: string, _namespace: string | null, name: string) => (name === 'display' ? 'block' : name === 'color' ? 'rgb(0, 0, 0)' : 'initial-value'), dispose: () => undefined };
+    try {
+      const diffed = new XMLSerializer().serializeToString(prepareScreenCloneForPicture(document.getElementById('list') as Element, { visibleBox: null, defaultStyles }));
+      const full = new XMLSerializer().serializeToString(prepareScreenCloneForPicture(document.getElementById('list') as Element, { visibleBox: null, defaultStyles: null }));
+      assert.ok(diffed.length <= elementCount * 120, `diffed copy ${diffed.length} bytes`);
+      assert.ok(full.length >= elementCount * 5000, `full copy ${full.length} bytes`);
+      // the red rows carry their colour; a black row under the default parent carries none
+      assert.match(diffed, /<p class="odd" style="[^"]*color:rgb\(200, 0, 0\)/);
+      assert.ok(!/<p class="even" style="[^"]*color/.test(diffed));
+      assert.ok(!diffed.includes('--tw-token'));
+    } finally {
+      getComputedStyle.mockRestore();
+    }
+  });
+
+  it('copies a border width that matches the default: it computes to 0 only under border-style none', () => {
+    document.body.innerHTML = '<div id="cell" style="border-style:solid;border-top-width:0px">cell</div>';
+    const defaultStyles = { valueOf: (_tag: string, _namespace: string | null, name: string) => (name === 'border-top-width' ? '0px' : name === 'display' ? 'block' : ''), dispose: () => undefined };
+    const clone = prepareScreenCloneForPicture(document.body, { visibleBox: null, defaultStyles });
+    assert.match(clone.querySelector('#cell')?.getAttribute('style') ?? '', /border-top-width:\s*0px/);
+  });
+
+  it('reads the browser defaults of a tag from an empty frame', () => {
+    document.head.insertAdjacentHTML('beforeend', '<style id="page-style">div { display: inline; }</style>');
+    const defaults = createFrameDefaultStyleSource(document);
+    try {
+      assert.equal(defaults.valueOf('div', null, 'display'), 'block');
+    } finally {
+      defaults.dispose();
+      document.getElementById('page-style')?.remove();
+    }
+    assert.equal(document.querySelectorAll('iframe').length, 0);
   });
 });
 

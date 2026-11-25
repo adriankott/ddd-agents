@@ -42,5 +42,6 @@ export const createAgentWindowAdapter = (options: AgentWindowAdapterOptions): Ag
       return true;
     },
     shouldStepAsideBefore: (requestType: ClientToolRequestType) => stepAsideFor.includes(requestType),
+    getMode: () => options.getMode(),
   };
 };

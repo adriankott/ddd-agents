@@ -121,7 +121,12 @@ const uiClient = useAgentUIClient({
   `data-agent-tabs`, `data-agent-views`, `data-agent-anchor-group` (with `groupKey`).
 - In a picture, passwords show as dots, `data-agent-secret` content is blanked and `data-agent-skip` elements are left
   out (mark the agent window `data-agent-skip`); what a picture cannot show is `PICTURE_LIMITATIONS`.
-- The agent window steps aside before a screen is opened, marked or pictured, and comes back after a picture.
+- The agent window steps aside before a screen is opened, marked or pictured, and comes back after a picture. Its
+  mode (`getMode`) and the browser size ride with the UI state into the `[SIGNAL:ui]` note.
+- `new DomScreenReader({ findRoot, currentLocation, describeUnsavedChanges, registry, findNavigation,
+  describeAgentWindow })`: `findNavigation` returns the main menu (entries `data-nav-key`, groups `data-nav-group`,
+  read as `nav.<key>`), `describeAgentWindow` says where the agent window is (`full screen: it covers the page`).
+- A picture shows the browser window only: elements out of view are not copied.
 - A host push transport hands each message to `acceptArrivedRealtimeMessage(conversationId, message, uiClient, sendAnswer)`;
   without one the run-state read delivers. A transport that only pings calls
   `readRunStateAfterClientToolRequestPing(conversationId, client.getConversationRunState, uiClient)`: a read that

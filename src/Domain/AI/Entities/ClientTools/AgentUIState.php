@@ -10,10 +10,11 @@ use DDD\Infrastructure\Base\DateTime\DateTime;
 
 /**
  * What the user's client reports about its UI with every message and every run-state read (`Agent.UI`): the route
- * with its parameters, the tab and view, the references of unsaved and of invalid fields, an open dialog, whether the
- * client is visible and when it captured the state. Tokens of one pattern only, capped in number and length: the
- * server keeps no free text of the client ({@see normalize()}); the state note the model reads is written by the
- * server from these tokens and the application's screen catalog
+ * with its parameters, the tab and view, the references of unsaved and of invalid fields, an open dialog, the mode of
+ * the agent window and the size of the browser window, whether the client is visible and when it captured the state.
+ * Tokens of one pattern only, capped in number and length: the server keeps no free text of the client
+ * ({@see normalize()}); the state note the model reads is written by the server from these tokens and the
+ * application's screen catalog
  * ({@see \DDD\Domain\AI\Services\ClientTools\AgentUIScreenCatalogService}).
  *
  * @phpstan-consistent-constructor
@@ -35,6 +36,15 @@ class AgentUIState extends ValueObject
     /** @var int The longest route parameter value that is kept */
     public const int MAX_ROUTE_PARAMETER_VALUE_CHARS = 100;
 
+    /** @var int The largest browser window side that is kept (pixels) */
+    public const int MAX_VIEWPORT_PIXELS = 20000;
+
+    /** @var int Below this width the browser window is narrow (a phone): a panel beside the page does not fit */
+    public const int NARROW_VIEWPORT_MAX_WIDTH = 640;
+
+    /** @var int Below this width (and from the narrow one) the browser window is medium (a tablet, a small window) */
+    public const int MEDIUM_VIEWPORT_MAX_WIDTH = 1024;
+
     /** @var string|null The path of the route the client shows, e.g. `/orders/42` */
     public ?string $routePath = null;
 
@@ -55,6 +65,15 @@ class AgentUIState extends ValueObject
 
     /** @var string|null The key of a dialog or drawer open on the screen */
     public ?string $openDialogKey = null;
+
+    /** @var string|null The mode the agent window shows (`full`, `compact`, `closed`, … the application's modes), a token */
+    public ?string $agentWindow = null;
+
+    /** @var int|null The width of the browser window in CSS pixels */
+    public ?int $viewportWidth = null;
+
+    /** @var int|null The height of the browser window in CSS pixels */
+    public ?int $viewportHeight = null;
 
     /** @var bool|null Whether the client is visible (a foreground tab) */
     public ?bool $visible = null;
@@ -104,9 +123,39 @@ class AgentUIState extends ValueObject
         $normalizedUIState->unsavedFieldReferences = static::keepValidReferences($this->unsavedFieldReferences);
         $normalizedUIState->invalidFieldReferences = static::keepValidReferences($this->invalidFieldReferences);
         $normalizedUIState->openDialogKey = static::isValidToken($this->openDialogKey) ? $this->openDialogKey : null;
+        $normalizedUIState->agentWindow = static::isValidToken($this->agentWindow) ? $this->agentWindow : null;
+        $normalizedUIState->viewportWidth = static::keepValidViewportSide($this->viewportWidth);
+        $normalizedUIState->viewportHeight = static::keepValidViewportSide($this->viewportHeight);
         $normalizedUIState->visible = $this->visible;
         $normalizedUIState->capturedAt = $this->capturedAt;
         return $normalizedUIState;
+    }
+
+    /** A side of the browser window from 1 to {@see MAX_VIEWPORT_PIXELS} pixels; anything else null */
+    protected static function keepValidViewportSide(mixed $viewportSide): ?int
+    {
+        return is_int($viewportSide) && $viewportSide >= 1 && $viewportSide <= static::MAX_VIEWPORT_PIXELS ? $viewportSide : null;
+    }
+
+    /**
+     * The agent window and the browser window for the state note, e.g. `agent window full · browser window narrow
+     * (under 640 px wide, a phone)`; null when the client reported neither. The width goes as a class, not in pixels:
+     * the note is compared on every model call, and every resize would be a new note. A screen read carries the pixels.
+     */
+    public function describeWindows(): ?string
+    {
+        $windowParts = [];
+        if ($this->agentWindow !== null) {
+            $windowParts[] = 'agent window ' . $this->agentWindow;
+        }
+        if ($this->viewportWidth !== null) {
+            $windowParts[] = 'browser window ' . match (true) {
+                $this->viewportWidth < static::NARROW_VIEWPORT_MAX_WIDTH => 'narrow (under ' . static::NARROW_VIEWPORT_MAX_WIDTH . ' px wide, a phone)',
+                $this->viewportWidth < static::MEDIUM_VIEWPORT_MAX_WIDTH => 'medium (under ' . static::MEDIUM_VIEWPORT_MAX_WIDTH . ' px wide)',
+                default => 'wide',
+            };
+        }
+        return $windowParts === [] ? null : implode(' · ', $windowParts);
     }
 
     /**
