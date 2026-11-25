@@ -35,6 +35,18 @@ class AgentRealtimeChannelContractTest extends UnitTestCase
         self::assertSame([], $sharedCache->lockTokensByKey, 'the mailbox lock is released');
     }
 
+    public function testTheMailboxIsWrittenBeforeTheTransportRingsAndClearedBeforeTheTransportIsTold(): void
+    {
+        $channel = new RecordingTransportChannelServiceDouble(new SharedCacheWithCountersDouble());
+        $audience = AgentRealtimeAudience::forConversation(3, 70);
+
+        $channel->sendMessage(static::buildRing($audience, 'call-1'));
+        $channel->clearMessage($audience, DemoRealtimeMessageTypeProviderDouble::MESSAGE_TYPE_RING, 'call-1');
+
+        self::assertSame([true], $channel->mailboxHeldMessageAtPublish, 'a client the ring wakes finds the message');
+        self::assertSame([false], $channel->mailboxHeldMessageAtClear, 'a client the clear wakes no longer finds it');
+    }
+
     public function testTheSameTypeAndKeyReplacesAndAClearRemovesFromTransportAndMailbox(): void
     {
         $channel = new RecordingTransportChannelServiceDouble(new SharedCacheWithCountersDouble());

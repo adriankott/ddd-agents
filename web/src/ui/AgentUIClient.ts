@@ -26,6 +26,8 @@ export class AgentUIClient implements AgentUIClientBinding {
 
   protected readonly uiStateSource: AgentUIStateSource | null;
 
+  protected acceptedClientToolRequestCount = 0;
+
   constructor(adapters: ScreenAdapters, uiStateSource: AgentUIStateSource | null = null, clientId: string = createAgentUIClientId()) {
     this.clientId = clientId;
     this.runner = new ClientToolRequestRunner(adapters);
@@ -41,7 +43,13 @@ export class AgentUIClient implements AgentUIClientBinding {
   }
 
   acceptClientToolRequest(_conversationId: number, delivery: ClientToolRequestDelivery, sendAnswer: ClientToolAnswerSender): void {
+    this.acceptedClientToolRequestCount += 1;
     this.runner.accept(delivery, sendAnswer);
+  }
+
+  /** How many client tool requests were delivered to this client so far (a repeat delivery counts again). */
+  countAcceptedClientToolRequests(): number {
+    return this.acceptedClientToolRequestCount;
   }
 
   /** Resolves when every accepted request was answered (tests). */

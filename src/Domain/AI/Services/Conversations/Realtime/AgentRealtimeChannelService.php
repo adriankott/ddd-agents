@@ -117,8 +117,9 @@ class AgentRealtimeChannelService extends Service
     }
 
     /**
-     * (a) Sends a message: to the host's transport and into the mailbox. A message of the same type and key in the
-     * mailbox is replaced.
+     * (a) Sends a message: into the mailbox, then to the host's transport. A message of the same type and key in the
+     * mailbox is replaced. The mailbox comes first: a transport that only rings makes the client read the mailbox at
+     * once, and that read must find the message.
      *
      * @throws BadRequestException an unregistered type, an invalid key, a payload that is no JSON object or too long
      */
@@ -126,24 +127,27 @@ class AgentRealtimeChannelService extends Service
     {
         $this->validateMessage($agentRealtimeMessage);
         $agentRealtimeSendResult = new AgentRealtimeSendResult();
+        $agentRealtimeSendResult->keptInMailbox = $this->changeMailbox($agentRealtimeMessage->audience, $agentRealtimeMessage, null, null);
         try {
             $agentRealtimeSendResult->sentThroughTransport = $this->publishMessageToTransport($agentRealtimeMessage);
         } catch (Throwable $transportFailure) {
             $this->logTransportFailure('publish', $agentRealtimeMessage->messageType, $transportFailure);
         }
-        $agentRealtimeSendResult->keptInMailbox = $this->changeMailbox($agentRealtimeMessage->audience, $agentRealtimeMessage, null, null);
         return $agentRealtimeSendResult;
     }
 
-    /** (b) Removes a message by type and key, from the transport and the mailbox; a missing message is fine */
+    /**
+     * (b) Removes a message by type and key, from the mailbox, then from the transport; a missing message is fine. The
+     * mailbox comes first for the reason of {@see sendMessage()}: a client the transport tells re-reads the mailbox.
+     */
     public function clearMessage(AgentRealtimeAudience $agentRealtimeAudience, string $messageType, string $messageKey): void
     {
+        $this->changeMailbox($agentRealtimeAudience, null, $messageType, $messageKey);
         try {
             $this->clearMessageOnTransport($agentRealtimeAudience, $messageType, $messageKey);
         } catch (Throwable $transportFailure) {
             $this->logTransportFailure('clear', $messageType, $transportFailure);
         }
-        $this->changeMailbox($agentRealtimeAudience, null, $messageType, $messageKey);
     }
 
     /**

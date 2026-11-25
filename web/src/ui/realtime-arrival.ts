@@ -67,6 +67,34 @@ export const acceptArrivedRealtimeMessage = (
   return false;
 };
 
+/** The pause before the one re-read of `readRunStateAfterClientToolRequestPing` when the first read found nothing. */
+export const CLIENT_TOOL_REQUEST_PING_REREAD_DELAY_MS = 400;
+
+/** What counts the client tool requests delivered to the UI client (`AgentUIClient`). */
+export interface ClientToolRequestDeliveryCounter {
+  countAcceptedClientToolRequests(): number;
+}
+
+/**
+ * The arrival adapter for a host transport that only pings (it carries no message, e.g. the per-conversation ping of
+ * a client tool request): reads the run state, which hands a waiting request to the UI client; when that read
+ * delivered none — the ping overtook the server's write — it reads once more after `rereadDelayMs`, so the request is
+ * not left to the next regular read. Resolves with whether a request was delivered.
+ */
+export const readRunStateAfterClientToolRequestPing = async (
+  conversationId: number,
+  readRunState: (conversationId: number) => Promise<unknown>,
+  deliveryCounter: ClientToolRequestDeliveryCounter,
+  rereadDelayMs: number = CLIENT_TOOL_REQUEST_PING_REREAD_DELAY_MS,
+): Promise<boolean> => {
+  const acceptedBefore = deliveryCounter.countAcceptedClientToolRequests();
+  await readRunState(conversationId);
+  if (deliveryCounter.countAcceptedClientToolRequests() > acceptedBefore) return true;
+  await new Promise<void>(resolve => setTimeout(resolve, rereadDelayMs));
+  await readRunState(conversationId);
+  return deliveryCounter.countAcceptedClientToolRequests() > acceptedBefore;
+};
+
 let developmentRequestId = 9_000_000_000_000;
 
 /**

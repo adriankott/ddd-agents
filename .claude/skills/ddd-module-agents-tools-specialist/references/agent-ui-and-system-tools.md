@@ -62,7 +62,8 @@ Every message also sits in a mailbox in the shared cache (at most 20 per audienc
 the run-state read delivers the open ones (`realtimeMessages`). A host binds its push channel (WebSocket, Firebase,
 SSE …) by overriding the four hooks in a same-path subclass: `publishMessageToTransport()` (true = the transport took
 it), `clearMessageOnTransport()`, `issueListenerCredential()`, `askTransportWhetherClientIsListening()` (null = cannot
-tell). A hook that throws is logged; the mailbox still delivers. The deprecated
+tell). The mailbox is written before the transport is rung, and cleared before the transport is told. A hook that
+throws is logged; the mailbox still delivers. The deprecated
 `AIConversationRealtimeSignalService::publishClientToolRequestSignal()` is still rung for a client tool request while
 the port publishes nothing, so an existing ping keeps waking the client. The contract test with a fake transport:
 `tests/Domain/AI/Services/Conversations/Realtime/AgentRealtimeChannelContractTest.php`.

@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.5.4
+
+**Fix: a client tool request no longer times out behind a transport that only pings.** npm `@mgamadeus/ddd-agents`
+0.5.4 in lockstep.
+
+- `AgentRealtimeChannelService::sendMessage()` writes the shared-cache mailbox first and rings the transport
+  (`publishMessageToTransport()`) after it; `clearMessage()` clears the mailbox before it tells the transport
+  (`clearMessageOnTransport()`). Before, a transport that only pings woke the client before the write: its run-state
+  read found an empty mailbox and the request waited for the next regular read, past its time limit. A host override
+  that reordered the two calls can be removed.
+- npm `@mgamadeus/ddd-agents/ui`: `readRunStateAfterClientToolRequestPing(conversationId, readRunState, uiClient,
+  rereadDelayMs?)` for a transport that only pings — reads the run state and, when that read delivered no client tool
+  request, reads once more after `CLIENT_TOOL_REQUEST_PING_REREAD_DELAY_MS` (400 ms). `AgentUIClient` counts the
+  requests delivered to it (`countAcceptedClientToolRequests()`).
+
 ## 0.5.3
 
 **The payer of the schedule budget pot at run time** (`AIConversationSchedulesService`), the counterpart of 0.5.2's

@@ -116,7 +116,9 @@ const uiClient = useAgentUIClient({
   out (mark the agent window `data-agent-skip`); what a picture cannot show is `PICTURE_LIMITATIONS`.
 - The agent window steps aside before a screen is opened, marked or pictured, and comes back after a picture.
 - A host push transport hands each message to `acceptArrivedRealtimeMessage(conversationId, message, uiClient, sendAnswer)`;
-  without one the run-state read delivers. `runClientToolRequestForDevelopment(uiClient, 'LIST_TARGETS')` tries the
+  without one the run-state read delivers. A transport that only pings calls
+  `readRunStateAfterClientToolRequestPing(conversationId, client.getConversationRunState, uiClient)`: a read that
+  finds no request is repeated once after `CLIENT_TOOL_REQUEST_PING_REREAD_DELAY_MS` (400 ms). `runClientToolRequestForDevelopment(uiClient, 'LIST_TARGETS')` tries the
   adapters without a model.
 
 ## Texts and translations

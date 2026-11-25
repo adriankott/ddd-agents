@@ -28,6 +28,12 @@ class RecordingTransportChannelServiceDouble extends AgentRealtimeChannelService
     /** @var string[] type|key of every cleared message */
     public array $clearedMessages = [];
 
+    /** @var bool[] per publish: whether the mailbox already held the message when the transport was rung */
+    public array $mailboxHeldMessageAtPublish = [];
+
+    /** @var bool[] per clear: whether the mailbox still held the message when the transport was told */
+    public array $mailboxHeldMessageAtClear = [];
+
     /** @var array<string, bool> mailbox name => whether a client listens on the transport */
     public array $listeningByMailboxName = [];
 
@@ -41,6 +47,7 @@ class RecordingTransportChannelServiceDouble extends AgentRealtimeChannelService
 
     protected function publishMessageToTransport(AgentRealtimeMessage $agentRealtimeMessage): bool
     {
+        $this->mailboxHeldMessageAtPublish[] = $this->isMessageInMailbox($agentRealtimeMessage->audience, $agentRealtimeMessage->messageType, $agentRealtimeMessage->messageKey);
         if (!$this->hasTransport) {
             return false;
         }
@@ -53,6 +60,7 @@ class RecordingTransportChannelServiceDouble extends AgentRealtimeChannelService
 
     protected function clearMessageOnTransport(AgentRealtimeAudience $agentRealtimeAudience, string $messageType, string $messageKey): void
     {
+        $this->mailboxHeldMessageAtClear[] = $this->isMessageInMailbox($agentRealtimeAudience, $messageType, $messageKey);
         if ($this->hasTransport) {
             $this->clearedMessages[] = $messageType . '|' . $messageKey;
         }
@@ -83,5 +91,15 @@ class RecordingTransportChannelServiceDouble extends AgentRealtimeChannelService
     protected function readSettings(): array
     {
         return ['sharedCacheGroup' => 'shared'];
+    }
+
+    protected function isMessageInMailbox(AgentRealtimeAudience $agentRealtimeAudience, string $messageType, string $messageKey): bool
+    {
+        foreach ($this->findOpenMessages($agentRealtimeAudience, $messageType)->getElements() as $openMessage) {
+            if ($openMessage->messageKey === $messageKey) {
+                return true;
+            }
+        }
+        return false;
     }
 }

@@ -51,6 +51,10 @@ The package always keeps a **mailbox in the shared cache** (`config/app/AI/agent
 polling client picks the message up on its next read. A host with a push channel overrides the transport hooks in a
 same-path subclass (the client hands what arrives to `acceptArrivedRealtimeMessage()` of `@mgamadeus/ddd-agents/ui`): `publishMessageToTransport()`, `clearMessageOnTransport()`, `issueListenerCredential()`,
 `askTransportWhetherClientIsListening()`; each must swallow its own failures (the mailbox stays the authority).
+`sendMessage()` writes the mailbox BEFORE it rings the transport, and `clearMessage()` clears it before it tells the
+transport: a client the transport wakes reads a mailbox that is already current. A transport that only pings (no
+message) hands the ping to `readRunStateAfterClientToolRequestPing(conversationId, client.getConversationRunState, uiClient)`
+of `@mgamadeus/ddd-agents/ui`: an empty read is followed by one re-read after `CLIENT_TOOL_REQUEST_PING_REREAD_DELAY_MS`.
 A process-local cache (APCu) cannot carry the mailbox across workers: the installation check `realtimeChannel` warns
 while Agent.UI is bound without a shared cache.
 
