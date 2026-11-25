@@ -51,9 +51,11 @@ routes trait, the one place that attaches the package's session worker to an ope
   default (a feature switch, an exemption an operator set). A refusal with a code of the application:
   `AgentVoiceCallRefusal::forCode()`, with the end reason a running call gets.
 - `isVoiceRightHeld()`, `findAccountRightsOfCallStart()`: how the right is answered and from which rights.
-- `findBilledAccountOfConversation()`, `findBilledEntity()`: who pays. For a running call
-  `buildSessionModelCallOfRunningCall()` is the ONE place that says so, to the gate and to the booking alike: an
-  application that bills another account overrides it and nothing else.
+- `findBilledAccountOfConversation()`, `findBilledEntity()`: who pays. For a call start
+  `findBilledAccountOfCallStart()` is the ONE place that names the account the gate is asked for (default: the
+  conversation's account, else the call's account; also without a conversation an application can name the owner of
+  the agent space here). For a running call `buildSessionModelCallOfRunningCall()` is the ONE place that says so, to
+  the gate and to the booking alike: an application that bills another account overrides it and nothing else.
 - `getSessionUsageScope()`, `getSessionEnvelopeScope()`, `getSessionPromptName()`: the stored names the usage is
   booked under.
 - `getSecondsOfNextSlice()`: how far ahead the budget is asked.
@@ -127,8 +129,10 @@ A sentence itself is changed by replacing its prompt file in the application's c
 ## The routes and the admin list
 
 `AgentVoiceSessionsTrait`: `authorizeVoiceSessionAccess()`, `requireAccountOfVoiceRequest()`, `findOwnCall()`,
-`findConversationOfVoiceRequest()`, `throwForbiddenIfCallStartIsRefused()`, `openProviderSessionForCall()`,
-`getVoiceProviderAdapterOfCall()`, `findClientIdOfVoiceRequest()`; each routed method's body is a protected builder
+`findRingAccountOfCallRequest()` (the account a ring of "call me" is started for and that owns the call; the routes
+that name a call accept its calls too, so one override gives both), `findConversationOfVoiceRequest()`,
+`throwForbiddenIfCallStartIsRefused()`, `openProviderSessionForCall()`, `getVoiceProviderAdapterOfCall()`,
+`findClientIdOfVoiceRequest()`; each routed method's body is a protected builder
 an application calls from its own redeclared route, and each request DTO is read as the application's subclass of it.
 
 `AdminAgentVoiceCallsTrait`: `findAccountIdsOfListableVoiceCalls()`, `throwForbiddenUnlessVoiceCallsAccessAllowed()`,

@@ -84,8 +84,9 @@ use Throwable;
  * GUARDS. Every routed method and both builders call {@see self::authorizeConversationAccess()} of the chat's hooks
  * trait first, then {@see self::authorizeVoiceSessionAccess()}. Whether a call may START is asked of
  * {@see AgentVoiceCallAdmissionService} (by `open` here, by the ring start for `ring`); its refusal is answered as
- * `403` with its code. The routes that name a call act on a call of the signed-in account only; a call of another
- * account reads as `404 call_not_found`. The package ships no request listener.
+ * `403` with its code. The routes that name a call act on a call of the signed-in account, or of the account
+ * {@see self::findRingAccountOfCallRequest()} names for the request and the call's space (the signed-in account by
+ * default); any other call reads as `404 call_not_found`. The package ships no request listener.
  *
  * SWITCHED OFF. While the voice channel cannot run in the installation
  * ({@see AgentVoiceCallAdmissionService::canVoiceRunHere()}: `AI.agentVoice.enabled` is false, or the session worker's
@@ -103,6 +104,9 @@ use Throwable;
  * - {@see self::requireAccountOfVoiceRequest()}: whose request it is;
  * - {@see self::findOwnCall()}: which calls the account of the request may act on (an application with an oversight
  *   role, or one that reads calls under the rights of their conversation);
+ * - {@see self::findRingAccountOfCallRequest()}: the account a ring of "call me" is started for and that owns the call
+ *   (the owner of the agent space, for an agency user or a sub-user who presses "call me"); the routes that name a call
+ *   accept that account's calls too;
  * - {@see self::findConversationOfVoiceRequest()}: which conversations a call may continue;
  * - {@see self::throwForbiddenIfCallStartIsRefused()}: the admission of a session open;
  * - {@see self::openProviderSessionForCall()} and {@see self::getVoiceProviderAdapterOfCall()}: the session of a
@@ -289,7 +293,9 @@ trait AgentVoiceSessionsTrait
     /**
      * The body of the application's `ring` route ("call me"): the agent rings every open client of the account, and
      * the first one to answer gets the call. The trigger is the owner asking to be called, not a client reacting to a
-     * ring; the other routes are the client's side of the same call.
+     * ring; the other routes are the client's side of the same call. The ring is started for the account
+     * {@see self::findRingAccountOfCallRequest()} names (the signed-in account by default), and the one-call check
+     * reads that account's calls.
      *
      * A ring that reaches nobody answers 200 with `anyDeviceReached: false` rather than an error: the call exists and
      * is over; it is a finished call, not a failed request.
@@ -308,8 +314,11 @@ trait AgentVoiceSessionsTrait
     ): AgentVoiceSessionRingResponseDto {
         $this->authorizeConversationAccess();
         $this->authorizeVoiceSessionAccess();
-        $authAccount = $this->requireAccountOfVoiceRequest();
-        if ($this->getAgentVoiceCallsService()->findOpenAppCallForAccountId((int)$authAccount->id) !== null) {
+        $this->requireAccountOfVoiceRequest();
+        // The account that is rung and owns the call: the signed-in account unless the application names another one
+        // for this request and space (the owner of the agent space, rung for an agency user who pressed "call me").
+        $ringAccount = $this->findRingAccountOfCallRequest($requestDto, $agentSpace);
+        if ($this->getAgentVoiceCallsService()->findOpenAppCallForAccountId((int)$ringAccount->id) !== null) {
             throw new ConflictException('call_already_running');
         }
 
@@ -322,7 +331,7 @@ trait AgentVoiceSessionsTrait
         // read rights of the caller.
         DDDService::instance()->deactivateEntityRightsRestrictions();
         try {
-            $agentVoiceCall = $this->getAgentVoiceCallStartsService()->startRing($authAccount, $agentSpace, $aiConversation, $requestDto->task);
+            $agentVoiceCall = $this->getAgentVoiceCallStartsService()->startRing($ringAccount, $agentSpace, $aiConversation, $requestDto->task);
         } finally {
             DDDService::instance()->restoreEntityRightsRestrictionsStateSnapshot();
         }
@@ -353,7 +362,7 @@ trait AgentVoiceSessionsTrait
      */
     protected function buildVoiceCallAnsweredResponse(AgentVoiceSessionAnswerRequestDto $requestDto): AgentVoiceSessionAnswerResponseDto
     {
-        $agentVoiceCall = $this->findOwnCall($requestDto->callId);
+        $agentVoiceCall = $this->findCallOfVoiceRequest($requestDto->callId, $requestDto);
         // The claim says no in two cases, and the ring service tells the client which: another client holds the
         // answer (`already_answered`), or the deadline passed between the token check and the claim (`ring_expired`).
         $this->getAgentVoiceRingService()->answerRing(
@@ -379,7 +388,7 @@ trait AgentVoiceSessionsTrait
      */
     protected function buildVoiceCallDeclinedResponse(AgentVoiceSessionDeclineRequestDto $requestDto): AgentVoiceSessionAcknowledgeResponseDto
     {
-        $agentVoiceCall = $this->findOwnCall($requestDto->callId);
+        $agentVoiceCall = $this->findCallOfVoiceRequest($requestDto->callId, $requestDto);
         try {
             // Ends the call as DECLINED behind its end claim, so a deadline expiry at the same moment writes nothing
             // twice; the agent reads at its next turn that the owner declined (no follow-up turn: the owner refused).
@@ -400,7 +409,7 @@ trait AgentVoiceSessionsTrait
      */
     protected function buildVoiceCallHungUpResponse(AgentVoiceSessionHangUpRequestDto $requestDto): AgentVoiceSessionAcknowledgeResponseDto
     {
-        $agentVoiceCall = $this->findOwnCall($requestDto->callId);
+        $agentVoiceCall = $this->findCallOfVoiceRequest($requestDto->callId, $requestDto);
         // The one end path (shared with the agent's endVoiceCall): the call and its call-end marker, the ring of a
         // call that still rang, the provider session hung up by the provider pinned on the call.
         $this->getAgentVoiceCallsService()->endCallNow(
@@ -420,7 +429,7 @@ trait AgentVoiceSessionsTrait
     protected function buildVoiceCallDeviceStatusRecordedResponse(AgentVoiceSessionDeviceStatusRequestDto $requestDto): AgentVoiceSessionAcknowledgeResponseDto
     {
         $receivedAtUnixMs = AIConversationTraceEvent::nowUnixMs();
-        $agentVoiceCall = $this->findOwnCall($requestDto->callId);
+        $agentVoiceCall = $this->findCallOfVoiceRequest($requestDto->callId, $requestDto);
         DDDService::instance()->getLogger()->info(
             'AgentVoiceSession deviceStatus: call ' . $agentVoiceCall->id
             . ' status=' . $requestDto->status
@@ -459,7 +468,7 @@ trait AgentVoiceSessionsTrait
      */
     protected function buildVoiceCallStateResponse(AgentVoiceSessionCallStateGetRequestDto $requestDto): AgentVoiceSessionCallStateGetResponseDto
     {
-        $agentVoiceCall = $this->findOwnCall($requestDto->callId);
+        $agentVoiceCall = $this->findCallOfVoiceRequest($requestDto->callId, $requestDto);
 
         $responseDto = new AgentVoiceSessionCallStateGetResponseDto();
         $responseDto->callId = (int)$agentVoiceCall->id;
@@ -488,7 +497,7 @@ trait AgentVoiceSessionsTrait
         ?AgentSpace $agentSpace,
         int $openReceivedAtUnixMs
     ): AgentVoiceSessionOpenResponseDto {
-        $agentVoiceCall = $this->findOwnCall((int)$requestDto->callId);
+        $agentVoiceCall = $this->findCallOfVoiceRequest((int)$requestDto->callId, $requestDto);
         if ($agentVoiceCall->getChannelType() !== AgentVoiceCall::CHANNEL_TYPE_APP) {
             throw new NotFoundException('call_not_found');
         }
@@ -508,8 +517,8 @@ trait AgentVoiceSessionsTrait
         $aiConversation = $this->findConversationOfCall($agentVoiceCall);
 
         // The admission was asked when the ring started, but a ring can sit for its whole deadline: it is asked again
-        // before the provider starts billing audio.
-        $this->throwForbiddenIfCallStartIsRefused($authAccount, $agentSpace, $aiConversation);
+        // before the provider starts billing audio, for the account the ring was started for.
+        $this->throwForbiddenIfCallStartIsRefused($this->findRingAccountOfCallRequest($requestDto, $agentSpace), $agentSpace, $aiConversation);
 
         return $this->openProviderSessionForCall($agentVoiceCall, $aiConversation, $requestDto->sdpOffer, $openReceivedAtUnixMs);
     }
@@ -762,7 +771,8 @@ trait AgentVoiceSessionsTrait
 
     /**
      * The call `$callId` when it is a call of the account of this request. The account is a filter of the read, so a
-     * call of another account cannot be told from one that does not exist.
+     * call of another account cannot be told from one that does not exist. The routes ask it first, through
+     * {@see self::findCallOfVoiceRequest()}.
      *
      * @throws NotFoundException `call_not_found`
      * @throws ForbiddenException
@@ -775,6 +785,96 @@ trait AgentVoiceSessionsTrait
         }
 
         return $agentVoiceCall;
+    }
+
+    /**
+     * The account a ring of the route "call me" is started for, and that owns the call: the account that is rung, that
+     * the admission is asked for, and whose calls the routes that name a call accept beside the signed-in account's
+     * ({@see self::findCallOfVoiceRequest()}). Default: the signed-in account
+     * ({@see self::requireAccountOfVoiceRequest()}).
+     *
+     * An application in which the person who presses "call me" is not the owner of the agent space (an agency user
+     * acting for the owner, a sub-user of the owner) answers the owner of `$agentSpace` here. This ONE method gives
+     * both effects: the ring is started for the account it names, and the signed-in user may answer, decline, hang up,
+     * report on and read that account's call of that space. It is asked with the request of each route.
+     *
+     * THE OVERRIDE CHECKS THE SIGNED-IN USER ITSELF. At a route that names a call, `$agentSpace` is the space of the
+     * call's conversation, read with the entity rights lifted: it says which space the call works for, not that the
+     * signed-in user may see or act for that space. An override names another account only after it has checked that
+     * the signed-in user acts for `$agentSpace` (a member of the owner's team, an agency assigned to the owner), and
+     * the signed-in account in every other case. An override that names the owner of any space it is handed opens
+     * every call of that owner to every signed-in user.
+     *
+     * @param RequestDto $requestDto the request of the route: the ring request at `ring`, the open request at `open` of
+     *     a rung call, the request of the route that names a call there
+     * @param AgentSpace|null $agentSpace at `ring` and `open` the space the application's route resolved; at a route
+     *     that names a call the space of the call's conversation; null = the account as a whole
+     * @throws ForbiddenException
+     */
+    protected function findRingAccountOfCallRequest(RequestDto $requestDto, ?AgentSpace $agentSpace): Account
+    {
+        return $this->requireAccountOfVoiceRequest();
+    }
+
+    /**
+     * The call a request that names a call acts on: a call of the account of the request ({@see self::findOwnCall()}),
+     * else a call of the account {@see self::findRingAccountOfCallRequest()} names for this request and the call's
+     * space. Any other call is refused exactly as {@see self::findOwnCall()} refuses it, so a call of another account
+     * still cannot be told from one that does not exist.
+     *
+     * @throws NotFoundException `call_not_found`
+     * @throws ForbiddenException
+     */
+    protected function findCallOfVoiceRequest(int $callId, RequestDto $requestDto): AgentVoiceCall
+    {
+        try {
+            return $this->findOwnCall($callId);
+        } catch (NotFoundException $callNotFound) {
+            $agentVoiceCall = $this->getAgentVoiceCallStoreService()->findCall($callId);
+            if ($agentVoiceCall instanceof AgentVoiceCall && $this->isCallOfRingAccountOfVoiceRequest($agentVoiceCall, $requestDto)) {
+                return $agentVoiceCall;
+            }
+
+            throw $callNotFound;
+        }
+    }
+
+    /**
+     * Whether `$agentVoiceCall` belongs to the account {@see self::findRingAccountOfCallRequest()} names for this
+     * request and the space of the call. The space is the one of the call's conversation, read with the entity rights
+     * lifted, as the package reads the space of a call's conversation elsewhere: the decision is the hook's, not the
+     * caller's read rights. A call without an account, whose conversation cannot be read, or whose conversation names a
+     * space that is gone, belongs to no one here.
+     *
+     * @throws ForbiddenException
+     */
+    protected function isCallOfRingAccountOfVoiceRequest(AgentVoiceCall $agentVoiceCall, RequestDto $requestDto): bool
+    {
+        if ($agentVoiceCall->accountId === null) {
+            return false;
+        }
+        $agentSpace = null;
+        if ($agentVoiceCall->aiConversationId !== null) {
+            DDDService::instance()->deactivateEntityRightsRestrictions();
+            try {
+                $aiConversation = $this->getConversationsServiceOfVoiceRoutes()->find((int)$agentVoiceCall->aiConversationId);
+                if (!$aiConversation instanceof AIConversation) {
+                    return false;
+                }
+                if (isset($aiConversation->agentSpaceId)) {
+                    $agentSpace = $aiConversation->agentSpace ?? null;
+                    if ($agentSpace === null) {
+                        return false; // the space the conversation works for is gone
+                    }
+                }
+            } catch (NotFoundException) {
+                return false;
+            } finally {
+                DDDService::instance()->restoreEntityRightsRestrictionsStateSnapshot();
+            }
+        }
+
+        return (int)$this->findRingAccountOfCallRequest($requestDto, $agentSpace)->id === (int)$agentVoiceCall->accountId;
     }
 
     /**

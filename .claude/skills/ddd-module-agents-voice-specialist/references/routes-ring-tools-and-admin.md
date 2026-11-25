@@ -37,8 +37,15 @@ application.
    read.
 3. For a call start (`open` without a call id, `ring`): `AgentVoiceCallAdmissionService::findRefusalOfCallStart()`;
    its refusal is answered as 403 with its code.
-4. The routes that name a call act on a call of the signed-in account only (`findOwnCall()`); a call of another
-   account reads as `404 call_not_found`.
+4. The routes that name a call act on a call of the signed-in account (`findOwnCall()`) or of the account the hook
+   `findRingAccountOfCallRequest()` names for the request and the space of the call's conversation (the signed-in
+   account by default); any other call reads as `404 call_not_found` (`findCallOfVoiceRequest()`). The hook gets
+   the call's space read with the entity rights lifted, so an override checks itself that the signed-in user acts for
+   that space before it names another account, and names the signed-in account otherwise.
+5. `ring` starts the ring for the account `findRingAccountOfCallRequest()` names for the request and the space the
+   route resolved (the signed-in account by default): that account is rung, owns the call and is the one the
+   one-call check reads; `open` of the rung call asks the admission again for it. An application in which an agency
+   user or a sub-user presses "call me" for the owner of the agent space overrides this ONE method.
 
 ## The codes
 

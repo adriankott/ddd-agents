@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DDD\Tests\Agents\Voice\Domain\AI\Services\Voice\Admission;
 
+use DDD\Domain\AI\Entities\AgentSpaces\AgentSpace;
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Entities\Voice\AgentVoiceAccountRights;
 use DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceCall;
@@ -320,6 +321,45 @@ class AgentVoiceCallAdmissionServiceTest extends AgentVoiceIntegrationTestCase
         static::assertSame(5, $this->gateService->askedModelCalls[0]->accountBilledForAICosts->id);
     }
 
+    public function testByDefaultAStartOnAConversationIsBilledToTheConversationsAccountElseToTheCallsAccount(): void
+    {
+        static::assertNull($this->admissionService->findRefusalOfCallStart($this->buildAccount(5), $this->buildAgentSpace(3, 6), $this->buildConversation(30, 6)));
+        static::assertNull($this->admissionService->findRefusalOfCallStart($this->buildAccount(5), $this->buildAgentSpace(3, 6), $this->buildConversation(31, 99)));
+
+        static::assertSame([6, 5], $this->findAccountIdsTheGateWasAskedFor());
+        static::assertSame(
+            ['open:6:ENVELOPE.AI.VOICE.SESSION', 'close:ENVELOPE.AI.VOICE.SESSION', 'open:5:ENVELOPE.AI.VOICE.SESSION', 'close:ENVELOPE.AI.VOICE.SESSION'],
+            $this->envelopesService->recordedActions
+        );
+    }
+
+    public function testByDefaultAStartWithoutAConversationIsBilledToTheCallsAccountAlsoInASpaceOfAnotherOwner(): void
+    {
+        static::assertNull($this->admissionService->findRefusalOfCallStart($this->buildAccount(5), $this->buildAgentSpace(3, 6), null));
+
+        static::assertSame([5], $this->findAccountIdsTheGateWasAskedFor());
+        static::assertSame([], $this->accountsService->foundAccounts, 'no conversation: no account is read');
+    }
+
+    public function testAnApplicationThatBillsTheOwnerOfTheSpaceHasTheGateAskedForTheOwner(): void
+    {
+        $admissionService = new SpaceOwnerPaysAgentVoiceCallAdmissionService();
+
+        static::assertNull($admissionService->findRefusalOfCallStart($this->buildAccount(5), $this->buildAgentSpace(3, 6), null));
+        static::assertNull($admissionService->findRefusalOfCallStart($this->buildAccount(5), $this->buildAgentSpace(4, 8), $this->buildConversation(30, 6)));
+        static::assertNull($admissionService->findRefusalOfCallStart($this->buildAccount(5), null, null));
+
+        static::assertSame([6, 8, 5], $this->findAccountIdsTheGateWasAskedFor());
+        static::assertSame(
+            [
+                'open:6:ENVELOPE.AI.VOICE.SESSION', 'close:ENVELOPE.AI.VOICE.SESSION',
+                'open:8:ENVELOPE.AI.VOICE.SESSION', 'close:ENVELOPE.AI.VOICE.SESSION',
+                'open:5:ENVELOPE.AI.VOICE.SESSION', 'close:ENVELOPE.AI.VOICE.SESSION',
+            ],
+            $this->envelopesService->recordedActions
+        );
+    }
+
     public function testARunningCallReChecksTheCapAndTheBudgetButNotTheRight(): void
     {
         $this->declareAgentVoiceConfiguration(static::buildShippedAgentVoiceConfigurationWith(['enabled' => true, 'limits' => ['dailySecondsPerAccount' => 600]]));
@@ -591,6 +631,32 @@ class AgentVoiceCallAdmissionServiceTest extends AgentVoiceIntegrationTestCase
         $conversation->accountId = $accountId;
 
         return $conversation;
+    }
+
+    protected function buildAgentSpace(int $agentSpaceId, int $ownerAccountId): AgentSpace
+    {
+        $agentSpace = AgentSpace::newInstance();
+        $agentSpace->id = $agentSpaceId;
+        $agentSpace->accountId = $ownerAccountId;
+
+        return $agentSpace;
+    }
+
+    /**
+     * The billed account of each question the gate was asked, read from its first stage.
+     *
+     * @return int[]
+     */
+    protected function findAccountIdsTheGateWasAskedFor(): array
+    {
+        $accountIds = [];
+        foreach ($this->gateService->askedStageNames as $stageIndex => $stageName) {
+            if ($stageName === 'refuseModelCallWithoutUsageScopeOrEnvelope') {
+                $accountIds[] = (int)$this->gateService->askedModelCalls[$stageIndex]->accountBilledForAICosts->id;
+            }
+        }
+
+        return $accountIds;
     }
 
     protected function buildAccount(int $accountId): Account

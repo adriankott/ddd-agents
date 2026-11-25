@@ -81,8 +81,10 @@ use Throwable;
  * - {@see findRefusalOfCallStart()}, {@see findRefusalOfRunningCall()}: conditions of its own before or after the
  *   default (its feature switches, an exemption an operator set);
  * - {@see isVoiceRightHeld()}, {@see findAccountRightsOfCallStart()}: how the right is answered and from which rights;
- * - {@see findBilledAccountOfConversation()}, {@see findBilledEntity()}: who pays; for a running call
- *   {@see buildSessionModelCallOfRunningCall()} is the one place that says so, to the gate and to the booking alike;
+ * - {@see findBilledAccountOfConversation()}, {@see findBilledEntity()}: who pays; for a call start
+ *   {@see findBilledAccountOfCallStart()} is the one place that names the account (also without a conversation), for a
+ *   running call {@see buildSessionModelCallOfRunningCall()} is the one place that says so, to the gate and to the
+ *   booking alike;
  * - {@see getSessionUsageScope()}, {@see getSessionEnvelopeScope()}, {@see getSessionPromptName()}: the stored names
  *   the usage is booked under, the one place they are named (the session worker reads them here);
  * - {@see getSecondsOfNextSlice()}: how far ahead the budget is asked.
@@ -146,9 +148,31 @@ class AgentVoiceCallAdmissionService extends Service
         if ($this->isDailyLimitReached($account)) {
             return AgentVoiceCallRefusal::forDailyLimitReached();
         }
-        $billedAccount = ($conversation !== null ? $this->findBilledAccountOfConversation($conversation) : null) ?? $account;
+        $billedAccount = $this->findBilledAccountOfCallStart($account, $agentSpace, $conversation);
 
         return $this->findRefusalOfTheModelCallGate($billedAccount, $this->findBilledEntity($agentSpace, $conversation), null);
+    }
+
+    /**
+     * The account a call START is billed to, the ONE place the start check names it: the model-call gate is asked for
+     * this account, and the usage envelope of the question is opened for it. Default: with a conversation the account
+     * of the conversation ({@see findBilledAccountOfConversation()}), else, and when that answers null, `$account`.
+     *
+     * An application in which the owner of the agent space pays although someone else starts the call (an agency user
+     * acting for the owner, a sub-user of the owner) answers the owner here, also for a start without a conversation.
+     * Who pays for a RUNNING call is said by {@see buildSessionModelCallOfRunningCall()}.
+     *
+     * @param Account $account the account the call belongs to
+     * @param AgentSpace|null $agentSpace the space the call works for; null = the account as a whole
+     * @param AIConversation|null $conversation the conversation the call continues; null = it gets a new one
+     */
+    protected function findBilledAccountOfCallStart(Account $account, ?AgentSpace $agentSpace, ?AIConversation $conversation): Account
+    {
+        if ($conversation !== null) {
+            return $this->findBilledAccountOfConversation($conversation) ?? $account;
+        }
+
+        return $account;
     }
 
     /**

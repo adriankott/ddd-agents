@@ -337,7 +337,8 @@ class AgentVoiceRingService extends Service implements AIConversationTurnStartLi
     /**
      * Ends the call as EXPIRED when its ring is overdue: never answered, not ended, and past its ring deadline. The
      * end is written exactly once with the call end marker in its conversation, and a ring the agent itself started
-     * then gets the agent's one follow-up turn. The ring message is removed either way. True when the ring was overdue
+     * then gets the agent's one follow-up turn. For an overdue ring the ring message is removed, whether this look or
+     * one at the same moment wrote the end; a ring inside its window keeps its message. True when the ring was overdue
      * (the call has ended by this look or by one at the same moment); false for a call that is answered, already
      * ended or still inside its ring window.
      */

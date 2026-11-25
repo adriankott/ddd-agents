@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.6.7
+
+**Voice: who pays for a call start and which account "call me" rings are override points.** No web change; npm
+`@mgamadeus/ddd-agents` 0.6.7 in lockstep.
+
+- **Voice: who pays for a call start is one override point.** `AgentVoiceCallAdmissionService::findBilledAccountOfCallStart(Account $account, ?AgentSpace $agentSpace, ?AIConversation $conversation): Account` (protected) names the account the model-call gate is asked for, and the usage envelope of the question is opened for, when `open` or a ring starts a call. Default, unchanged in its results: with a conversation the conversation's account (`findBilledAccountOfConversation()`), falling back to the call's account when that answers null; without a conversation the call's account. An application in which the owner of the agent space pays although someone else starts the call overrides this one method, also for a start without a conversation. An application that worked around the missing point by overriding `findRefusalOfCallStart()` to re-ask the gate for another account can remove that override (or keep only its own extra conditions in it). Who pays for a running call stays `buildSessionModelCallOfRunningCall()`.
+- **Voice: the account a ring of "call me" is started for is one override point of the routes.** `AgentVoiceSessionsTrait::findRingAccountOfCallRequest(RequestDto $requestDto, ?AgentSpace $agentSpace): Account` (protected). Default: the signed-in account, so behaviour without an override is unchanged. The account it names is the one `ring` hands to `AgentVoiceCallStartsService::startRing()`, the one the one-call check (`call_already_running`) reads, and the one `open` of the rung call asks the admission for again. The routes that name a call (`answer`, `decline`, `hangUp`, `deviceStatus`, `GET /{callId}`, and `open` with a `callId`) now accept a call of the signed-in account OR of the account this hook names for the request and the space of the call's conversation (read with the entity rights lifted). Any other call stays `404 call_not_found`, the same status and message as before. An application in which an agency user or a sub-user presses "call me" for the owner of the agent space overrides this ONE method and gets both effects. An application that worked around it by redeclaring the `ring` route with its own copy of `buildVoiceCallRingingResponse()`, or by widening `findOwnCall()` for its agency or sub-user roles, can remove that copy or override.
+- **Voice: the new protected helpers of the routes trait.** `findCallOfVoiceRequest(int $callId, RequestDto $requestDto): AgentVoiceCall` is what the routes that name a call now read their call through: `findOwnCall()` first (its signature and its override point are unchanged), then the hook's account. `isCallOfRingAccountOfVoiceRequest(AgentVoiceCall $agentVoiceCall, RequestDto $requestDto): bool` makes the decision. A call without an account, whose conversation cannot be read, or whose conversation names a space that is gone, is refused.
+- **Voice: an override of the ring account checks the signed-in user itself.** At a route that names a call the hook gets the space of the call's conversation, read with the entity rights lifted: it says which space the call works for, not that the signed-in user may act for it. An override names another account only after it has checked that the signed-in user acts for that space, and the signed-in account in every other case (the hook's docblock and the voice skill's route reference say so).
+- **Docs:** `AgentVoiceRingService::expireOverdueRingOfCall()` says when the ring message is removed (an overdue ring,
+  whichever look wrote the end), no behaviour change.
+- Tests: the billed account of a start (default with and without a conversation, an override naming the space owner),
+  the ring account (default, an override ringing the owner, the routes that name a call accept the owner's call and
+  refuse an outside account with `404 call_not_found`).
+
 ## 0.6.6
 
 **Agent.UI: the agent reads the whole screen and sees its own window.** Measured on a host list of 200 tickets: the
