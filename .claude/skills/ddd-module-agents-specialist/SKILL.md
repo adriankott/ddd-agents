@@ -196,7 +196,6 @@ with the same name.
 | `app:agent:reap` | wakes or expires runs whose worker died, times out sub-agent groups, wakes parents of settled groups, settles purposed conversations closed without an owner turn, re-sends lost run-end notifications | every five minutes | yes |
 | `app:agent:chat` | the console chat with the agent (ephemeral or stored, `--conversationId` resumes, turns file, slash commands); `--record-run-for-comparison` / `--replay-run-and-compare` record a run and compare a replay with it (observability skill, console-commands reference) | no | yes (makes model calls) |
 | `app:agent:chat-tui` | the full-screen chat (suggested `php-tui/php-tui`; without it one line names the library) | no | yes (makes model calls) |
-| `app:agent:purge-client-tool-requests` | expires overdue `Agent.UI` tool requests, deletes requests after 30 days and client attachments after a day | hourly, with `Agent.UI` | yes |
 | `app:agent:inspect` | prints one conversation: header, summary, transcript, request snapshots | no | no |
 | `app:agent:jev-probe` | runs the decision probe over a fixture, one evaluation envelope per case | no | no (makes model calls) |
 | `app:agent:conversation-scorecards` | selects conversations and dispatches (or runs `--inline`) their quality scorecards; `--print` the metrics | no | yes |

@@ -21,14 +21,17 @@ class AgentClientToolAnswer extends ValueObject
     /** @var string The client answered that it did not do it; `outcome` names why, `text` says it */
     public const string KIND_REFUSED = 'REFUSED';
 
-    /** @var string No client of the user shows the conversation (no request was stored) */
+    /** @var string No client of the user shows the conversation (no request was sent) */
     public const string KIND_NO_CLIENT = 'NO_CLIENT';
 
-    /** @var string The client that shows the conversation is in the background and reads nothing (no request was stored) */
+    /** @var string The client that shows the conversation is in the background and reads nothing (no request was sent) */
     public const string KIND_BACKGROUND = 'BACKGROUND';
 
-    /** @var string A request was stored and the client did not answer in time */
+    /** @var string A request was sent and the client did not answer in time */
     public const string KIND_NO_ANSWER = 'NO_ANSWER';
+
+    /** @var string The request type is registered but switched off, or not registered (no request was sent) */
+    public const string KIND_NOT_ENABLED = 'NOT_ENABLED';
 
     /** @var string One of the KIND_* constants */
     public string $kind;
@@ -42,8 +45,11 @@ class AgentClientToolAnswer extends ValueObject
     /** @var string|null Small facts of the answer (route, title, counts) as one flat JSON object */
     public ?string $detailsJson = null;
 
-    /** @var int|null The id of the stored request; null when none was stored */
+    /** @var int|null The id of the sent request; null when none was sent */
     public ?int $requestId = null;
+
+    /** @var AgentScreenPicture|null The picture the client captured (a READ_SCREEN in the format picture), checked by the server */
+    public ?AgentScreenPicture $picture = null;
 
     /** @var int How many seconds the tool waited */
     public int $secondsWaited = 0;

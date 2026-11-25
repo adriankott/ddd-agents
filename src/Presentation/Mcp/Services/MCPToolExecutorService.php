@@ -22,6 +22,7 @@ use DDD\Domain\AI\Services\Conversations\Agent\AgentToolCallImageStoreService;
 use DDD\Domain\AI\Entities\MCPPackages\MCPServerProvidedInput;
 use DDD\Domain\AI\Entities\MCPPackages\MCPTool;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolOverlays;
+use DDD\Domain\AI\Entities\MCPPackages\MCPToolResponseImageProvider;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolSummary;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolEntitlement;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolRequiresMandate;
@@ -847,6 +848,9 @@ class MCPToolExecutorService extends Service
 
                 // THE ARGUMENTS THE CONVERSATION'S SPACE FILLS — BEFORE the gates and the DTO hydration, so both see
                 // the filled arguments.
+                // a parameter the application hides by overlay is never taken from the caller: the space argument then
+                // comes from the conversation (the defaults below), for the gates too
+                $arguments = $this->removeHiddenParametersFromToolArguments($toolName, $arguments);
                 $arguments = $this->applyAgentSpaceDefaultsToToolArguments($method, $arguments, $serverProvidedInput);
 
                 // THE TARGET OF THE CALL, asked ONCE and handed to every gate below: the space an argument names,
@@ -1181,9 +1185,9 @@ class MCPToolExecutorService extends Service
     }
 
     /**
-     * The platform note ({@see MCPToolResponsePlatformNoteProvider}) and the dictated widget type
-     * ({@see MCPToolResponseDictatedWidgetTypeProvider}) of a result, set on its response — for a markdown rendering
-     * and a structured one alike.
+     * The platform note ({@see MCPToolResponsePlatformNoteProvider}), the dictated widget type
+     * ({@see MCPToolResponseDictatedWidgetTypeProvider}) and the pictures ({@see MCPToolResponseImageProvider}) of a
+     * result, set on its response — for a markdown rendering and a structured one alike.
      */
     protected function applyResultNoteAndDictatedWidgetType(mixed $result, MCPToolResponse $response): MCPToolResponse
     {
@@ -1195,6 +1199,11 @@ class MCPToolExecutorService extends Service
         }
         if ($result instanceof MCPToolResultDeclaresContentTrust) {
             $response->setDeclaredTrustedContent($this->readDeclaredTrustedContent($result));
+        }
+        if ($result instanceof MCPToolResponseImageProvider) {
+            foreach ($result->getResponseImages() as $toolResultImage) {
+                $response->addImageContent($toolResultImage->base64Data, $toolResultImage->mimeType);
+            }
         }
         return $response;
     }
@@ -1956,6 +1965,30 @@ class MCPToolExecutorService extends Service
         $agentSpacesService = DDDService::instance()->getService(AgentSpacesService::class);
         // an argument the model passed as "none" is left out and never filled ("do not narrow"); without a space nothing is filled
         return $agentSpacesService->applyAgentSpaceDefaultsToToolArgumentsOfCall($arguments, $parameterClassNames, $serverProvidedInput->agentSpace);
+    }
+
+    /**
+     * Leaves out every argument the application hides by overlay (`AI.toolOverlays`, `'parameters' => ['<name>' =>
+     * false]`, {@see MCPToolOverlays}): by its name on the wire; a hidden space argument (its DTO name or the configured
+     * name) under both names.
+     *
+     * @param array<array-key, mixed> $arguments
+     * @return array<array-key, mixed>
+     */
+    protected function removeHiddenParametersFromToolArguments(string $toolName, array $arguments): array
+    {
+        $mcpToolOverlay = MCPToolOverlays::getApplicationOverlays()->findOverlayOfTool($toolName);
+        if ($mcpToolOverlay === null || $mcpToolOverlay->hiddenParameterNames === []) {
+            return $arguments;
+        }
+        $agentSpaceToolArgument = AgentSpaceToolArgument::current();
+        foreach ($mcpToolOverlay->hiddenParameterNames as $hiddenParameterName) {
+            unset($arguments[$hiddenParameterName]);
+            if ($hiddenParameterName === $agentSpaceToolArgument->name || $hiddenParameterName === AgentSpaceToolArgument::DTO_PROPERTY_NAME) {
+                unset($arguments[$agentSpaceToolArgument->name], $arguments[AgentSpaceToolArgument::DTO_PROPERTY_NAME]);
+            }
+        }
+        return $arguments;
     }
 
     /**

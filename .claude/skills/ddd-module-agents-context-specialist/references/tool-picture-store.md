@@ -24,7 +24,10 @@ The key of 0.3.7–0.3.11, `AI.toolCallImageSpool`, is still read and mapped (`c
      `ttlSeconds` (600) window;
    - **L2** `sharedCache`: a cache group all workers share, one pipeline per capture, TTL `ttlSeconds` (1800);
    - **L3** `objectStore`: a Core object store, key `<keyPrefix><scope>/<sha256>` (scope = agent space id, else
-     `account-<id>`, else `conversation-<id>`). The reference is **durable** only once L3 acknowledged the write.
+     `account-<id>`, else `conversation-<id>`). The object holds the raw picture bytes with their content type
+     (before 0.5.0: base64 text; a read takes either — raw when the bytes match the sha256, else decoded as base64).
+     Any Core object store driver serves, a narrow one too (`ObjectStorageService::getBasicObjectStorage()`: put, get,
+     delete, exists). The reference is **durable** only once L3 acknowledged the write.
    A failing L3 write leaves the picture in L1/L2 and writes an issues-log warning. With no tier at all (or
    `enabled` false) the picture stays inline: it rides in its own worker invocation and leaves at its end.
 2. **Read** (every model call, `readStoredToolCallImages()`, one call for all pictures of the call): L1 → the L1
@@ -78,7 +81,8 @@ OBJECT_STORAGE_AGENTTOOLIMAGES_SECRET_KEY=<from the secret store>
 ```
 
 (the s3 driver needs `async-aws/s3` in the application; details: Core's `ddd-service-specialist` › Object Storage).
-**The lifecycle is the host's:** the package never deletes and never sets a bucket rule. Give the key prefix
+**The lifecycle is the host's:** the package sets no bucket rule; it deletes only the pictures of the conversations
+the eval purge erases (`app:agent:eval-conversations-purge`, report field `toolPicturesErased`: L1/L2 entries and the L3 object). Give the key prefix
 (`agent-tool-images/`) an expiry rule in the bucket (e.g. 30 or 90 days, matching how long conversations are resumed);
 an expired picture is a miss, its result then carries the marker.
 

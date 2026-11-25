@@ -26,6 +26,11 @@ import {
 import type { AgentUIState } from "../../ui/agent-ui-state";
 import type { AgentUIClientBinding } from "../../ui/AgentUIClient";
 import type { ClientToolAnswer } from "../../ui/client-tools";
+import {
+  acceptArrivedRealtimeMessage,
+  type AgentRealtimeListenerCredential,
+  type AgentRealtimeMessageDelivery,
+} from "../../ui/realtime-arrival";
 import { composeAttachmentMessageText } from "../compose-attachment-message-text";
 import type { PollingConversationChangeSubscriptionOptions } from "../polling/createPollingConversationChangeSubscription";
 import { withPollingChangeSubscription } from "../polling/withPollingChangeSubscription";
@@ -100,6 +105,13 @@ export interface AgentsHttpConversationClientOptions extends AgentsConversationC
    * posts its answer (`POST /{conversationId}/clientToolRequests/{requestId}/answer`). Default: none.
    */
   uiClient?: AgentUIClientBinding;
+  /**
+   * The open messages of the realtime port of other types than a client tool request (types other packages
+   * registered), as the run-state read delivers them; a client acts on one type and key once. Default: none.
+   */
+  onRealtimeMessage?: (conversationId: number, message: AgentRealtimeMessageDelivery) => void;
+  /** What the client needs to listen on the host's transport, with every run-state read (null without one). Default: none. */
+  onRealtimeListenerCredential?: (conversationId: number, credential: AgentRealtimeListenerCredential | null) => void;
 }
 
 /** The writes that carry the client context. */
@@ -154,11 +166,16 @@ class AgentsHttpConversationClient implements AgentsConversationClient {
       path: `/${conversationId}/runState`,
       query: uiClient ? { clientId: uiClient.clientId, uiStateJson: uiState ? JSON.stringify(uiState) : undefined } : undefined,
     });
+    const sendAnswer = (requestId: number, answer: ClientToolAnswer): Promise<void> =>
+      this.answerClientToolRequest(conversationId, requestId, answer);
     if (uiClient && response.clientToolRequest) {
-      uiClient.acceptClientToolRequest(conversationId, response.clientToolRequest, (requestId, answer) =>
-        this.answerClientToolRequest(conversationId, requestId, answer),
-      );
+      uiClient.acceptClientToolRequest(conversationId, response.clientToolRequest, sendAnswer);
     }
+    for (const message of readWireSetElements(response.realtimeMessages)) {
+      if (uiClient) acceptArrivedRealtimeMessage(conversationId, message, uiClient, sendAnswer, this.options.onRealtimeMessage);
+      else this.options.onRealtimeMessage?.(conversationId, message);
+    }
+    this.options.onRealtimeListenerCredential?.(conversationId, response.realtimeListenerCredential ?? null);
     return mapWireConversationRunState(response);
   };
 
@@ -173,9 +190,17 @@ class AgentsHttpConversationClient implements AgentsConversationClient {
         outcome: answer.outcome,
         text: answer.text,
         detailsJson: JSON.stringify(answer.details ?? {}),
+        pictureBase64: answer.pictureBase64,
+        uiStateJson: this.readUIStateJsonAfterAnswer(),
       },
     });
   };
+
+  /** What the UI shows after the request was carried out, so the server's `[SIGNAL:ui]` note is current at once. */
+  protected readUIStateJsonAfterAnswer(): string | undefined {
+    const uiState: AgentUIState | null = this.options.uiClient?.readUIState() ?? null;
+    return uiState ? JSON.stringify(uiState) : undefined;
+  }
 
   getNewestMessagesPage = (conversationId: number, pageSize: number): Promise<ConversationMessagesPage> =>
     this.readMessagesPage("getNewestMessagesPage", conversationId, pageSize, undefined);

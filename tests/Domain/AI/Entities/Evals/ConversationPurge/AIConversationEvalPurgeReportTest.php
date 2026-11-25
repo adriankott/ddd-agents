@@ -143,6 +143,7 @@ class AIConversationEvalPurgeReportTest extends UnitTestCase
             'writes' => '0',
             'averageWriteMs' => '-',
             'slowestWriteMs' => '-',
+            'toolPicturesErased' => '0',
             'lastRootConversationId' => '42',
             'runSeconds' => '0',
             'stoppedBecause' => 'no eval conversation tree left',

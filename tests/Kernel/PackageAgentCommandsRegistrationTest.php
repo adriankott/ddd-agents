@@ -8,7 +8,6 @@ use DDD\Symfony\Commands\Agents\AgentActivityLinesCommand;
 use DDD\Symfony\Commands\Agents\AgentCacheDiffCommand;
 use DDD\Symfony\Commands\Agents\AgentChatCommand;
 use DDD\Symfony\Commands\Agents\AgentCheckInstallationCommand;
-use DDD\Symfony\Commands\Agents\AgentClientToolsPurgeCommand;
 use DDD\Symfony\Commands\Agents\AgentChatTuiCommand;
 use DDD\Symfony\Commands\Agents\AgentCloseSchedulesForInactiveAgentSpacesCommand;
 use DDD\Symfony\Commands\Agents\AgentCompactConversationCommand;
@@ -69,7 +68,6 @@ class PackageAgentCommandsRegistrationTest extends IntegrationTestCase
 {
     /** @var string[] The command class by command name */
     public const array COMMAND_CLASSES_BY_NAME = [
-        'app:agent:purge-client-tool-requests' => AgentClientToolsPurgeCommand::class,
         'app:agent:backfill-message-embeddings' => AIConversationBackfillEmbeddingsCommand::class,
         'app:agent:repair-zero-embeddings' => AIConversationEmbeddingsRepairCommand::class,
         'app:agent:backfill-conversation-environment' => AIConversationBackfillEnvironmentCommand::class,
@@ -161,12 +159,12 @@ class PackageAgentCommandsRegistrationTest extends IntegrationTestCase
 
         $visibleCommandNames = array_keys(self::COMMAND_CLASSES_BY_NAME);
         $visibleCommandNames = array_values(array_diff($visibleCommandNames, [self::HIDDEN_COMMAND_NAME]));
-        self::assertCount(48, $visibleCommandNames);
+        self::assertCount(47, $visibleCommandNames);
         self::assertSame([], array_values(array_diff($visibleCommandNames, $listedCommandNames)), 'every visible command is listed');
         self::assertNotContains(self::HIDDEN_COMMAND_NAME, $listedCommandNames);
         self::assertContains(self::HIDDEN_COMMAND_NAME, $hiddenCommandNames);
         $textListProcess = $this->runConsoleScript('list', '--raw');
-        self::assertSame(48, preg_match_all('/^app:(agent|mcp):\S+/m', $textListProcess->getOutput()), 'the text listing names the 48 visible commands');
+        self::assertSame(47, preg_match_all('/^app:(agent|mcp):\S+/m', $textListProcess->getOutput()), 'the text listing names the 47 visible commands');
 
         $helpProcess = $this->runConsoleScript('help', self::HIDDEN_COMMAND_NAME);
         self::assertSame(0, $helpProcess->getExitCode(), $helpProcess->getErrorOutput());

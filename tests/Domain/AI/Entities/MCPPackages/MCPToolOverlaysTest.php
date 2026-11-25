@@ -12,6 +12,7 @@ use DDD\Domain\AI\Entities\MCPPackages\MCPToolOverlays;
 use DDD\Domain\Base\Entities\LazyLoad\LazyLoadRepo;
 use DDD\Infrastructure\Libs\Config;
 use DDD\Presentation\Mcp\Client\Agents\AgentTaskSchedulesMCPPackage;
+use DDD\Presentation\Mcp\Services\MCPToolExecutorService;
 use DDD\Tests\Agents\Support\UnitTestCase;
 use ReflectionClass;
 
@@ -81,6 +82,28 @@ class MCPToolOverlaysTest extends UnitTestCase
         self::assertSame(['getTaskRuns'], MCPToolOverlays::getApplicationOverlays()->getToolNames());
         self::assertSame(['colour'], MCPToolOverlays::getApplicationOverlays()->findOverlayOfTool('getTaskRuns')->unknownKeys);
         self::assertFalse(MCPToolOverlays::getApplicationOverlays()->findOverlayOfTool('getTaskRuns')->replacesAccountRights());
+    }
+
+    public function testAHiddenParameterLeavesTheSchemaAndTheSentValueIsIgnored(): void
+    {
+        MCPToolOverlays::replaceCurrent(MCPToolOverlays::fromConfigEntries([
+            'getTaskSchedules' => ['parameters' => ['agentSpaceId' => false]],
+            'pauseTaskSchedule' => ['examples' => [['scheduleId' => 7]]],
+        ]));
+
+        $listDocumentation = $this->findToolDocumentation('getTaskSchedules');
+        self::assertArrayNotHasKey('agentSpaceId', $listDocumentation->inputSchema->properties);
+        self::assertStringNotContainsString('agentSpaceId', (string)json_encode($listDocumentation->inputSchema->toObject()));
+        self::assertSame([['scheduleId' => 7]], $this->findToolDocumentation('pauseTaskSchedule')->inputSchema->examples);
+        self::assertNotSame([['scheduleId' => 7]], $listDocumentation->inputSchema->examples ?? null, 'other tools keep theirs');
+
+        $executorService = static::instantiateWithoutConstructor(MCPToolExecutorService::class);
+        self::assertSame(
+            ['filters' => 'x'],
+            static::invokeMethod($executorService, 'removeHiddenParametersFromToolArguments', ['getTaskSchedules', ['agentSpaceId' => 99, 'filters' => 'x']]),
+            'the space then comes from the conversation'
+        );
+        self::assertSame(['agentSpaceId' => 99], static::invokeMethod($executorService, 'removeHiddenParametersFromToolArguments', ['getTaskRuns', ['agentSpaceId' => 99]]));
     }
 
     /** @return string[] */

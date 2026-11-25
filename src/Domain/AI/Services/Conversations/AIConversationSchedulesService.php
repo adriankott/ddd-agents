@@ -812,13 +812,29 @@ class AIConversationSchedulesService extends EntitiesService
             return $deleteAction;
         }
         if ($deleteAction === AIConversationSchedule::DELETE_ACTION_HARD_DELETE) {
-            $schedule->delete();
+            $this->hardDeleteScheduleWithoutEntityRights($schedule);
             return $deleteAction;
         }
         if ($deleteTransition->targetStatus !== null) {
             $this->transitionStatus($schedule, $deleteTransition->targetStatus);
         }
         return $deleteAction;
+    }
+
+    /**
+     * Removes a schedule row for good, without the entity delete rights — like the status changes
+     * ({@see transitionStatus()}): the caller decided the scope before (the task tools by the scope rule of their
+     * lists, `AgentTaskSchedulesMCPPackage::isScheduleInScopeOfAccount()`; an admin console by its own access), so a
+     * sub-account that may use the space deletes a schedule it sees. The rights state is restored afterwards.
+     */
+    protected function hardDeleteScheduleWithoutEntityRights(AIConversationSchedule $schedule): void
+    {
+        DDDService::instance()->deactivateEntityRightsRestrictions();
+        try {
+            $schedule->delete();
+        } finally {
+            DDDService::instance()->restoreEntityRightsRestrictionsStateSnapshot();
+        }
     }
 
     /**

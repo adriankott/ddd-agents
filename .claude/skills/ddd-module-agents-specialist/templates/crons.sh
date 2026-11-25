@@ -28,10 +28,6 @@ set -e
   --description="Wake or expire agent runs whose worker died, time out stale delegation batches" \
   --schedule="*/5 * * * *" --command="app:agent:reap"
 
-{{CONSOLE}} app:crons:upsert --name=agent-client-tool-requests-purge \
-  --description="Expire overdue Agent.UI tool requests, delete old requests and client attachments (only with Agent.UI)" \
-  --schedule="23 * * * *" --command="app:agent:purge-client-tool-requests"
-
 {{CONSOLE}} app:crons:upsert --name=agent-conversations-mark-finalized \
   --description="Mark agent conversations idle past the window as finalized" \
   --schedule="*/5 * * * *" --command="app:agent:mark-finalized-conversations"

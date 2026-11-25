@@ -12,6 +12,7 @@ use DDD\Presentation\Mcp\Client\Agents\AgentMemoriesMCPPackage;
 use DDD\Presentation\Mcp\Client\Agents\AgentTaskRunReportsMCPPackage;
 use DDD\Presentation\Mcp\Client\Agents\AgentTaskSchedulesMCPPackage;
 use DDD\Presentation\Mcp\Client\Agents\AgentUIMCPPackage;
+use DDD\Presentation\Mcp\Client\Agents\AgentUIWindowMCPPackage;
 use DDD\Presentation\Mcp\Admin\System\SystemCronsMCPPackage;
 use DDD\Presentation\Mcp\Admin\System\SystemHealthMCPPackage;
 use DDD\Presentation\Mcp\Admin\System\SystemIssuesMCPPackage;
@@ -70,7 +71,7 @@ class MCPPackageIdsServiceTest extends TestCase
                 AISkill::AGENT_MEMORY => [AgentMemoriesMCPPackage::class],
                 AISkill::AGENT_IMAGES => [AgentImagesMCPPackage::class],
                 AISkill::AGENT_WEB_SEARCH => [WebSearchMCPPackage::class],
-                AISkill::AGENT_UI => [AgentUIMCPPackage::class],
+                AISkill::AGENT_UI => [AgentUIMCPPackage::class, AgentUIWindowMCPPackage::class],
                 AISkill::SYSTEM_HEALTH => [SystemHealthMCPPackage::class],
                 AISkill::SYSTEM_ISSUES => [SystemIssuesMCPPackage::class],
                 AISkill::SYSTEM_WORKERS => [SystemWorkersMCPPackage::class],

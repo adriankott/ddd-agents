@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace DDD\Domain\AI\Services\Installation;
 
 use DDD\Domain\AI\Entities\Conversations\Entitlements\AgentRoleMappedAccountRights;
-use DDD\Domain\AI\Entities\Conversations\Memories\AgentMemory;
 use DDD\Domain\AI\Entities\Discovery\AgentSourceRoot;
+use DDD\Domain\AI\Entities\Installation\AgentFeatureTableConditions;
 use DDD\Domain\AI\Entities\Installation\AgentInstallationFinding;
 use DDD\Domain\AI\Entities\Installation\AgentInstallationFindings;
 use DDD\Domain\AI\Entities\Installation\AgentPackageRename;
@@ -19,8 +19,6 @@ use DDD\Domain\AI\Entities\Skills\AISkill;
 use DDD\Domain\AI\Services\Conversations\Discovery\AgentSourceRootsService;
 use DDD\Domain\AI\Services\Conversations\Entitlements\AgentDeclaredAccountRightsService;
 use DDD\Domain\AI\Services\Conversations\Entitlements\AIConversationEntitlementsService;
-use DDD\Domain\AI\Services\Conversations\Memories\AgentMemoriesService;
-use DDD\Domain\AI\Services\Conversations\Memories\AgentMemoryStoreService;
 use DDD\Domain\AI\Services\Skills\AISkillFilesLintService;
 use DDD\Domain\AI\Services\Skills\AISkillSourcesService;
 use DDD\Domain\AI\Services\Skills\AISkillsService;
@@ -139,6 +137,18 @@ class AgentInstallationCheckService extends Service
 
     /** @var Application|null The console of the current run; null = the command check is skipped */
     protected ?Application $consoleApplication = null;
+
+    /** @var iterable<AgentFeatureTableConditionProvider> The declared feature tables (by tag) */
+    protected iterable $agentFeatureTableConditionProviders = [];
+
+    /** @param iterable<AgentFeatureTableConditionProvider> $agentFeatureTableConditionProviders */
+    #[Required]
+    public function setAgentFeatureTableConditionProviders(
+        #[AutowireIterator(AgentFeatureTableConditionProvider::TAG)]
+        iterable $agentFeatureTableConditionProviders
+    ): void {
+        $this->agentFeatureTableConditionProviders = $agentFeatureTableConditionProviders;
+    }
 
     /** @param iterable<AgentInstallationCheckInterface> $agentInstallationChecks */
     #[Required]
@@ -516,7 +526,9 @@ class AgentInstallationCheckService extends Service
     /**
      * `missingTables`: the table of a package entity (or of the application's subclass of one) that the schema lacks
      * (BLOCKING). Tables the application excludes (`Base.Repo.database.excludedTables`), tables in
-     * `acceptedMissingTables` and the memory table while memory is off or a host store answers it are not required.
+     * `acceptedMissingTables` and the tables of a feature that is not in use (switched off, or its skill not bound:
+     * {@see AgentFeatureTableConditionProvider}, e.g. the memory table while memory is off or a host store answers it)
+     * are not required.
      */
     protected function addMissingTableFindings(AgentInstallationFindings $agentInstallationFindings): void
     {
@@ -527,13 +539,14 @@ class AgentInstallationCheckService extends Service
         try {
             $liveTableNames = $this->findLiveTableNames();
         } catch (Throwable $databaseFailure) {
-            $firstLineOfReason = strtok(trim($databaseFailure->getMessage()), "\n");
+            // the driver's text is left out: it can name the user, the host or the DSN
             $agentInstallationFindings->addFinding(
                 static::CHECK_MISSING_TABLES,
                 AgentInstallationFinding::SEVERITY_WARNING,
                 'database',
-                'The tables could not be checked: the database did not answer (' . ($firstLineOfReason !== false ? $firstLineOfReason : $databaseFailure::class) . ').',
-                'Run the command where the database is reachable.'
+                'The tables could not be checked: the database did not answer (' . (new ReflectionClass($databaseFailure))->getShortName()
+                . '; the driver\'s message is not shown, it can name the user, host or DSN).',
+                'Run the command where the database is reachable; the application log of the connection names the cause.'
             );
             return;
         }
@@ -562,14 +575,15 @@ class AgentInstallationCheckService extends Service
     {
         $packageSourceRoots = $this->findPackageSourceRoots();
         $acceptedTableNames = array_map('strtolower', $this->readConfiguredNames('acceptedMissingTables'));
-        $memoryTableIsRequired = $this->isMemoryTableRequired();
+        $agentFeatureTableConditions = $this->findFeatureTableConditions();
+        $boundSkillNames = $this->findBoundSkillNames();
         $requiredTableNamesByEntityClass = [];
         foreach (EntityModelGeneratorService::getAllEntityClasses(filterOverriddenEntities: true) as $entityClassWithNamespace) {
             $entityClassName = $entityClassWithNamespace->getNameWithNamespace();
             if (!$this->isEntityOfPackage($entityClassName, $packageSourceRoots)) {
                 continue;
             }
-            if (!$memoryTableIsRequired && is_a($entityClassName, AgentMemory::class, true)) {
+            if ($agentFeatureTableConditions->findReasonTableIsNotRequired($entityClassName, $boundSkillNames) !== null) {
                 continue;
             }
             $databaseModel = DatabaseModel::fromEntityClass($entityClassName);
@@ -586,14 +600,31 @@ class AgentInstallationCheckService extends Service
         return $requiredTableNamesByEntityClass;
     }
 
-    /** Whether the package's memory table is read: memory is on and the package's own store answers it */
-    protected function isMemoryTableRequired(): bool
+    /** The conditions every provider declares; a provider that throws is skipped with a warning */
+    protected function findFeatureTableConditions(): AgentFeatureTableConditions
     {
-        if (!AgentMemoriesService::isMemoryStoreEnabled()) {
-            return false;
+        $agentFeatureTableConditions = new AgentFeatureTableConditions();
+        foreach ($this->agentFeatureTableConditionProviders as $agentFeatureTableConditionProvider) {
+            try {
+                foreach ($agentFeatureTableConditionProvider->getFeatureTableConditions()->getElements() as $agentFeatureTableCondition) {
+                    $agentFeatureTableConditions->add($agentFeatureTableCondition);
+                }
+            } catch (Throwable $providerFailure) {
+                DDDService::instance()->getLogger()->warning('[AgentInstallationCheck] feature table conditions of ' . $agentFeatureTableConditionProvider::class . ' skipped: ' . $providerFailure->getMessage());
+            }
         }
-        $agentMemoryStoreService = DDDService::instance()->getService(AgentMemoryStoreService::class);
-        return $agentMemoryStoreService::class === AgentMemoryStoreService::class;
+        return $agentFeatureTableConditions;
+    }
+
+    /**
+     * The skill names config/app/AI/skillPackages.php binds.
+     *
+     * @return string[]
+     */
+    protected function findBoundSkillNames(): array
+    {
+        $configuredBinding = Config::get(AISkillsService::CONFIG_SKILL_PACKAGES);
+        return is_array($configuredBinding) ? array_map('strval', array_keys($configuredBinding)) : [];
     }
 
     /** Whether the class or one of its parent classes lies below one of the package source roots */
@@ -852,8 +883,8 @@ class AgentInstallationCheckService extends Service
      */
     protected function readAppliedThroughVersionByPackageName(): array
     {
-        $stateFile = DDDService::instance()->getRootDir() . '/' . static::RENAMES_STATE_FILE_NAME;
-        $stateDocument = is_file($stateFile) ? json_decode((string)file_get_contents($stateFile), true) : null;
+        $stateFile = $this->findRenamesStateFile();
+        $stateDocument = $stateFile !== null ? json_decode((string)file_get_contents($stateFile), true) : null;
         $recordedPackages = is_array($stateDocument['packages'] ?? null) ? $stateDocument['packages'] : [];
         $appliedThroughVersionByPackageName = [];
         foreach ($recordedPackages as $packageName => $recordedPackage) {
@@ -862,6 +893,45 @@ class AgentInstallationCheckService extends Service
             }
         }
         return $appliedThroughVersionByPackageName;
+    }
+
+    /**
+     * The application's `.ddd-renames.json`: the path `renamesStateFile` of config/app/AI/installationCheck.php
+     * (absolute, or relative to the project directory) when set; else the first one found in the project directory
+     * and its parent directories, up to the repository root (the directory holding `.git`) — a project in a sub-folder
+     * of its repository keeps the file at the repository root. Null when there is none.
+     */
+    public function findRenamesStateFile(): ?string
+    {
+        $projectDirectory = rtrim($this->getProjectDirectory(), '/');
+        $configuredStateFileValue = Config::get(static::CONFIG_PATH . '.renamesStateFile');
+        $configuredStateFile = is_string($configuredStateFileValue) ? trim($configuredStateFileValue) : '';
+        if ($configuredStateFile !== '') {
+            $stateFile = str_starts_with($configuredStateFile, '/') ? $configuredStateFile : $projectDirectory . '/' . $configuredStateFile;
+            return is_file($stateFile) ? $stateFile : null;
+        }
+        $directory = $projectDirectory;
+        while ($directory !== '' && $directory !== '/') {
+            $stateFile = $directory . '/' . static::RENAMES_STATE_FILE_NAME;
+            if (is_file($stateFile)) {
+                return $stateFile;
+            }
+            if (file_exists($directory . '/.git')) {
+                return null;
+            }
+            $parentDirectory = dirname($directory);
+            if ($parentDirectory === $directory) {
+                return null;
+            }
+            $directory = $parentDirectory;
+        }
+        return null;
+    }
+
+    /** The application's project directory (the kernel's) */
+    protected function getProjectDirectory(): string
+    {
+        return DDDService::instance()->getRootDir();
     }
 
     /** Every rename the installed packages list in their `renames.json` (one per package root) */

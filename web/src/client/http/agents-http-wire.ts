@@ -172,6 +172,10 @@ export interface WireConversationRunStateResponse {
   updated?: string | null;
   /** A request of `Agent.UI` for the reading client (`AgentClientToolRequestDelivery`) */
   clientToolRequest?: { id: number; requestType: string; argumentsJson: string; secondsLeft: number } | null;
+  /** The open messages of the realtime port for the reading client (`AgentRealtimeMessageDeliveries`) */
+  realtimeMessages?: WireSet<{ messageType: string; messageKey: string; payloadJson: string; secondsLeft: number }> | null;
+  /** What the client needs to listen on the host's transport (`AgentRealtimeListenerCredential`) */
+  realtimeListenerCredential?: { transportName: string; credential: string; listenPath?: string | null; expiresAt?: string | null } | null;
 }
 
 /** `AIConversationActivityGetResponseDto`. */

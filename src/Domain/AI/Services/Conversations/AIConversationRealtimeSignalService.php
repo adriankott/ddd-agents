@@ -160,6 +160,11 @@ class AIConversationRealtimeSignalService extends Service
      * Signal that a client tool request of `Agent.UI` waits for the user's client of the conversation, so the client
      * reads its run state at once instead of at its next read. Best effort. The core has no realtime transport:
      * nothing is written; the client then receives the request with its next run-state read.
+     *
+     * @deprecated since 0.5.0: bind the realtime port instead
+     *             ({@see \DDD\Domain\AI\Services\Conversations\Realtime\AgentRealtimeChannelService::publishMessageToTransport()}),
+     *             which carries the request itself. Still rung for a client tool request while the port publishes
+     *             nothing, so an existing ping keeps working.
      */
     public function publishClientToolRequestSignal(int $rootConversationId): void
     {

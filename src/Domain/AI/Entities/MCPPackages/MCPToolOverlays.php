@@ -114,6 +114,8 @@ class MCPToolOverlays extends ObjectSet
                 $mcpToolOverlay->summary,
                 $mcpToolOverlay->parameterDescriptions,
                 $mcpToolOverlay->ownerFacingSubject,
+                $mcpToolOverlay->hiddenParameterNames,
+                $mcpToolOverlay->examples,
             ];
         }
         ksort($overlayEntries);

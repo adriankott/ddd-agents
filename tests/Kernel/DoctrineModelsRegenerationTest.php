@@ -23,7 +23,7 @@ class DoctrineModelsRegenerationTest extends UnitTestCase
     public const string SHIPPED_MODELS_TABLE_PREFIX = '';
 
     /** @var int Package entities with a DB repository, each with one committed model */
-    public const int PACKAGE_DB_ENTITY_COUNT = 18;
+    public const int PACKAGE_DB_ENTITY_COUNT = 16;
 
     protected ?string $tablePrefixBefore = null;
 

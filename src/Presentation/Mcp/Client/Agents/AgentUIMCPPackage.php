@@ -8,6 +8,12 @@ use DDD\Domain\AI\Entities\ClientTools\AgentClientToolAnswer;
 use DDD\Domain\AI\Entities\ClientTools\AgentClientToolRequest;
 use DDD\Domain\AI\Entities\Conversations\Entitlements\AgentAccountRights;
 use DDD\Domain\AI\Services\ClientTools\AgentClientToolRequestsService;
+use DDD\Domain\AI\Services\Conversations\Realtime\AgentRealtimeChannelService;
+use DDD\Infrastructure\Services\DDDService;
+use Throwable;
+use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
+use DDD\Infrastructure\Cache\Cache;
+use DDD\Infrastructure\Libs\Config;
 use DDD\Infrastructure\Services\AuthService;
 use DDD\Presentation\Mcp\Client\Agents\Dtos\AgentUIToolResponseDto;
 use DDD\Presentation\Mcp\Client\Agents\Dtos\GetCurrentScreenRequestDto;
@@ -111,24 +117,75 @@ class AgentUIMCPPackage extends MCPPackage
 
     public const string REFUSED_OTHER = 'the client refused (%s).';
 
+    public const string NOT_ENABLED = 'This request type is switched off on this platform. Nothing was sent to the client.';
+
+    /** @var string The text format of getCurrentScreen (default) */
+    public const string FORMAT_TEXT = 'text';
+
+    /** @var string The picture format of getCurrentScreen */
+    public const string FORMAT_PICTURE = 'picture';
+
+    /** @var string[] The picture sizes (the client's presets with a pixel and a byte budget each) */
+    public const array PICTURE_SIZES = ['small', 'medium', 'large'];
+
+    /** @var string The picture size when none is named */
+    public const string DEFAULT_PICTURE_SIZE = 'medium';
+
+    /** @var string[] The render modes of a picture: colour, greyscale, machine (64 grey levels, 75 % size, half the bytes) */
+    public const array RENDER_MODES = ['colour', 'greyscale', 'machine'];
+
+    /** @var string The render mode when none is named */
+    public const string DEFAULT_RENDER_MODE = 'colour';
+
+    public const string PICTURE_FRAME = 'A picture of the user\'s screen as the client renders it now%s (%d×%d, %s). It shows layout, colours and charts; for values and references read the screen as text.';
+
+    public const string PICTURE_MISSING = 'The client answered without a picture. Read the screen as text instead.';
+
+    /** @var string[] What a picture of the screen cannot show — the same fixed list the npm capturer states */
+    public const array PICTURE_LIMITATIONS = [
+        'content of other origins (embedded frames, some images and fonts) can be blank or replaced',
+        'video, canvas and WebGL content can be blank',
+        'password fields show dots; fields the application marks secret or skipped are left out',
+        'scrolled-away parts of a scroll container are shown expanded, so the picture can be longer than the window',
+    ];
+
+    public const string PICTURE_LIMITATIONS_LINE = 'A picture cannot show: %s.';
+
+    /** @var int How many screens openScreen opens for one message of the user unless `AI.agentUI.maxOpenScreenPerUserTurn` says otherwise */
+    public const int DEFAULT_MAX_OPEN_SCREEN_PER_USER_TURN = 1;
+
+    public const string OPEN_SCREEN_CAP_REACHED = 'Not opened: %d screen(s) were opened for this message of the user already. Say where the next step is and let the user ask for it.';
+
+    /** @var string The outcome of a refused openScreen over the cap */
+    public const string OUTCOME_OPEN_SCREEN_CAP = 'OPEN_SCREEN_CAP';
+
     /**
      * What the user sees right now: URL, title, visible table rows, form fields with unsaved values, tab, filters,
      * selection, validation messages, and short references for highlightOnScreen. For stored data use the data tools;
      * the ui note already names the open screen and record. Never write a value from this result without reading it
-     * with the data tool first.
+     * with the data tool first. `format: "picture"` returns an image of the screen instead (layout, colours, charts):
+     * only when the text cannot answer.
      *
      * @example {}
      * @example {"focus": "f.description"}
+     * @example {"format": "picture", "pictureSize": "small", "renderMode": "machine"}
      */
     #[MCPTool]
     #[MCPToolEffect(MCPToolEffect::READ, resultIsReusedWithinTurn: false)]
-    #[MCPToolSummary('Reads what the user sees on the open screen (unsaved values, visible rows, messages) as Markdown with references.')]
+    #[MCPToolSummary('Reads what the user sees on the open screen (unsaved values, visible rows, messages) as Markdown with references, or as a picture.')]
     #[MCPToolReturnsUntrustedContent('a screen shows texts other people wrote')]
     public function getCurrentScreen(
         GetCurrentScreenRequestDto $requestDto,
         AgentClientToolRequestsService $agentClientToolRequestsService,
         AgentToolCallProvenance $agentToolCallProvenance
     ): AgentUIToolResponseDto {
+        $format = strtolower(trim((string)$requestDto->format));
+        if ($format === static::FORMAT_PICTURE) {
+            return $this->readScreenPicture($requestDto, $agentClientToolRequestsService, $agentToolCallProvenance);
+        }
+        if ($format !== '' && $format !== static::FORMAT_TEXT) {
+            return static::buildLineResponse(sprintf(static::INVALID_ARGUMENT, 'format (text or picture)'), 'INVALID_ARGUMENT');
+        }
         $arguments = [];
         $focus = trim((string)$requestDto->focus);
         if ($focus !== '') {
@@ -137,7 +194,7 @@ class AgentUIMCPPackage extends MCPPackage
             }
             $arguments['focus'] = $focus;
         }
-        $answer = $this->send($agentClientToolRequestsService, $agentToolCallProvenance, AgentClientToolRequest::TYPE_READ_SCREEN, $arguments, static::READ_WAIT_SECONDS);
+        $answer = static::sendClientToolRequest($agentClientToolRequestsService, $agentToolCallProvenance, AgentClientToolRequest::TYPE_READ_SCREEN, $arguments, static::READ_WAIT_SECONDS);
         if ($answer->kind !== AgentClientToolAnswer::KIND_ANSWERED) {
             return static::buildUnansweredResponse($answer, static::READ_WAIT_SECONDS, false);
         }
@@ -168,7 +225,7 @@ class AgentUIMCPPackage extends MCPPackage
         if ($searchText !== '') {
             $arguments['searchText'] = mb_substr($searchText, 0, static::MAX_TOKEN_CHARS);
         }
-        $answer = $this->send($agentClientToolRequestsService, $agentToolCallProvenance, AgentClientToolRequest::TYPE_LIST_TARGETS, $arguments, static::LIST_WAIT_SECONDS);
+        $answer = static::sendClientToolRequest($agentClientToolRequestsService, $agentToolCallProvenance, AgentClientToolRequest::TYPE_LIST_TARGETS, $arguments, static::LIST_WAIT_SECONDS);
         if ($answer->kind !== AgentClientToolAnswer::KIND_ANSWERED) {
             return static::buildUnansweredResponse($answer, static::LIST_WAIT_SECONDS, false);
         }
@@ -198,6 +255,11 @@ class AgentUIMCPPackage extends MCPPackage
         $target = trim((string)$requestDto->target);
         if ($target === '') {
             return static::buildLineResponse(static::MISSING_TARGET, 'MISSING_TARGET');
+        }
+        $maxOpenScreenPerUserTurn = static::getMaxOpenScreenPerUserTurn();
+        $openedScreensOfUserTurn = max(static::countOpenScreenCallsOfUserTurn($agentToolCallProvenance), static::readOpenedScreensOfUserTurn($agentToolCallProvenance));
+        if ($openedScreensOfUserTurn >= $maxOpenScreenPerUserTurn) {
+            return static::buildLineResponse(sprintf(static::OPEN_SCREEN_CAP_REACHED, $openedScreensOfUserTurn), static::OUTCOME_OPEN_SCREEN_CAP);
         }
         $arguments = ['target' => $target];
         $tab = trim((string)$requestDto->tab);
@@ -234,10 +296,11 @@ class AgentUIMCPPackage extends MCPPackage
         if ($requestDto->includeScreen === true) {
             $arguments['includeScreen'] = true;
         }
-        $answer = $this->send($agentClientToolRequestsService, $agentToolCallProvenance, AgentClientToolRequest::TYPE_OPEN_TARGET, $arguments, static::OPEN_WAIT_SECONDS);
+        $answer = static::sendClientToolRequest($agentClientToolRequestsService, $agentToolCallProvenance, AgentClientToolRequest::TYPE_OPEN_TARGET, $arguments, static::OPEN_WAIT_SECONDS);
         if ($answer->kind !== AgentClientToolAnswer::KIND_ANSWERED) {
             return static::buildUnansweredResponse($answer, static::OPEN_WAIT_SECONDS, true);
         }
+        static::countOpenedScreenOfUserTurn($agentToolCallProvenance);
         $responseDto = new AgentUIToolResponseDto();
         $responseDto->outcome = $answer->outcome;
         $title = (string)($answer->getDetailValue('title') ?? $target);
@@ -288,7 +351,7 @@ class AgentUIMCPPackage extends MCPPackage
         if ($note !== '') {
             $arguments['note'] = mb_substr($note, 0, static::MAX_NOTE_CHARS);
         }
-        $answer = $this->send($agentClientToolRequestsService, $agentToolCallProvenance, AgentClientToolRequest::TYPE_HIGHLIGHT, $arguments, static::HIGHLIGHT_WAIT_SECONDS);
+        $answer = static::sendClientToolRequest($agentClientToolRequestsService, $agentToolCallProvenance, AgentClientToolRequest::TYPE_HIGHLIGHT, $arguments, static::HIGHLIGHT_WAIT_SECONDS);
         if ($answer->kind === AgentClientToolAnswer::KIND_ANSWERED || ($answer->kind === AgentClientToolAnswer::KIND_REFUSED && trim((string)$answer->text) !== '')) {
             $responseDto = new AgentUIToolResponseDto();
             $responseDto->outcome = $answer->outcome;
@@ -302,6 +365,134 @@ class AgentUIMCPPackage extends MCPPackage
     }
 
     /**
+     * A picture of the screen: the client captures it with the named size preset and render mode; the server checked
+     * the bytes as untrusted ({@see AgentClientToolRequestsService::checkScreenPicture()}); the picture rides inline as an
+     * image part ({@see AgentUIToolResponseDto::getResponseImages()}) and the tool picture store keeps it like any tool
+     * picture.
+     */
+    protected function readScreenPicture(
+        GetCurrentScreenRequestDto $requestDto,
+        AgentClientToolRequestsService $agentClientToolRequestsService,
+        AgentToolCallProvenance $agentToolCallProvenance
+    ): AgentUIToolResponseDto {
+        $pictureSize = strtolower(trim((string)$requestDto->pictureSize));
+        $pictureSize = $pictureSize === '' ? static::DEFAULT_PICTURE_SIZE : $pictureSize;
+        if (!in_array($pictureSize, static::PICTURE_SIZES, true)) {
+            return static::buildLineResponse(sprintf(static::INVALID_ARGUMENT, 'pictureSize (' . implode(', ', static::PICTURE_SIZES) . ')'), 'INVALID_ARGUMENT');
+        }
+        $renderMode = strtolower(trim((string)$requestDto->renderMode));
+        $renderMode = $renderMode === '' ? static::DEFAULT_RENDER_MODE : ($renderMode === 'color' ? 'colour' : $renderMode);
+        if (!in_array($renderMode, static::RENDER_MODES, true)) {
+            return static::buildLineResponse(sprintf(static::INVALID_ARGUMENT, 'renderMode (' . implode(', ', static::RENDER_MODES) . ')'), 'INVALID_ARGUMENT');
+        }
+        $arguments = ['format' => static::FORMAT_PICTURE, 'pictureSize' => $pictureSize, 'renderMode' => $renderMode];
+        $answer = static::sendClientToolRequest($agentClientToolRequestsService, $agentToolCallProvenance, AgentClientToolRequest::TYPE_READ_SCREEN, $arguments, static::READ_WAIT_SECONDS);
+        if ($answer->kind !== AgentClientToolAnswer::KIND_ANSWERED) {
+            return static::buildUnansweredResponse($answer, static::READ_WAIT_SECONDS, false);
+        }
+        if ($answer->picture === null) {
+            return static::buildLineResponse(static::PICTURE_MISSING, 'PICTURE_MISSING');
+        }
+        $responseDto = new AgentUIToolResponseDto();
+        $responseDto->outcome = $answer->outcome;
+        $responseDto->contentIsUntrusted = false;
+        $responseDto->lines[] = sprintf(
+            static::PICTURE_FRAME,
+            $answer->getDetailValue('visible') === false ? static::CLIENT_IN_BACKGROUND : '',
+            $answer->picture->width,
+            $answer->picture->height,
+            $renderMode
+        );
+        $responseDto->lines[] = sprintf(static::PICTURE_LIMITATIONS_LINE, implode('; ', static::PICTURE_LIMITATIONS));
+        $responseDto->setScreenPicture($answer->picture);
+        return $responseDto;
+    }
+
+    /** How many screens openScreen opens for one message of the user (`AI.agentUI.maxOpenScreenPerUserTurn`, at least 1) */
+    public static function getMaxOpenScreenPerUserTurn(): int
+    {
+        $settings = Config::get('AI.agentUI');
+        $configuredMaximum = is_array($settings) ? ($settings['maxOpenScreenPerUserTurn'] ?? null) : null;
+        return is_int($configuredMaximum) && $configuredMaximum > 0 ? $configuredMaximum : static::DEFAULT_MAX_OPEN_SCREEN_PER_USER_TURN;
+    }
+
+    /**
+     * The openScreen calls of the owner's thread after the user's message this call answers (the call itself left
+     * out, a failed call not counted); 0 where there is no owner thread to read.
+     */
+    public static function countOpenScreenCallsOfUserTurn(AgentToolCallProvenance $agentToolCallProvenance): int
+    {
+        $ownerThreadMessages = $agentToolCallProvenance->getOwnerThreadMessages();
+        $sourceUserMessageIndex = $agentToolCallProvenance->sourceUserMessage?->indexInConversation ?? null;
+        if ($ownerThreadMessages === null || $sourceUserMessageIndex === null) {
+            return 0;
+        }
+        $openScreenCalls = 0;
+        foreach ($ownerThreadMessages->getElements() as $conversationMessage) {
+            if (($conversationMessage->indexInConversation ?? -1) <= $sourceUserMessageIndex
+                || ($conversationMessage->messageType ?? null) !== AIConversationMessage::MESSAGE_TOOL_CALL
+                || !isset($conversationMessage->toolCall)
+            ) {
+                continue;
+            }
+            $toolCall = $conversationMessage->toolCall;
+            if (preg_match('/(^|[._])openScreen$/', (string)($toolCall->name ?? '')) !== 1
+                || ($toolCall->status ?? null) === AIConversationMessage::STATUS_FAILED
+                || ($agentToolCallProvenance->toolCallId !== null && $toolCall->toolCallId === $agentToolCallProvenance->toolCallId)
+            ) {
+                continue;
+            }
+            $openScreenCalls++;
+        }
+        return $openScreenCalls;
+    }
+
+    /** @var string The shared-cache counter of the screens opened for one message of the user */
+    public const string OPENED_SCREENS_KEY_PREFIX = 'agent-ui-opened-screens-';
+
+    /** @var int How long that counter lives */
+    public const int OPENED_SCREENS_TTL_SECONDS = 3600;
+
+    /**
+     * The screens opened for the user's message so far by the counter in the shared cache — it also sees the calls of
+     * the current step, whose rows are not written yet; 0 without a shared cache or a source message.
+     */
+    public static function readOpenedScreensOfUserTurn(AgentToolCallProvenance $agentToolCallProvenance): int
+    {
+        $sourceUserMessageId = $agentToolCallProvenance->getSourceUserMessageId();
+        if ($sourceUserMessageId === null) {
+            return 0;
+        }
+        try {
+            $openedScreens = static::getSharedCache()?->get(static::OPENED_SCREENS_KEY_PREFIX . $sourceUserMessageId);
+        } catch (Throwable) {
+            return 0;
+        }
+        return is_numeric($openedScreens) ? (int)$openedScreens : 0;
+    }
+
+    /** Counts one opened screen for the user's message (atomic; nothing without a shared cache) */
+    protected static function countOpenedScreenOfUserTurn(AgentToolCallProvenance $agentToolCallProvenance): void
+    {
+        $sourceUserMessageId = $agentToolCallProvenance->getSourceUserMessageId();
+        if ($sourceUserMessageId === null) {
+            return;
+        }
+        try {
+            static::getSharedCache()?->increment(static::OPENED_SCREENS_KEY_PREFIX . $sourceUserMessageId, 1, static::OPENED_SCREENS_TTL_SECONDS);
+        } catch (Throwable) {
+            // a cache without counters: the rows of the turn still cap the next steps
+        }
+    }
+
+    protected static function getSharedCache(): ?Cache
+    {
+        /** @var AgentRealtimeChannelService $agentRealtimeChannelService */
+        $agentRealtimeChannelService = DDDService::instance()->getService(AgentRealtimeChannelService::class);
+        return $agentRealtimeChannelService->getSharedCache();
+    }
+
+    /**
      * @param AgentClientToolRequestsService $agentClientToolRequestsService
      * @param AgentToolCallProvenance $agentToolCallProvenance
      * @param string $requestType
@@ -309,7 +500,7 @@ class AgentUIMCPPackage extends MCPPackage
      * @param int $waitSeconds
      * @return AgentClientToolAnswer
      */
-    protected function send(
+    public static function sendClientToolRequest(
         AgentClientToolRequestsService $agentClientToolRequestsService,
         AgentToolCallProvenance $agentToolCallProvenance,
         string $requestType,
@@ -339,11 +530,12 @@ class AgentUIMCPPackage extends MCPPackage
      * @param bool $isNavigation
      * @return AgentUIToolResponseDto
      */
-    protected static function buildUnansweredResponse(AgentClientToolAnswer $answer, int $waitSeconds, bool $isNavigation): AgentUIToolResponseDto
+    public static function buildUnansweredResponse(AgentClientToolAnswer $answer, int $waitSeconds, bool $isNavigation): AgentUIToolResponseDto
     {
         return match ($answer->kind) {
             AgentClientToolAnswer::KIND_NO_CLIENT => static::buildLineResponse(static::NO_CLIENT, AgentClientToolAnswer::KIND_NO_CLIENT),
             AgentClientToolAnswer::KIND_BACKGROUND => static::buildLineResponse(static::BACKGROUND_CLIENT, AgentClientToolAnswer::KIND_BACKGROUND),
+            AgentClientToolAnswer::KIND_NOT_ENABLED => static::buildLineResponse(static::NOT_ENABLED, AgentClientToolAnswer::KIND_NOT_ENABLED),
             AgentClientToolAnswer::KIND_NO_ANSWER => static::buildLineResponse(sprintf($isNavigation ? static::NO_ANSWER_OPEN : static::NO_ANSWER, $waitSeconds), AgentClientToolAnswer::KIND_NO_ANSWER),
             default => static::buildLineResponse(sprintf($isNavigation ? static::NOT_OPENED : static::NOT_DONE, static::describeRefusal((string)$answer->outcome)), (string)$answer->outcome),
         };
@@ -363,7 +555,7 @@ class AgentUIMCPPackage extends MCPPackage
      * @param string $outcome
      * @return AgentUIToolResponseDto
      */
-    protected static function buildLineResponse(string $line, string $outcome): AgentUIToolResponseDto
+    public static function buildLineResponse(string $line, string $outcome): AgentUIToolResponseDto
     {
         $responseDto = new AgentUIToolResponseDto();
         $responseDto->lines[] = $line;

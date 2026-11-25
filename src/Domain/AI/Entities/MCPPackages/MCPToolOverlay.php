@@ -15,6 +15,8 @@ use DDD\Domain\Base\Entities\ValueObject;
  *       'description' => 'The runs of the tasks …',    // replaces the method docblock the model reads
  *       'summary' => 'The runs that executed …',       // replaces #[MCPToolSummary]
  *       'parameters' => ['filters' => 'Filter on …'], // replaces a parameter description, by parameter name
+ *       'parameters' => ['agentSpaceId' => false],     // false hides the parameter: schema, sent value, gates
+ *       'examples' => [['scheduleId' => 42]],          // replaces the @example lines of the input schema
  *       'ownerFacingSubject' => 'Task runs',           // replaces #[MCPToolOwnerFacingSubject]
  *   ],
  *
@@ -34,11 +36,14 @@ class MCPToolOverlay extends ValueObject
     /** @var string The config key of the parameter descriptions */
     public const string KEY_PARAMETERS = 'parameters';
 
+    /** @var string The config key of the examples */
+    public const string KEY_EXAMPLES = 'examples';
+
     /** @var string The config key of the owner-facing subject */
     public const string KEY_OWNER_FACING_SUBJECT = 'ownerFacingSubject';
 
     /** @var string[] Every key an overlay entry may carry */
-    public const array KEYS = [self::KEY_ACCOUNT_RIGHTS, self::KEY_DESCRIPTION, self::KEY_SUMMARY, self::KEY_PARAMETERS, self::KEY_OWNER_FACING_SUBJECT];
+    public const array KEYS = [self::KEY_ACCOUNT_RIGHTS, self::KEY_DESCRIPTION, self::KEY_SUMMARY, self::KEY_PARAMETERS, self::KEY_OWNER_FACING_SUBJECT, self::KEY_EXAMPLES];
 
     /** @var string The tool's name (the method name on the wire) */
     public string $toolName = '';
@@ -57,6 +62,19 @@ class MCPToolOverlay extends ValueObject
 
     /** @var string[] Parameter name => the description that replaces the property docblock */
     public array $parameterDescriptions = [];
+
+    /**
+     * @var string[] The parameters the application hides (`'parameters' => ['<name>' => false]`): left out of the
+     *               input schema, a sent value is ignored. The space argument (by its DTO name or the configured name)
+     *               then comes from the conversation the call runs in, for the gates too.
+     */
+    public array $hiddenParameterNames = [];
+
+    /**
+     * @var array<int, mixed>|null The examples of the input schema INSTEAD of the method's `@example` lines (each a JSON
+     *                             object as an array, or a text); [] = none; null = the method's
+     */
+    public ?array $examples = null;
 
     /** @var string|null The run report's name of what the tool saves, instead of `#[MCPToolOwnerFacingSubject]` */
     public ?string $ownerFacingSubject = null;
@@ -85,8 +103,18 @@ class MCPToolOverlay extends ValueObject
         $mcpToolOverlay->ownerFacingSubject = self::readText($overlayEntry, self::KEY_OWNER_FACING_SUBJECT);
         if (is_array($overlayEntry[self::KEY_PARAMETERS] ?? null)) {
             foreach ($overlayEntry[self::KEY_PARAMETERS] as $parameterName => $parameterDescription) {
-                if (is_string($parameterName) && is_string($parameterDescription) && trim($parameterDescription) !== '') {
+                if (is_string($parameterName) && $parameterDescription === false) {
+                    $mcpToolOverlay->hiddenParameterNames[] = $parameterName;
+                } elseif (is_string($parameterName) && is_string($parameterDescription) && trim($parameterDescription) !== '') {
                     $mcpToolOverlay->parameterDescriptions[$parameterName] = trim($parameterDescription);
+                }
+            }
+        }
+        if (is_array($overlayEntry[self::KEY_EXAMPLES] ?? null)) {
+            $mcpToolOverlay->examples = [];
+            foreach ($overlayEntry[self::KEY_EXAMPLES] as $example) {
+                if (is_array($example) || (is_string($example) && trim($example) !== '')) {
+                    $mcpToolOverlay->examples[] = $example;
                 }
             }
         }
@@ -105,6 +133,12 @@ class MCPToolOverlay extends ValueObject
     public function replacesAccountRights(): bool
     {
         return $this->accountRightNames !== null;
+    }
+
+    /** Whether the overlay hides parameter `$parameterName` (its name on the wire or its DTO property name) */
+    public function hidesParameter(string $parameterName): bool
+    {
+        return in_array($parameterName, $this->hiddenParameterNames, true);
     }
 
     /** The description of parameter `$parameterName` the overlay sets, or null */

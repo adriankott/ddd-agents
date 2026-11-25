@@ -2,7 +2,7 @@
 
 **Reader:** host developer
 
-Contents: a ping, never a payload · what the package ships and what the host writes · when a signal goes out · the run statuses · activity lines · traps
+Contents: a ping, never a payload · what the package ships and what the host writes · the realtime port (typed messages) · when a signal goes out · the run statuses · activity lines · traps
 
 ## A ping, never a payload
 
@@ -31,6 +31,31 @@ measurement the loop reads (`$lastPublishBreakdownMs`; its key names are the loo
 the conversation it was called with, a sub-agent's included; mapping a child's change to the root conversation the
 owner watches (`AIConversation::getTreeRootConversationId()`) is the host's choice in its override. The client
 needs a credential for its channel that the host mints under the conversation's read rights.
+
+## The realtime port (typed messages)
+
+Since 0.5.0 the package has one port for typed messages to a client: `DDD\Domain\AI\Services\Conversations\Realtime\AgentRealtimeChannelService`.
+Agent.UI sends its client tool requests through it (no tables); other features may register their own message types
+through a type provider.
+
+| Method | Contract |
+|---|---|
+| `sendMessage()` | a message of a registered type (`AgentRealtimeMessageTypeProvider`) with a key, a payload of one JSON object and an expiry, to one account's open clients or to the clients of one conversation (`AgentRealtimeAudience::forAccount()` / `forConversation()`), optionally to one client of them |
+| `clearMessage()` | removes it; a later message of the same type and key replaces the earlier one |
+| `findListenerCredential()` | issues or reuses what a client needs to listen on the host's transport (null without a transport) |
+| `isClientListening()` | whether a client listens: the transport's own answer when it has one, else the presence the clients state with what they already send (`AgentClientPresenceService`) |
+
+The package always keeps a **mailbox in the shared cache** (`config/app/AI/agentRealtimeChannel.php`,
+`sharedCacheGroup`; null tries `redis`, then Core's default group): the run-state read carries the pending messages
+(`realtimeMessages`) and the credential (`realtimeListenerCredential`), so delivery works without any transport — a
+polling client picks the message up on its next read. A host with a push channel overrides the transport hooks in a
+same-path subclass (the client hands what arrives to `acceptArrivedRealtimeMessage()` of `@mgamadeus/ddd-agents/ui`): `publishMessageToTransport()`, `clearMessageOnTransport()`, `issueListenerCredential()`,
+`askTransportWhetherClientIsListening()`; each must swallow its own failures (the mailbox stays the authority).
+A process-local cache (APCu) cannot carry the mailbox across workers: the installation check `realtimeChannel` warns
+while Agent.UI is bound without a shared cache.
+
+`AIConversationRealtimeSignalService::publishClientToolRequestSignal()` is deprecated since 0.5.0: the package still
+rings it after every client tool request, so a host override keeps working; move it to `publishMessageToTransport()`.
 
 ## When a signal goes out
 
@@ -136,7 +161,8 @@ model and endpoint; a host that uses another provider replaces it like any Argus
 
 ## Traps
 
-- Content in the ping bypasses the rights of the REST read. Send ids and a status only.
+- Content in the ping bypasses the rights of the REST read. Send ids and a status only (a typed realtime message carries
+  only what its type declares, for the conversation's own clients).
 - A realtime write that throws must not break the turn: catch inside `writeChangeSignal()`.
 - `ai_activity_lines` needs a consumer: routed without one, the lines wait in the queue and arrive stale; left unrouted,
   every narration runs synchronously inside the step that triggered it (the entry skill's transports).

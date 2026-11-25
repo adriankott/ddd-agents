@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DDD\Domain\AI\Services\Eval;
 
+use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
 use DDD\Domain\AI\Entities\Evals\ConversationPurge\AIConversationEvalPurgeKeys;
 use DDD\Domain\AI\Entities\Evals\ConversationPurge\AIConversationEvalPurgeReport;
 use DDD\Domain\AI\Entities\Evals\ConversationPurge\AIConversationEvalPurgeSettings;
@@ -13,6 +14,7 @@ use DDD\Domain\AI\Entities\Evals\ConversationPurge\AIConversationEvalTree;
 use DDD\Domain\AI\Entities\Evals\ConversationPurge\AIConversationEvalTreeConversation;
 use DDD\Domain\AI\Entities\Evals\ConversationPurge\AIConversationEvalTreeConversations;
 use DDD\Domain\AI\Entities\Evals\ConversationPurge\AIConversationEvalTrees;
+use DDD\Domain\AI\Entities\MCPPackages\ToolCallImageReference;
 use DDD\Domain\AI\Interfaces\AIConversationProgressReporterInterface;
 use DDD\Domain\AI\Repo\DB\Conversations\A2A\DBAIConversationTaskPushNotificationConfigModel;
 use DDD\Domain\AI\Repo\DB\Conversations\Agent\DBAIConversationDelegationBatchModel;
@@ -27,6 +29,7 @@ use DDD\Domain\AI\Repo\DB\Conversations\TurnEvents\DBAIConversationTurnEventMode
 use DDD\Domain\AI\Repo\DB\Evals\SuiteRuns\AgentEvalSuiteCases\DBAgentEvalSuiteCaseModel;
 use DDD\Domain\AI\Repo\DB\Mandates\DBAgentMandateModel;
 use DDD\Domain\AI\Services\Conversations\Agent\AgentEvalAccountsService;
+use DDD\Domain\AI\Services\Conversations\Agent\AgentToolCallImageStoreService;
 use DDD\Domain\AI\Services\Conversations\AIConversationMessagesService;
 use DDD\Domain\AI\Services\Conversations\Memories\AgentMemoryStoreService;
 use DDD\Domain\Base\Repo\DB\Dialect\Json\JsonPath;
@@ -403,13 +406,106 @@ class AIConversationEvalPurgeService extends Service
             ? $this->findEvalMarkersOfRootConversations($treesToPurge->getRootConversationIds())
             : [];
         $purgeKeys = $this->buildPurgeKeys($treesToPurge, $settings);
+        // read before the messages go, erased only once every step of the batch finished
+        $toolCallImageReferences = $settings->dryRun ? [] : $this->findStoredToolCallImageReferencesOfMessages($purgeKeys->getMessageIds(), $settings);
         $batchResult = $this->runPurgeSteps($steps, $purgeKeys, $settings, $report, $startedAtSeconds, $averageRowBytesByTableName);
         if ($batchResult === static::STEP_RESULT_DONE) {
+            $report->toolPicturesErased += $this->eraseStoredToolCallImages($toolCallImageReferences);
             $report->recordPurgedTrees($treesToPurge, $purgeKeys, $evalMarkersByRootConversationId);
         } else {
             $report->batchesLeftIncomplete++;
         }
         return $batchResult;
+    }
+
+    /**
+     * The stored pictures of the tool calls of messages (references to the picture store; inline pictures have
+     * nothing stored). Never throws: a failed read leaves the pictures to the bucket's lifecycle rule.
+     *
+     * @param int[] $messageIds
+     * @return ToolCallImageReference[]
+     */
+    protected function findStoredToolCallImageReferencesOfMessages(array $messageIds, AIConversationEvalPurgeSettings $settings): array
+    {
+        $toolCallImageReferences = [];
+        $toolCallsSql = $this->buildToolCallsOfMessagesSql();
+        try {
+            foreach (array_chunk($messageIds, max(1, $settings->idsPerStatement)) as $messageIdChunk) {
+                $this->beginStatementLimitedRead();
+                try {
+                    $toolCallJsons = $this->getConnection()->fetchFirstColumn(
+                        $toolCallsSql,
+                        ['messageIds' => $messageIdChunk, 'messageType' => AIConversationMessage::MESSAGE_TOOL_CALL],
+                        ['messageIds' => ArrayParameterType::INTEGER]
+                    );
+                } finally {
+                    $this->endStatementLimitedRead();
+                }
+                foreach ($toolCallJsons as $toolCallJson) {
+                    foreach (static::extractStoredToolCallImageReferences($toolCallJson) as $toolCallImageReference) {
+                        $toolCallImageReferences[] = $toolCallImageReference;
+                    }
+                }
+            }
+        } catch (Throwable $readFailure) {
+            DDDService::instance()->getLogger()->warning('[AgentEvalPurge] tool pictures not read: ' . $readFailure->getMessage());
+        }
+        return $toolCallImageReferences;
+    }
+
+    /** The read of {@see findStoredToolCallImageReferencesOfMessages()}; bound parameters `:messageIds`, `:messageType`. */
+    public function buildToolCallsOfMessagesSql(): string
+    {
+        return 'SELECT ' . $this->quoteName('toolCall') . ' FROM ' . $this->quoteName((string)DBAIConversationMessageModel::getTableName())
+            . ' WHERE ' . $this->quoteName('id') . ' IN (:messageIds) AND ' . $this->quoteName('messageType') . ' = :messageType'
+            . ' AND ' . $this->quoteName('toolCall') . ' IS NOT NULL';
+    }
+
+    /**
+     * The references of a stored tool call JSON that name the picture store (`imageReferences`); none for a value
+     * that is no tool call.
+     *
+     * @return ToolCallImageReference[]
+     */
+    public static function extractStoredToolCallImageReferences(mixed $toolCallJson): array
+    {
+        $toolCall = is_string($toolCallJson) ? json_decode($toolCallJson, true) : null;
+        $imageReferences = is_array($toolCall) ? ($toolCall['imageReferences'] ?? null) : null;
+        $toolCallImageReferences = [];
+        foreach (is_array($imageReferences) ? $imageReferences : [] as $imageReference) {
+            if (!is_array($imageReference) || ($imageReference['sourceStore'] ?? null) !== ToolCallImageReference::SOURCE_STORE_SPOOL
+                || !is_string($imageReference['sourceImageId'] ?? null) || $imageReference['sourceImageId'] === ''
+            ) {
+                continue;
+            }
+            $toolCallImageReference = new ToolCallImageReference();
+            $toolCallImageReference->sourceStore = ToolCallImageReference::SOURCE_STORE_SPOOL;
+            $toolCallImageReference->sourceImageId = $imageReference['sourceImageId'];
+            $toolCallImageReference->sha256 = is_string($imageReference['sha256'] ?? null) ? $imageReference['sha256'] : '';
+            $toolCallImageReferences[] = $toolCallImageReference;
+        }
+        return $toolCallImageReferences;
+    }
+
+    /**
+     * Erases the stored pictures of purged tool calls ({@see AgentToolCallImageStoreService::eraseStoredPicturesOfReferences()}).
+     *
+     * @param ToolCallImageReference[] $toolCallImageReferences
+     * @return int the objects deleted
+     */
+    protected function eraseStoredToolCallImages(array $toolCallImageReferences): int
+    {
+        if ($toolCallImageReferences === []) {
+            return 0;
+        }
+        try {
+            /** @var AgentToolCallImageStoreService $agentToolCallImageStoreService */
+            $agentToolCallImageStoreService = DDDService::instance()->getService(AgentToolCallImageStoreService::class);
+            return $agentToolCallImageStoreService->eraseStoredPicturesOfReferences($toolCallImageReferences);
+        } catch (Throwable $eraseFailure) {
+            DDDService::instance()->getLogger()->warning('[AgentEvalPurge] tool pictures not erased: ' . $eraseFailure->getMessage());
+            return 0;
+        }
     }
 
     /**

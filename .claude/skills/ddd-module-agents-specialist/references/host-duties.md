@@ -53,6 +53,7 @@ registers its cron line. Every row that names no package command is a duty of th
 | A test that reads the widgets' contract fixtures | the fixtures and the schema exist, no test for the host; the package command `app:agent:export-composed-view-node-schema` writes and checks the schema file | needed for a host with a frontend (wire contract) | `ddd-module-agents-widgets-specialist` |
 | A test that tool names are unique over every `MCPTool` method | no such test for the host | recommended (a duplicate name shadows a tool) | `ddd-module-agents-tools-specialist` |
 | Realtime change signal and push (`AIConversationRealtimeSignalService::writeChangeSignal()` and its siblings) | the defaults do nothing | optional (without it the client polls) | `ddd-module-agents-widgets-specialist` |
+| A shared cache for the realtime mailbox (Agent.UI requests, presence, answers), and optionally a push transport (same-path `AgentRealtimeChannelService` transport hooks) | the mailbox ships; the transport hooks do nothing | the shared cache is mandatory while Agent.UI is bound (check `realtimeChannel`); the transport optional | `ddd-module-agents-widgets-specialist`, `ddd-module-agents-tools-specialist` |
 | External agents: a protocol controller, push delivery (`dispatchTaskPushNotification()` in the realtime subclass), its transport and worker | not shipped | optional | `ddd-module-agents-widgets-specialist` |
 | Recall tools for the agent (over `SemanticSearchService`, `AIConversationMessagesService::loadMessageContext()`) | the package ships no recall tool | optional; the episodic segment points the model at them | `ddd-module-agents-context-specialist` |
 | An embedding provider (same-path `AITextEmbeddingsService::generateEmbeddingForText()`) | the default has none | optional (search stays keyword-only, every embedding job logs `TextEmbeddingNotGeneratedException`) | `ddd-module-agents-context-specialist` |
@@ -102,6 +103,7 @@ sections 1, 5 and 8 follow them on the base `AgentConsoleCommand`, except where 
 | `DDD\Domain\AI\Services\Conversations\Agent\AIConversationOwnerReportDeliveryService` |
 | `DDD\Domain\AI\Entities\Conversations\Purposes\AIConversationPurpose` |
 | `DDD\Domain\AI\Services\Conversations\AIConversationRealtimeSignalService` |
+| `DDD\Domain\AI\Services\Conversations\Realtime\AgentRealtimeChannelService` |
 | `DDD\Domain\AI\Services\Conversations\AIConversationRunClaimsService` |
 | `DDD\Domain\AI\Services\Conversations\AIConversationSchedulesService` |
 | `DDD\Domain\AI\Services\Conversations\TraceEvents\AIConversationTraceEventsService` |

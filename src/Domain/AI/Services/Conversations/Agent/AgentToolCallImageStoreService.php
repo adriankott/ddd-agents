@@ -13,7 +13,7 @@ use DDD\Domain\AI\Entities\MCPPackages\ToolResultImage;
 use DDD\Infrastructure\Cache\Apc;
 use DDD\Infrastructure\Cache\Cache;
 use DDD\Infrastructure\Libs\Config;
-use DDD\Infrastructure\ObjectStorage\ObjectStorage;
+use DDD\Infrastructure\ObjectStorage\BasicObjectStorage;
 use DDD\Infrastructure\ObjectStorage\ParallelReadableObjectStorage;
 use DDD\Infrastructure\Services\DDDService;
 use DDD\Infrastructure\Services\IssuesLogService;
@@ -145,7 +145,8 @@ class AgentToolCallImageStoreService extends Service
             $writtenToObjectStore = false;
             if ($objectStorage !== null) {
                 try {
-                    $objectStorage->putObject($settings->objectKeyPrefix . $storeImageId, $toolResultImage->base64Data, 'text/plain');
+                    // the raw picture with its type (before 0.5.0: base64 text as text/plain, still read)
+                    $objectStorage->putObject($settings->objectKeyPrefix . $storeImageId, (string)base64_decode($toolResultImage->base64Data, true), $toolResultImage->mimeType);
                     $writtenToObjectStore = true;
                 } catch (Throwable $objectStoreFailure) {
                     $this->logStoreFailure($objectStoreFailure, 'write', $storeImageId);
@@ -232,8 +233,9 @@ class AgentToolCallImageStoreService extends Service
             foreach ($pendingReferencesBySha256 as $sha256 => $toolCallImageReference) {
                 $sha256sByObjectKey[$settings->objectKeyPrefix . $toolCallImageReference->sourceImageId] = (string)$sha256;
             }
-            foreach ($this->readFromObjectStorage($objectStorage, array_keys($sha256sByObjectKey)) as $objectKey => $base64Data) {
+            foreach ($this->readFromObjectStorage($objectStorage, array_keys($sha256sByObjectKey)) as $objectKey => $objectContent) {
                 $sha256 = $sha256sByObjectKey[$objectKey] ?? null;
+                $base64Data = $sha256 !== null && is_string($objectContent) ? static::convertStoredObjectToBase64($objectContent, $sha256) : null;
                 $toolResultImage = $sha256 !== null && is_string($base64Data) ? $this->buildImageFromStoredBase64($pendingReferencesBySha256[$sha256], $base64Data) : null;
                 if ($toolResultImage !== null) {
                     $agentToolCallImageReadResult->addImage($toolResultImage);
@@ -397,6 +399,72 @@ class AgentToolCallImageStoreService extends Service
     }
 
     /**
+     * The base64 text of an object of L3: the raw picture (since 0.5.0) when its sha256 matches, else the object as it
+     * is — a base64 text written before 0.5.0, which {@see buildImageFromStoredBase64()} checks against the reference.
+     */
+    public static function convertStoredObjectToBase64(string $objectContent, string $sha256): string
+    {
+        return hash('sha256', $objectContent) === $sha256 ? base64_encode($objectContent) : trim($objectContent);
+    }
+
+    /**
+     * Erases the stored pictures behind tool call references (a purged conversation): the objects of L3 and the
+     * entries of L2 and L1. A reference that names no store of this service is skipped; a picture stays readable
+     * where another conversation of the same agent space showed the same bytes (one object per space and sha256) — it
+     * is then a miss there and its placeholder stands in. Never throws; a failed delete is logged.
+     *
+     * @param ToolCallImageReference[] $toolCallImageReferences
+     * @return int the objects deleted from L3
+     */
+    public function eraseStoredPicturesOfReferences(array $toolCallImageReferences): int
+    {
+        $settings = $this->getSettings();
+        $storeImageIds = [];
+        $cacheKeys = [];
+        foreach ($toolCallImageReferences as $toolCallImageReference) {
+            if (!$toolCallImageReference instanceof ToolCallImageReference
+                || $toolCallImageReference->sourceStore !== ToolCallImageReference::SOURCE_STORE_SPOOL
+                || $toolCallImageReference->sourceImageId === ''
+            ) {
+                continue;
+            }
+            $storeImageIds[$toolCallImageReference->sourceImageId] = true;
+            if ($toolCallImageReference->sha256 !== '') {
+                $cacheKeys[$this->buildCacheKey($toolCallImageReference->sha256)] = true;
+            }
+        }
+        if ($storeImageIds === []) {
+            return 0;
+        }
+        foreach ([$this->getProcessCache($settings), $this->getSharedCache($settings)] as $cache) {
+            if ($cache === null) {
+                continue;
+            }
+            foreach (array_keys($cacheKeys) as $cacheKey) {
+                try {
+                    $cache->delete($cacheKey);
+                } catch (Throwable) {
+                    // a cache entry ends with its TTL anyway
+                }
+            }
+        }
+        $objectStorage = $this->findObjectStorage($settings);
+        if ($objectStorage === null) {
+            return 0;
+        }
+        $deletedObjects = 0;
+        foreach (array_keys($storeImageIds) as $storeImageId) {
+            try {
+                $objectStorage->deleteObject($settings->objectKeyPrefix . $storeImageId);
+                $deletedObjects++;
+            } catch (Throwable $objectStoreFailure) {
+                $this->logStoreFailure($objectStoreFailure, 'delete', (string)$storeImageId);
+            }
+        }
+        return $deletedObjects;
+    }
+
+    /**
      * The values of a cache by sha256 (one batch read); empty without a cache or when the read fails.
      *
      * @param string[] $sha256s
@@ -426,13 +494,13 @@ class AgentToolCallImageStoreService extends Service
     }
 
     /**
-     * Several objects of L3 at once (parallel on the s3 driver), object key => base64 text or null; a failed read is a
-     * miss of every key and an issues-log entry.
+     * Several objects of L3 at once (parallel when the store offers it), object key => the object's content (raw
+     * bytes, or base64 text written before 0.5.0) or null; a failed read is a miss of every key and an issues-log entry.
      *
      * @param string[] $objectKeys
      * @return array<string, string|null>
      */
-    protected function readFromObjectStorage(ObjectStorage $objectStorage, array $objectKeys): array
+    protected function readFromObjectStorage(BasicObjectStorage $objectStorage, array $objectKeys): array
     {
         try {
             if ($objectStorage instanceof ParallelReadableObjectStorage) {
@@ -544,7 +612,7 @@ class AgentToolCallImageStoreService extends Service
     }
 
     /** L3: the configured object store; null when off, and null (reported once per process) when it is not configured. */
-    protected function findObjectStorage(AgentToolCallImageStoreSettings $settings): ?ObjectStorage
+    protected function findObjectStorage(AgentToolCallImageStoreSettings $settings): ?BasicObjectStorage
     {
         if (!$settings->objectStoreEnabled) {
             return null;
@@ -572,12 +640,15 @@ class AgentToolCallImageStoreService extends Service
         return Cache::instance($cacheGroup);
     }
 
-    /** The Core object store of a name; null when it is not configured. */
-    protected function resolveObjectStorage(string $objectStorageName): ?ObjectStorage
+    /**
+     * The Core object store of a name at the basic level (put, get, delete, exists — every driver offers it, a narrow
+     * one of the application too); null when it is not configured.
+     */
+    protected function resolveObjectStorage(string $objectStorageName): ?BasicObjectStorage
     {
         /** @var ObjectStorageService $objectStorageService */
         $objectStorageService = DDDService::instance()->getService(ObjectStorageService::class);
-        return $objectStorageService->getObjectStorage($objectStorageName);
+        return $objectStorageService->getBasicObjectStorage($objectStorageName);
     }
 
     protected function logStoreFailure(Throwable $storeFailure, string $operation, string $subject): void

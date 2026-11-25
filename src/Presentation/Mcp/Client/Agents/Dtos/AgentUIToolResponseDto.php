@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace DDD\Presentation\Mcp\Client\Agents\Dtos;
 
+use DDD\Domain\AI\Entities\ClientTools\AgentScreenPicture;
+use DDD\Domain\AI\Entities\MCPPackages\MCPToolResponseImageProvider;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolResponsePlatformNoteProvider;
+use DDD\Domain\AI\Entities\MCPPackages\ToolResultImage;
 use DDD\Domain\AI\Entities\MCPPackages\ToolResultUntrustedSegments;
 use DDD\Domain\Base\Entities\LlmMarkdownRenderable;
 use DDD\Presentation\Base\Dtos\RestResponseDto;
@@ -15,7 +18,7 @@ use DDD\Presentation\Base\OpenApi\Attributes\Parameter;
  * untrusted, and the closing lines. The content is cut at
  * {@see self::MAX_CONTENT_CHARS}, so no screen can flood the context.
  */
-class AgentUIToolResponseDto extends RestResponseDto implements LlmMarkdownRenderable, MCPToolResponsePlatformNoteProvider
+class AgentUIToolResponseDto extends RestResponseDto implements LlmMarkdownRenderable, MCPToolResponsePlatformNoteProvider, MCPToolResponseImageProvider
 {
     /** @var int The most characters of client content in one result */
     public const int MAX_CONTENT_CHARS = 8000;
@@ -42,6 +45,34 @@ class AgentUIToolResponseDto extends RestResponseDto implements LlmMarkdownRende
     /** @var string|null The outcome (`OK`, `NO_BROWSER`, `UNSAVED_CHANGES`, …) */
     #[Parameter(in: Parameter::RESPONSE, required: false)]
     public ?string $outcome = null;
+
+    /** @var AgentScreenPicture|null A picture of the screen (getCurrentScreen with format picture); rides as an image part, never in the text */
+    protected ?AgentScreenPicture $screenPicture = null;
+
+    public function setScreenPicture(?AgentScreenPicture $screenPicture): void
+    {
+        $this->screenPicture = $screenPicture;
+    }
+
+    public function getScreenPicture(): ?AgentScreenPicture
+    {
+        return $this->screenPicture;
+    }
+
+    /** @return ToolResultImage[] the screen picture as an inline tool picture; none without one */
+    public function getResponseImages(): array
+    {
+        if ($this->screenPicture === null) {
+            return [];
+        }
+        $toolResultImage = new ToolResultImage();
+        $toolResultImage->base64Data = $this->screenPicture->base64Data;
+        $toolResultImage->mimeType = $this->screenPicture->mimeType;
+        $toolResultImage->width = $this->screenPicture->width;
+        $toolResultImage->height = $this->screenPicture->height;
+        $toolResultImage->byteSize = $this->screenPicture->byteSize;
+        return [$toolResultImage];
+    }
 
     /**
      * @return string

@@ -29,6 +29,13 @@ export const useAgentUIClient = (adapters: ScreenAdapters, uiStateSource: AgentU
       },
       isVisible: () => adaptersRef.current.isVisible(),
     };
+    // the optional adapters: present on the object when the latest render has them
+    Object.defineProperties(latestAdapters, {
+      picture: { enumerable: true, get: () => adaptersRef.current.picture },
+      agentWindow: { enumerable: true, get: () => adaptersRef.current.agentWindow },
+      pathGuide: { enumerable: true, get: () => adaptersRef.current.pathGuide },
+      requestHandlers: { enumerable: true, get: () => adaptersRef.current.requestHandlers },
+    });
     clientRef.current = new AgentUIClient(latestAdapters, { readUIState: () => uiStateSourceRef.current?.readUIState() ?? null });
   }
   return clientRef.current;

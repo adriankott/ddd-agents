@@ -11,7 +11,10 @@ declare(strict_types=1);
  *   (`[]` = no right for this tool);
  * - `description`: what the model reads instead of the method docblock;
  * - `summary`: the routing line instead of `#[MCPToolSummary]`;
- * - `parameters`: parameter name => the description instead of the property docblock;
+ * - `parameters`: parameter name => the description instead of the property docblock, or `false` to hide the
+ *   parameter: it leaves the input schema and a sent value is ignored; a hidden space argument (`agentSpaceId` or the
+ *   name of `AI.agentSpaceToolArgument`) then comes from the conversation, for the rights and flag gates too;
+ * - `examples`: the examples of the input schema instead of the method's `@example` lines (JSON objects as arrays);
  * - `ownerFacingSubject`: what the run report calls what the tool saves, instead of `#[MCPToolOwnerFacingSubject]`.
  *
  * A tool name no installed package exposes is reported by `app:agent:check-installation` (warning).
@@ -19,5 +22,6 @@ declare(strict_types=1);
  * Example:
  *   'getTaskRuns' => ['accountRights' => [], 'summary' => 'The runs of the tasks that executed, newest first.'],
  *   'createRecurringTaskSchedule' => ['parameters' => ['task' => 'What each run does, in the owner\'s words.']],
+ *   'getTaskSchedules' => ['parameters' => ['agentSpaceId' => false], 'examples' => [['filters' => "status eq 'ACTIVE'"]]],
  */
 return [];

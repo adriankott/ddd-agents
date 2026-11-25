@@ -151,9 +151,10 @@ model-built URL is refused (skill `ddd-module-agents-decisions-and-guards-specia
 ## Agent.UI and System
 
 `Agent.UI` reads the user's screen, opens screens and points at elements: a `[SIGNAL:ui]` state note from the UI state
-the client reports, the client tool request channel (tables `AgentClientToolRequests`, `AgentClientAttachments`), the
-tools of `AgentUIMCPPackage`, the screen catalog port `AgentUIScreenCatalogService`, the hourly
-`app:agent:purge-client-tool-requests`, and the client side in the npm entry `@mgamadeus/ddd-agents/ui`. `System.*`
+the client reports, the client tool requests over the realtime port `AgentRealtimeChannelService` (typed messages,
+a mailbox and the presences in the shared cache, no table; a host binds its transport in a same-path subclass), the
+tools of `AgentUIMCPPackage` (screen text or picture, a navigation cap per user message), the screen catalog port
+`AgentUIScreenCatalogService`, and the client side in the npm entry `@mgamadeus/ddd-agents/ui`. `System.*`
 reads Core's workers, crons and issues registry and changes an issue group's status; the host adds health sections
 through `SystemHealthSectionProvider`. Details: skill `ddd-module-agents-tools-specialist`.
 

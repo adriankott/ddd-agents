@@ -4,14 +4,12 @@ declare(strict_types=1);
 
 namespace DDD\Tests\Agents\Domain\AI\Entities\ClientTools;
 
-use DDD\Domain\AI\Entities\ClientTools\AgentClientAttachment;
-use DDD\Domain\AI\Entities\ClientTools\AgentClientAttachments;
+use DDD\Domain\AI\Entities\ClientTools\AgentClientPresence;
+use DDD\Domain\AI\Entities\ClientTools\AgentClientPresences;
 use DDD\Domain\AI\Entities\ClientTools\AgentUIState;
 use DDD\Domain\AI\Entities\Conversations\Agent\StateDelivery\AgentConversationState;
 use DDD\Domain\AI\Entities\Conversations\Agent\StateDelivery\AgentStateChangeDetection;
 use DDD\Domain\AI\Entities\Conversations\Agent\StateDelivery\AgentStateDelta;
-use DDD\Domain\AI\Services\ClientTools\AgentClientAttachmentsService;
-use DDD\Infrastructure\Base\DateTime\DateTime;
 use DDD\Tests\Agents\Support\UnitTestCase;
 
 /**
@@ -43,16 +41,19 @@ class AgentUIStateTest extends UnitTestCase
 
     public function testARequestGoesToTheClientTheUserSentFromLastElseToTheNewestVisibleOne(): void
     {
-        $hiddenClient = $this->buildAttachment('client-hidden-0001', false, 100, null);
-        $visibleClient = $this->buildAttachment('client-visible-0001', true, 90, null);
-        $sentFromClient = $this->buildAttachment('client-sender-0001', false, 80, 70);
+        $hiddenClient = $this->buildPresence('client-hidden-0001', false, 10, null);
+        $visibleClient = $this->buildPresence('client-visible-0001', true, 12, null);
+        $sentFromClient = $this->buildPresence('client-sender-0001', false, 14, 20);
 
-        $freshAttachments = AgentClientAttachments::newInstance();
-        $freshAttachments->add($hiddenClient, $visibleClient);
-        self::assertSame('client-visible-0001', AgentClientAttachmentsService::pickTargetAttachment($freshAttachments)?->clientId);
-        $freshAttachments->add($sentFromClient);
-        self::assertSame('client-sender-0001', AgentClientAttachmentsService::pickTargetAttachment($freshAttachments)?->clientId);
-        self::assertNull(AgentClientAttachmentsService::pickTargetAttachment(AgentClientAttachments::newInstance()));
+        $freshPresences = new AgentClientPresences();
+        $freshPresences->add($hiddenClient, $visibleClient);
+        self::assertSame('client-visible-0001', $freshPresences->pickTargetPresence()?->clientId);
+        $freshPresences->add($sentFromClient);
+        self::assertSame('client-sender-0001', $freshPresences->pickTargetPresence()?->clientId);
+        self::assertNull((new AgentClientPresences())->pickTargetPresence());
+        $stalePresences = new AgentClientPresences();
+        $stalePresences->add($this->buildPresence('client-stale-0001', true, AgentClientPresence::FRESH_FOR_SECONDS + 5, null));
+        self::assertSame(0, $stalePresences->filterFresh(new \DateTimeImmutable())->count());
     }
 
     public function testTheUINoteIsDeliveredOnceWhenItChangedAndNeverKeptInAnEpochRecord(): void
@@ -69,13 +70,14 @@ class AgentUIStateTest extends UnitTestCase
         self::assertSame($currentState->uiNote, AgentConversationState::fromArray($currentState->toArray())->uiNote);
     }
 
-    protected function buildAttachment(string $clientId, bool $visible, int $secondsAgoSeen, ?int $secondsAgoSent): AgentClientAttachment
+    protected function buildPresence(string $clientId, bool $visible, int $secondsAgoSeen, ?int $secondsAgoSent): AgentClientPresence
     {
-        $agentClientAttachment = new AgentClientAttachment();
-        $agentClientAttachment->clientId = $clientId;
-        $agentClientAttachment->visible = $visible;
-        $agentClientAttachment->lastSeenAt = DateTime::fromTimestamp(time() - $secondsAgoSeen);
-        $agentClientAttachment->lastOwnerSendAt = $secondsAgoSent !== null ? DateTime::fromTimestamp(time() - $secondsAgoSent) : null;
-        return $agentClientAttachment;
+        $agentClientPresence = new AgentClientPresence();
+        $agentClientPresence->conversationId = 1;
+        $agentClientPresence->clientId = $clientId;
+        $agentClientPresence->visible = $visible;
+        $agentClientPresence->lastSeenAt = time() - $secondsAgoSeen;
+        $agentClientPresence->lastOwnerSendAt = $secondsAgoSent !== null ? time() - $secondsAgoSent : null;
+        return $agentClientPresence;
     }
 }

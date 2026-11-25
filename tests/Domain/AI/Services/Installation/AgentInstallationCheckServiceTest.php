@@ -8,7 +8,11 @@ use DDD\Domain\AI\Entities\Conversations\Entitlements\AgentAccountRights;
 use DDD\Domain\AI\Entities\Conversations\Entitlements\AgentRoleMappedAccountRights;
 use DDD\Domain\AI\Entities\Installation\AgentInstallationFinding;
 use DDD\Domain\AI\Entities\Installation\AgentInstallationFindings;
+use DDD\Domain\AI\Entities\AgentSpaces\AgentSpace;
+use DDD\Domain\AI\Entities\Installation\AgentFeatureTableCondition;
+use DDD\Domain\AI\Entities\Installation\AgentFeatureTableConditions;
 use DDD\Domain\AI\Entities\Installation\AgentPackageRenames;
+use DDD\Domain\AI\Entities\Mandates\AgentMandate;
 use DDD\Domain\AI\Services\Installation\AgentInstallationCheckService;
 use DDD\Domain\Common\Entities\Roles\Role;
 use DDD\Infrastructure\Libs\Config;
@@ -216,6 +220,73 @@ class AgentInstallationCheckServiceTest extends UnitTestCase
         self::assertSame('The check could not run: the host store did not answer', $brokenCheckFinding->message);
         self::assertSame(2, $findings->countBlockingFindings());
         self::assertContains('hostFeatureStore', $agentInstallationCheckService->getCheckNames());
+    }
+
+    public function testADatabaseThatDoesNotAnswerIsReportedWithoutTheDriverText(): void
+    {
+        $agentInstallationCheckService = new AgentInstallationCheckWithFixtureTablesDouble();
+        $agentInstallationCheckService->setAgentFeatureTableConditionProviders([]);
+        $agentInstallationCheckService->fixtureLiveTableNames = null;
+
+        $findings = $this->runOnlyCheck(AgentInstallationCheckService::CHECK_MISSING_TABLES, $agentInstallationCheckService);
+
+        self::assertSame(['database'], $findings->getSubjects());
+        $message = $findings->getElements()[0]->message;
+        self::assertStringContainsString('the database did not answer (RuntimeException;', $message);
+        foreach (['agent_app', 'db.internal.example', 'secret', 'SQLSTATE', 'mysql://'] as $leakedPart) {
+            self::assertStringNotContainsString($leakedPart, $message);
+        }
+    }
+
+    public function testAMissingTableOfAFeatureThatIsOffOrUnboundIsNotBlocking(): void
+    {
+        $agentInstallationCheckService = new AgentInstallationCheckWithFixtureTablesDouble();
+        $agentInstallationCheckService->fixtureLiveTableNames = [];
+        $agentInstallationCheckService->setAgentFeatureTableConditionProviders([]);
+        $findingsWithoutConditions = $this->runOnlyCheck(AgentInstallationCheckService::CHECK_MISSING_TABLES, $agentInstallationCheckService);
+        self::assertContains('AgentMandates', $findingsWithoutConditions->getSubjects());
+        self::assertContains('AgentSpaces', $findingsWithoutConditions->getSubjects());
+
+        $agentFeatureTableConditions = new AgentFeatureTableConditions();
+        $mandatesCondition = AgentFeatureTableCondition::create(AgentMandate::class, 'the mandates (demo switch)', false);
+        $agentFeatureTableConditions->add($mandatesCondition);
+        $spacesCondition = AgentFeatureTableCondition::create(AgentSpace::class, 'the spaces', null, 'Demo.NotBound');
+        $agentFeatureTableConditions->add($spacesCondition);
+        $agentInstallationCheckService->setAgentFeatureTableConditionProviders([new AgentFeatureTableConditionProviderDouble($agentFeatureTableConditions)]);
+        $findingsWithConditions = $this->runOnlyCheck(AgentInstallationCheckService::CHECK_MISSING_TABLES, $agentInstallationCheckService);
+
+        self::assertNotContains('AgentMandates', $findingsWithConditions->getSubjects(), 'switched off');
+        self::assertNotContains('AgentSpaces', $findingsWithConditions->getSubjects(), 'its skill is not bound');
+        self::assertSame($findingsWithoutConditions->count() - 2, $findingsWithConditions->count());
+
+        $this->setAIConfigValue('skillPackages', ['Demo.NotBound' => []]);
+        self::assertSame("the skill 'Demo.NotBound' is not bound", AgentFeatureTableCondition::create(AgentSpace::class, 'the spaces', true, 'Demo.NotBound')->findReasonTableIsNotRequired([]));
+        self::assertNull(AgentFeatureTableCondition::create(AgentSpace::class, 'the spaces', true, 'Demo.NotBound')->findReasonTableIsNotRequired(['Demo.NotBound']));
+    }
+
+    public function testTheRenamesRecordIsFoundInAParentDirectoryUpToTheRepositoryRootOrAtTheConfiguredPath(): void
+    {
+        $this->fixtureDirectory = sys_get_temp_dir() . '/agent-installation-check-' . bin2hex(random_bytes(4));
+        $repositoryDirectory = $this->fixtureDirectory . '/repository';
+        mkdir($repositoryDirectory . '/.git', 0777, true);
+        mkdir($repositoryDirectory . '/app');
+        file_put_contents($repositoryDirectory . '/.ddd-renames.json', '{}');
+        file_put_contents($this->fixtureDirectory . '/.ddd-renames.json', '{}');
+        $agentInstallationCheckService = new AgentInstallationCheckWithFixtureTablesDouble();
+        $agentInstallationCheckService->fixtureProjectDirectory = $repositoryDirectory . '/app';
+        $this->setAIConfigValue('installationCheck', []);
+
+        self::assertSame($repositoryDirectory . '/.ddd-renames.json', $agentInstallationCheckService->findRenamesStateFile(), 'the repository root of a project in a sub-folder');
+
+        unlink($repositoryDirectory . '/.ddd-renames.json');
+        self::assertNull($agentInstallationCheckService->findRenamesStateFile(), 'never above the repository root');
+
+        mkdir($repositoryDirectory . '/state');
+        file_put_contents($repositoryDirectory . '/state/renames.json', '{}');
+        $this->setAIConfigValue('installationCheck', ['renamesStateFile' => '../state/renames.json']);
+        self::assertSame($repositoryDirectory . '/app/../state/renames.json', $agentInstallationCheckService->findRenamesStateFile());
+        exec('rm -rf ' . escapeshellarg($this->fixtureDirectory));
+        $this->fixtureDirectory = null;
     }
 
     protected function buildFixturePackageRenames(): AgentPackageRenames

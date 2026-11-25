@@ -146,4 +146,78 @@ describe('ClientToolRequestRunner', () => {
     const runner = new ClientToolRequestRunner(createAdapters().adapters);
     assert.equal((await runner.run(delivery('CAPTURE', {}))).outcome, 'UNKNOWN_REQUEST');
   });
+
+  it('steps the agent window aside before opening, guides without waiting, and the guide never blocks the answer', async () => {
+    const { adapters, opened } = createAdapters();
+    const events: string[] = [];
+    adapters.agentWindow = {
+      stepAside: requestType => { events.push(`aside ${requestType}`); },
+      restore: () => { events.push('restore'); },
+      setMode: () => true,
+    };
+    adapters.pathGuide = {
+      guide: () => { events.push('guide'); throw new Error('broken guide'); },
+      cancel: () => undefined,
+    };
+    const runner = new ClientToolRequestRunner(adapters);
+    const answer = await runner.run(delivery('OPEN_TARGET', { target: 'orders' }));
+    assert.equal(answer.outcome, 'OK');
+    assert.deepEqual(events, ['aside OPEN_TARGET', 'guide']);
+    assert.equal(opened.length, 1);
+  });
+
+  it('sets the window mode, restores, and refuses unknown modes or a missing window', async () => {
+    const { adapters } = createAdapters();
+    const runnerWithoutWindow = new ClientToolRequestRunner(adapters);
+    assert.equal((await runnerWithoutWindow.run(delivery('SET_WINDOW_MODE', { mode: 'aside' }))).outcome, 'UNKNOWN_MODE');
+    const modes: string[] = [];
+    adapters.agentWindow = {
+      stepAside: () => undefined,
+      restore: () => { modes.push('restore'); },
+      setMode: mode => { modes.push(mode); return mode === 'aside'; },
+    };
+    const runner = new ClientToolRequestRunner(adapters);
+    assert.equal((await runner.run(delivery('SET_WINDOW_MODE', { mode: 'aside' }))).outcome, 'OK');
+    assert.equal((await runner.run(delivery('SET_WINDOW_MODE', { mode: 'restore' }))).outcome, 'OK');
+    assert.equal((await runner.run(delivery('SET_WINDOW_MODE', { mode: 'huge' }))).outcome, 'UNKNOWN_MODE');
+    assert.deepEqual(modes, ['aside', 'restore', 'huge']);
+  });
+
+  it('captures a picture with the window aside and restores it afterwards', async () => {
+    const { adapters } = createAdapters();
+    const runnerWithoutCapturer = new ClientToolRequestRunner(adapters);
+    assert.equal((await runnerWithoutCapturer.run(delivery('READ_SCREEN', { format: 'picture' }))).outcome, 'PICTURE_UNAVAILABLE');
+    const events: string[] = [];
+    adapters.agentWindow = {
+      stepAside: () => { events.push('aside'); },
+      restore: () => { events.push('restore'); },
+      setMode: () => true,
+    };
+    adapters.picture = {
+      capture: async request => {
+        events.push(`capture ${request.pictureSize} ${request.renderMode}`);
+        return { base64: 'AAAA', mimeType: 'image/webp', width: 800, height: 600, byteSize: 3 };
+      },
+    };
+    const runner = new ClientToolRequestRunner(adapters);
+    const answer = await runner.run(delivery('READ_SCREEN', { format: 'picture', pictureSize: 'small', renderMode: 'machine' }));
+    assert.equal(answer.outcome, 'OK');
+    assert.equal(answer.pictureBase64, 'AAAA');
+    assert.equal(answer.details.width, 800);
+    assert.deepEqual(events, ['aside', 'capture small machine', 'restore']);
+    const defaults = await runner.run(delivery('READ_SCREEN', { format: 'picture', pictureSize: 'huge' }));
+    assert.equal(defaults.outcome, 'OK');
+    assert.equal(events[4], 'capture medium colour');
+  });
+
+  it('runs a handler of the application for a further type, never for a type of the package', async () => {
+    const { adapters } = createAdapters();
+    adapters.requestHandlers = {
+      PLAY_SOUND: parameters => ({ outcome: 'OK', text: `played ${String(parameters.sound)}`, details: {} }),
+      READ_SCREEN: () => ({ outcome: 'OK', text: 'replaced', details: {} }),
+    };
+    const runner = new ClientToolRequestRunner(adapters);
+    assert.equal((await runner.run(delivery('PLAY_SOUND', { sound: 'chime' }))).text, 'played chime');
+    assert.equal((await runner.run(delivery('READ_SCREEN', {}))).text, '# Home');
+  });
 });

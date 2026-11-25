@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace DDD\Domain\AI\Services\ClientTools;
 
-use DDD\Domain\AI\Entities\ClientTools\AgentClientAttachment;
-use DDD\Domain\AI\Entities\ClientTools\AgentClientAttachments;
+use DDD\Domain\AI\Entities\ClientTools\AgentClientPresence;
+use DDD\Domain\AI\Entities\ClientTools\AgentClientPresences;
 use DDD\Domain\AI\Entities\ClientTools\AgentUIScreen;
 use DDD\Domain\AI\Entities\ClientTools\AgentUIState;
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
@@ -48,8 +48,9 @@ class AgentUIStateNotesService extends Service
     public const int MAX_RECORD_DESCRIPTION_CHARS = 160;
 
     /**
-     * The note of the conversation for a model call now: null when no client of the conversation ever reported a UI
-     * state (the conversation has no UI); the no-client note when the clients that reported one are no longer fresh.
+     * The note of the conversation for a model call now: null when no client of the conversation reported a UI state
+     * within the presence TTL (the conversation has no UI); the no-client note when the clients that reported one are
+     * no longer fresh.
      *
      * @throws Throwable a failed read (the caller treats the value as unknown and compares nothing)
      */
@@ -59,41 +60,35 @@ class AgentUIStateNotesService extends Service
         if ($rootConversationId <= 0 || !$this->isUISkillBound()) {
             return null;
         }
-        DDDService::instance()->deactivateEntityRightsRestrictions();
-        try {
-            $agentClientAttachments = $this->getAgentClientAttachmentsService()->findAttachmentsOfConversation($rootConversationId);
-        } finally {
-            DDDService::instance()->restoreEntityRightsRestrictionsStateSnapshot();
-        }
         $hasReportedUIState = false;
-        $freshAttachments = AgentClientAttachments::newInstance();
+        $freshPresences = new AgentClientPresences();
         $now = new DateTime();
-        foreach ($agentClientAttachments->getElements() as $agentClientAttachment) {
-            if (($agentClientAttachment->uiStateJson ?? null) === null) {
+        foreach ($this->getAgentClientPresenceService()->findPresencesOfConversation($rootConversationId)->getElements() as $agentClientPresence) {
+            if ($agentClientPresence->uiStateJson === null) {
                 continue;
             }
             $hasReportedUIState = true;
-            if ($agentClientAttachment->isFresh($now)) {
-                $freshAttachments->add($agentClientAttachment);
+            if ($agentClientPresence->isFresh($now)) {
+                $freshPresences->add($agentClientPresence);
             }
         }
         if (!$hasReportedUIState) {
             return null;
         }
-        $targetAttachment = AgentClientAttachmentsService::pickTargetAttachment($freshAttachments);
-        if ($targetAttachment === null) {
+        $targetPresence = $freshPresences->pickTargetPresence();
+        if ($targetPresence === null) {
             return static::NO_CLIENT_NOTE;
         }
-        if (($targetAttachment->visible ?? null) === false) {
+        if ($targetPresence->visible === false) {
             return static::BACKGROUND_NOTE;
         }
-        return $this->buildScreenNote($targetAttachment, $conversation);
+        return $this->buildScreenNote($targetPresence, $conversation);
     }
 
     /** The note of one client's UI state */
-    public function buildScreenNote(AgentClientAttachment $agentClientAttachment, AIConversation $conversation): string
+    public function buildScreenNote(AgentClientPresence $agentClientPresence, AIConversation $conversation): string
     {
-        $agentUIState = $agentClientAttachment->getUIState() ?? new AgentUIState();
+        $agentUIState = $agentClientPresence->getUIState() ?? new AgentUIState();
         $agentUIScreen = $this->getAgentUIScreenCatalogService()->describeScreen($agentUIState, $conversation);
         $noteParts = [$this->describeArea($agentUIScreen)];
         if ($agentUIScreen !== null && $agentUIScreen->recordId !== null && AgentUIState::isValidToken($agentUIScreen->recordId)) {
@@ -137,11 +132,11 @@ class AgentUIStateNotesService extends Service
         return 'area ' . ($areaLabel !== '' ? LlmTextRendering::shorten(LlmTextRendering::toSingleLine($areaLabel), 80) . ' (' . $agentUIScreen->areaKey . ')' : $agentUIScreen->areaKey);
     }
 
-    protected function getAgentClientAttachmentsService(): AgentClientAttachmentsService
+    protected function getAgentClientPresenceService(): AgentClientPresenceService
     {
-        /** @var AgentClientAttachmentsService $agentClientAttachmentsService */
-        $agentClientAttachmentsService = DDDService::instance()->getService(AgentClientAttachmentsService::class);
-        return $agentClientAttachmentsService;
+        /** @var AgentClientPresenceService $agentClientPresenceService */
+        $agentClientPresenceService = DDDService::instance()->getService(AgentClientPresenceService::class);
+        return $agentClientPresenceService;
     }
 
     protected function getAgentUIScreenCatalogService(): AgentUIScreenCatalogService

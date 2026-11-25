@@ -867,6 +867,9 @@ default account for console work.
   statement limit (`AIConversationEvalPurgeService::STATEMENT_TIMEOUT_SECONDS`), every write chunk runs in its own
   transaction with a 2 s lock wait (`LOCK_WAIT_TIMEOUT_SECONDS`); nothing stays set on the connection.
   The time budget is checked before every tree check and every write, never inside a statement.
+- **Tool pictures:** with `--apply`, the stored pictures of the tool calls of the deleted trees (tool picture store:
+  the L1/L2 entries and the L3 object) are erased after each finished batch; the report counts them
+  (`toolPicturesErased`).
 - **Exit codes:** `0`; `1` when the purge fails. **Budget:** no option.
 - **Override points:** `getEvalOnlyOptionDescription()`.
 

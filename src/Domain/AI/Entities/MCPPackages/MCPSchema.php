@@ -254,8 +254,9 @@ class MCPSchema extends ValueObject
 
     /**
      * What the application configures into an INPUT schema: the space argument under its own name and description
-     * ({@see AgentSpaceToolArgument}; the property keeps its place) and the parameter descriptions of the tool's overlay
-     * ({@see MCPToolOverlays}; by the name on the wire, or by the DTO property name of the space argument).
+     * ({@see AgentSpaceToolArgument}; the property keeps its place), and from the tool's overlay ({@see MCPToolOverlays};
+     * by the name on the wire, or by the DTO property name of the space argument) the parameter descriptions, the hidden
+     * parameters (left out) and the examples (replacing the `@example` lines).
      */
     public function applyApplicationSchemaConfiguration(string $toolName): void
     {
@@ -276,6 +277,18 @@ class MCPSchema extends ValueObject
         $mcpToolOverlay = $toolName !== '' ? MCPToolOverlays::getApplicationOverlays()->findOverlayOfTool($toolName) : null;
         if ($mcpToolOverlay === null) {
             return;
+        }
+        // a hidden parameter leaves the schema (by its name on the wire; the space argument also by its DTO name)
+        foreach (array_keys($this->properties) as $propertyName) {
+            $isSpaceArgument = $propertyName === $agentSpaceToolArgument->name || $propertyName === AgentSpaceToolArgument::DTO_PROPERTY_NAME;
+            if ($mcpToolOverlay->hidesParameter((string)$propertyName)
+                || ($isSpaceArgument && ($mcpToolOverlay->hidesParameter($agentSpaceToolArgument->name) || $mcpToolOverlay->hidesParameter(AgentSpaceToolArgument::DTO_PROPERTY_NAME)))
+            ) {
+                unset($this->properties[$propertyName]);
+            }
+        }
+        if ($mcpToolOverlay->examples !== null) {
+            $this->examples = $mcpToolOverlay->examples;
         }
         foreach ($this->properties as $propertyName => $objectProperty) {
             $overlaidDescription = $mcpToolOverlay->findParameterDescription((string)$propertyName);

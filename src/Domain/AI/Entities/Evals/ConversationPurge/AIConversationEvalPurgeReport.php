@@ -63,6 +63,9 @@ class AIConversationEvalPurgeReport extends ValueObject
 
     public int $writes = 0;
 
+    /** @var int The stored tool pictures of the purged messages deleted from the picture store's object store */
+    public int $toolPicturesErased = 0;
+
     public ?int $averageWriteMs = null;
 
     public ?int $slowestWriteMs = null;
@@ -240,6 +243,7 @@ class AIConversationEvalPurgeReport extends ValueObject
             'writes' => $this->writes,
             'averageWriteMs' => $this->averageWriteMs,
             'slowestWriteMs' => $this->slowestWriteMs,
+            'toolPicturesErased' => $this->toolPicturesErased,
             'lastRootConversationId' => $this->lastRootConversationId,
             'runSeconds' => $this->runSeconds,
             'stoppedBecause' => $this->stoppedBecause,

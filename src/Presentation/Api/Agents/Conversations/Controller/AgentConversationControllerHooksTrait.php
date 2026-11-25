@@ -16,7 +16,12 @@ use DDD\Domain\AI\Entities\Conversations\SignalSources\ConversationSignalSources
 use DDD\Domain\AI\Entities\Conversations\Usage\AgentAIUsageScope;
 use DDD\Domain\AI\Entities\UsageLogs\AIUsageEnvelopeContext;
 use DDD\Domain\AI\Services\AgentSpaces\AgentSpacesService;
-use DDD\Domain\AI\Services\ClientTools\AgentClientAttachmentsService;
+use DDD\Domain\AI\Services\ClientTools\AgentClientPresenceService;
+use DDD\Domain\AI\Services\ClientTools\AgentUIRealtimeMessageTypeProviderService;
+use DDD\Domain\AI\Services\Conversations\Realtime\AgentRealtimeChannelService;
+use DDD\Domain\AI\Entities\Conversations\Realtime\AgentRealtimeAudience;
+use DDD\Domain\AI\Entities\Conversations\Realtime\AgentRealtimeListenerCredential;
+use DDD\Domain\AI\Entities\Conversations\Realtime\AgentRealtimeMessageDeliveries;
 use DDD\Domain\AI\Services\ClientTools\AgentClientToolRequestsService;
 use DDD\Domain\AI\Services\AIUsageEnvelopesService;
 use DDD\Domain\AI\Services\Conversations\AIConversationsService;
@@ -347,9 +352,9 @@ trait AgentConversationControllerHooksTrait
     }
 
     /**
-     * Stamps the client that reads or sends (`Agent.UI`): its UI state for the `[SIGNAL:ui]` note and its presence for
-     * the client tool requests. Never fails the request it rides on: a missing table, a refused write or a bad value
-     * is logged and skipped.
+     * Records the statement of the client that reads, sends or answers (`Agent.UI`): its UI state for the `[SIGNAL:ui]`
+     * note and its presence for the client tool requests ({@see AgentClientPresenceService}, shared cache, no table).
+     * Never fails the request it rides on: a missing cache, a refused write or a bad value is logged and skipped.
      */
     protected function stampUIClientOfConversation(AIConversation $conversation, ?string $clientId, ?AgentUIState $agentUIState, bool $isOwnerSend): void
     {
@@ -357,9 +362,9 @@ trait AgentConversationControllerHooksTrait
             return;
         }
         try {
-            /** @var AgentClientAttachmentsService $agentClientAttachmentsService */
-            $agentClientAttachmentsService = DDDService::instance()->getService(AgentClientAttachmentsService::class);
-            $agentClientAttachmentsService->stampClient(
+            /** @var AgentClientPresenceService $agentClientPresenceService */
+            $agentClientPresenceService = DDDService::instance()->getService(AgentClientPresenceService::class);
+            $agentClientPresenceService->recordClientStatement(
                 (int)($conversation->rootConversationId ?? $conversation->id),
                 (int)($conversation->accountId ?? 0),
                 $clientId,
@@ -367,13 +372,13 @@ trait AgentConversationControllerHooksTrait
                 $isOwnerSend
             );
         } catch (Throwable $throwable) {
-            DDDService::instance()->getLogger()->warning('[AgentUI] client stamp skipped', ['conversationId' => $conversation->id, 'reason' => $throwable->getMessage()]);
+            DDDService::instance()->getLogger()->warning('[AgentUI] client statement skipped', ['conversationId' => $conversation->id, 'reason' => $throwable->getMessage()]);
         }
     }
 
     /**
-     * The client tool request the reading client is to execute now (`Agent.UI`); null without one. Never fails the
-     * run-state read: an error is logged and answers null.
+     * The client tool request the reading client is to execute now (`Agent.UI`, from the realtime mailbox); null
+     * without one. Never fails the run-state read: an error is logged and answers null.
      */
     protected function findClientToolRequestDeliveryOfClient(AIConversation $conversation, ?string $clientId): ?AgentClientToolRequestDelivery
     {
@@ -383,11 +388,49 @@ trait AgentConversationControllerHooksTrait
         try {
             /** @var AgentClientToolRequestsService $agentClientToolRequestsService */
             $agentClientToolRequestsService = DDDService::instance()->getService(AgentClientToolRequestsService::class);
-            return $agentClientToolRequestsService->findDeliveryForClient((int)($conversation->rootConversationId ?? $conversation->id), $clientId);
+            return $agentClientToolRequestsService->findDeliveryForClient(
+                (int)($conversation->rootConversationId ?? $conversation->id),
+                (int)($conversation->accountId ?? 0),
+                $clientId
+            );
         } catch (Throwable $throwable) {
             DDDService::instance()->getLogger()->warning('[AgentUI] client tool request delivery skipped', ['conversationId' => $conversation->id, 'reason' => $throwable->getMessage()]);
             return null;
         }
+    }
+
+    /**
+     * The open realtime messages of the realtime port for the reading client (the mailbox of a host without a
+     * transport; the client tool requests come in their own field); empty on any error.
+     */
+    protected function findRealtimeMessageDeliveriesOfClient(AIConversation $conversation, ?string $clientId): AgentRealtimeMessageDeliveries
+    {
+        if (!isset($conversation->id) || !isset($conversation->accountId) || $conversation->accountId === null) {
+            return new AgentRealtimeMessageDeliveries();
+        }
+        try {
+            /** @var AgentRealtimeChannelService $agentRealtimeChannelService */
+            $agentRealtimeChannelService = DDDService::instance()->getService(AgentRealtimeChannelService::class);
+            return $agentRealtimeChannelService->findDeliveriesForClient(
+                AgentRealtimeAudience::forConversation((int)$conversation->accountId, (int)($conversation->rootConversationId ?? $conversation->id)),
+                $clientId !== '' ? $clientId : null,
+                [AgentUIRealtimeMessageTypeProviderService::MESSAGE_TYPE_CLIENT_TOOL_REQUEST]
+            );
+        } catch (Throwable $throwable) {
+            DDDService::instance()->getLogger()->warning('[AgentRealtime] mailbox delivery skipped', ['conversationId' => $conversation->id, 'reason' => $throwable->getMessage()]);
+            return new AgentRealtimeMessageDeliveries();
+        }
+    }
+
+    /** The listener credential of the host's realtime transport for the reading account (null without a transport) */
+    protected function findRealtimeListenerCredentialOfConversation(AIConversation $conversation): ?AgentRealtimeListenerCredential
+    {
+        if (!isset($conversation->accountId) || $conversation->accountId === null) {
+            return null;
+        }
+        /** @var AgentRealtimeChannelService $agentRealtimeChannelService */
+        $agentRealtimeChannelService = DDDService::instance()->getService(AgentRealtimeChannelService::class);
+        return $agentRealtimeChannelService->findListenerCredential((int)$conversation->accountId, (int)($conversation->rootConversationId ?? $conversation->id));
     }
 
     /** {@see stampUIClientOfConversation()} for a send that names its conversation by id, read under the caller's rights */

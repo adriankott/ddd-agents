@@ -100,7 +100,8 @@ trait AgentConversationWritesTrait
 
     /**
      * The answer of the user's client to a client tool request of `Agent.UI` (the request came with the run-state
-     * read). 404 when the request is not one of this conversation for this client, 409 when it no longer waits.
+     * read or the host's transport). 404 when the request is not one of this conversation for this client, 409 when it no
+     * longer waits (answered or expired), 403 without the right useUI, 400 for a value or picture out of its bounds.
      *
      * @throws \DDD\Infrastructure\Exceptions\BadRequestException
      * @throws \DDD\Infrastructure\Exceptions\ConflictException
@@ -142,8 +143,10 @@ trait AgentConversationWritesTrait
             $requestDto->clientId,
             $requestDto->outcome,
             $requestDto->text ?? null,
-            $requestDto->detailsJson ?? null
+            $requestDto->detailsJson ?? null,
+            $requestDto->pictureBase64 ?? null
         );
+        $this->stampUIClientOfConversation($conversation, $requestDto->clientId, $requestDto->findUIState(), false);
         $responseDto = new AIConversationClientToolRequestAnswerPostResponseDto();
         $responseDto->requestId = (int)$requestDto->requestId;
         return $responseDto;

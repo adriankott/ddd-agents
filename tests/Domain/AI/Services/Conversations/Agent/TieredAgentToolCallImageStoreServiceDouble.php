@@ -6,7 +6,7 @@ namespace DDD\Tests\Agents\Domain\AI\Services\Conversations\Agent;
 
 use DDD\Domain\AI\Services\Conversations\Agent\AgentToolCallImageStoreService;
 use DDD\Infrastructure\Cache\Cache;
-use DDD\Infrastructure\ObjectStorage\ObjectStorage;
+use DDD\Infrastructure\ObjectStorage\BasicObjectStorage;
 
 /**
  * The picture store with its configuration, cache groups and object store given by the test; the tier logic, the
@@ -22,7 +22,7 @@ class TieredAgentToolCallImageStoreServiceDouble extends AgentToolCallImageStore
     /** @var array<string, Cache> The cache groups by name ({@see DEFAULT_GROUP} for null) */
     public array $cachesByGroup = [];
 
-    /** @var array<string, ObjectStorage> The object stores by name */
+    /** @var array<string, BasicObjectStorage> The object stores by name */
     public array $objectStoragesByName = [];
 
     public const string PROCESS_CACHE_GROUP = 'l1';
@@ -35,7 +35,7 @@ class TieredAgentToolCallImageStoreServiceDouble extends AgentToolCallImageStore
 
     public ?InMemoryCacheGroupDouble $sharedCache = null;
 
-    public ?ObjectStorage $objectStorage = null;
+    public ?BasicObjectStorage $objectStorage = null;
 
     /**
      * The store with the given tiers ({@see PROCESS_CACHE_GROUP}, {@see SHARED_CACHE_GROUP}, {@see OBJECT_STORAGE_NAME})
@@ -43,7 +43,7 @@ class TieredAgentToolCallImageStoreServiceDouble extends AgentToolCallImageStore
      *
      * @param array<string, mixed> $extraConfig
      */
-    public static function withTiers(bool $withProcessCache, bool $withSharedCache, ?ObjectStorage $objectStorage, array $extraConfig = []): static
+    public static function withTiers(bool $withProcessCache, bool $withSharedCache, ?BasicObjectStorage $objectStorage, array $extraConfig = []): static
     {
         $storeService = new static();
         $storeService->resetProcessState();
@@ -84,7 +84,7 @@ class TieredAgentToolCallImageStoreServiceDouble extends AgentToolCallImageStore
         return $this->cachesByGroup[$cacheGroup ?? self::DEFAULT_GROUP] ?? null;
     }
 
-    protected function resolveObjectStorage(string $objectStorageName): ?ObjectStorage
+    protected function resolveObjectStorage(string $objectStorageName): ?BasicObjectStorage
     {
         return $this->objectStoragesByName[$objectStorageName] ?? null;
     }

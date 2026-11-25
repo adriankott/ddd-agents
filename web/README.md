@@ -17,7 +17,7 @@ The second part is the peer set (React 19 assumed present; `axios` ^0.28.0 only 
 The agent skills come with the Composer package (`vendor/mgamadeus/ddd-agents/.claude/skills`), not with this one.
 
 Entries: `@mgamadeus/ddd-agents` (provider and setup), `/provider` (the provider alone), `/chat`, `/renderer`, `/widgets`, `/kit`, `/contract`,
-`/client`, `/client/testing`, `/preview`, `/image-render`, and the stylesheet `@mgamadeus/ddd-agents/styles.css`
+`/client`, `/client/testing`, `/preview`, `/image-render`, `/ui`, and the stylesheet `@mgamadeus/ddd-agents/styles.css`
 (import it once). Non-code files (widget documentation, preview fixtures, contracts, the node schema, the
 sandbox frame, SCSS tokens) are exported one subpath per file at their path below `src`. React 19 and the libraries listed under `peerDependencies` come from the application.
 
@@ -91,6 +91,33 @@ mappers above. One trap with RTK Query: a binding that reads with forced refetch
 those endpoints. With 0 the store drops the cache entry the moment the first read ends and aborts a request still in
 flight when a second read of the same key arrives — the chat then shows an empty conversation after a page load with a
 conversation in the URL. Keep the default (or any value above 0) and let the forced reads refresh the entry.
+
+## Agent.UI on the client (`/ui`)
+
+The UI tools of the agent (`getCurrentScreen`, `listScreens`, `openScreen`, `highlightOnScreen`, optionally
+`setAgentWindowMode`) send requests to the user's open client; `useAgentUIClient(adapters)` runs them and the
+conversation client posts the answers (`createAgentsHttpConversationClient({ uiClient })`).
+
+```ts
+const uiClient = useAgentUIClient({
+  targets: createDomScreenTargetSource(),            // the data-agent-anchor marks of the navigation
+  navigator, reader, highlighter,                    // the application's router, DomScreenReader, DomScreenHighlighter
+  isVisible: () => document.visibilityState === 'visible',
+  picture: createDomScreenPictureCapturer(),          // optional: getCurrentScreen(format: picture)
+  pathGuide: createDomScreenPathGuide({ findPathElements, currentRoute }), // optional
+  agentWindow: createAgentWindowAdapter({ getMode, applyMode, modes: ['docked', 'aside'] }), // optional
+});
+```
+
+- A mark: `<a href="/orders" data-agent-anchor="orders" data-agent-group="Sales" data-agent-filters="customerId">`;
+  further attributes `data-agent-label`, `data-agent-route` (`/orders/:orderId`), `data-agent-parameters`,
+  `data-agent-tabs`, `data-agent-views`, `data-agent-anchor-group` (with `groupKey`).
+- In a picture, passwords show as dots, `data-agent-secret` content is blanked and `data-agent-skip` elements are left
+  out (mark the agent window `data-agent-skip`); what a picture cannot show is `PICTURE_LIMITATIONS`.
+- The agent window steps aside before a screen is opened, marked or pictured, and comes back after a picture.
+- A host push transport hands each message to `acceptArrivedRealtimeMessage(conversationId, message, uiClient, sendAnswer)`;
+  without one the run-state read delivers. `runClientToolRequestForDevelopment(uiClient, 'LIST_TARGETS')` tries the
+  adapters without a model.
 
 ## Texts and translations
 

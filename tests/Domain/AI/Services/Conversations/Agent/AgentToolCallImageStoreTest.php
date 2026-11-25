@@ -221,6 +221,41 @@ class AgentToolCallImageStoreTest extends IntegrationTestCase
         return [$readResult->processCacheHits, $readResult->sharedCacheHits, $readResult->objectStoreHits, $readResult->misses];
     }
 
+    public function testTheObjectStoreHoldsTheRawPictureAndStillReadsABase64TextOfAnEarlierVersion(): void
+    {
+        $objectStorage = new FailingWritesFilesystemObjectStorageDouble($this->objectStoreDirectory);
+        $storeService = TieredAgentToolCallImageStoreServiceDouble::withTiers(false, false, $objectStorage);
+        $toolResult = ToolPictureFixtures::buildToolResultWithPicture();
+        $storeService->storeInlineToolResultImages($toolResult, static::buildConversation());
+        $toolResultImage = $toolResult->images[0];
+        $objectKey = 'agent-tool-images/' . $toolResultImage->sourceImageId;
+        self::assertSame(base64_decode($toolResultImage->base64Data, true), $objectStorage->getObjectContent($objectKey), 'raw bytes, no base64 text');
+        $reference = $toolResultImage->toToolCallImageReference();
+        self::assertSame($toolResultImage->base64Data, $storeService->readStoredToolCallImage($reference)?->base64Data);
+
+        // an object written before 0.5.0: the base64 text as text/plain
+        $objectStorage->putObject($objectKey, $toolResultImage->base64Data, 'text/plain');
+        self::assertSame($toolResultImage->base64Data, $storeService->readStoredToolCallImage($reference)?->base64Data);
+    }
+
+    public function testErasingTheReferencesOfAPurgedConversationDeletesTheObjectAndTheCacheEntries(): void
+    {
+        $objectStorage = new FailingWritesFilesystemObjectStorageDouble($this->objectStoreDirectory);
+        $storeService = TieredAgentToolCallImageStoreServiceDouble::withTiers(true, true, $objectStorage);
+        $toolResult = ToolPictureFixtures::buildToolResultWithPicture();
+        $storeService->storeInlineToolResultImages($toolResult, static::buildConversation());
+        $reference = $toolResult->images[0]->toToolCallImageReference();
+        $inlineReference = new ToolCallImageReference();
+
+        self::assertSame(1, $storeService->eraseStoredPicturesOfReferences([$reference, $inlineReference]));
+
+        self::assertFalse($objectStorage->objectExists('agent-tool-images/' . $reference->sourceImageId));
+        self::assertSame([], $storeService->processCache->valuesByKey);
+        self::assertSame([], $storeService->sharedCache->valuesByKey);
+        self::assertNull($storeService->readStoredToolCallImage($reference));
+        self::assertSame(0, $storeService->eraseStoredPicturesOfReferences([$inlineReference]), 'an inline picture has nothing stored');
+    }
+
     protected static function buildConversation(): AIConversation
     {
         $conversation = new AIConversation();

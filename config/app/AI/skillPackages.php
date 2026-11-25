@@ -9,6 +9,7 @@ use DDD\Presentation\Mcp\Client\Agents\AgentMemoriesMCPPackage;
 use DDD\Presentation\Mcp\Client\Agents\AgentTaskRunReportsMCPPackage;
 use DDD\Presentation\Mcp\Client\Agents\AgentTaskSchedulesMCPPackage;
 use DDD\Presentation\Mcp\Client\Agents\AgentUIMCPPackage;
+use DDD\Presentation\Mcp\Client\Agents\AgentUIWindowMCPPackage;
 use DDD\Presentation\Mcp\Client\Agents\WebSearchMCPPackage;
 use DDD\Presentation\Mcp\Admin\System\SystemCronsMCPPackage;
 use DDD\Presentation\Mcp\Admin\System\SystemHealthMCPPackage;
@@ -33,8 +34,9 @@ return [
     AISkill::AGENT_IMAGES => [AgentImagesMCPPackage::class],
     // offered only while the web research is switched on (AI.webSearch) and its capability has an endpoint
     AISkill::AGENT_WEB_SEARCH => [WebSearchMCPPackage::class],
-    // offered only to a conversation whose client executes client tool requests (AgentUIMCPPackage::isAvailable())
-    AISkill::AGENT_UI => [AgentUIMCPPackage::class],
+    // the user's client: requests over the realtime channel (AI.agentRealtimeChannel); the window-mode package only
+    // while AI.agentUI.windowModeRequests is on (AgentUIWindowMCPPackage::isAvailable())
+    AISkill::AGENT_UI => [AgentUIMCPPackage::class, AgentUIWindowMCPPackage::class],
     // Core's features for the platform operators: offered and callable only with the right operatePlatform
     // (AI.accountRights maps it to the superadmins) and an account with access to every resource
     AISkill::SYSTEM_HEALTH => [SystemHealthMCPPackage::class],

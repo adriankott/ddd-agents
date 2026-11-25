@@ -8,7 +8,7 @@
  */
 
 /** What the server asks a tab to do (`AgentClientToolRequest::TYPE_*`). */
-export type ClientToolRequestType = 'READ_SCREEN' | 'LIST_TARGETS' | 'OPEN_TARGET' | 'HIGHLIGHT';
+export type ClientToolRequestType = 'READ_SCREEN' | 'LIST_TARGETS' | 'OPEN_TARGET' | 'HIGHLIGHT' | 'SET_WINDOW_MODE';
 
 /** A request as the run-state read delivers it. */
 export interface ClientToolRequestDelivery {
@@ -23,6 +23,8 @@ export interface ClientToolAnswer {
   outcome: string;
   text: string;
   details: Record<string, string | number | boolean | null>;
+  /** A picture of the screen (base64 of WebP, JPEG or PNG), only for a `READ_SCREEN` request with `format: picture` */
+  pictureBase64?: string;
 }
 
 /** A tab never starts a request with fewer seconds left: it would finish after the tool gave up. */
@@ -45,6 +47,8 @@ export const CLIENT_TOOL_OUTCOMES = {
   expiredBeforeStart: 'EXPIRED_BEFORE_START',
   readFailed: 'READ_FAILED',
   unknownRequest: 'UNKNOWN_REQUEST',
+  unknownMode: 'UNKNOWN_MODE',
+  pictureUnavailable: 'PICTURE_UNAVAILABLE',
 } as const;
 
 // ── The navigation targets ───────────────────────────────────────────────────────────────────────────────────────────
@@ -140,6 +144,58 @@ export interface ScreenHighlighter {
   clear(): void;
 }
 
+/** The size presets of a screen picture (`pictureSize` of `getCurrentScreen`). */
+export type ScreenPictureSize = 'small' | 'medium' | 'large';
+
+/** How a screen picture is rendered (`renderMode` of `getCurrentScreen`). */
+export type ScreenPictureRenderMode = 'colour' | 'greyscale' | 'machine';
+
+export interface ScreenPictureRequest {
+  pictureSize: ScreenPictureSize;
+  renderMode: ScreenPictureRenderMode;
+}
+
+/** A captured picture of the screen. */
+export interface ScreenPicture {
+  /** base64 of the encoded bytes, without a `data:` prefix */
+  base64: string;
+  mimeType: 'image/webp' | 'image/jpeg' | 'image/png';
+  width: number;
+  height: number;
+  byteSize: number;
+}
+
+/** Captures the open screen as a picture (`createDomScreenPictureCapturer()` is the DOM default). */
+export interface ScreenPictureCapturer {
+  capture(request: ScreenPictureRequest): Promise<ScreenPicture | null>;
+}
+
+/** The agent window of the application: steps aside before the agent works on the screen, takes a requested mode. */
+export interface AgentWindowAdapter {
+  /** Makes room for the screen (the default before `OPEN_TARGET`, `HIGHLIGHT` and a picture) */
+  stepAside(requestType: ClientToolRequestType): void | Promise<void>;
+  /** Back to the mode before `stepAside()` */
+  restore(): void | Promise<void>;
+  /** A mode the application knows (`SET_WINDOW_MODE`); false = unknown mode */
+  setMode(mode: string): boolean | Promise<boolean>;
+  /** Whether the window steps aside before a request of the type; default true for the three screen requests */
+  shouldStepAsideBefore?(requestType: ClientToolRequestType): boolean;
+}
+
+/** Shows the user the way to a target before it opens (`createDomScreenPathGuide()` is the DOM default). */
+export interface ScreenPathGuide {
+  /**
+   * Shows the path to the target; never awaited by the runner, so it never delays the answer. Returns false when it
+   * shows nothing (reduced motion, already on the target, no element of the path on the screen).
+   */
+  guide(target: ScreenTarget, request: ScreenOpenRequest): boolean;
+  /** Stops a guide still running */
+  cancel(): void;
+}
+
+/** A request type the application handles itself (a type a host or package registered on the server). */
+export type ClientToolRequestHandler = (parameters: Record<string, unknown>, delivery: ClientToolRequestDelivery) => ClientToolAnswer | Promise<ClientToolAnswer>;
+
 export interface ScreenAdapters {
   targets: ScreenTargetSource;
   navigator: ScreenNavigator;
@@ -147,6 +203,14 @@ export interface ScreenAdapters {
   highlighter: ScreenHighlighter;
   /** Whether the client is visible now */
   isVisible: () => boolean;
+  /** Optional: captures the screen as a picture; without it a picture request is answered `PICTURE_UNAVAILABLE` */
+  picture?: ScreenPictureCapturer;
+  /** Optional: the agent window; without it `SET_WINDOW_MODE` is answered `UNKNOWN_MODE` */
+  agentWindow?: AgentWindowAdapter;
+  /** Optional: the path guide shown before `OPEN_TARGET` */
+  pathGuide?: ScreenPathGuide;
+  /** Optional: handlers of further request types, by type; a type of the package is never replaced */
+  requestHandlers?: Record<string, ClientToolRequestHandler>;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────────────────────────────────────────────

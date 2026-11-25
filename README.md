@@ -76,7 +76,13 @@ section 5.
   `AgentAccountRightsAnsweringInterface` decides the names it answers alone. `AgentDeclaredAccountRightsService`
   lists every right the installed packages declare.
 - **Per tool, by name** (`config/app/AI/toolOverlays.php`): `accountRights` (replaces the attributes, `[]` = none),
-  `description`, `summary`, `parameters`, `ownerFacingSubject`.
+  `description`, `summary`, `parameters` (a parameter set to `false` leaves the schema and its sent value is ignored —
+  for the space argument the conversation's space applies), `examples` (replaces the `@example` lines the model
+  sees), `ownerFacingSubject`.
+- **Agent.UI** (`config/app/AI/agentUI.php`, `config/app/AI/agentRealtimeChannel.php`): no tables; requests travel
+  through the realtime port (`AgentRealtimeChannelService`: a mailbox in the shared cache read with the run state, a
+  host transport optional); `openScreen` at most once per user turn by default (`maxOpenScreenPerUserTurn`), the window
+  tool `setAgentWindowMode` off by default (`windowModeRequests`).
 - **The space argument** (`config/app/AI/agentSpaceToolArgument.php`): its name and description on the wire.
 - **The task list widget** (`config/app/AI/agentTasks.php`): `taskListWidgetType`.
 - **`app:agent:check-installation`** (read-only, `--format=json`, exit 1 on a blocking finding): unbound package

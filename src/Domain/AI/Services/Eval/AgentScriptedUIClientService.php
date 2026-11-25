@@ -117,10 +117,13 @@ class AgentScriptedUIClientService extends Service
         $state = $this->readState($accountId) ?? ['screen' => static::NO_CLIENT_FIXTURE, 'log' => []];
         $screen = $this->loadFixture((string)$state['screen']);
         [$outcome, $text, $details, $logLine, $nextScreen] = match ($request->requestType) {
-            AgentClientToolRequest::TYPE_READ_SCREEN => $this->answerReadScreen($screen),
+            AgentClientToolRequest::TYPE_READ_SCREEN => $request->getArgument('format') === 'picture'
+                ? ['READ_FAILED', null, [], 'picture not available', null]
+                : $this->answerReadScreen($screen),
             AgentClientToolRequest::TYPE_LIST_TARGETS => $this->answerListTargets($request),
             AgentClientToolRequest::TYPE_OPEN_TARGET => $this->answerOpenTarget($screen, $request),
             AgentClientToolRequest::TYPE_HIGHLIGHT => $this->answerHighlight($screen, $request),
+            AgentClientToolRequest::TYPE_SET_WINDOW_MODE => ['OK', null, [], 'window mode ' . (string)$request->getArgument('mode'), null],
             default => ['UNKNOWN_REQUEST', 'This request type is not known.', [], 'unknown request', null],
         };
         $state['log'][] = $logLine;

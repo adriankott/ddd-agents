@@ -23,7 +23,7 @@ use DDD\Infrastructure\Modules\DDDModule;
  * - `DDD\Domain\AI\Libs\RecordedRuns\`, `DDD\Domain\AI\Listeners\Conversations\`,
  *   `DDD\Domain\AI\Messenger\Conversations\`, `DDD\Domain\AI\Traits\Conversations\`;
  * - `DDD\Domain\AI\Repo\Argus\Conversations\`, `…\Repo\Argus\Guard\`, `…\Repo\Argus\Mandates\`, `…\Repo\Argus\WebSearch\`,
- *   `…\Repo\DB\AgentSpaces\`, `…\Repo\DB\ClientTools\`, `…\Repo\DB\Conversations\`, `…\Repo\DB\Evals\`, `…\Repo\DB\Mandates\`;
+ *   `…\Repo\DB\AgentSpaces\`, `…\Repo\DB\Conversations\`, `…\Repo\DB\Evals\`, `…\Repo\DB\Mandates\`;
  * - `DDD\Domain\AI\Services\AgentSpaces\`, `…\Services\ClientTools\`, `…\Services\Conversations\`, `…\Services\Decisions\`, `…\Services\Documents\`,
  *   `…\Services\Drives\`, `…\Services\Eval\`, `…\Services\Installation\`, `…\Services\Mandates\`,
  *   `…\Services\Skills\`, `…\Services\SystemHealth\`, `…\Services\SystemPrompts\`, `…\Services\Texts\Embeddings\`, `…\Services\WebSearch\`;
@@ -76,7 +76,6 @@ class AgentsModule extends DDDModule
         'DDD\\Domain\\AI\\Repo\\Argus\\Mandates\\',
         'DDD\\Domain\\AI\\Repo\\Argus\\WebSearch\\',
         'DDD\\Domain\\AI\\Repo\\DB\\AgentSpaces\\',
-        'DDD\\Domain\\AI\\Repo\\DB\\ClientTools\\',
         'DDD\\Domain\\AI\\Repo\\DB\\Conversations\\',
         'DDD\\Domain\\AI\\Repo\\DB\\Evals\\',
         'DDD\\Domain\\AI\\Repo\\DB\\Mandates\\',

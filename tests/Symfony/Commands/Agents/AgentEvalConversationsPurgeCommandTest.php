@@ -121,6 +121,7 @@ class AgentEvalConversationsPurgeCommandTest extends UnitTestCase
 | writes                     | 0                              |
 | averageWriteMs             | -                              |
 | slowestWriteMs             | -                              |
+| toolPicturesErased         | 0                              |
 | lastRootConversationId     | 30                             |
 | runSeconds                 | 0                              |
 | stoppedBecause             | no eval conversation tree left |

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace DDD\Presentation\Api\Agents\Conversations\Dtos;
 
 use DDD\Domain\AI\Entities\ClientTools\AgentClientToolRequestDelivery;
+use DDD\Domain\AI\Entities\Conversations\Realtime\AgentRealtimeListenerCredential;
+use DDD\Domain\AI\Entities\Conversations\Realtime\AgentRealtimeMessageDeliveries;
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Infrastructure\Base\DateTime\DateTime;
 use DDD\Presentation\Base\Dtos\RestResponseDto;
@@ -43,6 +45,21 @@ class AIConversationRunStateGetResponseDto extends RestResponseDto
      */
     #[Parameter(in: Parameter::RESPONSE, required: false)]
     public ?AgentClientToolRequestDelivery $clientToolRequest = null;
+
+    /**
+     * @var AgentRealtimeMessageDeliveries|null The open messages of the realtime port for the reading client (types other
+     * packages registered, e.g. a call's ring), from the mailbox of a host without a transport; a client acts on one
+     * type and key once
+     */
+    #[Parameter(in: Parameter::RESPONSE, required: false)]
+    public ?AgentRealtimeMessageDeliveries $realtimeMessages = null;
+
+    /**
+     * @var AgentRealtimeListenerCredential|null What the client needs to listen on the host's realtime transport; null
+     * without a transport (the run-state read then delivers)
+     */
+    #[Parameter(in: Parameter::RESPONSE, required: false)]
+    public ?AgentRealtimeListenerCredential $realtimeListenerCredential = null;
 
     /** @var string|null The display title; null until the first title was generated. */
     #[Parameter(in: Parameter::RESPONSE, required: true)]

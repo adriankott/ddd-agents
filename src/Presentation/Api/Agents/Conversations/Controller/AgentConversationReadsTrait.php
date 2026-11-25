@@ -491,6 +491,8 @@ trait AgentConversationReadsTrait
         $this->stampUIClientOfConversation($aiConversation, $requestDto->clientId ?? null, $requestDto->findUIState(), false);
         $responseDto = AIConversationRunStateGetResponseDto::fromConversation($aiConversation);
         $responseDto->clientToolRequest = $this->findClientToolRequestDeliveryOfClient($aiConversation, $requestDto->clientId ?? null);
+        $responseDto->realtimeMessages = $this->findRealtimeMessageDeliveriesOfClient($aiConversation, $requestDto->clientId ?? null);
+        $responseDto->realtimeListenerCredential = $this->findRealtimeListenerCredentialOfConversation($aiConversation);
         return $responseDto;
     }
 }

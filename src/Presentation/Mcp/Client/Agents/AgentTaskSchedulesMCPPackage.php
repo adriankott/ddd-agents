@@ -233,9 +233,7 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
             $alreadyProducedResponseDto = new TaskScheduleCreateMcpResponseDto();
             $alreadyProducedResponseDto->scheduleId = isset($alreadyProducedSchedule->id) ? (int)$alreadyProducedSchedule->id : null;
             $alreadyProducedResponseDto->nextRunAt = $alreadyProducedSchedule->nextRunAt ?? null;
-            $alreadyProducedResponseDto->note = 'This call already produced schedule #' . (int)($alreadyProducedSchedule->id ?? 0)
-                . ' — it was NOT created again. ' . static::composeNextFiringNote($alreadyProducedSchedule)
-                . 'Confirm it to the user in ONE short sentence; do not schedule it again.';
+            $alreadyProducedResponseDto->note = $this->composeScheduleAlreadyProducedNote($alreadyProducedSchedule, $requestDto, $callProvenance);
             return $alreadyProducedResponseDto;
         }
         // the zone is decided before anything is parsed: an explicit override, else the zone this call thinks in, else
@@ -1323,6 +1321,20 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
             DDDService::instance()->restoreEntityRightsRestrictionsStateSnapshot();
         }
         return $runConversation instanceof AIConversation ? $runConversation : null;
+    }
+
+    /**
+     * Override point: what the model reads when a retried call answers with the schedule it already produced
+     * ({@see findScheduleAlreadyProducedByCall()}): nothing was created again; confirm it once.
+     */
+    protected function composeScheduleAlreadyProducedNote(
+        AIConversationSchedule $alreadyProducedSchedule,
+        OneTimeTaskScheduleCreateRequestDto $requestDto,
+        AgentToolCallProvenance $callProvenance
+    ): string {
+        return 'This call already produced schedule #' . (int)($alreadyProducedSchedule->id ?? 0)
+            . ' — it was NOT created again. ' . static::composeNextFiringNote($alreadyProducedSchedule)
+            . 'Confirm it to the user in ONE short sentence; do not schedule it again.';
     }
 
     /**

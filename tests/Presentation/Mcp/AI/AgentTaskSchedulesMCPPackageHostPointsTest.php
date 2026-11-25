@@ -64,6 +64,14 @@ class AgentTaskSchedulesMCPPackageHostPointsTest extends UnitTestCase
         self::assertTrue((new AgentTaskSchedulesMCPPackageWithTaskListWidgetDouble())->isScopeReadWithoutEntityRightsForTest(null, new Account()));
     }
 
+    public function testTheAlreadyProducedNoteIsAnOverridePoint(): void
+    {
+        $noteMethod = new ReflectionMethod(AgentTaskSchedulesMCPPackage::class, 'composeScheduleAlreadyProducedNote');
+
+        self::assertTrue($noteMethod->isProtected());
+        self::assertSame('string', (string)$noteMethod->getReturnType());
+    }
+
     public function testTheRetriedCallHookAnswersNullByDefault(): void
     {
         $hookMethod = new ReflectionMethod(AgentTaskSchedulesMCPPackage::class, 'findScheduleAlreadyProducedByCall');

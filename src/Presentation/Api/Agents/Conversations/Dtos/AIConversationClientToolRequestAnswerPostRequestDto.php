@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DDD\Presentation\Api\Agents\Conversations\Dtos;
 
 use DDD\Domain\AI\Entities\ClientTools\AgentClientToolRequest;
+use DDD\Domain\AI\Entities\ClientTools\AgentUIState;
 use DDD\Presentation\Base\Dtos\RequestDto;
 use DDD\Presentation\Base\OpenApi\Attributes\Parameter;
 
@@ -36,6 +37,34 @@ class AIConversationClientToolRequestAnswerPostRequestDto extends RequestDto
     /** @var string|null Small facts as one flat JSON object (route, title, counts), at most 1,024 characters */
     #[Parameter(in: Parameter::BODY, required: false)]
     public ?string $detailsJson = null;
+
+    /**
+     * @var string|null A picture of the screen (base64 of WebP, JPEG or PNG; a `READ_SCREEN` request with
+     * `format: picture`); checked as untrusted bytes: the type from the magic bytes, the size from the pinned decoder
+     */
+    #[Parameter(in: Parameter::BODY, required: false)]
+    public ?string $pictureBase64 = null;
+
+    /**
+     * @var string|null What the client's UI shows after it carried out the request, as one JSON object of the shape of
+     * `AgentUIState`; recorded as the client's statement (presence and the `[SIGNAL:ui]` note), a value that is no JSON
+     * object is ignored
+     */
+    #[Parameter(in: Parameter::BODY, required: false)]
+    public ?string $uiStateJson = null;
+
+    /** The UI state the answer carries; null when it carries none */
+    public function findUIState(): ?AgentUIState
+    {
+        // setPropertiesFromObject() takes its argument by reference: it needs a variable, never an expression
+        $uiStateObject = json_decode((string)($this->uiStateJson ?? ''));
+        if (!is_object($uiStateObject)) {
+            return null;
+        }
+        $agentUIState = new AgentUIState();
+        $agentUIState->setPropertiesFromObject($uiStateObject);
+        return $agentUIState;
+    }
 
     /** The longest answer text the route takes ({@see AgentClientToolRequest::MAX_ANSWER_TEXT_CHARS}) */
     public static function getMaxAnswerTextChars(): int

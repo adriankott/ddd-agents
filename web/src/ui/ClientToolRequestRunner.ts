@@ -8,9 +8,22 @@ import {
   isClientToolToken,
   MIN_SECONDS_LEFT_TO_START,
   parseClientToolArguments,
+  type ClientToolRequestType,
   type ScreenAdapters,
+  type ScreenPictureRenderMode,
+  type ScreenPictureSize,
   type ScreenTarget,
 } from "./client-tools";
+
+/** The request types of the package; a handler of the application never replaces them. */
+const PACKAGE_REQUEST_TYPES: string[] = ['READ_SCREEN', 'LIST_TARGETS', 'OPEN_TARGET', 'HIGHLIGHT', 'SET_WINDOW_MODE'];
+
+/** The request types the agent window steps aside for by default. */
+const STEP_ASIDE_REQUEST_TYPES: ClientToolRequestType[] = ['OPEN_TARGET', 'HIGHLIGHT', 'READ_SCREEN'];
+
+const PICTURE_SIZES: ScreenPictureSize[] = ['small', 'medium', 'large'];
+
+const RENDER_MODES: ScreenPictureRenderMode[] = ['colour', 'greyscale', 'machine'];
 
 /** The most characters of screen content in one answer (the server cuts at 8,000 again). */
 export const MAX_SCREEN_CHARS = 6000;
@@ -70,19 +83,82 @@ export class ClientToolRequestRunner {
     try {
       switch (delivery.requestType) {
         case 'READ_SCREEN':
+          if (parameters.format === 'picture') {
+            await this.stepAgentWindowAside('READ_SCREEN');
+            try {
+              return await this.readScreenPicture(parameters);
+            } finally {
+              await this.adapters.agentWindow?.restore();
+            }
+          }
           return this.readScreen(parameters);
         case 'LIST_TARGETS':
           return this.listTargets(parameters);
         case 'OPEN_TARGET':
           return await this.openTarget(parameters);
         case 'HIGHLIGHT':
+          await this.stepAgentWindowAside('HIGHLIGHT');
           return this.highlight(parameters);
+        case 'SET_WINDOW_MODE':
+          return await this.setWindowMode(parameters);
         default:
-          return refusal(CLIENT_TOOL_OUTCOMES.unknownRequest);
+          return await this.runRequestOfApplication(delivery, parameters);
       }
     } catch {
       return refusal(CLIENT_TOOL_OUTCOMES.readFailed);
     }
+  }
+
+  /** A request type the application registered: its handler, else `UNKNOWN_REQUEST`. */
+  protected async runRequestOfApplication(delivery: ClientToolRequestDelivery, parameters: Record<string, unknown>): Promise<ClientToolAnswer> {
+    const handler = PACKAGE_REQUEST_TYPES.includes(delivery.requestType) ? undefined : this.adapters.requestHandlers?.[delivery.requestType];
+    if (!handler) return refusal(CLIENT_TOOL_OUTCOMES.unknownRequest);
+    return handler(parameters, delivery);
+  }
+
+  /** Lets the agent window make room before the agent works on the screen (the default for the screen requests). */
+  protected async stepAgentWindowAside(requestType: ClientToolRequestType): Promise<void> {
+    const agentWindow = this.adapters.agentWindow;
+    if (!agentWindow) return;
+    const shouldStepAside = agentWindow.shouldStepAsideBefore
+      ? agentWindow.shouldStepAsideBefore(requestType)
+      : STEP_ASIDE_REQUEST_TYPES.includes(requestType);
+    if (shouldStepAside) await agentWindow.stepAside(requestType);
+  }
+
+  protected async setWindowMode(parameters: Record<string, unknown>): Promise<ClientToolAnswer> {
+    const agentWindow = this.adapters.agentWindow;
+    if (!agentWindow || !isClientToolToken(parameters.mode)) return refusal(CLIENT_TOOL_OUTCOMES.unknownMode);
+    if (parameters.mode === 'restore') {
+      await agentWindow.restore();
+      return { outcome: CLIENT_TOOL_OUTCOMES.ok, text: '', details: { mode: 'restore' } };
+    }
+    const accepted = await agentWindow.setMode(parameters.mode);
+    if (!accepted) return refusal(CLIENT_TOOL_OUTCOMES.unknownMode);
+    return { outcome: CLIENT_TOOL_OUTCOMES.ok, text: '', details: { mode: parameters.mode } };
+  }
+
+  protected async readScreenPicture(parameters: Record<string, unknown>): Promise<ClientToolAnswer> {
+    const capturer = this.adapters.picture;
+    if (!capturer) return refusal(CLIENT_TOOL_OUTCOMES.pictureUnavailable);
+    const pictureSize = PICTURE_SIZES.find(size => size === parameters.pictureSize) ?? 'medium';
+    const renderMode = RENDER_MODES.find(mode => mode === parameters.renderMode) ?? 'colour';
+    const picture = await capturer.capture({ pictureSize, renderMode });
+    if (!picture) return refusal(CLIENT_TOOL_OUTCOMES.pictureUnavailable);
+    const location = this.adapters.navigator.currentLocation();
+    return {
+      outcome: CLIENT_TOOL_OUTCOMES.ok,
+      text: '',
+      details: {
+        route: location.route,
+        visible: this.adapters.isVisible(),
+        width: picture.width,
+        height: picture.height,
+        bytes: picture.byteSize,
+        renderMode,
+      },
+      pictureBase64: picture.base64,
+    };
   }
 
   protected readScreen(parameters: Record<string, unknown>): ClientToolAnswer {
@@ -121,7 +197,14 @@ export class ClientToolRequestRunner {
     if (buildTargetRoute(target, recordIds, tab) === null) return refusal(CLIENT_TOOL_OUTCOMES.missingParameter);
     const blocker = this.adapters.navigator.describeBlockers();
     if (blocker) return { outcome: blocker.outcome, text: blocker.reason, details: {} };
-    const location = await this.adapters.navigator.open(target, { recordIds, tab, filters });
+    await this.stepAgentWindowAside('OPEN_TARGET');
+    const openRequest = { recordIds, tab, filters };
+    try {
+      this.adapters.pathGuide?.guide(target, openRequest);
+    } catch {
+      // a guide is decoration: the navigation goes on without it
+    }
+    const location = await this.adapters.navigator.open(target, openRequest);
     const details = { route: location.route, title: location.title };
     if (parameters.includeScreen !== true) return { outcome: CLIENT_TOOL_OUTCOMES.ok, text: '', details };
     const snapshot = this.adapters.reader.read({ maxChars: MAX_SCREEN_CHARS });

@@ -31,7 +31,6 @@ src/Domain/AI/MessageHandlers/AIConversationScorecard*	observability
 src/Domain/AI/Interfaces/AIConversationProgressReporterInterface.php	observability
 src/Domain/AI/Traits/**	observability
 src/Presentation/Mcp/Agents/**	observability
-src/Symfony/Commands/Agents/AgentClientToolsPurgeCommand.php	tools
 src/Symfony/Commands/Agents/AgentCheckInstallationCommand.php	entry
 src/Symfony/Commands/Agents/**	observability
 src/Presentation/Api/Agents/Conversations/Dtos/AIConversationMessageSentPayload*	observability
@@ -63,6 +62,8 @@ config/app/AI/Prompts/AI/Agent/OwnerMessageInjectionGateRules.md	decisions-and-g
 # Agent.UI and System.* (ddd-module-agents-tools-specialist): the UI tools with their client channel, the platform tools
 src/Domain/AI/**/ClientTools/**	tools
 src/Presentation/Mcp/Client/Agents/AgentUIMCPPackage.php	tools
+src/Presentation/Mcp/Client/Agents/AgentUIWindowMCPPackage.php	tools
+config/app/AI/agentUI.php	tools
 src/Presentation/Mcp/Client/Agents/Dtos/AgentUIToolResponseDto.php	tools
 src/Presentation/Mcp/Client/Agents/Dtos/*Screen*	tools
 src/Presentation/Api/Agents/Conversations/Dtos/AIConversationClientToolRequestAnswer*	tools
@@ -134,6 +135,8 @@ src/Domain/AI/Entities/Conversations/Messages/AIConversationSignalSource.php	wid
 src/Domain/AI/**/A2A/**	widgets
 **/*ActivityLines*	widgets
 src/Domain/AI/Services/Conversations/AIConversationRealtimeSignalService.php	widgets
+src/Domain/AI/**/Conversations/Realtime/**	widgets
+config/app/AI/agentRealtimeChannel.php	widgets
 src/Domain/AI/Services/Conversations/AIConversationTaskPushNotificationConfigsService.php	widgets
 src/Domain/AI/Services/Conversations/ComposedViewBindingResolutionService.php	widgets
 src/Presentation/Api/Agents/Conversations/Dtos/AIConversationActivity*	widgets

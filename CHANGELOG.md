@@ -1,5 +1,78 @@
 # Changelog
 
+## 0.5.0
+
+Agent.UI without tables, screen pictures, the realtime port, and host adaptability. A minor with removals. Requires
+`mgamadeus/ddd` ^3.46.1 and `mgamadeus/ddd-ai` ^3.7.0; npm `@mgamadeus/ddd-agents` 0.5.0 in lockstep.
+
+**Removed (read before updating):**
+
+- **The Agent.UI tables.** Client tool requests, their answers and the client presence live in the shared cache for
+  the seconds they matter; nothing is persisted. Removed: the entities `AgentClientToolRequests`,
+  `AgentClientAttachment(s)`, `AgentClientToolsPurgeResult`, the repositories `DBAgentClientToolRequest(s)`,
+  `DBAgentClientAttachment(s)` with their models, `AgentClientToolRowRights`, `AgentClientAttachmentsService`, the
+  namespace `DDD\Domain\AI\Repo\DB\ClientTools\` from the owned namespaces, and the command
+  `app:agent:purge-client-tool-requests` (alias `app:ai-agent:client-tools:purge`) with its cron line.
+  `AgentClientToolRequest` is a ValueObject now (no repository).
+- `AgentClientToolRequestsService`: `blankAnswerText()` and `purge()` are gone; `findDeliveryForClient()` takes the
+  account id (`$conversationId, $accountId, $clientId`); `findRequest()` reads the shared cache.
+
+**Host steps:**
+
+1. Give the agent a shared cache (`config/app/AI/agentRealtimeChannel.php` `sharedCacheGroup`; null tries `redis`,
+   then Core's default group). APCu alone is no shared cache: the UI tools then answer "no client" and
+   `app:agent:check-installation` warns (`realtimeChannel`).
+2. Remove the cron line of `app:agent:purge-client-tool-requests` and any screen or fixture that names it.
+3. Drop the tables `AgentClientToolRequests` and `AgentClientAttachments` (with the host's table prefix or
+   `tableNames`) when convenient; the package no longer reads them. Regenerate the Doctrine models.
+4. Optional push transport: a same-path subclass of `AgentRealtimeChannelService` overriding
+   `publishMessageToTransport()`, `clearMessageOnTransport()`, `issueListenerCredential()`,
+   `askTransportWhetherClientIsListening()`. An existing override of
+   `AIConversationRealtimeSignalService::publishClientToolRequestSignal()` keeps working (deprecated, still rung).
+5. npm: update `@mgamadeus/ddd-agents` to 0.5.0; the answer now carries `uiStateJson` (and `pictureBase64`).
+
+**Changed defaults:**
+
+- `openScreen` opens at most one screen per user message (`AI.agentUI.maxOpenScreenPerUserTurn`, default 1; counted
+  over the stored calls and a shared-cache counter); a further call answers `OPEN_SCREEN_CAP`.
+- The window tool `setAgentWindowMode` (package `agent.ui.window`, request type `SET_WINDOW_MODE`) is off unless
+  `AI.agentUI.windowModeRequests` is true; a switched-off or unknown request type answers `NOT_ENABLED`.
+
+**New:**
+
+- **The realtime port** `AgentRealtimeChannelService`: typed messages (tagged `AgentRealtimeMessageTypeProvider`) to an
+  account's or a conversation's clients — `sendMessage()`, `clearMessage()` (same type and key replaces),
+  `findListenerCredential()`, `isClientListening()` — with a mailbox in the shared cache that the run-state read
+  delivers (`realtimeMessages`, `realtimeListenerCredential`), so a host without a transport works as is. Client
+  presence from what the clients already send (`AgentClientPresenceService`). Request types are open (tagged
+  `AgentClientToolRequestTypeProvider`).
+- **Screen pictures:** `getCurrentScreen(format: picture, pictureSize: small|medium|large, renderMode:
+  colour|greyscale|machine)`; the client's picture is checked as untrusted bytes (`RasterImageDecoder`, size and type
+  caps) and reaches the model as an image part (`MCPToolResponseImageProvider`), with the fixed list of what a picture
+  cannot show (`AgentUIMCPPackage::PICTURE_LIMITATIONS`). The answer also carries the UI state after the request.
+- **npm `/ui`:** `createDomScreenTargetSource()` (`data-agent-anchor` marks, optional `groupKey`),
+  `createDomScreenPictureCapturer()` (three presets with pixel and byte budgets, three render modes, retries from the
+  source size, passwords as dots, `data-agent-secret` / `data-agent-skip`, scroll containers expanded),
+  `createDomScreenPathGuide()` (Esc or a click cancels, skipped under reduced motion, on the target or without a path
+  element, never delays the answer; `createGuideCounter()` guides a target twice, localStorage in try/catch),
+  `createAgentWindowAdapter()` (steps aside before opening, marking and a picture), `acceptArrivedRealtimeMessage()`
+  for a host transport, `runClientToolRequestForDevelopment()`; the runner takes `SET_WINDOW_MODE`, pictures and
+  `requestHandlers` for further request types; the HTTP client hands other realtime message types to
+  `onRealtimeMessage` and the credential to `onRealtimeListenerCredential`.
+- **Tool overlays** (`config/app/AI/toolOverlays.php`): a parameter set to `false` is hidden — gone from the schema,
+  a sent value ignored; for the space argument the conversation's space applies (also for the rights gates).
+  `examples` replaces the `@example` lines the model sees.
+- **Installation check:** a feature's table is required only while its feature is on or its skill is bound (tagged
+  `AgentFeatureTableConditionProvider`; organ packages declare theirs); the database error message is redacted (the
+  driver's text is not shown); the renames state file is found by `AI.installationCheck.renamesStateFile` or in the
+  parent folders up to the repository root.
+- **Tool picture store:** the object store holds the raw bytes with their content type (older base64 objects are
+  still read), any Core object store driver serves (`BasicObjectStorage`), and the eval purge erases the pictures of
+  the trees it deletes (`toolPicturesErased`).
+- **Schedules:** the hard delete of the archive policy runs without entity rights once the scope rule allowed it
+  (`hardDeleteScheduleWithoutEntityRights()`, protected), like the status changes; the note of a one-time task whose
+  result already exists is a protected hook, `composeScheduleAlreadyProducedNote()`.
+
 ## 0.4.2
 
 **Bug fix: a schedule stored without a zone no longer changes when it fires on an unrelated edit.** In 0.4.0 and 0.4.1
