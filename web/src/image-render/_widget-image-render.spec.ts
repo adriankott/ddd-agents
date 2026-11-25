@@ -1,4 +1,3 @@
-import axios from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFrozenHydration } from "./WidgetImageRenderContext";
 import { installFrozenWidgetRequests } from "./frozen-widget-requests";
@@ -53,25 +52,145 @@ const element = () => {
   return node;
 };
 
+/** One request through `fetch` or a plain `XMLHttpRequest`: its JSON answer, or `{ ok: false }` when it failed. */
+const send = async (
+  transport: "fetch" | "xhr",
+  method: string,
+  url: string,
+  body?: string,
+): Promise<{ ok: true; status: number; data: unknown } | { ok: false }> => {
+  if (transport === "fetch") {
+    try {
+      const response = await window.fetch(url, { method, body });
+      const text = await response.text();
+      return { ok: true, status: response.status, data: text === "asset" ? text : JSON.parse(text) };
+    } catch {
+      return { ok: false };
+    }
+  }
+  return new Promise((resolve) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open(method, url);
+    xhr.onload = () =>
+      resolve({ ok: true, status: xhr.status, data: xhr.responseText === "asset" ? "asset" : JSON.parse(xhr.responseText) });
+    xhr.onerror = () => resolve({ ok: false });
+    xhr.send(body ?? null);
+  });
+};
+
 describe("frozen widget input", () => {
   it("uses exact hydration before the type default and treats explicit null as a result", () => {
     expect(readFrozenHydration({ keyword: "default", "keyword:1": null }, "keyword", "keyword:1")).toBeNull();
     expect(() => readFrozenHydration({}, "keyword", "keyword:1")).toThrow("MISSING_FROZEN_HYDRATION");
   });
-  it("serves supplied GETs without transport and blocks mutations and unknown reads", async () => {
-    const fail = vi.fn();
-    const restore = installFrozenWidgetRequests({ "GET /api/keywords?a=1&b=2": { name: "dentist" } }, fail);
-    // An instance takes the installed adapter from the defaults but none of the response interceptors an app module
-    // registered on the global axios (the spec setup loads the application's modules): the transport is the subject here.
-    const transportOnly = axios.create();
-    try {
-      expect((await transportOnly.get("/api/keywords?b=2&a=1")).data).toEqual({ name: "dentist" });
-      await expect(transportOnly.post("/api/keywords?a=1&b=2", {})).rejects.toThrow("MISSING_FROZEN_RESPONSE");
-      await expect(transportOnly.get("/api/other")).rejects.toThrow("MISSING_FROZEN_RESPONSE");
-      expect(fail).toHaveBeenCalledTimes(2);
-    } finally {
-      restore();
-    }
+  describe("by default (XMLHttpRequest, as the former axios adapter; fetch untouched)", () => {
+    const pageFetch = window.fetch;
+    afterEach(() => {
+      window.fetch = pageFetch;
+    });
+
+    it("serves supplied GETs without transport and blocks mutations and unknown reads", async () => {
+      const fail = vi.fn();
+      const restore = installFrozenWidgetRequests({ "GET /api/keywords?a=1&b=2": { name: "dentist" } }, fail);
+      try {
+        expect(await send("xhr", "GET", "/api/keywords?b=2&a=1")).toEqual({ ok: true, status: 200, data: { name: "dentist" } });
+        expect(await send("xhr", "POST", "/api/keywords?a=1&b=2", "{}")).toEqual({ ok: false });
+        expect(await send("xhr", "GET", "/api/other")).toEqual({ ok: false });
+        expect(fail).toHaveBeenCalledTimes(2);
+        expect(fail).toHaveBeenCalledWith("MISSING_FROZEN_RESPONSE");
+      } finally {
+        restore();
+      }
+    });
+
+    it("answers each read with its own copy", async () => {
+      const responses = { "GET /api/keywords": { names: ["dentist"] } };
+      const restore = installFrozenWidgetRequests(responses, vi.fn());
+      try {
+        const first = await send("xhr", "GET", "/api/keywords");
+        (first as { data: { names: string[] } }).data.names.push("changed");
+        expect(await send("xhr", "GET", "/api/keywords")).toMatchObject({ data: { names: ["dentist"] } });
+        expect(responses["GET /api/keywords"].names).toEqual(["dentist"]);
+      } finally {
+        restore();
+      }
+    });
+
+    it("fails static images and other origins through XMLHttpRequest too, without the network", async () => {
+      const network = vi.fn(async () => new Response("asset"));
+      window.fetch = network as unknown as typeof window.fetch;
+      const fail = vi.fn();
+      const restore = installFrozenWidgetRequests({}, fail);
+      try {
+        expect(await send("xhr", "GET", "/react/app-build/assets/logos/google.svg")).toEqual({ ok: false });
+        expect(await send("xhr", "GET", "https://maps.googleapis.com/maps/api/js")).toEqual({ ok: false });
+        expect(fail).toHaveBeenCalledTimes(2);
+        expect(network).not.toHaveBeenCalled();
+      } finally {
+        restore();
+      }
+    });
+
+    it("leaves fetch as it is", async () => {
+      const network = vi.fn(async () => new Response('{"from":"network"}'));
+      window.fetch = network as unknown as typeof window.fetch;
+      const fail = vi.fn();
+      const restore = installFrozenWidgetRequests({ "GET /api/keywords": { name: "dentist" } }, fail);
+      try {
+        expect(window.fetch).toBe(network);
+        expect(await send("fetch", "GET", "/api/keywords")).toEqual({ ok: true, status: 200, data: { from: "network" } });
+        expect(fail).not.toHaveBeenCalled();
+      } finally {
+        restore();
+      }
+      expect(window.fetch).toBe(network);
+    });
+  });
+
+  describe("with interceptFetch: fetch answered like XMLHttpRequest", () => {
+    const pageFetch = window.fetch;
+    afterEach(() => {
+      window.fetch = pageFetch;
+    });
+
+    it("serves supplied GETs through fetch and blocks mutations and unknown reads of the page's origin", async () => {
+      const network = vi.fn(async () => new Response("{}"));
+      window.fetch = network as unknown as typeof window.fetch;
+      const fail = vi.fn();
+      const restore = installFrozenWidgetRequests({ "GET /api/keywords?a=1&b=2": { name: "dentist" } }, fail, {
+        interceptFetch: true,
+      });
+      try {
+        expect(await send("fetch", "GET", "/api/keywords?b=2&a=1")).toEqual({ ok: true, status: 200, data: { name: "dentist" } });
+        expect(await window.fetch(new URL("/api/keywords?a=1&b=2", window.location.origin)).then((r) => r.json())).toEqual({
+          name: "dentist",
+        });
+        expect(await send("fetch", "POST", "/api/keywords?a=1&b=2", "{}")).toEqual({ ok: false });
+        expect(await send("fetch", "GET", "/api/other")).toEqual({ ok: false });
+        expect(await send("xhr", "GET", "/api/keywords?a=1&b=2")).toMatchObject({ ok: true, data: { name: "dentist" } });
+        expect(fail).toHaveBeenCalledTimes(2);
+        expect(network).not.toHaveBeenCalled();
+      } finally {
+        restore();
+      }
+      expect(window.fetch).toBe(network);
+    });
+
+    it("lets a fetch of a static bundle image or another origin pass unchanged, as without the option", async () => {
+      const network = vi.fn(async () => new Response("asset"));
+      window.fetch = network as unknown as typeof window.fetch;
+      const fail = vi.fn();
+      const restore = installFrozenWidgetRequests({}, fail, { interceptFetch: true });
+      try {
+        expect(await send("fetch", "GET", "/react/app-build/assets/logos/google.svg")).toMatchObject({ ok: true });
+        expect(await send("fetch", "GET", "https://maps.googleapis.com/maps/api/js")).toMatchObject({ ok: true });
+        expect(network).toHaveBeenCalledTimes(2);
+        expect(await send("fetch", "GET", "/react/app-build/assets/logos/google.svg?v=1")).toEqual({ ok: false });
+        expect(fail).toHaveBeenCalledOnce();
+      } finally {
+        restore();
+      }
+    });
   });
 });
 

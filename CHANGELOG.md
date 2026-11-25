@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.5.16
+
+**The web package no longer needs axios: the request stand-ins of the widget preview and the widget-image capture
+replace `XMLHttpRequest` (the transport of axios's browser adapter) instead of `axios.defaults.adapter`; new opt-in
+`interceptFetch` for the frozen capture.** Additive and non-breaking: with the default options a host on axios gets the
+answers it got before; a host on `fetch` opts in. npm `@mgamadeus/ddd-agents` 0.5.16 in lockstep (no PHP change).
+
+- **axios** left `peerDependencies` (it was optional), `peerDependenciesMeta`, `devDependencies` and the lockfile; no
+  module of the package imports it. A host may keep axios: its browser adapter sends through `XMLHttpRequest`, which
+  the stand-ins answer.
+- New internal module `src/request-interception/browser-request-interception.ts` (not an entry):
+  `interceptXMLHttpRequests(handler)` and `interceptFetchRequests(handler)` replace `XMLHttpRequest` or `fetch` (on the
+  window and the global object) until the returned function is called. The handler answers with a `Response` or
+  throws; a thrown error fails an `XMLHttpRequest` like a network error (status 0, no header, no body) and rejects a
+  `fetch`. The `XMLHttpRequest` stand-in supports `open`, `setRequestHeader`, `send`, `abort`, `timeout`,
+  `withCredentials`, `responseType` `""`, `text`, `json`, `blob`, `arraybuffer`, `response`/`responseText`,
+  `status`/`statusText`/`readyState`/`responseURL`, `getAllResponseHeaders`/`getResponseHeader`, `upload` with progress
+  events, the `on…` handlers and listeners for `loadstart`, `progress`, `load`, `error`, `abort`, `timeout`, `loadend`
+  and `readystatechange`. A `fetch` input may be a string, a `URL` or a `Request` of any realm (recognised by its brand,
+  `Object.prototype.toString`, never `instanceof`).
+- `installFrozenWidgetRequests(responses, fail, options?)`: `XMLHttpRequest` answers as the former axios adapter (a
+  supplied GET by its key `METHOD /path?sortedQuery`, a copy per read, no response header; anything else
+  `MISSING_FROZEN_RESPONSE`); `fetch` stays untouched by default, as before. **New:** `options.interceptFetch` (default
+  false) answers `fetch` the same way; a static bundle image of the page's origin and a request to another origin (a
+  map's SDK) still go to the network unchanged, as they did without the option.
+- `installLiveWidgetRequests`: unchanged signature. The `fetch` stand-in keeps its rules; `XMLHttpRequest` follows the
+  former axios adapter's rules (the scoped capture read only, answered with its JSON and no header; anything else
+  `WIDGET_HYDRATION_FAILED`, failing without URL, headers, token or remote body).
+- `installWidgetPreviewRequests`: unchanged signature. `XMLHttpRequest` as the former axios adapter (a missing response
+  fails without response and is reported, a `__status` entry answers with its status and `__body`, `__pending` never
+  answers); the `fetch` stand-in keeps its answers.
+- Fixed: a `Request` of another realm passed to the live or the preview `fetch` stand-in is read by its URL, method,
+  headers and body (before, `instanceof Request` failed and the stand-in read `[object Request]` as the URL).
+- Specs: `_browser-request-interception.spec.ts` (the stand-ins), `_live-widget-requests.spec.ts`,
+  `_widget-image-render.spec.ts` (frozen, default and `interceptFetch`) and the new `_widget-preview-requests.spec.ts`,
+  with plain `fetch` and `XMLHttpRequest`, the security cases (no token, credentials, URL or remote body leak; fail
+  closed) included. README: the peer set without axios and the request stand-ins.
 ## 0.5.15
 
 **A completed `wait_for_sub_agents` is no longer an action of the turn: the final answer is not asked to report it,
