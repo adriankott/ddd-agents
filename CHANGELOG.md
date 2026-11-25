@@ -1,5 +1,47 @@
 # Changelog
 
+## 0.6.10
+
+**`app:mcp:clear-cache` rebuilds the container in a child process; the Agent.UI picture keeps the columns of a wide
+table.** npm `@mgamadeus/ddd-agents` 0.6.10 in lockstep.
+
+- **`app:mcp:clear-cache`: the container is rebuilt in a child process.** Layer 2 (`cache:clear`) no longer runs in
+  the command's own process, which already holds the reflection of every bundle and skill package of layer 1: in an
+  application with 14 bundles and 65 skill packages whose console script sets 512 MB, the in-process run died with
+  "Allowed memory size … exhausted", exit 255, and left the half-built warm-up directory of `cache:clear` behind. The
+  child is started through the process component with an argument array (no shell, no timeout): the PHP binary and
+  the console script of this process, `getContainerCacheClearCommandName()`, `--env=` of the running kernel and
+  `--no-debug` when the running kernel is not in debug mode, with the environment variables this process started
+  with and those of `$_ENV`. Its standard and error output are passed through as they arrive. New protected
+  methods, one job each: `getPhpBinaryPath()`, `getConsoleScriptPath()`, `getRunningKernelEnvironment()`,
+  `isRunningKernelInDebugMode()`, `getRunningKernelBuildDirectory()`,
+  `buildContainerCacheClearChildArguments(): array`,
+  `startContainerCacheClearChildProcess(array $childArguments, OutputInterface $output): int`.
+- **`app:mcp:clear-cache`: a failed container rebuild fails the command.** A child that ends non-zero ends the
+  command with exit `1`; the last lines name layer 2, the child's exit code and that layer 1 completed (run only
+  `cache:clear` again). The warm-up directory the failed child left beside the build directory is removed
+  (`getContainerCacheWarmupDirectoryPath()`, named like Symfony's `CacheClearCommand` names it, and
+  `removeContainerCacheWarmupDirectory()`); a directory that cannot be removed is named by its path. The real cache
+  directory is never touched, and nothing is removed after a successful child. Before, the exit code of
+  `cache:clear` was ignored and the command answered `0`.
+- **`app:mcp:clear-cache --onlyPackageCaches`.** Clears layer 1 alone and starts no child (exit `0`); the output
+  says the container was not rebuilt and that the application's own cache reset, then the worker restart, rebuild it
+  (`getContainerRebuildSkippedNotice()`). For an application that serves web requests from the same cache directory
+  and must not run `cache:clear` under a serving web process.
+- **`rebuildCompiledContainer(OutputInterface $output): void` keeps its signature.** It now starts the child and
+  records the exit code in `$containerCacheClearExitCode`; the command asks the new
+  `rebuildCompiledContainerAndFindExitCode(OutputInterface $output): int`, which calls it. An application's override
+  that rebuilds the container another way keeps working: it records its exit code there, or leaves it null and the
+  run counts as rebuilt (as before). The test command `ContainerCacheClearRecordingCommand` is removed.
+- **Fixed: the picture lost the columns at the right edge of a wide table.** The copy leaves out the columns right of
+  the window but kept the table's page width (2,637 px for 13 columns on a host list, 3 of them out of view); the table
+  layout spread it over the 10 copied columns, each grew by about 17 %, and a column partly in view left the picture.
+  Table parts (`table`, row groups, rows) now get neither their page height nor their page width; the cells keep
+  theirs, so the copied columns have the page's widths.
+- Tests: the child's arguments (environment, `--no-debug`), a failed child fails the command and names layer 2, the
+  warm-up directory removed or named, `--onlyPackageCaches` starts no child, an override that records nothing counts as
+  rebuilt; no width or inline size on a table, a row group or a row, the cell keeps its width.
+
 ## 0.6.9
 
 **Purposes: one conversation per record, and a purposed start route for the client.** npm `@mgamadeus/ddd-agents` 0.6.9 in

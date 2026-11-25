@@ -17,4 +17,5 @@ return [
     ['file' => 'src/Symfony/Commands/Agents/AgentEvalToolsCommand.php', 'sink' => 'process', 'reason' => 'the command re-runs itself per case, argument array'],
     ['file' => 'src/Symfony/Commands/Agents/Chat/ConsoleLineEditor.php', 'sink' => 'shell', 'reason' => 'fixed stty/tput commands of the developer console; the one variable part is the saved stty state, escapeshellarg-quoted'],
     ['file' => 'src/Symfony/Commands/Agents/Chat/CopySlashCommand.php', 'sink' => 'process', 'reason' => 'pbcopy of the developer console, argument array, the text on stdin'],
+    ['file' => 'src/Symfony/Commands/Agents/MCPClearCacheCommand.php', 'sink' => 'process', 'reason' => 'the command rebuilds the container in a child (this process\'s PHP binary and console script, the container cache clear command), argument array'],
 ];

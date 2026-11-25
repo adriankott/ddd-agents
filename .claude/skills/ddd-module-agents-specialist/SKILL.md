@@ -207,7 +207,7 @@ with the same name.
 | `app:agent:jev-probe` | runs the decision probe over a fixture, one evaluation envelope per case | no | no (makes model calls) |
 | `app:agent:conversation-scorecards` | selects conversations and dispatches (or runs `--inline`) their quality scorecards; `--print` the metrics | no | yes |
 | `app:mcp:documentation` | prints the MCP documentation of a bundle or package; `--call` runs one tool for a space | no | only with `--call` |
-| `app:mcp:clear-cache` | clears the cached MCP documentation of the bundles and skill packages, then the container cache | no | no |
+| `app:mcp:clear-cache` | clears the cached MCP documentation of the bundles and skill packages, then the container cache in a child process (a failed child ends it non-zero); `--onlyPackageCaches` leaves the container to the application's own cache reset | no | no |
 | `app:agent:export-composed-view-node-schema` | writes or checks the composed-view node schema file (`--check`) | no | yes, unless checking |
 | `app:agent:request-snapshot-debug-payloads-strip` | removes the full request and raw response from request snapshots older than `--olderThanDays` (default 2); resumes from a cursor | optional, nightly, `--maxSeconds` below 360 | yes |
 | `app:agent:loaded-capabilities-compact` | rewrites loaded-capability rows that carry their complete set into checkpoints and change records; resumes from a cursor | optional, nightly, `--maxSeconds` below 360; only once every reader reads the chain format | yes |

@@ -420,13 +420,39 @@ tool in-process through the agent's executor and measures its response.
 
 ### `app:mcp:clear-cache` — `MCPClearCacheCommand`
 
-Clears the MCP documentation cache of every bundle and every package bound to a skill, then runs the container cache
-clear in the same process. No options.
+Clears the MCP documentation cache of every bundle and every package bound to a skill (layer 1), then runs the
+container cache clear in a CHILD process (layer 2): the PHP binary and the console script of this process, the command
+`cache:clear`, `--env=` of the running kernel and `--no-debug` when the running kernel is not in debug mode, this
+process's environment variables; no shell. The child's standard and error output are passed through as they arrive.
+The child has its own memory: this process already holds the reflection of every bundle and package, and a container
+rebuild on top of it can exhaust the memory limit a console script sets.
 
-- **Writes:** the cache entries (`mcp.doc.bundle.*`, `mcp.doc.package.*`) and the compiled container.
-- **Envelope:** no model call. **Exit codes:** `0`. **Budget:** no option.
+| Option | Default | Meaning |
+|---|---|---|
+| `--onlyPackageCaches` | flag | layer 1 alone: no child, the container is NOT rebuilt; the output says so and what rebuilds it |
+
+`--onlyPackageCaches` is for an application that serves web requests from the same cache directory: it rebuilds its
+container through its own cache reset and must not run `cache:clear` under a serving web process. After it: the
+application's cache reset, then the worker restart.
+
+- **Writes:** the cache entries (`mcp.doc.bundle.*`, `mcp.doc.package.*`) and, through the child, the compiled
+  container. After a failed child it removes the temporary warm-up directory `cache:clear` left beside the build
+  directory (the build directory with its last character replaced by `_`, by `-` when it ends with `_`); the real cache
+  directory is never touched, and nothing is removed after a successful child.
+- **Envelope:** no model call. **Budget:** no option.
+- **Exit codes:** `0`; `1` when the child ends non-zero. The last lines then name layer 2, the child's exit code and
+  that layer 1 completed — run only `cache:clear` again, not the whole command; a warm-up directory that cannot be
+  removed is named by its path. No restart notice is printed after a failure.
 - **Override points:** `getBundleClasses()` (the bundles cleared), `getContainerCacheClearCommandName()` (default
-  `cache:clear`), `getWorkerRestartNotice()` (the last line; a running worker still needs a restart).
+  `cache:clear`), `getWorkerRestartNotice()` (the last line; a running worker still needs a restart),
+  `getContainerRebuildSkippedNotice()` (the line under `--onlyPackageCaches`); the child: `getPhpBinaryPath()` (default the PHP
+  binary of this process), `getConsoleScriptPath()` (default the script this process runs), `getRunningKernelEnvironment()`,
+  `isRunningKernelInDebugMode()`, `buildContainerCacheClearChildArguments()` (the whole argument list),
+  `startContainerCacheClearChildProcess()` (the start, answers the exit code); the cleanup:
+  `getContainerCacheWarmupDirectoryPath()`, `removeContainerCacheWarmupDirectory()`. `rebuildCompiledContainer()` keeps
+  its signature: an application's override that rebuilds the container another way records its exit code in
+  `$containerCacheClearExitCode` (left null, the run counts as rebuilt), which `rebuildCompiledContainerAndFindExitCode()`
+  answers to the command.
 
 ### `app:agent:export-composed-view-node-schema` — `ComposedViewNodeSchemaExportCommand`
 

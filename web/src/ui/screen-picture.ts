@@ -173,9 +173,12 @@ export const createFrameDefaultStyleSource = (documentOfRoot: Document): Default
 };
 
 /**
- * The display types whose height the table layout computes from their rows. A copy of a list holds fewer rows than
- * the page (rows out of view, the element cap): with the page's height (17,769 px for 200 rows) the layout stretched
- * the copied rows over it and the picture showed the header and at most one row. Their height is never copied.
+ * The display types whose size the table layout computes from their rows and cells. A copy of a list holds fewer rows
+ * and columns than the page (out of view, the element cap): with the page's height (17,769 px for 200 rows) the layout
+ * stretched the copied rows over it and the picture showed the header and at most one row; with the page's width
+ * (2,637 px for 13 columns, 3 of them right of the window) it spread the width over the 10 copied columns, each grew by
+ * about 17 %, and a column partly in view (the status) left the picture. Their size is never copied; the cells keep
+ * theirs.
  */
 const TABLE_LAYOUT_DISPLAYS = new Set(['table', 'inline-table', 'table-row-group', 'table-header-group', 'table-footer-group', 'table-row']);
 
@@ -187,7 +190,7 @@ const TABLE_LAYOUT_DISPLAYS = new Set(['table', 'inline-table', 'table-row-group
 const ALWAYS_COPIED_PROPERTY = /^(border-.*-width|outline-width|column-rule-width)$/;
 
 /** Properties never copied onto a table part (see {@link TABLE_LAYOUT_DISPLAYS}). */
-const TABLE_LAYOUT_HEIGHT_PROPERTIES = new Set(['height', 'block-size']);
+const TABLE_LAYOUT_SIZE_PROPERTIES = new Set(['height', 'block-size', 'width', 'inline-size']);
 
 /**
  * Copies the computed style of an element onto its clone as inline style: a declaration only when it differs from the
@@ -207,7 +210,7 @@ const copyComputedStyle = (
   const namespaceUri = original.namespaceURI === 'http://www.w3.org/1999/xhtml' ? null : original.namespaceURI;
   for (let index = 0; index < style.length; index += 1) {
     const property = style.item(index);
-    if (property.startsWith('--') || (isTablePart && TABLE_LAYOUT_HEIGHT_PROPERTIES.has(property))) continue;
+    if (property.startsWith('--') || (isTablePart && TABLE_LAYOUT_SIZE_PROPERTIES.has(property))) continue;
     const value = style.getPropertyValue(property);
     const isDefault = defaults !== null && value === defaults.valueOf(original.localName, namespaceUri, property);
     if (isDefault && !ALWAYS_COPIED_PROPERTY.test(property) && (parentStyle === null || parentStyle.getPropertyValue(property) === value)) continue;

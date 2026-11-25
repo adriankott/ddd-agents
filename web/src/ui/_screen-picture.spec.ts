@@ -134,6 +134,16 @@ describe('prepareScreenCloneForPicture', () => {
     assert.match(styleOf('box'), /(^|;)\s*height:\s*40px/);
   });
 
+  it('never copies the width of a table part: the copied columns keep their own width', () => {
+    document.body.innerHTML =
+      '<table id="table" style="width:2637px"><thead id="head" style="width:2637px"><tr id="row" style="width:2637px">' +
+      '<th id="status" style="width:217px">Status</th></tr></thead></table>';
+    const clone = prepareScreenCloneForPicture(document.body, { visibleBox: null, defaultStyles: null });
+    const styleOf = (id: string): string => clone.querySelector(`#${id}`)?.getAttribute('style') ?? '';
+    for (const id of ['table', 'head', 'row']) assert.ok(!/(^|;)\s*(width|inline-size):/.test(styleOf(id)), `${id}: ${styleOf(id)}`);
+    assert.match(styleOf('status'), /(^|;)\s*width:\s*217px/);
+  });
+
   it('copies a declaration only where it differs from the tag default or the parent: the copy stays within elements × bytes', () => {
     const elementCount = 200;
     document.body.innerHTML = `<div id="list">${Array.from({ length: elementCount - 1 }, (_, index) => `<p class="${index % 2 === 0 ? 'even' : 'odd'}">row ${index}</p>`).join('')}</div>`;
