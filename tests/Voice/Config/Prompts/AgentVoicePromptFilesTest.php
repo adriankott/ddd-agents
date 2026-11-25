@@ -52,6 +52,7 @@ class AgentVoicePromptFilesTest extends AgentVoiceUnitTestCase
         AgentVoiceAIPromptNames::APP_AI_VOICE_GOODBYE_AFTER_SILENCE_CHECKS => [],
         AgentVoiceAIPromptNames::APP_AI_VOICE_BUDGET_END => [],
         AgentVoiceAIPromptNames::APP_AI_VOICE_REFUSED_CALL_GOODBYE => [],
+        AgentVoiceAIPromptNames::APP_AI_VOICE_WORKER_STOPPING_GOODBYE => [],
         AgentVoiceAIPromptNames::APP_AI_VOICE_ANSWER_SHOWN_IN_THE_CHAT => ['LEAD_IN'],
         AgentVoiceAIPromptNames::APP_AI_VOICE_ANSWER_CUT => [],
         AgentVoiceAIPromptNames::APP_AI_VOICE_STEP_WITHOUT_LINE => ['STEP_WORDS'],
@@ -112,7 +113,7 @@ class AgentVoicePromptFilesTest extends AgentVoiceUnitTestCase
         sort($promptNames);
 
         static::assertSame($promptNames, $promptNamesOfTheFiles);
-        static::assertCount(30, $promptNames);
+        static::assertCount(31, $promptNames);
     }
 
     public function testEveryReaderIsKnownForEveryPromptName(): void

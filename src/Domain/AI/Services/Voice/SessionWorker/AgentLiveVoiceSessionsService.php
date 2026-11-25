@@ -636,14 +636,67 @@ class AgentLiveVoiceSessionsService extends Service
         }
     }
 
-    /** The SIGTERM handler of the drain mode. Public only because the event loop calls it. */
+    /**
+     * The SIGTERM handler of the drain mode. Public only because the event loop calls it. With
+     * `AI.agentVoice.endCallOnTerminationSignal` (the default) the next watcher tick ends the call after one short
+     * goodbye ({@see endCallWhenTheWorkerIsStopping()}); otherwise the call runs to its end. Either way the signal is
+     * passed on once the call is over ({@see endDrainModeOfTheCall()}).
+     */
     public function logTerminationSignalDrain(): void
     {
         $this->terminationSignalDrained = true;
         $this->appendToVoiceLog(
-            'LIVE ' . ($this->attachedAgentVoiceCall?->providerCallId ?? '?') . ' SIGTERM received — draining: the live'
-            . ' call finishes before this worker stops'
+            'LIVE ' . ($this->attachedAgentVoiceCall?->providerCallId ?? '?') . ' SIGTERM received — '
+            . ($this->isCallEndedOnTerminationSignal()
+                ? 'ending the live call after a short goodbye, then this worker stops'
+                : 'draining: the live call finishes before this worker stops')
         );
+    }
+
+    /**
+     * Whether a SIGTERM ends the running call after one short goodbye (`AI.agentVoice.endCallOnTerminationSignal`,
+     * default true) instead of letting it run to its end: a rollout or a node drain then waits seconds for a busy
+     * worker, not up to the longest call, and the owner can call again at once and reaches a new worker.
+     */
+    protected function isCallEndedOnTerminationSignal(): bool
+    {
+        return AgentVoiceConfiguration::current()->endCallOnTerminationSignal;
+    }
+
+    /**
+     * Ends the call when a SIGTERM arrived and {@see isCallEndedOnTerminationSignal()} says so: one goodbye without a
+     * reason ({@see buildWorkerStoppingGoodbyeInstruction()}), then the farewell hang-up and the normal teardown
+     * ({@see finishCall()}: transcript, end marker, booked seconds, provider session hung up) with the end reason
+     * COMPLETED. True while the farewell is armed, so the watcher tick ends here.
+     */
+    protected function endCallWhenTheWorkerIsStopping(AgentVoiceCall $agentVoiceCall, WebSocket $webSocketConnection): bool
+    {
+        if (!$this->terminationSignalDrained || !$this->isCallEndedOnTerminationSignal()) {
+            return false;
+        }
+        if ($this->farewellHangUpArmed) {
+            return true;
+        }
+        $this->appendToVoiceLog(
+            "LIVE {$agentVoiceCall->providerCallId} worker stopping (SIGTERM) — saying goodbye and hanging up"
+        );
+        $this->armFarewellHangUp(
+            $agentVoiceCall,
+            $webSocketConnection,
+            $this->buildWorkerStoppingGoodbyeInstruction($agentVoiceCall),
+            AgentVoiceCall::END_REASON_COMPLETED
+        );
+
+        return true;
+    }
+
+    /**
+     * What the voice model is told before the call ends because its worker stops: one short goodbye without a reason
+     * ({@see AgentVoiceSessionContextsService::buildWorkerStoppingGoodbyeInstruction()}).
+     */
+    protected function buildWorkerStoppingGoodbyeInstruction(AgentVoiceCall $agentVoiceCall): string
+    {
+        return $this->voiceSessionContextsService()->buildWorkerStoppingGoodbyeInstruction($agentVoiceCall);
     }
 
     /**
@@ -1099,6 +1152,9 @@ class AgentLiveVoiceSessionsService extends Service
             }
         }
 
+        if ($this->endCallWhenTheWorkerIsStopping($agentVoiceCall, $webSocketConnection)) {
+            return;
+        }
         if ($this->hangUpAfterRequestedGoodbyeWhenDue($agentVoiceCall, $webSocketConnection)) {
             return;
         }

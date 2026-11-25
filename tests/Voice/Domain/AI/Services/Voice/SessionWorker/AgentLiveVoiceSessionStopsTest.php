@@ -112,6 +112,69 @@ class AgentLiveVoiceSessionStopsTest extends AgentLiveVoiceSessionWorkerTestCase
         static::assertSame([static::PROVIDER_SESSION_ID], $worker->voiceProviderAdapter->hungUpProviderSessionIds);
     }
 
+    public function testASigtermEndsTheCallAfterOneShortGoodbyeThroughTheNormalTeardown(): void
+    {
+        $worker = $this->buildWorkerWithConversation();
+        $agentVoiceCall = static::buildRunningCall();
+        $sidebandWebSocket = new RecordingSidebandWebSocket();
+        $this->runWatcherTicks($worker, $agentVoiceCall, $sidebandWebSocket, 1);
+        static::assertSame([], $sidebandWebSocket->findSentClientEventsOfType('session.instructions.append'), 'nothing before the signal');
+
+        $worker->setWorkerState('attachedAgentVoiceCall', $agentVoiceCall);
+        $worker->logTerminationSignalDrain();
+        $this->runWatcherTicks($worker, $agentVoiceCall, $sidebandWebSocket, 3);
+
+        static::assertSame(
+            [RecordingAgentVoiceSessionContextsService::WORKER_STOPPING_GOODBYE],
+            array_column($sidebandWebSocket->findSentClientEventsOfType('session.instructions.append'), 'content'),
+            'one goodbye, not one per tick'
+        );
+        static::assertSame(
+            ['LIVE live_session_seven worker stopping (SIGTERM) — saying goodbye and hanging up'],
+            $worker->findVoiceLogLinesContaining('worker stopping')
+        );
+        static::assertSame([6.0], $this->scriptedEventLoop->getWaitingOneShotTimerIntervals(), 'the goodbye gets six seconds');
+        static::assertSame([], $worker->agentVoiceCallsService->persistedCallEnds, 'not ended before the goodbye was spoken');
+
+        $worker->hangUpAfterFarewellWasSpoken();
+
+        static::assertSame([static::PROVIDER_SESSION_ID], $worker->voiceProviderAdapter->hungUpProviderSessionIds);
+        static::assertSame([AgentVoiceCall::END_REASON_COMPLETED], array_column($worker->agentVoiceCallsService->persistedCallEnds, 'endReason'));
+        static::assertSame(1, $this->scriptedEventLoop->stopCount);
+    }
+
+    public function testWithTheSwitchOffASigtermLetsTheCallRunToItsEnd(): void
+    {
+        $this->declareAgentVoiceConfiguration(static::buildShippedAgentVoiceConfigurationWith(['endCallOnTerminationSignal' => false]));
+        $worker = $this->buildWorkerWithConversation();
+        $agentVoiceCall = static::buildRunningCall();
+        $sidebandWebSocket = new RecordingSidebandWebSocket();
+
+        $worker->setWorkerState('attachedAgentVoiceCall', $agentVoiceCall);
+        $worker->logTerminationSignalDrain();
+        $this->runWatcherTicks($worker, $agentVoiceCall, $sidebandWebSocket, 5);
+
+        static::assertSame(
+            ['LIVE live_session_seven SIGTERM received — draining: the live call finishes before this worker stops'],
+            $worker->findVoiceLogLinesContaining('SIGTERM received')
+        );
+        static::assertSame([], $worker->findVoiceLogLinesContaining('worker stopping'));
+        static::assertSame([], $worker->agentVoiceCallsService->persistedCallEnds);
+        static::assertTrue($worker->getWorkerState('terminationSignalDrained'), 'the signal is still passed on at the end');
+    }
+
+    public function testWithoutASigtermTheWorkerSaysNoStoppingGoodbye(): void
+    {
+        $worker = $this->buildWorkerWithConversation();
+        $agentVoiceCall = static::buildRunningCall();
+        $sidebandWebSocket = new RecordingSidebandWebSocket();
+
+        $this->runWatcherTicks($worker, $agentVoiceCall, $sidebandWebSocket, 5);
+
+        static::assertSame([], $worker->findVoiceLogLinesContaining('worker stopping'));
+        static::assertSame([], $worker->agentVoiceCallsService->persistedCallEnds);
+    }
+
     public function testASilentLineIsCheckedOnceThenAgainAfterTheCallerSpoke(): void
     {
         $worker = $this->buildWorkerWithConversation();

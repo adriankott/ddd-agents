@@ -50,6 +50,12 @@ class AgentVoiceConfiguration extends ValueObject
     /** @var array<string, array<string, mixed>> Provider adapter name => its settings */
     public array $providerSettings = [];
 
+    /**
+     * @var bool Whether a SIGTERM ends a running call after one short goodbye (`endCallOnTerminationSignal`); false =
+     *           the call runs to its end before the worker stops
+     */
+    public bool $endCallOnTerminationSignal = true;
+
     /** @var string|null The language of a call; null = the language of its conversation */
     public ?string $language = null;
 
@@ -105,6 +111,9 @@ class AgentVoiceConfiguration extends ValueObject
         }
         if (array_key_exists('language', $voiceConfigEntries) && is_string($voiceConfigEntries['language']) && trim($voiceConfigEntries['language']) !== '') {
             $agentVoiceConfiguration->language = trim($voiceConfigEntries['language']);
+        }
+        if (is_bool($voiceConfigEntries['endCallOnTerminationSignal'] ?? null)) {
+            $agentVoiceConfiguration->endCallOnTerminationSignal = $voiceConfigEntries['endCallOnTerminationSignal'];
         }
         $agentVoiceConfiguration->applyProviderEntries($voiceConfigEntries['provider'] ?? null);
         $agentVoiceConfiguration->applyLimitEntries($voiceConfigEntries['limits'] ?? null);

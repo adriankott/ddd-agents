@@ -413,6 +413,20 @@ class AgentVoiceSessionContextsService extends Service
     }
 
     /** The prompt of the note that ends a refused call without naming a reason. */
+    /**
+     * The goodbye of a call that ends because its worker stops (a rollout, a node drain): one short sentence without a
+     * reason; the owner can call again at once.
+     */
+    public function buildWorkerStoppingGoodbyeInstruction(AgentVoiceCall $agentVoiceCall): string
+    {
+        return AgentVoicePromptText::forName($this->getWorkerStoppingGoodbyePromptName()) . $this->buildCallLanguageClause($agentVoiceCall);
+    }
+
+    protected function getWorkerStoppingGoodbyePromptName(): string
+    {
+        return AgentVoiceAIPromptNames::APP_AI_VOICE_WORKER_STOPPING_GOODBYE;
+    }
+
     protected function getRefusedCallGoodbyePromptName(): string
     {
         return AgentVoiceAIPromptNames::APP_AI_VOICE_REFUSED_CALL_GOODBYE;

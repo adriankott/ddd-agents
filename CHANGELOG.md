@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.6.3
+
+**Voice: a SIGTERM ends a running call within seconds instead of holding the worker up to the longest call.** Bug fix.
+No web change; npm `@mgamadeus/ddd-agents` 0.6.3 in lockstep.
+
+- **Fixed: the session worker held its process until the call ended on its own** (up to `limits.maximumCallSeconds`,
+  3600 s), so every rollout or node drain during a call waited up to an hour per busy worker. Now the next watcher tick
+  after a SIGTERM (at most 2 s) tells the voice model ONE short goodbye without a reason
+  (`buildWorkerStoppingGoodbyeInstruction()`, new prompt `AI.Voice.WorkerStoppingGoodbye`), hangs up after the
+  farewell's six seconds and runs the normal teardown (`finishCall()`: transcript flushed, one end marker, seconds
+  booked, provider session hung up) with the end reason `COMPLETED`. The signal is then passed on as before. The owner
+  can call again at once and reaches another worker.
+- **New config `AI.agentVoice.endCallOnTerminationSignal`** (default `true`, `AgentVoiceConfiguration::$endCallOnTerminationSignal`;
+  override point `isCallEndedOnTerminationSignal()`): `false` keeps the drain of 0.6.0 (the call runs to its end before
+  the worker stops; the stop grace must then exceed `limits.maximumCallSeconds`).
+- **Behaviour change for an application with voice on:** a deploy now ends running calls after the goodbye. A stop grace
+  of about a minute is enough for the voice consumers; a grace sized for the longest call can be lowered.
+- Tests: the goodbye once, the hang-up and the teardown after SIGTERM; no goodbye without a signal; the switch off
+  keeps the drain; the config entry and its malformed form; the prompt file.
+
 ## 0.6.2
 
 **Web only: hooks for an application around the voice components.** Additive; every default is unchanged. No PHP

@@ -98,6 +98,9 @@ class AgentVoiceAIPromptNames
     /** @var string The call may not go on for a reason that is no used-up allowance: one sentence without a reason, then the call ends. */
     public const string APP_AI_VOICE_REFUSED_CALL_GOODBYE = 'AI.Voice.RefusedCallGoodbye';
 
+    /** @var string What the voice says before a call ends because its worker stops (a deploy): one goodbye, no reason. */
+    public const string APP_AI_VOICE_WORKER_STOPPING_GOODBYE = 'AI.Voice.WorkerStoppingGoodbye';
+
     /** @var string What the voice says for an answer whose content is in widgets only. Placeholder: LEAD_IN. */
     public const string APP_AI_VOICE_ANSWER_SHOWN_IN_THE_CHAT = 'AI.Voice.AnswerShownInTheChat';
 

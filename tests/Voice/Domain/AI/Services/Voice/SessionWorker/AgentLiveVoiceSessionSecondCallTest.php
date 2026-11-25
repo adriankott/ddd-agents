@@ -95,7 +95,7 @@ class AgentLiveVoiceSessionSecondCallTest extends AgentLiveVoiceSessionWorkerTes
         pcntl_signal_dispatch();
 
         static::assertSame(
-            ['LIVE live_session_seven SIGTERM received — draining: the live call finishes before this worker stops'],
+            ['LIVE live_session_seven SIGTERM received — ending the live call after a short goodbye, then this worker stops'],
             $worker->voiceLogLines
         );
         static::assertSame([SIGTERM], RecordedTerminationSignals::$receivedSignals, 'the consumer stops after the call it drained for');

@@ -26,6 +26,8 @@ class RecordingAgentVoiceSessionContextsService extends AgentVoiceSessionContext
 
     public const string REFUSED_CALL_GOODBYE_PREFIX = 'REFUSED CALL GOODBYE: ';
 
+    public const string WORKER_STOPPING_GOODBYE = 'WORKER STOPPING GOODBYE';
+
     /** @var AgentVoiceCallRefusal[] Every refusal a goodbye was asked for */
     public array $refusalsAskedFor = [];
 
@@ -60,5 +62,10 @@ class RecordingAgentVoiceSessionContextsService extends AgentVoiceSessionContext
         }
 
         return static::REFUSED_CALL_GOODBYE_PREFIX . $agentVoiceCallRefusal->code;
+    }
+
+    public function buildWorkerStoppingGoodbyeInstruction(AgentVoiceCall $agentVoiceCall): string
+    {
+        return static::WORKER_STOPPING_GOODBYE;
     }
 }

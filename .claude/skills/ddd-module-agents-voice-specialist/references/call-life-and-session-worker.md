@@ -73,8 +73,11 @@ instructions append-only. The worker:
 The worker survives its own death: the attach message is acknowledged only when the call is over, a lease in the
 shared cache keeps two workers off one session, and a successor books from the stored baseline. The fields of the
 service are the state of the one call the process accompanies; `resetStateOfThePreviousCall()` puts them back at
-every attach. A SIGTERM that arrives during a call does not cut it; it is passed on to the process when the call is
-over.
+every attach. A SIGTERM that arrives during a call (a deploy, a node drain) ends it at the next watcher tick
+after one short goodbye without a reason (`buildWorkerStoppingGoodbyeInstruction()`, prompt `AI.Voice.WorkerStoppingGoodbye`),
+through the normal teardown with the end reason `COMPLETED`; the owner can call again at once and reaches another
+worker. With `endCallOnTerminationSignal: false` the call runs to its end instead. Either way the signal is passed on
+to the process when the call is over.
 
 ## The two transports and their pools
 
@@ -83,7 +86,7 @@ copies none of it.
 
 | Transport | Message | Pool |
 |---|---|---|
-| `voice_live_session` (`AgentVoiceMessengerTransports::LIVE_SESSION`) | `VoiceLiveSessionAttachMessage` | one message = one running call, and the handler returns only when the call is over: the pool size is the number of calls at the same time. A process may take the next call afterwards, so the consumer needs no limit per process. The stop grace is above `limits.maximumCallSeconds`, so a deploy does not cut a call. The worker needs outbound WebSocket access to the provider's host |
+| `voice_live_session` (`AgentVoiceMessengerTransports::LIVE_SESSION`) | `VoiceLiveSessionAttachMessage` | one message = one running call, and the handler returns only when the call is over: the pool size is the number of calls at the same time. A process may take the next call afterwards, so the consumer needs no limit per process. A stop ends a running call within seconds (goodbye plus hang-up): a stop grace of a minute is enough. Only with `endCallOnTerminationSignal: false` must the grace exceed `limits.maximumCallSeconds`. The worker needs outbound WebSocket access to the provider's host |
 | `voice_ring_deadline` (`AgentVoiceMessengerTransports::RING_DEADLINE`) | `AgentVoiceRingDeadlineMessage` | one short message per ring, delayed by the ring length plus a few seconds: the transport must keep delayed messages. Any pool size. The handler never throws and a repeated look is harmless, so no retry is needed |
 
 A message the application does not route runs synchronously in the dispatching request: for the attach message that

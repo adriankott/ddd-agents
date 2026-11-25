@@ -18,6 +18,10 @@ return [
     // the store that keeps calls: 'entity' (the package's call table), or a name the application maps to a
     // store of its own (AgentVoiceCallStoreService::getCallStoreClassNames())
     'callStore' => 'entity',
+    // a SIGTERM (a deploy, a node drain) ends a running call after one short goodbye, so the worker stops within
+    // seconds and the owner can call again at once; false = the call runs to its end before the worker stops (then
+    // the stop grace must exceed limits.maximumCallSeconds)
+    'endCallOnTerminationSignal' => true,
     'provider' => [
         'default' => 'openAiLive',
         // adapter name => class; an application registers further adapters here. One class, one name: a second
