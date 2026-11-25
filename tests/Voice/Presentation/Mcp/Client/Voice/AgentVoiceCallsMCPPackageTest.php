@@ -32,6 +32,7 @@ use DDD\Presentation\Mcp\Client\Voice\Dtos\AgentVoiceCallEndRequestDto;
 use DDD\Presentation\Mcp\Client\Voice\Dtos\AgentVoiceCallsGetRequestDto;
 use DDD\Presentation\Mcp\Client\Voice\Dtos\AgentVoiceCallStartRequestDto;
 use DDD\Tests\Agents\Voice\Support\AgentVoiceIntegrationTestCase;
+use ReflectionClass;
 use RuntimeException;
 
 /**
@@ -98,6 +99,17 @@ class AgentVoiceCallsMCPPackageTest extends AgentVoiceIntegrationTestCase
                 $toolName
             );
         }
+    }
+
+    public function testASubclassKeepsTheRightOfThePackageItExtends(): void
+    {
+        static::assertSame([AgentVoiceAccountRights::USE_VOICE], MCPPackage::findRequiredAccountRightNamesOfClass(SubclassedAgentVoiceCallsMCPPackage::class));
+        $reflectionClass = new ReflectionClass(SubclassedAgentVoiceCallsMCPPackage::class);
+        static::assertSame(
+            [AgentVoiceAccountRights::USE_VOICE],
+            MCPToolEntitlement::createFromReflectionMethod($reflectionClass, $reflectionClass->getMethod('startVoiceCall'))->requiredAccountRightNames,
+            'the gate of the tool is not lost by subclassing'
+        );
     }
 
     public function testTheToolsAndTheirArgumentsAreTheContracts(): void

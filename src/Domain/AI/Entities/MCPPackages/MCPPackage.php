@@ -6,6 +6,7 @@ namespace DDD\Domain\AI\Entities\MCPPackages;
 
 use DDD\Domain\Base\Entities\ValueObject;
 use DDD\Infrastructure\Cache\Cache;
+use ReflectionAttribute;
 use ReflectionClass;
 
 /**
@@ -60,8 +61,10 @@ class MCPPackage extends ValueObject
     }
 
     /**
-     * The account rights the package class itself requires (`#[MCPRequiresAccountRights]` on the class, never on a
-     * tool). Class attributes are not inherited: a subclass that replaces a package repeats them.
+     * The account rights the package class requires (`#[MCPRequiresAccountRights]` on the class, never on a tool),
+     * read through its parent packages: a subclass that replaces a package (an application's same-path class) keeps
+     * the gates of the package it extends and may add its own. An application lifts a tool's right with a tool
+     * overlay (`AI.toolOverlays`), never by leaving the attribute out.
      *
      * @param class-string<MCPPackage> $packageClass
      * @return string[]
@@ -69,10 +72,29 @@ class MCPPackage extends ValueObject
     public static function findRequiredAccountRightNamesOfClass(string $packageClass): array
     {
         $requiredRightNames = [];
-        foreach ((new ReflectionClass($packageClass))->getAttributes(MCPRequiresAccountRights::class) as $accountRightsAttribute) {
+        foreach (static::findClassAttributesOfPackageHierarchy(new ReflectionClass($packageClass), MCPRequiresAccountRights::class) as $accountRightsAttribute) {
             $requiredRightNames = array_merge($requiredRightNames, $accountRightsAttribute->newInstance()->accountRightNames);
         }
         return array_values(array_unique($requiredRightNames));
+    }
+
+    /**
+     * The class-level attributes of one kind on a package class and on every parent class up to (not including)
+     * {@see MCPPackage}: class attributes are not inherited by PHP, so an entitlement declared on a package is read
+     * here for its subclasses too.
+     *
+     * @param class-string $attributeClassName
+     * @return ReflectionAttribute[]
+     */
+    public static function findClassAttributesOfPackageHierarchy(ReflectionClass $packageReflectionClass, string $attributeClassName): array
+    {
+        $classAttributes = [];
+        $reflectionClass = $packageReflectionClass;
+        while ($reflectionClass !== false && $reflectionClass->getName() !== self::class) {
+            array_push($classAttributes, ...$reflectionClass->getAttributes($attributeClassName));
+            $reflectionClass = $reflectionClass->getParentClass();
+        }
+        return $classAttributes;
     }
 
     /**

@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.6.4
+
+**An application's subclasses are reached: the spoken answer of a voice call and the gates of a subclassed tools
+package.** No web change; npm `@mgamadeus/ddd-agents` 0.6.4 in lockstep.
+
+- **Fixed: the voice session worker built the spoken answer of a finished task with the package's class,** so an
+  application's same-path subclass of `AgentVoiceSpokenAnswer` (its `getShownOnlyInTheChatPromptName()` per channel
+  type) was never used. The worker now builds it through `buildSpokenAnswer()` (protected, overridable), which resolves
+  the application's class.
+- **Changed: the class-level gates of a tools package are read through its parent packages**
+  (`MCPPackage::findClassAttributesOfPackageHierarchy()`, used by `findRequiredAccountRightNamesOfClass()` and
+  `MCPToolEntitlement`): `MCPRequiresAccountRights`, `MCPRequiresFeatureFlags`, `MCPRequiresAnyFeatureFlag` declared on a
+  package also gate the tools of an application's subclass. Before, a subclass that did not repeat them lost every
+  gate silently. An application that relied on dropping a gate by subclassing lifts it with a tool overlay
+  (`AI.toolOverlays`, `accountRights: []`).
+- Tests: the application's spoken-answer class is built; a subclass of the voice tools package keeps `useVoice`.
+
 ## 0.6.3
 
 **Voice: a SIGTERM ends a running call within seconds instead of holding the worker up to the longest call.** Bug fix.

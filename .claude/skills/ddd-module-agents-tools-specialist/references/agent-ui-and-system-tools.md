@@ -41,8 +41,8 @@ The host provides:
    tries the adapters without a model. The answer carries `pictureBase64` and the UI state after the request.
    `@mgamadeus/ddd-admin-ui` brings the adapters of screens built from its blocks.
 4. The right: `useUI` (`AI.accountRights`). A host that keeps the tools to staff adds its gate in a same-path subclass
-   of the package and repeats `#[MCPRequiresAccountRights(AgentAccountRights::USE_UI)]` (class attributes are not
-   inherited).
+   of the package and adds its own `#[MCPRequiresAccountRights(...)]` there; the package's `useUI` gate is kept (the
+   gates of a package class are read through its parents).
 5. The transport (optional): a same-path subclass of `AgentRealtimeChannelService` (the realtime port, below). Without
    one the client finds a request with its next run-state read.
 

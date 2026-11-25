@@ -88,8 +88,8 @@ class MCPToolEntitlement extends ValueObject
     }
 
     /**
-     * The named list property of every instance of one entitlement attribute on the method AND on its package class,
-     * deduplicated. All three attributes are repeatable and carry a single string-list property, so one collector
+     * The named list property of every instance of one entitlement attribute on the method AND on its package class
+     * and that class' parent packages, deduplicated. All three attributes are repeatable and carry a single string-list property, so one collector
      * serves them; only the property name differs.
      *
      * @param class-string $entitlementAttributeClassName
@@ -105,7 +105,8 @@ class MCPToolEntitlement extends ValueObject
         foreach ($reflectionMethod->getAttributes($entitlementAttributeClassName) as $entitlementAttribute) {
             $collectedNames = array_merge($collectedNames, $entitlementAttribute->newInstance()->$attributeListPropertyName);
         }
-        foreach ($mcpPackageReflectionClass->getAttributes($entitlementAttributeClassName) as $entitlementAttribute) {
+        // the package class and its parent packages: a subclass keeps the gates of the package it extends
+        foreach (MCPPackage::findClassAttributesOfPackageHierarchy($mcpPackageReflectionClass, $entitlementAttributeClassName) as $entitlementAttribute) {
             $collectedNames = array_merge($collectedNames, $entitlementAttribute->newInstance()->$attributeListPropertyName);
         }
         return array_values(array_unique($collectedNames));

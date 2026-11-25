@@ -691,6 +691,20 @@ class AgentLiveVoiceSessionsService extends Service
     }
 
     /**
+     * The spoken answer of a finished backend task: built by the application's same-path subclass of
+     * {@see AgentVoiceSpokenAnswer} when it has one (its hooks, e.g. `getShownOnlyInTheChatPromptName()` per channel
+     * type, then apply), else by the package's class. Overridable for a spoken form of the application's own.
+     */
+    protected function buildSpokenAnswer(AgentVoiceCall $agentVoiceCall, string $answerText): AgentVoiceSpokenAnswer
+    {
+        /** @var class-string<AgentVoiceSpokenAnswer> $spokenAnswerClassName */
+        $spokenAnswerClassName = DDDService::instance()->getContainerServiceClassNameForClass(AgentVoiceSpokenAnswer::class)
+            ?? AgentVoiceSpokenAnswer::class;
+
+        return $spokenAnswerClassName::fromAnswerText($answerText, (string)$agentVoiceCall->getChannelType());
+    }
+
+    /**
      * What the voice model is told before the call ends because its worker stops: one short goodbye without a reason
      * ({@see AgentVoiceSessionContextsService::buildWorkerStoppingGoodbyeInstruction()}).
      */
@@ -1641,10 +1655,7 @@ class AgentLiveVoiceSessionsService extends Service
             // a widget block is never handed to the voice (the stored chat row keeps it); `widgetInCommentary`
             // below still reports that the answer carried one. Nothing or only headings left once the blocks are
             // gone → it says where the content is instead
-            $spokenAnswerText = AgentVoiceSpokenAnswer::fromAnswerText(
-                (string)$agentTaskOutcome->answerText,
-                (string)$agentVoiceCall->getChannelType()
-            )->spokenText;
+            $spokenAnswerText = $this->buildSpokenAnswer($agentVoiceCall, (string)$agentTaskOutcome->answerText)->spokenText;
             $commentaryText = $realtimeVoiceProviderAdapter->cutToAppendCap($spokenAnswerText);
         } else {
             $commentaryText = 'The backend task failed'

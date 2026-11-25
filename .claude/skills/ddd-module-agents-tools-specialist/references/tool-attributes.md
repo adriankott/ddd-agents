@@ -23,7 +23,9 @@ All live in `DDD\Domain\AI\Entities\MCPPackages`. They are read by reflection, n
 - "Method or package class" below means: the attribute may sit on the package class and then covers every tool of it.
   For the ceilings (`MCPToolExecutionTimeout`, `MCPToolImageBudget`) the method's own declaration wins over the class.
   For the gates (`MCPRequiresFeatureFlags`, `MCPRequiresAnyFeatureFlag`, `MCPRequiresAccountRights`) and
-  `MCPDeliversProductCapability` the method's and the class's values are united.
+  `MCPDeliversProductCapability` the method's and the class's values are united. The class's gates are read through
+  its parent packages (`MCPPackage::findClassAttributesOfPackageHierarchy()`): a subclass that replaces a package keeps
+  its rights and flags and may add its own; a tool's right is lifted only by a tool overlay (`AI.toolOverlays`).
 - A reader that holds only a STORED call (a name) asks `MCPToolAttributeCatalog` or `MCPToolEffectCatalog`. Both are
   built once per process from the packages of every skill (`AISkill::getPackageClassesBySkillName()`): a tool bound to
   no skill is unknown to them.
