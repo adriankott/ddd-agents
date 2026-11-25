@@ -220,7 +220,9 @@ width, its lifetime). `unregisterCanvasKind(canvasId)` takes a kind off again.
 | `activityTiming` | `AgentsEnvironment.chatActivityTiming`, else the package | the activity read window (3000 ms), the read floor while a turn runs (4000), the line paces (2200 / 1400 with a backlog) and the success beat (1400); a host with a realtime push that writes `activityUpdatedAt` lowers the read window so a narrated line shows at once |
 
 The canvas split fits by the width of the chat's own container (`ResizeObserver`), not the viewport: below 850 px the
-open canvas covers the chat. The default `SplitView` honours `coversBelowWidth` the same way. The default chat starts its
+open canvas covers the chat. The default `SplitView` honours `coversBelowWidth` the same way. A host's own `SplitView` must give the covering pane its own stacking context with a z-index above the
+conversation's layers (they go up to 10; the default uses 20) and an opaque background, and must keep it from
+overflowing horizontally (`box-sizing: border-box`, the split clipped with `overflow: hidden`). The default chat starts its
 thread at the top of the pane (`--agents-chat-top-padding: 24px` on its chat area); a host with a top bar floating over
 the thread sets that variable on `[data-agents-chat-scroll]` or through its own `chatAreaClassName`.
 
