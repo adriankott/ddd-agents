@@ -1,6 +1,6 @@
 ---
 name: ddd-module-agents-observability-specialist
-description: "Watches, debugs, records, replays and evaluates mgamadeus/ddd-agents runs and documents every package console command. Covers the command reference (chat record and replay, inspect, diagnose, cache-diff, run-report, app:ai-agent:eval-*, eval purge, decision commands, app:mcp:compare-tool-calls; options, defaults, exit codes, envelopes, --ignore-budget, --agentSpaceId, STOP file, override points), the eval fixture format (case keys, expect, restore, stateAfterRun, AI.evalSuite, result files), tool-call comparison scripts, seed accounts, the turn that never answers, request snapshots, turn and trace events, AGENT_TRACE, console printer, eval safety, metrics, costs. Use when a turn never answers, a run stays RUNNING, FAILED or AWAITING_DELEGATES, what the model saw is needed, a console command or option is looked up, an eval case or fixture is written, an eval suite runs, a refactor or MCP package change is proved by replay, a command is replaced, a test run must not send mail, or cost is measured."
+description: "Watches, debugs, records, replays and evaluates ddd-agents runs; documents every package console command. Covers the command reference (chat record/replay, inspect, diagnose, cache-diff, run-report, app:agent:eval-*, eval purge, decision commands, app:mcp:compare-tool-calls; options, defaults, exit codes, envelopes, --ignore-budget, --agentSpaceId, STOP file, override points), the eval fixture format (case keys, expect, restore, stateAfterRun, AI.evalSuite, result files), tool-call comparison scripts, seed accounts, surface snapshot (AgentSurfaceSnapshotTestCase), request snapshots, turn and trace events, AGENT_TRACE, printer, eval safety, costs. Use when a turn never answers, a run stays RUNNING, FAILED or AWAITING_DELEGATES, what the model saw is needed, a console command or option is looked up, an eval case or fixture is written, an eval suite runs, a refactor or MCP package change is proved by replay, a command is replaced, a host pins its surface, a test run must not send mail, or cost is measured."
 metadata:
   author: mgamadeus
   version: "0.3.0"
@@ -45,6 +45,7 @@ scripts are the application's.
 | the console printer, console stream, HTML transcript, TUI view model | the chat HTTP routes and controller traits (`ddd-module-agents-specialist`) |
 | record and replay, the recorded-run comparison, the tool-call comparison | delegation and sub-agent runs themselves (`ddd-module-agents-autonomy-specialist`) |
 | eval safety: `evalRun`, eval tool blocks, the outbound recipient guard | owner consent and mandates for real runs (`ddd-module-agents-decisions-and-guards-specialist`) |
+| characterization tests: the surface snapshot test case, the package's shipped surface | the skill files and tools the surface lists (`ddd-module-agents-skills-and-purposes-specialist`, `ddd-module-agents-tools-specialist`) |
 | conversation metrics, cost reads, scorecard worker | usage envelopes and cost summaries of a turn (`ddd-module-agents-loop-specialist`) |
 | the control panel statistics, the admin drive and truncate | widgets and the realtime push (`ddd-module-agents-widgets-specialist`) |
 | the decision commands (statistics, fixtures, replay base) | decision sites themselves (`ddd-module-agents-decisions-and-guards-specialist`) |
@@ -203,6 +204,7 @@ The override points of every command and how a new command is added:
 | Delete old evaluation conversations; give each parallel case its own seed account and a clean start; add the application's tables to the purge | [building-evaluation-in-the-host](references/building-evaluation-in-the-host.md) § Seed accounts, clean start and the purge |
 | Build an admin control panel; drive, edit or branch a conversation as an admin | [control-panel-and-admin-drive](references/control-panel-and-admin-drive.md) |
 | Read the turn events and the trace events of a conversation | [trace-and-turn-events](references/trace-and-turn-events.md) |
+| Characterization tests: `AgentSurfaceSnapshotTestCase` — pin what the application's agent is offered (skills, packages, tools, parameters, wire schemas, purposes, bundles); subclass it, the accepted-differences file, the regenerate switch `REGENERATE_AGENT_SURFACE_SNAPSHOT`, reading a failure | [characterization-tests](references/characterization-tests.md) |
 
 **Package maintainer**
 
@@ -216,6 +218,7 @@ The override points of every command and how a new command is added:
 | A new outbound channel or a new eval marker on `RunSettings` | [eval-safety](references/eval-safety.md) |
 | Change a metrics definition (bump `AIConversationMetrics::METRICS_VERSION`) | [metrics-and-cost](references/metrics-and-cost.md) |
 | Change the printer, the transcript or the view model | [console-chat-on-the-printer](references/console-chat-on-the-printer.md) |
+| A package tool, skill or purpose changed and `AgentPackageSurfaceTest` fails: regenerate the shipped `agent-package-surface.json` | [characterization-tests](references/characterization-tests.md#for-the-package-maintainer) |
 
 ## Cross-references
 

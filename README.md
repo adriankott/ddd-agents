@@ -14,6 +14,7 @@ supervisor, run claims, the decision layer, the message handlers of the loop and
 | `src/Domain/AI/…` | the agent core, in the namespace `DDD\Domain\AI\…` shared with `ddd-ai` (no class name collides) |
 | `src/Presentation/…` | the agent console printer, the JSON-RPC base controller `MCPController`, `MCPToolExecutorService` |
 | `config/app/AI/` | the module's defaults: application names and wording, egress, persona, the tool-call child process, context retention (an application overrides a file under its own `config/app/AI/`) |
+| `src/Testing/Agents/` | test hooks an application's suite extends (`AgentSurfaceSnapshotTestCase`); they need PHPUnit and are never services |
 | `tests/` | the package's own suite: unit, contract, integration (a local MariaDB) and the reference-kernel smoke test |
 | `examples/` | `reference-kernel/` (a minimal host without an application) and `workers.yaml` (one consumer per transport) |
 | `.claude/skills/` | the developer skills: the entry skill `ddd-module-agents-specialist` and eight topic skills |
@@ -38,6 +39,17 @@ Start with `.claude/skills/ddd-module-agents-specialist/SKILL.md`: install, wiri
 loop, context, skills and purposes, tools, widgets, autonomy, decisions and guards, observability.
 `tests/Contract/DeveloperSkill*Test.php` keep the skills in step with the code (every named class exists, every file
 under `src/` and `config/` has exactly one owning skill).
+
+## Characterization test: the agent surface snapshot
+
+An application pins what its agent is offered — skills, tool packages, tools, parameters, wire schemas, purposes,
+HTTP MCP bundles — with one subclass of `DDD\Testing\Agents\Surface\AgentSurfaceSnapshotTestCase` in its own suite
+(`getPinnedSurfaceFile()`, optionally `getAcceptedDifferencesFile()`, `findPurposeNames()`, `findBundleClasses()`). A
+failure names each changed value by its path. The package ships its own surface
+(`src/Testing/Agents/Surface/agent-package-surface.json`); with an accepted-differences file the application keeps
+only where it differs from the package, so a package release rewrites neither file unless the application's own change
+meets it. `REGENERATE_AGENT_SURFACE_SNAPSHOT=1` writes both files. Details: the observability skill, reference
+"characterization-tests".
 
 ## Application overrides
 

@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.5.8
+
+**A characterization test hook for applications: the agent surface snapshot.** Contributed by an application team.
+npm `@mgamadeus/ddd-agents` 0.5.8 in lockstep (no web change).
+
+- `DDD\Testing\Agents\Surface\AgentSurfaceSnapshotTestCase` (abstract, extends PHPUnit's `TestCase`): an application
+  pins what its agent is offered — skills, tool packages, tools, parameters (documented and wire schema), purposes,
+  HTTP MCP bundles — under its own container, config and bindings. A failure names each changed value by its path
+  (`~ packages → X → tools → y → description: … => …`), not a file hash. Hooks `getPinnedSurfaceFile()` (abstract),
+  `getAcceptedDifferencesFile()`, `getPackageSurfaceFile()`, `findPurposeNames()` (`findPurposeNamesInDirectory()`),
+  `findBundleClasses()`, `createSurfaceDocumentBuilder()`, `buildSurfaceDocumentToPin()`. `REGENERATE_AGENT_SURFACE_SNAPSHOT=1`
+  writes the files instead of comparing.
+- The package ships its own surface, `src/Testing/Agents/Surface/agent-package-surface.json` (9 skills, 9 packages,
+  3 purposes, about 67 KB), pinned by the package's `AgentPackageSurfaceTest`. With an accepted-differences file an
+  application keeps only where it differs from the package's entries (path => its value, `(absent)` for a package
+  skill it does not offer), and its pinned file holds its own entries only.
+- `AgentSurfaceDocumentBuilder` (values up to `MAXIMUM_PLAIN_TEXT_CHARACTERS` = 120 / `MAXIMUM_PLAIN_MAP_CHARACTERS` =
+  240 characters stay readable, longer ones become `#<12 hex> (<n> characters)`), `AgentSurfaceDocument` (the five
+  parts), `AgentSurfaceDocumentComparer` (value-by-value tree comparison, entry-wise helpers, no container),
+  `AgentSurfaceDifference` / `AgentSurfaceDifferences`.
+- Module: `DDD\Testing\Agents\` is an owned namespace and excluded from the container (`getExcludePatterns()` adds
+  `Testing`, as the framework excludes its own `src/Testing`): a production install without PHPUnit never loads the
+  hooks.
+- Tests: the comparer (12), the builder's value rules (6), the package surface. Observability skill reference
+  "characterization-tests", package-suite reference, README.
+
 ## 0.5.7
 
 **Two generic enablers for packages beside ddd-agents: a voice channel provider port and the account-level realtime

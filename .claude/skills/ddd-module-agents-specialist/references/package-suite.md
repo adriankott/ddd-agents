@@ -55,6 +55,14 @@ a space row through `DatabaseTestCase::insertAgentSpaceRow()`, which adds what t
 | "DeveloperSkillFormatTest", "DeveloperSkillNamesExistTest", "DeveloperSkillSourceOwnershipTest", "DeveloperSkillTemplatesTest" | the developer skills: strict frontmatter and links, every backticked name exists, every source file has one owner in the manifest, every PHP template passes the syntax check with its samples ([source-ownership.md](source-ownership.md)) |
 | `MessengerTransportsHaveWorkerBlocksContract` | the trait a host uses against its own configuration ([transports-and-workers.md](transports-and-workers.md)) |
 
+## The surface snapshot (`tests/Testing/Surface`)
+
+`AgentPackageSurfaceTest` pins the package's own surface (skills, packages, tools, parameters, wire schemas, purposes)
+in `src/Testing/Agents/Surface/agent-package-surface.json`, the file every application's surface snapshot compares
+with. A change of a package tool, skill or purpose regenerates it in the same commit:
+`REGENERATE_AGENT_SURFACE_SNAPSHOT=1 php tests/Support/bin/phpunit.php tests/Testing/Surface/AgentPackageSurfaceTest.php`
+(`ddd-module-agents-observability-specialist`, reference characterization-tests).
+
 ## The kernel tests (`tests/Kernel`)
 
 | Test | Guards |

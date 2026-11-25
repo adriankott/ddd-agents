@@ -31,6 +31,8 @@ use DDD\Infrastructure\Modules\DDDModule;
  *   the tool executor, the console printer and the JSON-RPC base controller);
  * - `DDD\Symfony\Commands\Agents\` (the console commands of the module, their shared base, the option traits and the
  *   progress reporter).
+ * - `DDD\Testing\Agents\` (the test hooks an application's suite extends, e.g. the surface snapshot test case; they
+ *   need PHPUnit and are never services, {@see getExcludePatterns()}).
  *
  * Every `Services` namespace of the module is public ({@see getPublicServiceNamespaces()}). What is no service lives
  * outside them and stays private: the recorded-run clock and id sources (a static library, `Libs\RecordedRuns`), the
@@ -98,6 +100,7 @@ class AgentsModule extends DDDModule
         'DDD\\Presentation\\Api\\Agents\\',
         'DDD\\Presentation\\Mcp\\',
         'DDD\\Symfony\\Commands\\Agents\\',
+        'DDD\\Testing\\Agents\\',
     ];
 
     /** @return string[] {@see self::OWNED_NAMESPACES}: Core checks that no other package ships a class below them */
@@ -169,11 +172,13 @@ class AgentsModule extends DDDModule
     }
 
     /**
-     * The framework defaults plus the value objects of the presentation layer (request and response DTOs) and the
-     * module's own non-service plumbing (`Modules`), none of which the container may autowire.
+     * The framework defaults plus the value objects of the presentation layer (request and response DTOs), the
+     * module's own non-service plumbing (`Modules`) and the test hooks of `DDD\Testing\Agents\` (`Testing`: they
+     * extend PHPUnit, which a production install does not have; as the framework's own `src/Testing`, they are loaded
+     * by an application's test suite only), none of which the container may autowire.
      */
     public static function getExcludePatterns(): array
     {
-        return [...parent::getExcludePatterns(), 'Dtos', 'Modules'];
+        return [...parent::getExcludePatterns(), 'Dtos', 'Modules', 'Testing'];
     }
 }

@@ -1,0 +1,1427 @@
+{
+    "skillOrder": [
+        "Agent.Mandates",
+        "Agent.Tasks",
+        "Agent.TaskRunReports",
+        "Agent.Images",
+        "Agent.UI",
+        "System.Health",
+        "System.Issues",
+        "System.Workers",
+        "System.Crons"
+    ],
+    "skills": {
+        "Agent.Images": {
+            "isLoadable": true,
+            "decisionCriteria": "#71e449bac304 (154 characters)",
+            "description": "#98ce32fbe38d (185 characters)",
+            "instruction": "#f39a13a1660c (940 characters)",
+            "name": "Agent.Images",
+            "shortDescription": "see again a picture of an earlier tool result that is no longer attached",
+            "toolNames": [
+                "viewEarlierToolImage"
+            ],
+            "packages": [
+                "AgentImagesMCPPackage"
+            ]
+        },
+        "Agent.Mandates": {
+            "isLoadable": true,
+            "decisionCriteria": "Standing permissions Assistant holds to act outward on the owner's behalf: grant one, list them, revoke one.",
+            "description": "#8341b8e476d4 (202 characters)",
+            "instruction": "#10f97ce0daa3 (5712 characters)",
+            "name": "Agent.Mandates",
+            "shortDescription": "standing permissions you grant Assistant for outward actions: grant, list, revoke",
+            "toolNames": [
+                "grantMandate",
+                "listMandates",
+                "revokeMandate"
+            ],
+            "packages": [
+                "AgentMandatesMCPPackage"
+            ]
+        },
+        "Agent.TaskRunReports": {
+            "isLoadable": true,
+            "decisionCriteria": "Only inside a scheduled run: read the reports the earlier runs of the same task wrote for the owner.",
+            "description": "#57f532663a51 (212 characters)",
+            "instruction": "#14a4424e8cad (756 characters)",
+            "name": "Agent.TaskRunReports",
+            "onlyUnderPurposeNames": [
+                "Schedule.Run"
+            ],
+            "shortDescription": "reads the earlier reports of the scheduled task this run executes",
+            "toolNames": [
+                "getPreviousTaskRunReports"
+            ],
+            "packages": [
+                "AgentTaskRunReportsMCPPackage"
+            ]
+        },
+        "Agent.Tasks": {
+            "isLoadable": true,
+            "decisionCriteria": "Work outside this turn: a deep job in the background now, something at a set time, or recurring checks.",
+            "description": "#4a42df8e0a24 (289 characters)",
+            "instruction": "#f18152197a24 (6183 characters)",
+            "name": "Agent.Tasks",
+            "shortDescription": "runs tasks for you: background work now, one-time at a set moment, recurring",
+            "toolNames": [
+                "startBackgroundTask",
+                "scheduleOneTimeTask",
+                "createRecurringTaskSchedule",
+                "getTaskSchedules",
+                "getTaskRuns",
+                "getTaskRunReport",
+                "pauseTaskSchedule",
+                "resumeTaskSchedule",
+                "deleteTaskSchedule",
+                "updateTaskSchedule"
+            ],
+            "packages": [
+                "AgentTaskSchedulesMCPPackage"
+            ]
+        },
+        "Agent.UI": {
+            "isLoadable": true,
+            "decisionCriteria": "#6ef0bf6a3875 (186 characters)",
+            "description": "#3c28ad3e3177 (456 characters)",
+            "instruction": "#d15d578a14ae (764 characters)",
+            "name": "Agent.UI",
+            "requiredAccountRights": [
+                "useUI"
+            ],
+            "shortDescription": "reads the user's open screen, opens screens and points at fields and buttons",
+            "toolNames": [
+                "getCurrentScreen",
+                "listScreens",
+                "openScreen",
+                "highlightOnScreen"
+            ],
+            "packages": [
+                "AgentUIMCPPackage"
+            ]
+        },
+        "System.Crons": {
+            "isLoadable": true,
+            "decisionCriteria": "The operator asks about cron jobs (scheduled tasks): which failed, did one run, when is the next run, what did it print.",
+            "description": "#a731f2460e7b (272 characters)",
+            "instruction": "#eac0835325cd (936 characters)",
+            "isSubSkill": true,
+            "name": "System.Crons",
+            "requiredAccountRights": [
+                "operatePlatform"
+            ],
+            "shortDescription": "reads the cron jobs: state, schedule, runs and their output",
+            "toolNames": [
+                "listCrons",
+                "getCron",
+                "listCronExecutions"
+            ],
+            "packages": [
+                "SystemCronsMCPPackage"
+            ]
+        },
+        "System.Health": {
+            "isLoadable": true,
+            "decisionCriteria": "#4b3eeb84933f (163 characters)",
+            "description": "#6645db6cf7a6 (347 characters)",
+            "instruction": "#141d0fe84911 (1208 characters)",
+            "name": "System.Health",
+            "requiredAccountRights": [
+                "operatePlatform"
+            ],
+            "shortDescription": "reports platform health: workers, crons, error groups and the application's sections",
+            "subSkillNames": [
+                "System.Workers",
+                "System.Crons",
+                "System.Issues"
+            ],
+            "toolNames": [
+                "getSystemHealth"
+            ],
+            "packages": [
+                "SystemHealthMCPPackage"
+            ]
+        },
+        "System.Issues": {
+            "isLoadable": true,
+            "decisionCriteria": "#b2b3d9104119 (185 characters)",
+            "description": "#5ae20aadf50c (496 characters)",
+            "instruction": "#82fa0e29c4d1 (2373 characters)",
+            "isSubSkill": true,
+            "name": "System.Issues",
+            "requiredAccountRights": [
+                "operatePlatform"
+            ],
+            "shortDescription": "lists and reads error groups of the issues registry with events and trend; sets a group resolved, ignored or open",
+            "toolNames": [
+                "listIssueGroups",
+                "getIssueGroup",
+                "getIssuesTrend",
+                "setIssueGroupStatus"
+            ],
+            "packages": [
+                "SystemIssuesMCPPackage"
+            ]
+        },
+        "System.Workers": {
+            "isLoadable": true,
+            "decisionCriteria": "#1ea285c395a8 (131 characters)",
+            "description": "#05cea81f63ca (285 characters)",
+            "instruction": "#f442b68de3ff (1118 characters)",
+            "isSubSkill": true,
+            "name": "System.Workers",
+            "requiredAccountRights": [
+                "operatePlatform"
+            ],
+            "shortDescription": "reads the Messenger workers: queues, processes, failures per transport and message class",
+            "toolNames": [
+                "getWorkersOverview",
+                "getWorkerTransport"
+            ],
+            "packages": [
+                "SystemWorkersMCPPackage"
+            ]
+        }
+    },
+    "packages": {
+        "AgentImagesMCPPackage": {
+            "packageId": "agent.images",
+            "description": "#aff82e644009 (136 characters)",
+            "tools": {
+                "viewEarlierToolImage": {
+                    "annotations": {
+                        "idempotentHint": true,
+                        "readOnlyHint": true
+                    },
+                    "description": "#183e27e11368 (287 characters)",
+                    "effect": {
+                        "effect": "READ",
+                        "resultIsReusedWithinTurn": true
+                    },
+                    "isParallelSafe": true,
+                    "returnsUntrustedContent": true,
+                    "summary": "#730259da809e (148 characters)",
+                    "title": "viewEarlierToolImage",
+                    "parameters": {
+                        "imageId": {
+                            "description": "The image id of the placeholder line (`[image <id>, …]`, the first 12 characters of its sha256)",
+                            "name": "imageId",
+                            "type": "string"
+                        }
+                    },
+                    "inputSchemaWithoutParameters": "#2fe32d840ed8 (261 characters)",
+                    "wire": {
+                        "description": "#183e27e11368 (287 characters)",
+                        "parameters": {
+                            "imageId": "#6985b2f2a6e3 (129 characters)"
+                        },
+                        "rest": "#db9a462b7aef (190 characters)"
+                    }
+                }
+            }
+        },
+        "AgentMandatesMCPPackage": {
+            "packageId": "agent.mandates",
+            "description": "#cc0a858c5036 (176 characters)",
+            "tools": {
+                "grantMandate": {
+                    "annotations": {
+                        "destructiveHint": true,
+                        "openWorldHint": true
+                    },
+                    "description": "#875c5ffe0034 (730 characters)",
+                    "effect": {
+                        "effect": "WRITE",
+                        "identicalRepeatDoesNewWork": true,
+                        "isOutwardAction": true,
+                        "resultIsReusedWithinTurn": true
+                    },
+                    "executionTimeoutSeconds": 100,
+                    "summary": "#7816fbb7aa93 (190 characters)",
+                    "title": "grantMandate",
+                    "parameters": {
+                        "actionClass": {
+                            "description": "The action class the customer authorized — one of the listed values.",
+                            "enum": [
+                                "STANDING_AUTOMATION"
+                            ],
+                            "name": "actionClass",
+                            "type": "string"
+                        },
+                        "scopeType": "#f6964f39af0b (430 characters)",
+                        "validUntil": "#4dc3fd181e15 (378 characters)",
+                        "constraintsNote": "#b1f8a929c966 (250 characters)",
+                        "agentSpaceId": {
+                            "description": "The space the mandate is bound to; omit it for the space this conversation works for.",
+                            "name": "agentSpaceId",
+                            "type": "integer"
+                        },
+                        "accountWide": "#cea70e0fb3be (241 characters)"
+                    },
+                    "inputSchemaWithoutParameters": "#519662cd63dd (432 characters)",
+                    "wire": {
+                        "description": "#875c5ffe0034 (730 characters)",
+                        "parameters": {
+                            "actionClass": "#5999ad3edae4 (133 characters)",
+                            "scopeType": "#488b8cc35574 (327 characters)",
+                            "validUntil": "#dd49ecb950e7 (274 characters)",
+                            "constraintsNote": "#075e4f1da849 (141 characters)",
+                            "agentSpaceId": "#1f4cfaecaf17 (120 characters)",
+                            "accountWide": "#227330975aa1 (136 characters)"
+                        },
+                        "rest": "#01995bc849aa (353 characters)"
+                    }
+                },
+                "listMandates": {
+                    "annotations": {
+                        "idempotentHint": true,
+                        "readOnlyHint": true
+                    },
+                    "description": "#2764fa82a37f (216 characters)",
+                    "effect": {
+                        "effect": "READ",
+                        "resultIsReusedWithinTurn": true
+                    },
+                    "isParallelSafe": true,
+                    "summary": "#e2b0a4f67863 (134 characters)",
+                    "title": "listMandates",
+                    "parameters": {
+                        "agentSpaceId": "#66d380700b52 (348 characters)"
+                    },
+                    "inputSchemaWithoutParameters": "#4ee92156f7f9 (256 characters)",
+                    "wire": {
+                        "description": "#2764fa82a37f (216 characters)",
+                        "parameters": {
+                            "agentSpaceId": "#458a95794bb4 (242 characters)"
+                        },
+                        "rest": "#e54902b9b40f (177 characters)"
+                    }
+                },
+                "revokeMandate": {
+                    "annotations": {
+                        "destructiveHint": true,
+                        "idempotentHint": true
+                    },
+                    "description": "#a914224d795d (264 characters)",
+                    "effect": {
+                        "effect": "DELETE",
+                        "resultIsReusedWithinTurn": true
+                    },
+                    "summary": "Revoke a mandate immediately — any customer utterance suffices; when in doubt, revoke. Id from listMandates.",
+                    "title": "revokeMandate",
+                    "parameters": {
+                        "mandateId": {
+                            "description": "The id of the mandate to revoke (from listMandates).",
+                            "name": "mandateId",
+                            "type": "integer"
+                        }
+                    },
+                    "inputSchemaWithoutParameters": "#f20acaaf228e (251 characters)",
+                    "wire": {
+                        "description": "#a914224d795d (264 characters)",
+                        "parameters": {
+                            "mandateId": "#819e6b27bbf3 (87 characters)"
+                        },
+                        "rest": "#666e5dbafb89 (173 characters)"
+                    }
+                }
+            }
+        },
+        "AgentTaskRunReportsMCPPackage": {
+            "packageId": "agent.taskRunReports",
+            "description": "Inside a scheduled run: read the reports the earlier runs of the same task wrote for the owner.",
+            "tools": {
+                "getPreviousTaskRunReports": {
+                    "annotations": {
+                        "idempotentHint": true,
+                        "readOnlyHint": true
+                    },
+                    "description": "#90c4cb33896a (436 characters)",
+                    "effect": {
+                        "effect": "READ",
+                        "resultIsReusedWithinTurn": true
+                    },
+                    "isParallelSafe": true,
+                    "summary": "#adb6f286a492 (247 characters)",
+                    "title": "getPreviousTaskRunReports",
+                    "parameters": {
+                        "count": {
+                            "description": "How many earlier reports, newest first: 1 (default) to 3.",
+                            "name": "count",
+                            "type": "integer"
+                        }
+                    },
+                    "inputSchemaWithoutParameters": "#4e51cdf520a3 (258 characters)",
+                    "wire": {
+                        "description": "#90c4cb33896a (436 characters)",
+                        "parameters": {
+                            "count": "#20e1f0f2d0c4 (92 characters)"
+                        },
+                        "rest": "#5ba48adee2b5 (192 characters)"
+                    }
+                }
+            }
+        },
+        "AgentTaskSchedulesMCPPackage": {
+            "packageId": "agent.tasks",
+            "description": "#a0e6bb06b5f2 (308 characters)",
+            "usesQueryOptions": true,
+            "usesSharedParams": true,
+            "tools": {
+                "startBackgroundTask": {
+                    "annotations": [],
+                    "description": "#3a1730c244e1 (553 characters)",
+                    "effect": {
+                        "effect": "WRITE",
+                        "identicalRepeatDoesNewWork": true,
+                        "resultIsReusedWithinTurn": true
+                    },
+                    "requiredAccountRightNames": [
+                        "scheduleAgentTasks"
+                    ],
+                    "summary": "#f37129392639 (179 characters)",
+                    "title": "startBackgroundTask",
+                    "parameters": {
+                        "task": "#25af3ac1937e (317 characters)",
+                        "title": {
+                            "description": "3-6 word label in the user's language shown in the owner's task list — ALWAYS provide it",
+                            "name": "title",
+                            "type": "string"
+                        },
+                        "reportChannel": "#2b282c930613 (287 characters)",
+                        "agentSpaceId": {
+                            "description": "The space the task works for; omit it for the space this conversation works for",
+                            "name": "agentSpaceId",
+                            "type": "integer"
+                        }
+                    },
+                    "inputSchemaWithoutParameters": "#a19a41ec5454 (556 characters)",
+                    "wire": {
+                        "description": "#3a1730c244e1 (553 characters)",
+                        "parameters": {
+                            "task": "#4dada8b91c23 (219 characters)",
+                            "title": "#9c1266888302 (122 characters)",
+                            "reportChannel": "#f3b8b3d7d882 (180 characters)",
+                            "agentSpaceId": "#1e2c96c982c3 (114 characters)"
+                        },
+                        "rest": "#6371ede770a4 (484 characters)"
+                    }
+                },
+                "scheduleOneTimeTask": {
+                    "annotations": [],
+                    "description": "#b09401582575 (950 characters)",
+                    "effect": {
+                        "effect": "WRITE",
+                        "identicalRepeatDoesNewWork": true,
+                        "resultIsReusedWithinTurn": true
+                    },
+                    "requiredAccountRightNames": [
+                        "scheduleAgentTasks"
+                    ],
+                    "summary": "#f0e3c421dddf (258 characters)",
+                    "title": "scheduleOneTimeTask",
+                    "parameters": {
+                        "task": "#ff88ccf26c97 (327 characters)",
+                        "title": {
+                            "description": "3-6 word label in the user's language shown in the owner's task list — ALWAYS provide it",
+                            "name": "title",
+                            "type": "string"
+                        },
+                        "runInMinutes": "#79dc635430e5 (316 characters)",
+                        "runAtLocalTime": "#c5d4cea2ed48 (356 characters)",
+                        "reportChannel": "#8266869ba5ee (278 characters)",
+                        "timezoneIdentifier": "#b7e2247f3ea9 (300 characters)",
+                        "agentSpaceId": {
+                            "description": "The space the task works for; omit it for the space this conversation works for",
+                            "name": "agentSpaceId",
+                            "type": "integer"
+                        }
+                    },
+                    "inputSchemaWithoutParameters": "#b5a41e9cb40a (514 characters)",
+                    "wire": {
+                        "description": "#b09401582575 (950 characters)",
+                        "parameters": {
+                            "task": "#2c468bda1f8e (229 characters)",
+                            "title": "#9c1266888302 (122 characters)",
+                            "runInMinutes": "#1bf62d41495f (210 characters)",
+                            "runAtLocalTime": "#22d4d47d2b26 (248 characters)",
+                            "reportChannel": "#9b38ff1aa30b (171 characters)",
+                            "timezoneIdentifier": "#f29282306637 (188 characters)",
+                            "agentSpaceId": "#1e2c96c982c3 (114 characters)"
+                        },
+                        "rest": "#e396931916a8 (442 characters)"
+                    }
+                },
+                "createRecurringTaskSchedule": {
+                    "annotations": {
+                        "idempotentHint": true
+                    },
+                    "description": "#8093c74f0121 (1101 characters)",
+                    "effect": {
+                        "effect": "WRITE",
+                        "resultIsReusedWithinTurn": true
+                    },
+                    "requiredAccountRightNames": [
+                        "scheduleAgentTasks"
+                    ],
+                    "summary": "#807b2556a0ca (270 characters)",
+                    "title": "createRecurringTaskSchedule",
+                    "parameters": {
+                        "task": "#23dbd4133ef0 (283 characters)",
+                        "title": {
+                            "description": "3-6 word label in the user's language shown in the owner's task list — ALWAYS provide it",
+                            "name": "title",
+                            "type": "string"
+                        },
+                        "cronSchedule": "#3be00ea216ac (253 characters)",
+                        "doneCriteria": "#7b2eb0906261 (262 characters)",
+                        "maxRuns": "#a489d2ede2fa (254 characters)",
+                        "reportChannel": "#efc798c787b6 (288 characters)",
+                        "timezoneIdentifier": "#b7e2247f3ea9 (300 characters)",
+                        "agentSpaceId": {
+                            "description": "The space the task works for; omit it for the space this conversation works for",
+                            "name": "agentSpaceId",
+                            "type": "integer"
+                        }
+                    },
+                    "inputSchemaWithoutParameters": "#d8a1b4d61671 (515 characters)",
+                    "wire": {
+                        "description": "#8093c74f0121 (1101 characters)",
+                        "parameters": {
+                            "task": "#d3155287cad6 (185 characters)",
+                            "title": "#9c1266888302 (122 characters)",
+                            "cronSchedule": "#04b4b96ee1dc (147 characters)",
+                            "doneCriteria": "#3f309e79748e (156 characters)",
+                            "maxRuns": "#88dafd173c0a (153 characters)",
+                            "reportChannel": "#592621501f8e (181 characters)",
+                            "timezoneIdentifier": "#f29282306637 (188 characters)",
+                            "agentSpaceId": "#1e2c96c982c3 (114 characters)"
+                        },
+                        "rest": "#289ae02c218e (451 characters)"
+                    }
+                },
+                "getTaskSchedules": {
+                    "annotations": {
+                        "idempotentHint": true,
+                        "readOnlyHint": true
+                    },
+                    "description": "#0bfcfe4b0a67 (899 characters)",
+                    "effect": {
+                        "effect": "READ",
+                        "resultIsReusedWithinTurn": true
+                    },
+                    "isParallelSafe": true,
+                    "refreshesStateOnEveryCall": true,
+                    "summary": "#9eee5d76b780 (291 characters)",
+                    "title": "getTaskSchedules",
+                    "parameters": {
+                        "includeArchived": {
+                            "description": "Also include ARCHIVED schedules (deleted after they ran — hidden by default)",
+                            "name": "includeArchived",
+                            "type": "boolean"
+                        },
+                        "agentSpaceId": {
+                            "description": "The space whose schedules to list; omit it for the space this conversation works for",
+                            "name": "agentSpaceId",
+                            "type": "integer"
+                        },
+                        "skip": {
+                            "name": "skip",
+                            "type": "integer"
+                        },
+                        "top": {
+                            "name": "top",
+                            "type": "integer"
+                        },
+                        "orderBy": "#28d4cd407e2b (268 characters)",
+                        "filters": "#ac15514927c8 (666 characters)"
+                    },
+                    "inputSchemaWithoutParameters": "#043431512fa6 (498 characters)",
+                    "wire": {
+                        "description": "#0bfcfe4b0a67 (899 characters)",
+                        "parameters": {
+                            "includeArchived": "#3ffaaf1ec3a0 (111 characters)",
+                            "agentSpaceId": "#7847589d0226 (119 characters)",
+                            "skip": "#4df23f6fcb2f (18 characters)",
+                            "top": "#4df23f6fcb2f (18 characters)",
+                            "orderBy": "#fb17914387fb (167 characters)",
+                            "filters": "#c5352ecfb750 (565 characters)"
+                        },
+                        "rest": "#9cf19c03d5d1 (425 characters)"
+                    }
+                },
+                "getTaskRuns": {
+                    "annotations": {
+                        "idempotentHint": true,
+                        "readOnlyHint": true
+                    },
+                    "description": "#b070bb5fdf97 (972 characters)",
+                    "effect": {
+                        "effect": "READ",
+                        "resultIsReusedWithinTurn": true
+                    },
+                    "isParallelSafe": true,
+                    "refreshesStateOnEveryCall": true,
+                    "summary": "#6b528ca11071 (266 characters)",
+                    "title": "getTaskRuns",
+                    "parameters": {
+                        "agentSpaceId": {
+                            "description": "The space whose task runs to list; omit it for the space this conversation works for",
+                            "name": "agentSpaceId",
+                            "type": "integer"
+                        },
+                        "skip": {
+                            "name": "skip",
+                            "type": "integer"
+                        },
+                        "top": {
+                            "name": "top",
+                            "type": "integer"
+                        },
+                        "orderBy": "#28d4cd407e2b (268 characters)",
+                        "filters": "#ecc1d8544d6c (410 characters)"
+                    },
+                    "inputSchemaWithoutParameters": "#ab41a01680d2 (419 characters)",
+                    "wire": {
+                        "description": "#b070bb5fdf97 (972 characters)",
+                        "parameters": {
+                            "agentSpaceId": "#62c785afd064 (119 characters)",
+                            "skip": "#4df23f6fcb2f (18 characters)",
+                            "top": "#4df23f6fcb2f (18 characters)",
+                            "orderBy": "#fb17914387fb (167 characters)",
+                            "filters": "#0d5ecdbcdebc (309 characters)"
+                        },
+                        "rest": "#dc1f6e7a15df (341 characters)"
+                    }
+                },
+                "getTaskRunReport": {
+                    "annotations": {
+                        "idempotentHint": true,
+                        "readOnlyHint": true
+                    },
+                    "description": "#e8396d6664d0 (510 characters)",
+                    "effect": {
+                        "effect": "READ",
+                        "resultIsReusedWithinTurn": true
+                    },
+                    "isParallelSafe": true,
+                    "refreshesStateOnEveryCall": true,
+                    "summary": "#0e862f0c8a77 (130 characters)",
+                    "title": "getTaskRunReport",
+                    "parameters": {
+                        "conversationId": {
+                            "description": "The run conversation's id (from getTaskRuns / getTaskSchedules)",
+                            "name": "conversationId",
+                            "type": "integer"
+                        }
+                    },
+                    "inputSchemaWithoutParameters": "#cf6db3a6a472 (260 characters)",
+                    "wire": {
+                        "description": "#e8396d6664d0 (510 characters)",
+                        "parameters": {
+                            "conversationId": "#4bc19a6985fd (98 characters)"
+                        },
+                        "rest": "#8cc12293f80d (185 characters)"
+                    }
+                },
+                "pauseTaskSchedule": {
+                    "annotations": [],
+                    "description": "#f01f9bbf7d47 (386 characters)",
+                    "effect": {
+                        "effect": "WRITE",
+                        "identicalRepeatDoesNewWork": true,
+                        "resultIsReusedWithinTurn": true
+                    },
+                    "requiredAccountRightNames": [
+                        "scheduleAgentTasks"
+                    ],
+                    "summary": "#7f2034a78c75 (140 characters)",
+                    "title": "pauseTaskSchedule",
+                    "parameters": {
+                        "scheduleId": {
+                            "description": "The schedule id (from getTaskSchedules)",
+                            "name": "scheduleId",
+                            "type": "integer"
+                        }
+                    },
+                    "inputSchemaWithoutParameters": "#a80ae41b0a12 (252 characters)",
+                    "wire": {
+                        "description": "#f01f9bbf7d47 (386 characters)",
+                        "parameters": {
+                            "scheduleId": "#a8c60395cadd (74 characters)"
+                        },
+                        "rest": "#18e5e1a1b267 (178 characters)"
+                    }
+                },
+                "resumeTaskSchedule": {
+                    "annotations": [],
+                    "description": "#ede4913d57a3 (496 characters)",
+                    "effect": {
+                        "effect": "WRITE",
+                        "identicalRepeatDoesNewWork": true,
+                        "resultIsReusedWithinTurn": true
+                    },
+                    "requiredAccountRightNames": [
+                        "scheduleAgentTasks"
+                    ],
+                    "summary": "#589b57ce4f18 (131 characters)",
+                    "title": "resumeTaskSchedule",
+                    "parameters": {
+                        "scheduleId": {
+                            "description": "The schedule id (from getTaskSchedules)",
+                            "name": "scheduleId",
+                            "type": "integer"
+                        }
+                    },
+                    "inputSchemaWithoutParameters": "#a80ae41b0a12 (252 characters)",
+                    "wire": {
+                        "description": "#ede4913d57a3 (496 characters)",
+                        "parameters": {
+                            "scheduleId": "#a8c60395cadd (74 characters)"
+                        },
+                        "rest": "#08f9572282e8 (179 characters)"
+                    }
+                },
+                "deleteTaskSchedule": {
+                    "annotations": {
+                        "destructiveHint": true,
+                        "idempotentHint": true
+                    },
+                    "description": "#ca8f65680a8c (425 characters)",
+                    "effect": {
+                        "effect": "DELETE",
+                        "resultIsReusedWithinTurn": true
+                    },
+                    "requiredAccountRightNames": [
+                        "scheduleAgentTasks"
+                    ],
+                    "summary": "#a84b150249b4 (216 characters)",
+                    "title": "deleteTaskSchedule",
+                    "parameters": {
+                        "scheduleId": {
+                            "description": "The schedule id (from getTaskSchedules)",
+                            "name": "scheduleId",
+                            "type": "integer"
+                        }
+                    },
+                    "inputSchemaWithoutParameters": "#a80ae41b0a12 (252 characters)",
+                    "wire": {
+                        "description": "#ca8f65680a8c (425 characters)",
+                        "parameters": {
+                            "scheduleId": "#a8c60395cadd (74 characters)"
+                        },
+                        "rest": "#acf96248a7d1 (179 characters)"
+                    }
+                },
+                "updateTaskSchedule": {
+                    "annotations": {
+                        "idempotentHint": true
+                    },
+                    "description": "#40b9a59a984b (847 characters)",
+                    "effect": {
+                        "effect": "WRITE",
+                        "resultIsReusedWithinTurn": true
+                    },
+                    "requiredAccountRightNames": [
+                        "scheduleAgentTasks"
+                    ],
+                    "summary": "#67b134e527ef (286 characters)",
+                    "title": "updateTaskSchedule",
+                    "parameters": {
+                        "scheduleId": {
+                            "description": "The schedule id to change (from getTaskSchedules)",
+                            "name": "scheduleId",
+                            "type": "integer"
+                        },
+                        "task": "#c983f94d4bc1 (256 characters)",
+                        "title": {
+                            "description": "New 3-6 word label in the user's language shown in the owner's task list",
+                            "name": "title",
+                            "type": "string"
+                        },
+                        "cronSchedule": {
+                            "description": "New cron expression (e.g. \"0 8 * * 5\") — RECURRING schedules only; at most 4 firings per day",
+                            "name": "cronSchedule",
+                            "type": "string"
+                        },
+                        "runAtLocalTime": "#b11742f10fa5 (297 characters)",
+                        "runInMinutes": "#fd40ec947533 (269 characters)",
+                        "doneCriteria": "#30f3999229e9 (282 characters)",
+                        "reportChannel": "#0ef3fdf27db8 (248 characters)",
+                        "timezoneIdentifier": "#cac55bb2be3f (272 characters)"
+                    },
+                    "inputSchemaWithoutParameters": "#b2a22207bbd8 (404 characters)",
+                    "wire": {
+                        "description": "#40b9a59a984b (847 characters)",
+                        "parameters": {
+                            "scheduleId": "#1831eb1efb90 (84 characters)",
+                            "task": "#3510705905b2 (158 characters)",
+                            "title": "#3ee556ea13f2 (106 characters)",
+                            "cronSchedule": "#97048383157e (128 characters)",
+                            "runAtLocalTime": "#0caf76647a43 (189 characters)",
+                            "runInMinutes": "#4112cd071b03 (163 characters)",
+                            "doneCriteria": "#29ca1ce7d860 (176 characters)",
+                            "reportChannel": "#b36137ac1825 (141 characters)",
+                            "timezoneIdentifier": "#9b9d4284bf5a (160 characters)"
+                        },
+                        "rest": "#0600a8ae6170 (331 characters)"
+                    }
+                }
+            }
+        },
+        "AgentUIMCPPackage": {
+            "packageId": "agent.ui",
+            "description": "Read the user's open screen, list and open screens, point at fields and buttons.",
+            "tools": {
+                "getCurrentScreen": {
+                    "annotations": {
+                        "idempotentHint": true,
+                        "openWorldHint": true,
+                        "readOnlyHint": true
+                    },
+                    "description": "#e3e3349cb012 (476 characters)",
+                    "effect": {
+                        "effect": "READ"
+                    },
+                    "executionTimeoutSeconds": 25,
+                    "requiredAccountRightNames": [
+                        "useUI"
+                    ],
+                    "returnsUntrustedContent": true,
+                    "summary": "#4f1f3ca89378 (130 characters)",
+                    "title": "getCurrentScreen",
+                    "parameters": {
+                        "focus": {
+                            "description": "One reference of the last read to read in full (a long text, all columns of a table), e.g. f.description",
+                            "name": "focus",
+                            "type": "string"
+                        },
+                        "format": "#fd1e03625ff8 (268 characters)",
+                        "pictureSize": {
+                            "description": "For a picture: `small`, `medium` (default) or `large`",
+                            "name": "pictureSize",
+                            "type": "string"
+                        },
+                        "renderMode": "#1a4e09a2b000 (248 characters)"
+                    },
+                    "inputSchemaWithoutParameters": "#9bb692dc1209 (329 characters)",
+                    "wire": {
+                        "description": "#e3e3349cb012 (476 characters)",
+                        "parameters": {
+                            "focus": "#d418d2d638b9 (138 characters)",
+                            "format": "#c2d9965e6ca4 (168 characters)",
+                            "pictureSize": "#1e1d88d11bcf (87 characters)",
+                            "renderMode": "#cd8b0c9d567e (144 characters)"
+                        },
+                        "rest": "#fa791d4b7ed3 (254 characters)"
+                    }
+                },
+                "listScreens": {
+                    "annotations": {
+                        "idempotentHint": true,
+                        "readOnlyHint": true
+                    },
+                    "description": "The screens this user can open: menu entries and record screens with their tabs and filters. Pass a key to\nopenScreen.",
+                    "effect": {
+                        "effect": "READ"
+                    },
+                    "executionTimeoutSeconds": 25,
+                    "requiredAccountRightNames": [
+                        "useUI"
+                    ],
+                    "summary": "Lists the screens this user can open (keys, tabs, filters) for openScreen; searchText narrows.",
+                    "title": "listScreens",
+                    "parameters": {
+                        "searchText": {
+                            "description": "Words of the screen's name, group or key; each must match. Empty lists every screen",
+                            "name": "searchText",
+                            "type": "string"
+                        }
+                    },
+                    "inputSchemaWithoutParameters": "#c246e92d23ec (257 characters)",
+                    "wire": {
+                        "description": "The screens this user can open: menu entries and record screens with their tabs and filters. Pass a key to\nopenScreen.",
+                        "parameters": {
+                            "searchText": "#9709e12c42e2 (117 characters)"
+                        },
+                        "rest": "#699a3054fdec (177 characters)"
+                    }
+                },
+                "openScreen": {
+                    "annotations": {
+                        "idempotentHint": true,
+                        "openWorldHint": true,
+                        "readOnlyHint": true
+                    },
+                    "description": "#ecdf4321253d (197 characters)",
+                    "effect": {
+                        "effect": "READ"
+                    },
+                    "executionTimeoutSeconds": 25,
+                    "requiredAccountRightNames": [
+                        "useUI"
+                    ],
+                    "returnsUntrustedContent": true,
+                    "summary": "Opens a screen (a key from listScreens, record id, tab, filters) in the user's client.",
+                    "title": "openScreen",
+                    "parameters": {
+                        "target": {
+                            "description": "(required) A key from listScreens, e.g. order or maintenance.crons",
+                            "name": "target",
+                            "type": "string"
+                        },
+                        "recordId": {
+                            "description": "The record id of a record screen (an order, a customer, …)",
+                            "name": "recordId",
+                            "type": "integer"
+                        },
+                        "tab": {
+                            "description": "One of the target's tabs, e.g. items",
+                            "name": "tab",
+                            "type": "string"
+                        },
+                        "filters": "#948a249a7945 (329 characters)",
+                        "includeScreen": {
+                            "description": "True: the answer carries the opened screen as getCurrentScreen reads it (saves the next call)",
+                            "name": "includeScreen",
+                            "type": "boolean"
+                        }
+                    },
+                    "inputSchemaWithoutParameters": "#eef7bca43ff0 (331 characters)",
+                    "wire": {
+                        "description": "#ecdf4321253d (197 characters)",
+                        "parameters": {
+                            "target": "#525fe8c6427b (100 characters)",
+                            "recordId": "#61684352fe9b (93 characters)",
+                            "tab": "#ea04a4d97b38 (70 characters)",
+                            "filters": "#5630bd37fa24 (144 characters)",
+                            "includeScreen": "#83d0e87fd6b9 (128 characters)"
+                        },
+                        "rest": "#65a3536572b5 (250 characters)"
+                    }
+                },
+                "highlightOnScreen": {
+                    "annotations": {
+                        "idempotentHint": true,
+                        "openWorldHint": true,
+                        "readOnlyHint": true
+                    },
+                    "description": "#65b620d70435 (191 characters)",
+                    "effect": {
+                        "effect": "READ"
+                    },
+                    "executionTimeoutSeconds": 25,
+                    "requiredAccountRightNames": [
+                        "useUI"
+                    ],
+                    "returnsUntrustedContent": true,
+                    "summary": "Marks fields, buttons, rows or sections on the user's screen by their references, with a short note.",
+                    "title": "highlightOnScreen",
+                    "parameters": {
+                        "references": "#9f88adbfa364 (364 characters)",
+                        "note": {
+                            "description": "A short note beside the first mark, at most 120 characters, plain text",
+                            "name": "note",
+                            "type": "string"
+                        }
+                    },
+                    "inputSchemaWithoutParameters": "#1fe0fefdc675 (297 characters)",
+                    "wire": {
+                        "description": "#65b620d70435 (191 characters)",
+                        "parameters": {
+                            "references": "#e332f136ba1f (176 characters)",
+                            "note": "#8547ae6f40ab (104 characters)"
+                        },
+                        "rest": "#de79a8aafab9 (223 characters)"
+                    }
+                }
+            }
+        },
+        "SystemCronsMCPPackage": {
+            "packageId": "ddd.system.crons",
+            "description": "Read the cron jobs: state, schedule, runs and their output.",
+            "tools": {
+                "listCrons": {
+                    "annotations": {
+                        "idempotentHint": true,
+                        "readOnlyHint": true
+                    },
+                    "description": "#526c6b396d74 (423 characters)",
+                    "effect": {
+                        "effect": "READ",
+                        "resultIsReusedWithinTurn": true
+                    },
+                    "requiredAccountRightNames": [
+                        "operatePlatform"
+                    ],
+                    "summary": "The cron jobs with state (failing, overdue, running, ok, paused), schedule, last and next run.",
+                    "title": "listCrons",
+                    "parameters": {
+                        "status": {
+                            "description": "Only crons in this state: OK, FAILING (last run failed), OVERDUE, RUNNING, PAUSED, MISSING_COMMAND",
+                            "name": "status",
+                            "type": "string"
+                        },
+                        "searchText": {
+                            "description": "A part of the name or of the command, e.g. \"import\"",
+                            "name": "searchText",
+                            "type": "string"
+                        },
+                        "top": {
+                            "description": "Rows per page, default 25, at most 50",
+                            "name": "top",
+                            "type": "integer"
+                        },
+                        "skip": {
+                            "description": "Rows to skip (the result names the value for the next page)",
+                            "name": "skip",
+                            "type": "integer"
+                        }
+                    },
+                    "inputSchemaWithoutParameters": "#50e92602136c (282 characters)",
+                    "wire": {
+                        "description": "#526c6b396d74 (423 characters)",
+                        "parameters": {
+                            "status": "#e57a46bb325a (132 characters)",
+                            "searchText": "#4d92aaff989b (87 characters)",
+                            "top": "#70f215070392 (72 characters)",
+                            "skip": "#2142f3801dc0 (94 characters)"
+                        },
+                        "rest": "#872127029d7b (200 characters)"
+                    }
+                },
+                "getCron": {
+                    "annotations": {
+                        "idempotentHint": true,
+                        "openWorldHint": true,
+                        "readOnlyHint": true
+                    },
+                    "description": "#3cc8cfcf830e (318 characters)",
+                    "effect": {
+                        "effect": "READ",
+                        "resultIsReusedWithinTurn": true
+                    },
+                    "requiredAccountRightNames": [
+                        "operatePlatform"
+                    ],
+                    "returnsUntrustedContent": true,
+                    "summary": "One cron with schedule, command, statistics and newest runs; or one run with the end of its output.",
+                    "title": "getCron",
+                    "parameters": {
+                        "cronId": {
+                            "description": "The id of the cron (listCrons shows it). Pass it or cronExecutionId",
+                            "name": "cronId",
+                            "type": "integer"
+                        },
+                        "cronExecutionId": "#cddc1f0648e9 (242 characters)"
+                    },
+                    "inputSchemaWithoutParameters": "#af1acf6224f7 (274 characters)",
+                    "wire": {
+                        "description": "#3cc8cfcf830e (318 characters)",
+                        "parameters": {
+                            "cronId": "#d775e5d04cc1 (102 characters)",
+                            "cronExecutionId": "#edd3dd109e57 (133 characters)"
+                        },
+                        "rest": "#e1112edf8204 (190 characters)"
+                    }
+                },
+                "listCronExecutions": {
+                    "annotations": {
+                        "idempotentHint": true,
+                        "openWorldHint": true,
+                        "readOnlyHint": true
+                    },
+                    "description": "#d341db6a1398 (320 characters)",
+                    "effect": {
+                        "effect": "READ",
+                        "resultIsReusedWithinTurn": true
+                    },
+                    "requiredAccountRightNames": [
+                        "operatePlatform"
+                    ],
+                    "returnsUntrustedContent": true,
+                    "summary": "Runs of the crons, newest first, optionally of one cron or only failed ones, with duration and first output line.",
+                    "title": "listCronExecutions",
+                    "parameters": {
+                        "cronId": {
+                            "description": "Only runs of this cron (listCrons shows the id); default: every cron",
+                            "name": "cronId",
+                            "type": "integer"
+                        },
+                        "result": {
+                            "description": "ALL (default), FAILED, SUCCESSFUL or RUNNING",
+                            "name": "result",
+                            "type": "string"
+                        },
+                        "top": {
+                            "description": "Rows per page, default 25, at most 50",
+                            "name": "top",
+                            "type": "integer"
+                        },
+                        "skip": {
+                            "description": "Rows to skip (the result names the value for the next page)",
+                            "name": "skip",
+                            "type": "integer"
+                        }
+                    },
+                    "inputSchemaWithoutParameters": "#10d086a6463e (277 characters)",
+                    "wire": {
+                        "description": "#d341db6a1398 (320 characters)",
+                        "parameters": {
+                            "cronId": "#6a5d6ec879be (103 characters)",
+                            "result": "#2fe3b716de31 (78 characters)",
+                            "top": "#70f215070392 (72 characters)",
+                            "skip": "#2142f3801dc0 (94 characters)"
+                        },
+                        "rest": "#d7f20e52429c (204 characters)"
+                    }
+                }
+            }
+        },
+        "SystemHealthMCPPackage": {
+            "packageId": "ddd.system.health",
+            "description": "Read whether the platform is healthy: workers, crons, error groups and the sections the application adds.",
+            "tools": {
+                "getSystemHealth": {
+                    "annotations": {
+                        "idempotentHint": true,
+                        "readOnlyHint": true
+                    },
+                    "description": "#ace76dafb698 (333 characters)",
+                    "effect": {
+                        "effect": "READ",
+                        "resultIsReusedWithinTurn": true
+                    },
+                    "requiredAccountRightNames": [
+                        "operatePlatform"
+                    ],
+                    "summary": "Platform health: workers, crons, error groups and the application's sections, each ok or ATTENTION with findings.",
+                    "title": "getSystemHealth",
+                    "parameters": {
+                        "sections": "#209a3d150234 (335 characters)"
+                    },
+                    "inputSchemaWithoutParameters": "#c20ded184fb9 (262 characters)",
+                    "wire": {
+                        "description": "#ace76dafb698 (333 characters)",
+                        "parameters": {
+                            "sections": "#31fc02b63c78 (149 characters)"
+                        },
+                        "rest": "#1dc8d64fa04f (186 characters)"
+                    }
+                }
+            }
+        },
+        "SystemIssuesMCPPackage": {
+            "packageId": "ddd.system.issues",
+            "description": "#0dac88fc7bb7 (173 characters)",
+            "tools": {
+                "listIssueGroups": {
+                    "annotations": {
+                        "idempotentHint": true,
+                        "openWorldHint": true,
+                        "readOnlyHint": true
+                    },
+                    "description": "#5ef683cdceba (407 characters)",
+                    "effect": {
+                        "effect": "READ",
+                        "resultIsReusedWithinTurn": true
+                    },
+                    "requiredAccountRightNames": [
+                        "operatePlatform"
+                    ],
+                    "returnsUntrustedContent": true,
+                    "summary": "Error groups of the issues registry by environment, status, section and search text, last seen first.",
+                    "title": "listIssueGroups",
+                    "parameters": {
+                        "environment": "#f61bc8a91156 (267 characters)",
+                        "status": {
+                            "description": "OPEN (default), RESOLVED, IGNORED or ALL",
+                            "name": "status",
+                            "type": "string"
+                        },
+                        "searchText": {
+                            "description": "A part of the error message, the exception type or the origin file",
+                            "name": "searchText",
+                            "type": "string"
+                        },
+                        "section": {
+                            "description": "Where the error happened: HTTP, CLI (commands and crons), MESSENGER (workers), WEB, WEB_SERVER or MOBILE",
+                            "name": "section",
+                            "type": "string"
+                        },
+                        "release": {
+                            "description": "Only groups first or last seen in this release (git sha)",
+                            "name": "release",
+                            "type": "string"
+                        },
+                        "top": {
+                            "description": "Rows per page, default 25, at most 50",
+                            "name": "top",
+                            "type": "integer"
+                        },
+                        "skip": {
+                            "description": "Rows to skip (the result names the value for the next page)",
+                            "name": "skip",
+                            "type": "integer"
+                        }
+                    },
+                    "inputSchemaWithoutParameters": "#42f7acac0e3f (348 characters)",
+                    "wire": {
+                        "description": "#5ef683cdceba (407 characters)",
+                        "parameters": {
+                            "environment": "#d02729cd5ae1 (162 characters)",
+                            "status": "#ac94d357c66c (74 characters)",
+                            "searchText": "#2c5d0dfa69a4 (100 characters)",
+                            "section": "#b53b2b349002 (138 characters)",
+                            "release": "#3b5b58a19773 (90 characters)",
+                            "top": "#70f215070392 (72 characters)",
+                            "skip": "#2142f3801dc0 (94 characters)"
+                        },
+                        "rest": "#4656f7fd5dc4 (272 characters)"
+                    }
+                },
+                "getIssueGroup": {
+                    "annotations": {
+                        "idempotentHint": true,
+                        "openWorldHint": true,
+                        "readOnlyHint": true
+                    },
+                    "description": "#05bc033512db (342 characters)",
+                    "effect": {
+                        "effect": "READ",
+                        "resultIsReusedWithinTurn": true
+                    },
+                    "requiredAccountRightNames": [
+                        "operatePlatform"
+                    ],
+                    "returnsUntrustedContent": true,
+                    "summary": "One error group: message, origin, releases, entry points and newest events with stack frames.",
+                    "title": "getIssueGroup",
+                    "parameters": {
+                        "issueGroupId": {
+                            "description": "The id of the error group (the #number of a listIssueGroups row). Pass it or groupHash",
+                            "name": "issueGroupId",
+                            "type": "integer"
+                        },
+                        "groupHash": {
+                            "description": "The hash of the error group, as an alert or the issues screen shows it",
+                            "name": "groupHash",
+                            "type": "string"
+                        },
+                        "environment": {
+                            "description": "Only with groupHash, when the hash exists in more than one environment",
+                            "name": "environment",
+                            "type": "string"
+                        }
+                    },
+                    "inputSchemaWithoutParameters": "#57c123579298 (306 characters)",
+                    "wire": {
+                        "description": "#05bc033512db (342 characters)",
+                        "parameters": {
+                            "issueGroupId": "#6414059d41b0 (121 characters)",
+                            "groupHash": "#94151d038b82 (104 characters)",
+                            "environment": "#f5108df4e4db (104 characters)"
+                        },
+                        "rest": "#88a05efd2de4 (228 characters)"
+                    }
+                },
+                "getIssuesTrend": {
+                    "annotations": {
+                        "idempotentHint": true,
+                        "readOnlyHint": true
+                    },
+                    "description": "#1395a5e294a8 (313 characters)",
+                    "effect": {
+                        "effect": "READ",
+                        "resultIsReusedWithinTurn": true
+                    },
+                    "requiredAccountRightNames": [
+                        "operatePlatform"
+                    ],
+                    "summary": "Error events over time for an environment or one error group: total, peak and buckets.",
+                    "title": "getIssuesTrend",
+                    "parameters": {
+                        "environment": "#93d511179855 (252 characters)",
+                        "issueGroupId": {
+                            "description": "Only this error group (the #number of a listIssueGroups row)",
+                            "name": "issueGroupId",
+                            "type": "integer"
+                        },
+                        "groupHash": {
+                            "description": "Only this error group, by its hash",
+                            "name": "groupHash",
+                            "type": "string"
+                        },
+                        "sinceHours": {
+                            "description": "Hours to look back, default 24, at most 744 (31 days)",
+                            "name": "sinceHours",
+                            "type": "integer"
+                        }
+                    },
+                    "inputSchemaWithoutParameters": "#ebb7127f6ee4 (313 characters)",
+                    "wire": {
+                        "description": "#1395a5e294a8 (313 characters)",
+                        "parameters": {
+                            "environment": "#3120a2dc5f80 (147 characters)",
+                            "issueGroupId": "#4838cb14aa51 (95 characters)",
+                            "groupHash": "#6c267bb6d9ee (68 characters)",
+                            "sinceHours": "#832ba649513a (88 characters)"
+                        },
+                        "rest": "#0cca816a7479 (236 characters)"
+                    }
+                },
+                "setIssueGroupStatus": {
+                    "annotations": {
+                        "idempotentHint": true
+                    },
+                    "description": "#6d976d04b0b5 (820 characters)",
+                    "effect": {
+                        "effect": "WRITE",
+                        "resultIsReusedWithinTurn": true
+                    },
+                    "requiredAccountRightNames": [
+                        "operatePlatform"
+                    ],
+                    "summary": "Set the status of one error group: RESOLVED, IGNORED or OPEN; asks the owner first.",
+                    "title": "setIssueGroupStatus",
+                    "parameters": {
+                        "issueGroupId": {
+                            "description": "The id of the error group (the #number of a listIssueGroups row). Pass it or groupHash",
+                            "name": "issueGroupId",
+                            "type": "integer"
+                        },
+                        "groupHash": {
+                            "description": "The hash of the error group, as an alert or the issues screen shows it",
+                            "name": "groupHash",
+                            "type": "string"
+                        },
+                        "environment": {
+                            "description": "Only with groupHash, when the hash exists in more than one environment",
+                            "name": "environment",
+                            "type": "string"
+                        },
+                        "status": "#67f826486fb4 (350 characters)"
+                    },
+                    "inputSchemaWithoutParameters": "#3ebd056f6617 (345 characters)",
+                    "wire": {
+                        "description": "#6d976d04b0b5 (820 characters)",
+                        "parameters": {
+                            "issueGroupId": "#6414059d41b0 (121 characters)",
+                            "groupHash": "#94151d038b82 (104 characters)",
+                            "environment": "#f5108df4e4db (104 characters)",
+                            "status": "#916a37500bf0 (250 characters)"
+                        },
+                        "rest": "#06d1f349b3a5 (273 characters)"
+                    }
+                }
+            }
+        },
+        "SystemWorkersMCPPackage": {
+            "packageId": "ddd.system.workers",
+            "description": "Read the Messenger workers: queues, processes, failures per transport and message class.",
+            "tools": {
+                "getWorkersOverview": {
+                    "annotations": {
+                        "idempotentHint": true,
+                        "readOnlyHint": true
+                    },
+                    "description": "#3a478314f02d (407 characters)",
+                    "effect": {
+                        "effect": "READ",
+                        "resultIsReusedWithinTurn": true
+                    },
+                    "requiredAccountRightNames": [
+                        "operatePlatform"
+                    ],
+                    "summary": "Workers overview: totals, each transport with state, waiting messages, processes, handled and failed.",
+                    "title": "getWorkersOverview",
+                    "parameters": [],
+                    "inputSchemaWithoutParameters": "#ffb7e0efa6fa (237 characters)",
+                    "wire": {
+                        "description": "#3a478314f02d (407 characters)",
+                        "parameters": [],
+                        "rest": "#c8c427286d51 (164 characters)"
+                    }
+                },
+                "getWorkerTransport": {
+                    "annotations": {
+                        "idempotentHint": true,
+                        "openWorldHint": true,
+                        "readOnlyHint": true
+                    },
+                    "description": "#87fcb9d9955a (342 characters)",
+                    "effect": {
+                        "effect": "READ",
+                        "resultIsReusedWithinTurn": true
+                    },
+                    "requiredAccountRightNames": [
+                        "operatePlatform"
+                    ],
+                    "returnsUntrustedContent": true,
+                    "summary": "One worker transport: state, waiting messages, message classes with failures and durations, live processes.",
+                    "title": "getWorkerTransport",
+                    "parameters": {
+                        "transport": {
+                            "description": "(required) The name of the transport as getWorkersOverview shows it, e.g. \"send_push_notification\"",
+                            "name": "transport",
+                            "type": "string"
+                        },
+                        "sinceHours": {
+                            "description": "Hours of message statistics, default 24, at most 168",
+                            "name": "sinceHours",
+                            "type": "integer"
+                        }
+                    },
+                    "inputSchemaWithoutParameters": "#3c90e1b3b064 (323 characters)",
+                    "wire": {
+                        "description": "#87fcb9d9955a (342 characters)",
+                        "parameters": {
+                            "transport": "#c90617070efa (134 characters)",
+                            "sinceHours": "#68454e67cb94 (87 characters)"
+                        },
+                        "rest": "#54ce82169221 (250 characters)"
+                    }
+                }
+            }
+        }
+    },
+    "purposes": {
+        "Background.MechanicalOperation": {
+            "isLoadable": true,
+            "class": "BackgroundMechanicalOperationPurpose",
+            "description": "#752807057cdf (171 characters)",
+            "directive": "#1159ead6da03 (732 characters)",
+            "name": "Background.MechanicalOperation",
+            "pinPreloadedSkills": true,
+            "readsLocalSituation": true,
+            "supervisorRunCap": 8
+        },
+        "Schedule.Run": {
+            "isLoadable": true,
+            "class": "ScheduleRunPurpose",
+            "blockedToolsRefusalText": "#7c5f22e97659 (235 characters)",
+            "description": "#b64ae2c343ab (274 characters)",
+            "directive": "#be90ebfce035 (3985 characters)",
+            "name": "Schedule.Run",
+            "pinPreloadedSkills": true,
+            "preloadSkillNames": [
+                "Agent.TaskRunReports"
+            ],
+            "readsLocalSituation": true,
+            "supervisorRunCap": 8
+        },
+        "Supervisor.Checkpoint": {
+            "isLoadable": true,
+            "class": "SupervisorCheckpointPurpose",
+            "description": "#7c5d1a84eea9 (168 characters)",
+            "directive": "#a1f5e6afb674 (581 characters)",
+            "name": "Supervisor.Checkpoint",
+            "pinPreloadedSkills": true,
+            "readsLocalSituation": true,
+            "supervisorRunCap": 8,
+            "usesSynthesizedOwnerText": true
+        }
+    },
+    "bundles": []
+}
