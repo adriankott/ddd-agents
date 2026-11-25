@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.6
+
+**Recurring vs one-time in `getTaskSchedules`.** Requires `mgamadeus/ddd` ^3.46.3; npm `@mgamadeus/ddd-agents` 0.5.6
+in lockstep, no web change.
+
+- `getTaskSchedules` (`agent.tasks`) tells the model the filter idiom in its description, its summary, an example and
+  the `Agent.Tasks` skill file: `oneTimeAt eq null` = recurring tasks, `oneTimeAt ne null` = one-time tasks (there is
+  no kind or type property).
+- Floor `mgamadeus/ddd` ^3.46.3: `oneTimeAt eq 'NULL'` was refused as not a date-time under the model-facing time zone
+  (the zone conversion of MOMENT literals); 3.46.3 leaves an `eq` / `ne` null comparison alone.
+- Test: the null comparisons on `oneTimeAt` (quoted and unquoted, `eq` and `ne`, in a group) pass validation and the
+  zone conversion against the filter definitions of `TaskSchedulesGetRequestDto`.
+
 ## 0.5.5
 
 **The model's reasoning carry-over per wire API.** Requires `mgamadeus/ddd-ai` ^3.8.0; npm `@mgamadeus/ddd-agents`

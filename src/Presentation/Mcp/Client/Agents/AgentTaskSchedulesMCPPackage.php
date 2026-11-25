@@ -385,14 +385,16 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
      * or still on are schedules in status ACTIVE — this read. What RAN — in a period, how often, with which result — is
      * `getTaskRuns`.
      *
-     * `filters`: `oneTimeAt ne 'NULL'` = one-time tasks, `eq 'NULL'` = recurring. Newest first by default; `top` 50
+     * Recurring or one-time is a filter on `oneTimeAt` (there is no kind or type property): `oneTimeAt eq null` =
+     * recurring tasks, `oneTimeAt ne null` = one-time tasks. Newest first by default; `top` 50
      * (max 100), page with `skip`; the header states how many match. ARCHIVED schedules (deleted after they ran) appear
      * only with `includeArchived: true`. A recurring schedule's cron digits count in the zone named on its row — never
      * convert them.
      *
      * @example {}
      * @example {"filters": "status eq 'ACTIVE'"}
-     * @example {"filters": "status in ['ACTIVE','PAUSED'] and oneTimeAt eq 'NULL'", "orderBy": "nextRunAt asc"}
+     * @example {"filters": "status in ['ACTIVE','PAUSED'] and oneTimeAt eq null", "orderBy": "nextRunAt asc"}
+     * @example {"filters": "status eq 'ACTIVE' and oneTimeAt ne null"}
      * @example {"includeArchived": true, "filters": "lastFiredAt ge '2026-09-01 00:00:00'", "top": 20}
      */
     #[MCPTool]
@@ -401,7 +403,7 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
     #[MCPHiddenQueryOptions(DtoQueryOptions::EXPAND, DtoQueryOptions::SELECT, 'skiptoken', 'noCache')]
     #[MCPExposedFilterProperties('status', 'oneTimeAt', 'nextRunAt', 'lastFiredAt', 'created', 'reportChannel', 'failureStreak')]
     #[MCPToolRefreshesState('schedules fire and close in the background — identical arguments legitimately return a changed list')]
-    #[MCPToolSummary('The task SCHEDULES that are set up (id, one-time vs recurring, status, timing, newest run line) with filters, sorting and paging — the id source for update / pause / resume / delete. What RAN in a period or how often → getTaskRuns.')]
+    #[MCPToolSummary('The task SCHEDULES that are set up (id, one-time vs recurring, status, timing, newest run line) with filters (recurring: oneTimeAt eq null; one-time: oneTimeAt ne null), sorting and paging — the id source for update / pause / resume / delete. What RAN in a period or how often → getTaskRuns.')]
     public function getTaskSchedules(
         TaskSchedulesGetRequestDto $requestDto,
         AIConversationSchedulesService $aIConversationSchedulesService,

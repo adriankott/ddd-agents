@@ -56,7 +56,8 @@ previous run's outcome line and continues from it.
 - **What is set up → `getTaskSchedules`**: id, one-time or recurring, status, next firing and task — the id source
   for changing, pausing, resuming and deleting. Only ACTIVE schedules still fire; PAUSED ones wait for
   `resumeTaskSchedule`; DONE / CANCELLED / EXPIRED are history. Narrow with `filters`; the header states how many
-  match.
+  match. Recurring or one-time is a filter on `oneTimeAt`: `oneTimeAt eq null` = recurring tasks, `oneTimeAt ne null`
+  = one-time tasks.
 - **What ran → `getTaskRuns`**: the executions across ALL schedules, archived ones included. A period is a filter on
   the start moment (`filters: "created ge '<seven days ago> 00:00:00'"`); one task's runs → `scheduleId eq '<id>'`;
   failed runs → `runState eq 'FAILED'`. A run that is over without the COMPLETED mark is never reported as
