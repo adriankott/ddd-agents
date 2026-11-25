@@ -57,3 +57,6 @@ registerDriveFileCardsSource({
 });
 ```
 A cloud drive host registers the source of `@mgamadeus/ddd-clouddrive/agents`.
+
+A store that registered a canvas opener (`registerDriveFileCanvasOpener(store, opener)` with a canvas kind of
+`registerCanvasKind`) opens its entries in the canvas beside the chat; without one a file opens in a new tab.

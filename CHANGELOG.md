@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.3.14
+
+Drive files open in the canvas. Web package only; no PHP change.
+
+**Added (web):**
+
+- **`registerCanvasKind({ canvasId, behaviour, body, openedByWidgets?, featureFlag? })`** (root entry, with
+  `unregisterCanvasKind` and the type `CanvasKind`): a further package brings a whole canvas — behaviour, body, opener
+  widgets, gate — in one call; the app declares nothing for it. `canvasBehaviourOf`, `isCanvasId`,
+  `getDeclaredCanvasIds`, the stored pointer and the restore after a reload read registered kinds like the app's
+  canvases. An id of the package's own canvases is refused; the app's `furtherCanvasBehaviours` entry for an id wins
+  over a kind's behaviour. `AgentsEnvironment.furtherCanvasBehaviours` + `registerCanvasBodies` work unchanged.
+- **`registerDriveFileCanvasOpener(store, opener)`** (root entry; `/widgets`: `readDriveFileCanvasOpener`,
+  `unregisterDriveFileCanvasOpener`, `driveFileCanvasTargetOf`): the opener of a drive store says which canvas shows
+  one of its files or folders. A row of the `DriveFiles` widget with a canvas opens it (anchored on the block's
+  message, origin `widgetClick`) and marks its button while that canvas is open; a row without one, a host without a
+  canvas surface and a store without an opener keep open-in-a-tab and download.
+- **Reference instance ids** (`/renderer`): `canvasInstanceIdForReference(canvasId, reference)`,
+  `referenceOfCanvasInstanceId(instanceId)`, `isCanvasReference(value)` — a viewer per object of a store
+  (`driveFile:reference:drive/812`); only a store reference passes (no path with `..`, no URL, no markup).
+  `isPackageCanvasId`, `canvasKindOpenerWidgetNamesOf`.
+
 ## 0.3.13
 
 The files release: documents of a drive reach the model as text by default, page images only when asked for.

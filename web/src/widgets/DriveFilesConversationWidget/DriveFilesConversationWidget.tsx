@@ -4,10 +4,13 @@ import { Button, StatusChip, Text, Tooltip } from "../../provider/components";
 import { escapePlainTextForText, getWidgetSelfHydrationKeyFieldName, translateText } from "../../provider/environment";
 import { useAgentsLinkNavigation } from "../../provider/link-navigation";
 import { readWidgetAgentSpaceKeyAttribute } from "../../renderer/_agent-space/widget-agent-space-key-attribute";
+import { sameCanvasIdentity } from "../../renderer/canvas/canvas-state";
+import { useConversationWidgetContext } from "../../renderer/ConversationWidgetCallbacksContext";
 import type { PayloadConversationWidgetProps } from "../../renderer/conversation-widget-props";
 import { useReportWidgetRenderStatus } from "../../renderer/render-report/widget-render-report";
 import { useWidgetHydration } from "../../renderer/widget-hydration/use-widget-hydration";
 import { WidgetListRow, WidgetSurface, WidgetSurfaceSkeleton } from "../_shared/modern";
+import { driveFileCanvasTargetOf } from "./shared/drive-file-canvas-openers";
 import {
   DRIVE_FILE_CARDS_SOURCE_MISSING,
   type DriveFileCardsSource,
@@ -134,15 +137,23 @@ interface DriveFileCardRowProps {
   /** What "open" shows in a new tab: the card, its PDF twin (an office file), or `null` (download only). */
   openCard: DriveFileCard | null;
   source: DriveFileCardsSource | null;
+  /** The store the block names: its canvas opener (`registerDriveFileCanvasOpener`) decides whether the row opens a canvas. */
+  store: string;
+  /** The block's message (the anchor of a canvas the row opens); undefined while the reply streams. */
+  messageId: string | number | undefined;
   /** Reads the block's cards again: after a click found this card's URLs expired, the thumbnails are stale too. */
   onCardsExpired: () => void;
 }
 
 /** One file or folder: tile, name, type · size · date (or the folder's entries), the store's state, the actions. */
-const DriveFileCardRow = ({ card, openCard, source, onCardsExpired }: DriveFileCardRowProps) => {
+const DriveFileCardRow = ({ card, openCard, source, store, messageId, onCardsExpired }: DriveFileCardRowProps) => {
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const { openLink } = useAgentsLinkNavigation();
+  const { openCanvas, canvas: openCanvasState, hostHasCanvasSurface } = useConversationWidgetContext();
+  // The canvas of the store for this entry (a file viewer, a folder browser); without one the row opens a tab as before.
+  const canvasTarget = hostHasCanvasSurface ? driveFileCanvasTargetOf(store, card, messageId) : null;
+  const isCanvasOpen = canvasTarget !== null && openCanvasState !== null && sameCanvasIdentity(openCanvasState, canvasTarget);
   const facts = useCardFacts(card);
   const name = card.name ?? "";
   const openName = openCard?.name ?? name;
@@ -177,6 +188,12 @@ const DriveFileCardRow = ({ card, openCard, source, onCardsExpired }: DriveFileC
     }
   };
 
+  const openInCanvas = () => {
+    if (canvasTarget === null) return;
+    setFailure(null);
+    openCanvas({ ...canvasTarget, origin: "widgetClick", justDelivered: false });
+  };
+
   const downloadFile = async () => {
     setBusy(true);
     setFailure(null);
@@ -208,7 +225,18 @@ const DriveFileCardRow = ({ card, openCard, source, onCardsExpired }: DriveFileC
 
   const actions = (
     <span className={styles.actions}>
-      {!card.isFolder && openCard !== null ? (
+      {canvasTarget !== null ? (
+        <Tooltip text="Open %name%" replacements={{ name }}>
+          <Button
+            variant={isCanvasOpen ? "default" : "muted"}
+            size="small"
+            icon="visibility"
+            ariaLabel={translateText("Open %name%", { name })}
+            onClick={openInCanvas}
+            testId={`${TEST_ID}-open-canvas`}
+          />
+        </Tooltip>
+      ) : !card.isFolder && openCard !== null ? (
         <Tooltip text="Open %name%" replacements={{ name: openName }}>
           <Button
             variant="muted"
@@ -264,10 +292,11 @@ const DriveFileCardRow = ({ card, openCard, source, onCardsExpired }: DriveFileC
 interface HydratedDriveFilesProps {
   request: DriveFilesRequest;
   justDelivered: boolean;
+  messageId: string | number | undefined;
 }
 
 /** The cards once the store answered: loading, failed (with a retry), not connected, none readable, or the list. */
-const HydratedDriveFiles = ({ request, justDelivered }: HydratedDriveFilesProps) => {
+const HydratedDriveFiles = ({ request, justDelivered, messageId }: HydratedDriveFilesProps) => {
   const hydration = useWidgetHydration<DriveFileCard[], DriveFilesRequest>(DRIVE_FILES_WIDGET_TYPE, request, {
     forceRefresh: justDelivered,
   });
@@ -344,6 +373,8 @@ const HydratedDriveFiles = ({ request, justDelivered }: HydratedDriveFilesProps)
                 card={card}
                 openCard={driveFileCardToOpen(card, cards)}
                 source={source}
+                store={request.store}
+                messageId={messageId}
                 onCardsExpired={() => hydration.refetch()}
               />
             ))}
@@ -362,17 +393,18 @@ const InvalidDriveFilesBlock = () => {
 
 /**
  * The file card widget `DriveFiles`: the files a block names, read under the viewer's rights through the host's
- * `DriveFileCardsSource`, each with type, size, date, a thumbnail, open (an office file opens its PDF twin, else it
- * only downloads), download and a link to its place in the host's drive screen. A block without a store or references
+ * `DriveFileCardsSource`, each with type, size, date, a thumbnail, open (in the canvas of the store when it registered
+ * an opener — `registerDriveFileCanvasOpener` — else in a new tab, where an office file opens its PDF twin or only
+ * downloads), download and a link to its place in the host's drive screen. A block without a store or references
  * renders nothing and reports it.
  */
 export const DriveFilesConversationWidget = (props: PayloadConversationWidgetProps) => {
-  const { payload, justDelivered = false } = props;
+  const { payload, justDelivered = false, messageId } = props;
   const selfHydrationKeyAttribute = readWidgetAgentSpaceKeyAttribute(props);
   const request = useMemo(
     () => parseDriveFilesPayload(payload, getWidgetSelfHydrationKeyFieldName(), selfHydrationKeyAttribute),
     [payload, selfHydrationKeyAttribute],
   );
   if (request === null) return <InvalidDriveFilesBlock />;
-  return <HydratedDriveFiles request={request} justDelivered={justDelivered} />;
+  return <HydratedDriveFiles request={request} justDelivered={justDelivered} messageId={messageId} />;
 };

@@ -22,6 +22,13 @@ export {
   unregisterDriveFileCardsSource,
 } from "../widgets/DriveFilesConversationWidget/shared/drive-file-cards-source";
 export {
+  type DriveFileCanvasOpener,
+  type DriveFileCanvasTarget,
+  driveFileCanvasTargetOf,
+  readDriveFileCanvasOpener,
+  unregisterDriveFileCanvasOpener,
+} from "../widgets/DriveFilesConversationWidget/shared/drive-file-canvas-openers";
+export {
   DRIVE_FILES_MAX_FILES,
   DRIVE_FILES_WIDGET_TYPE,
   type DriveFileCard,

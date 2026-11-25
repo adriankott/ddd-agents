@@ -1,4 +1,5 @@
 import { getFurtherCanvasBehaviours } from "../../provider/environment";
+import { getCanvasKindIds, readCanvasKindDeclaration } from "./canvas-kind-declarations";
 
 /**
  * The CANVAS BEHAVIOURS — one declaration per canvas of how it lives on the surface: how long it stays (`lifetime`),
@@ -8,7 +9,9 @@ import { getFurtherCanvasBehaviours } from "../../provider/environment";
  * detail canvas. The widget registry lists which canvases a widget may open (`opensCanvases`); the canvas BODIES (React
  * components) live in `canvasBodies.tsx`, imported only by the shell. The package declares the canvases of its own
  * widgets here (`packageCanvasBehaviours`); an app declares the canvases of its widgets on its agents environment
- * (`AgentsEnvironment.furtherCanvasBehaviours`), read at every lookup. This module imports nothing but the environment
+ * (`AgentsEnvironment.furtherCanvasBehaviours`), read at every lookup; a further package (a drive, an editor) brings a
+ * whole canvas kind — behaviour, body, opener widgets — with `registerCanvasKind` (`canvas-kinds.ts`), whose behaviour
+ * is kept in `canvas-kind-declarations.ts`. This module imports nothing but that one and the environment
  * module (which has no runtime imports), so the conversation slice and its specs can read it during store
  * initialisation (the widget registry is downstream of the store; a slice → registry import forms a temporal-dead-zone
  * cycle).
@@ -18,8 +21,8 @@ import { getFurtherCanvasBehaviours } from "../../provider/environment";
 export type PackageCanvasId = "conversationSearchResults" | "webSearchResults" | "entityDetail" | "mapFullScreen";
 
 /**
- * The id of a canvas: one of the package's (`PackageCanvasId`) or one an app declares
- * (`AgentsEnvironment.furtherCanvasBehaviours`). Append-only while a stored pointer (`canvasStorage.ts`) may still name
+ * The id of a canvas: one of the package's (`PackageCanvasId`), one an app declares
+ * (`AgentsEnvironment.furtherCanvasBehaviours`) or one a registered canvas kind brings (`registerCanvasKind`). Append-only while a stored pointer (`canvasStorage.ts`) may still name
  * the id. A string, because the app's ids are not known to the package; `isCanvasId` checks a value against both.
  */
 export type CanvasId = PackageCanvasId | (string & {});
@@ -101,26 +104,44 @@ export const packageCanvasBehaviours: Readonly<Record<PackageCanvasId, CanvasBeh
 const hasOwnCanvasBehaviour = (behaviours: Readonly<Record<string, CanvasBehaviour>>, canvasId: string): boolean =>
   Object.prototype.hasOwnProperty.call(behaviours, canvasId);
 
+/** Whether the id is one of the package's own canvases (a registered kind and an app can never take one). */
+export const isPackageCanvasId = (canvasId: string): canvasId is PackageCanvasId =>
+  hasOwnCanvasBehaviour(packageCanvasBehaviours, canvasId);
+
+/**
+ * The names of the widgets a registered canvas kind opens from (`CanvasKind.openedByWidgets`): a stored pointer of the
+ * kind restores only while its anchor message still carries one of them. Empty for another canvas (its openers are the
+ * registry's `opensCanvases`).
+ */
+export const canvasKindOpenerWidgetNamesOf = (canvasId: CanvasId): readonly string[] =>
+  readCanvasKindDeclaration(canvasId)?.openedByWidgets ?? [];
+
 /**
  * The behaviour of a canvas: the package's own, else the one the app declares
- * (`AgentsEnvironment.furtherCanvasBehaviours`); undefined for an id nobody declared (a stale stored pointer, a typo —
- * the opening rule ignores it). An app cannot replace a package canvas's behaviour.
+ * (`AgentsEnvironment.furtherCanvasBehaviours`), else the one of a registered canvas kind (`registerCanvasKind`);
+ * undefined for an id nobody declared (a stale stored pointer, a typo — the opening rule ignores it). Nobody can replace
+ * a package canvas's behaviour; the app's declaration wins over a registered kind's, so a host can tune a kind a
+ * further package brings.
  */
 export const canvasBehaviourOf = (canvasId: CanvasId): CanvasBehaviour | undefined => {
-  if (hasOwnCanvasBehaviour(packageCanvasBehaviours, canvasId)) {
-    return packageCanvasBehaviours[canvasId as PackageCanvasId];
+  if (isPackageCanvasId(canvasId)) {
+    return packageCanvasBehaviours[canvasId];
   }
   const furtherCanvasBehaviours = getFurtherCanvasBehaviours();
-  return hasOwnCanvasBehaviour(furtherCanvasBehaviours, canvasId) ? furtherCanvasBehaviours[canvasId] : undefined;
+  if (hasOwnCanvasBehaviour(furtherCanvasBehaviours, canvasId)) return furtherCanvasBehaviours[canvasId];
+  return readCanvasKindDeclaration(canvasId)?.behaviour;
 };
 
-/** Every declared canvas id: the package's own first, then the app's further ones. */
+/** Every declared canvas id: the package's own first, then the app's further ones, then the registered kinds'. */
 export const getDeclaredCanvasIds = (): readonly CanvasId[] => {
   const packageCanvasIds = Object.keys(packageCanvasBehaviours);
   const furtherCanvasIds = Object.keys(getFurtherCanvasBehaviours()).filter(
     (canvasId) => !packageCanvasIds.includes(canvasId),
   );
-  return [...packageCanvasIds, ...furtherCanvasIds];
+  const kindCanvasIds = getCanvasKindIds().filter(
+    (canvasId) => !packageCanvasIds.includes(canvasId) && !furtherCanvasIds.includes(canvasId),
+  );
+  return [...packageCanvasIds, ...furtherCanvasIds, ...kindCanvasIds];
 };
 
 /** Type guard for a value read from untrusted input (`sessionStorage`, a URL): is it a declared canvas id? */

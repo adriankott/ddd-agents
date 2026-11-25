@@ -9,6 +9,8 @@ export {
   type ConversationWidgetEntry,
 } from "../renderer/conversationWidgetRegistry";
 export { registerCanvasBodies } from "../renderer/canvas/canvasBodies";
+// A whole canvas of a further package (behaviour, body, opener widgets) in one registration.
+export { registerCanvasKind, unregisterCanvasKind, type CanvasKind } from "../renderer/canvas/canvas-kinds";
 export { registerCanvasFeatureFlags } from "../renderer/canvas/canvas-feature-flags";
 export { registerWidgetHydrator } from "../renderer/widget-hydration/widget-hydration.registry";
 // The store behind the DriveFiles cards (a cloud drive, a workspace): one source per host, before the first chat.
@@ -17,6 +19,11 @@ export {
   type DriveFileCardsSource,
 } from "../widgets/DriveFilesConversationWidget/shared/drive-file-cards-source";
 export type { DriveFileCard, DriveFileContent, DriveFilesRequest } from "../widgets/DriveFilesConversationWidget/shared/drive-files";
+// The canvas a store's files and folders open in (a file viewer, a folder browser); stores without one keep the tab.
+export {
+  registerDriveFileCanvasOpener,
+  type DriveFileCanvasOpener,
+} from "../widgets/DriveFilesConversationWidget/shared/drive-file-canvas-openers";
 export {
   registerComposedViewDataSourceFetcher,
   type ComposedViewDataSourceFetcher,

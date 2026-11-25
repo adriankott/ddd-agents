@@ -3,7 +3,7 @@ import type { ChatMessage } from "../../chat/chat-message";
 import { normalizeServerMessageToMarkdown } from "../../chat/normalize-server-message-to-markdown";
 import { useConversationWidgetContext } from "../ConversationWidgetCallbacksContext";
 import { conversationWidgetRegistry } from "../conversationWidgetRegistry";
-import { canvasBehaviourOf } from "./canvas-behaviours";
+import { canvasBehaviourOf, canvasKindOpenerWidgetNamesOf } from "./canvas-behaviours";
 import { payloadHashOfInstanceId } from "./canvas-state";
 import { StoredCanvasPointer, clearStoredCanvas, readStoredCanvas } from "./canvasStorage";
 import { findWidgetFencesInMarkdown } from "./find-widget-fences-in-markdown";
@@ -20,11 +20,13 @@ const anchorMessageCarriesCanvasWidget = (
   pointer: StoredCanvasPointer,
   anchorMessage: ChatMessage,
 ): boolean => {
-  const openers = new Set(
-    conversationWidgetRegistry.widgets
+  // The openers the widget registry declares (`opensCanvases`) and those a registered canvas kind names itself.
+  const openers = new Set([
+    ...conversationWidgetRegistry.widgets
       .filter((entry) => entry.opensCanvases?.includes(pointer.canvasId))
       .map((entry) => entry.name),
-  );
+    ...canvasKindOpenerWidgetNamesOf(pointer.canvasId),
+  ]);
   if (openers.size === 0) return false;
   const payloadHash = payloadHashOfInstanceId(pointer.instanceId);
   return findWidgetFencesInMarkdown(normalizeServerMessageToMarkdown(anchorMessage.message)).some(

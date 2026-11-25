@@ -143,6 +143,39 @@ registerDriveFileCardsSource({
 Without a source the card says the drive is not connected. A card's `openLink` is followed only as a path of this app
 or a same-origin URL, through `onNavigate`. A cloud drive host uses the source of `@mgamadeus/ddd-clouddrive/agents`.
 
+A store can open its files and folders in the canvas beside the chat instead of a new tab. It registers a canvas kind
+and an opener for its store name; stores without an opener keep the tab and the download:
+
+```ts
+import { registerCanvasKind, registerDriveFileCanvasOpener } from "@mgamadeus/ddd-agents";
+import { canvasInstanceIdForReference, referenceOfCanvasInstanceId } from "@mgamadeus/ddd-agents/renderer";
+
+registerCanvasKind({
+  canvasId: "exampleDriveFile",
+  behaviour: { lifetime: "pinned", layout: "split", narrowViewport: "overlay", fullBleed: false },
+  body: ({ canvas }) => <FileViewer reference={referenceOfCanvasInstanceId(canvas.instanceId)} />,
+  openedByWidgets: ["DriveFiles"],
+});
+registerDriveFileCanvasOpener("drive", (card) =>
+  card.isFolder ? null : { canvasId: "exampleDriveFile", instanceId: canvasInstanceIdForReference("exampleDriveFile", card.reference) },
+);
+```
+
+The opener answers per entry (`null` = no canvas for this one); the instance id carries the store's reference only, and
+the body reads the file itself under the viewer's rights. `@mgamadeus/ddd-clouddrive/agents` brings both for the cloud
+drive (`registerCloudDriveFileCanvas`).
+
+## Canvas kinds
+
+A canvas is declared by its behaviour (`CanvasBehaviour`: lifetime, layout, narrow viewport) and its body (the component
+the pane mounts). An app declares the canvases of its own widgets as before (`AgentsEnvironment.furtherCanvasBehaviours`
++ `registerCanvasBodies`). A further package brings a whole canvas in one call, `registerCanvasKind({ canvasId,
+behaviour, body, openedByWidgets?, featureFlag? })`, outside React and before the first render: the app declares
+nothing for it. `openedByWidgets` names the widgets in a message the canvas opens from; after a reload its pointer
+restores only while the anchor message still carries one of them. An id of the package's own canvases is refused; for
+any other id the app's `furtherCanvasBehaviours` entry wins over the kind's behaviour, so a host can tune a kind (its
+width, its lifetime). `unregisterCanvasKind(canvasId)` takes a kind off again.
+
 ## AgentChat in a host window
 
 | Prop | Default | |

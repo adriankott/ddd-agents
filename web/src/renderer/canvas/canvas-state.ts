@@ -148,6 +148,33 @@ export const entityIdOfInstanceId = (instanceId: string): number | undefined => 
   return match ? Number(match[1]) : undefined;
 };
 
+/**
+ * A reference a store hands out for one of its objects (`drive/812`): one or more segments of letters, digits, `_`,
+ * `-` and `.`, joined by `/` — never a path with `..`, a URL or markup.
+ */
+const CANVAS_REFERENCE_PATTERN = /^[A-Za-z0-9_-][A-Za-z0-9_.-]{0,127}(\/[A-Za-z0-9_-][A-Za-z0-9_.-]{0,127}){0,7}$/;
+
+/** Whether a value has the shape of a store reference an instance id may carry. */
+export const isCanvasReference = (value: string): boolean => CANVAS_REFERENCE_PATTERN.test(value);
+
+/**
+ * A viewer / editor unique per object of a store (a drive file, a folder): `<canvasId>:reference:<reference>`. The
+ * body reads the reference back (`referenceOfCanvasInstanceId`) and loads the object under the viewer's rights —
+ * the id carries no data, only what to ask for.
+ *
+ * @throws Error for a reference of another shape (`isCanvasReference`)
+ */
+export const canvasInstanceIdForReference = (canvasId: CanvasId, reference: string): string => {
+  if (!isCanvasReference(reference)) throw new Error("A canvas instance id carries a store reference such as drive/812.");
+  return `${canvasId}:reference:${reference}`;
+};
+
+/** The reference a reference instance id carries, or undefined for another shape of instance id (also a mangled one). */
+export const referenceOfCanvasInstanceId = (instanceId: string): string | undefined => {
+  const match = /^[a-zA-Z][a-zA-Z0-9]*:reference:(.+)$/.exec(instanceId);
+  return match && isCanvasReference(match[1]) ? match[1] : undefined;
+};
+
 /** True when the anchor message of a canvas is among the loaded messages (a restored pointer must point somewhere). */
 export const isCanvasAnchorLoaded = (
   anchor: CanvasAnchor,

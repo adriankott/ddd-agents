@@ -2,8 +2,12 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type AgentsEnvironment, getAgentsEnvironment, setAgentsEnvironment } from "../../provider/environment";
+import { registerCanvasKind, unregisterCanvasKind } from "../../renderer/canvas/canvas-kinds";
+import { canvasInstanceIdForReference } from "../../renderer/canvas/canvas-state";
+import { ConversationWidgetContext, defaultConversationWidgetCallbacks } from "../../renderer/ConversationWidgetCallbacksContext";
 import { createAgentsWidgetHydrationStateStore } from "../../renderer/widget-hydration/widget-hydration-state-store";
 import { DriveFilesConversationWidget } from "./DriveFilesConversationWidget";
+import { driveFileCanvasTargetOf, registerDriveFileCanvasOpener, unregisterDriveFileCanvasOpener } from "./shared/drive-file-canvas-openers";
 import {
   type DriveFileCardsSource,
   registerDriveFileCardsSource,
@@ -38,6 +42,8 @@ describe("DriveFilesConversationWidget", () => {
   afterEach(() => {
     cleanup();
     unregisterDriveFileCardsSource();
+    unregisterDriveFileCanvasOpener("drive");
+    unregisterCanvasKind("exampleDriveFile");
     setAgentsEnvironment(environmentBefore);
   });
 
@@ -76,5 +82,71 @@ describe("DriveFilesConversationWidget", () => {
     registerDriveFileCardsSource(buildSource([]));
     render(<DriveFilesConversationWidget payload={PAYLOAD} />);
     await waitFor(() => expect(screen.getByText("No file to show")).toBeTruthy());
+  });
+
+  /** A store's opener: files open the example canvas by their reference, folders have none. */
+  const registerExampleOpener = () => {
+    registerCanvasKind({
+      canvasId: "exampleDriveFile",
+      behaviour: { lifetime: "pinned", layout: "split", narrowViewport: "overlay", fullBleed: false },
+      body: () => null,
+      openedByWidgets: ["DriveFiles"],
+    });
+    registerDriveFileCanvasOpener("drive", (card) =>
+      card.isFolder
+        ? null
+        : { canvasId: "exampleDriveFile", instanceId: canvasInstanceIdForReference("exampleDriveFile", card.reference) },
+    );
+  };
+
+  it("opens a file in the store's canvas when the store registered an opener; the folder keeps its actions", async () => {
+    const source = buildSource(CARDS);
+    registerDriveFileCardsSource(source);
+    registerExampleOpener();
+    const openCanvas = vi.fn();
+    const openSpy = vi.spyOn(window, "open");
+    render(
+      <ConversationWidgetContext.Provider value={{ ...defaultConversationWidgetCallbacks, hostHasCanvasSurface: true, openCanvas }}>
+        <DriveFilesConversationWidget payload={PAYLOAD} messageId={41} />
+      </ConversationWidgetContext.Provider>,
+    );
+    await waitFor(() => expect(screen.getAllByTestId("drive-files-widget-card")).toHaveLength(3));
+    // both files open the canvas (the pptx itself, not its PDF twin in a tab); the folder has no open
+    expect(screen.getAllByTestId("drive-files-widget-open-canvas")).toHaveLength(2);
+    expect(screen.queryAllByTestId("drive-files-widget-open")).toHaveLength(0);
+    expect(screen.getAllByTestId("drive-files-widget-download")).toHaveLength(2);
+    fireEvent.click(screen.getAllByTestId("drive-files-widget-open-canvas")[1]);
+    expect(openCanvas).toHaveBeenCalledWith({
+      canvasId: "exampleDriveFile",
+      instanceId: "exampleDriveFile:reference:drive/813",
+      anchor: { kind: "message", messageId: 41 },
+      origin: "widgetClick",
+      justDelivered: false,
+    });
+    expect(openSpy).not.toHaveBeenCalled();
+    expect(source.readFileContent).not.toHaveBeenCalled();
+    openSpy.mockRestore();
+  });
+
+  it("keeps the tab without a canvas surface, without a message and for another store", async () => {
+    registerDriveFileCardsSource(buildSource(CARDS));
+    registerExampleOpener();
+    // a host without a split (the default context): the opener is not asked
+    render(<DriveFilesConversationWidget payload={PAYLOAD} messageId={41} />);
+    await waitFor(() => expect(screen.getAllByTestId("drive-files-widget-card")).toHaveLength(3));
+    expect(screen.queryAllByTestId("drive-files-widget-open-canvas")).toHaveLength(0);
+    expect(screen.getAllByTestId("drive-files-widget-open")).toHaveLength(2);
+
+    expect(driveFileCanvasTargetOf("drive", CARDS[1], 41)).toEqual({
+      canvasId: "exampleDriveFile",
+      instanceId: "exampleDriveFile:reference:drive/813",
+      anchor: { kind: "message", messageId: 41 },
+    });
+    expect(driveFileCanvasTargetOf("drive", CARDS[1], undefined)).toBeNull();
+    expect(driveFileCanvasTargetOf("drive", CARDS[2], 41)).toBeNull();
+    expect(driveFileCanvasTargetOf("workspace", CARDS[1], 41)).toBeNull();
+    // an opener that names a canvas nobody declared opens nothing
+    unregisterCanvasKind("exampleDriveFile");
+    expect(driveFileCanvasTargetOf("drive", CARDS[1], 41)).toBeNull();
   });
 });
