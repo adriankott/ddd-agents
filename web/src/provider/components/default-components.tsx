@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { PluggableList } from "unified";
@@ -297,41 +297,105 @@ const useElementWidth = (): [number | null, (element: HTMLElement | null) => voi
 /**
  * Two panes side by side. Below `coversBelowWidth` — measured on the split view's own box, so a narrow chat column in a
  * wide window counts as narrow — the open side pane covers the main pane instead of narrowing it.
+ *
+ * While the side pane covers the main pane: it takes the full width of the split, sits in its own stacking context
+ * above the main pane's layers with an opaque background, the covered main pane is inert (no Tab, hidden from
+ * assistive technology), the focus moves into the side pane and back to where it was in the main pane when the side
+ * pane stops covering it, and the toggle floats over the side pane's top end. Side by side the toggle is the strip on
+ * the divider. The toggle carries a translated name (`Close canvas` / `Re-open canvas`) and an icon.
  */
 const DefaultSplitView = (props: AgentsSplitViewProps) => {
   const { isSideOpen, coversBelowWidth, main, side, sideToggle } = props;
   const [splitViewWidth, observeSplitView] = useElementWidth();
   const coversMain = coversBelowWidth !== undefined && splitViewWidth !== null && splitViewWidth < coversBelowWidth;
+  const isMainCovered = isSideOpen && coversMain;
+  const toggleLabel = useTranslatedText(isSideOpen ? "Close canvas" : "Re-open canvas");
+  const sidePaneRef = useRef<HTMLDivElement>(null);
+  const lastFocusedInMainRef = useRef<HTMLElement | null>(null);
+
+  // The covered main pane is inert, so a focus inside it would fall to the page: it moves into the side pane, and back
+  // to the element last focused in the main pane (the control that opened the side pane) once the main pane is free.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (isMainCovered) {
+      const sidePane = sidePaneRef.current;
+      if (sidePane && !sidePane.contains(document.activeElement)) sidePane.focus({ preventScroll: true });
+      return;
+    }
+    const lastFocusedInMain = lastFocusedInMainRef.current;
+    const focusIsLost = document.activeElement === null || document.activeElement === document.body;
+    if (focusIsLost && lastFocusedInMain?.isConnected) lastFocusedInMain.focus({ preventScroll: true });
+  }, [isMainCovered]);
+
+  const toggleButton = sideToggle ? (
+    <button
+      type="button"
+      className={classNames("agents-split-view__toggle", isMainCovered && "agents-split-view__toggle--floating")}
+      onClick={sideToggle.onToggle}
+      aria-expanded={isSideOpen}
+      aria-label={toggleLabel}
+      title={toggleLabel}
+      style={isMainCovered ? { position: "absolute", top: 8, insetInlineEnd: 8, zIndex: 21 } : undefined}
+    >
+      <DefaultIcon name={isSideOpen ? "closeCanvas" : "maximize"} size="small" />
+    </button>
+  ) : null;
+
   return (
     <div
       ref={observeSplitView}
       className={classNames("agents-split-view", coversMain && "agents-split-view--covering")}
-      style={{ display: "flex", width: "100%", height: "100%", position: "relative" }}
+      style={{
+        display: "flex",
+        width: "100%",
+        height: "100%",
+        position: "relative",
+        overflow: isMainCovered ? "hidden" : undefined,
+      }}
     >
       <div
         className="agents-split-view__main"
         style={{
-          width: isSideOpen && !coversMain ? (main.narrowedWidth ?? main.width) : main.width,
+          width: isSideOpen && !coversMain ? (main.narrowedWidth ?? main.width) : isMainCovered ? "100%" : main.width,
           background: main.background,
+          isolation: isMainCovered ? "isolate" : undefined,
+        }}
+        inert={isMainCovered}
+        aria-hidden={isMainCovered ? true : undefined}
+        onFocusCapture={(event) => {
+          lastFocusedInMainRef.current = event.target as HTMLElement;
         }}
       >
         {main.content}
       </div>
-      {sideToggle && !coversMain ? (
-        <button type="button" className="agents-split-view__toggle" onClick={sideToggle.onToggle} aria-expanded={isSideOpen} />
-      ) : null}
+      {!coversMain ? toggleButton : null}
       {isSideOpen ? (
         <div
+          ref={sidePaneRef}
           className="agents-split-view__side"
+          tabIndex={isMainCovered ? -1 : undefined}
           style={
-            coversMain
-              ? { position: "absolute", inset: 0, width: "100%", zIndex: 20, background: side.background }
+            isMainCovered
+              ? {
+                  position: "absolute",
+                  inset: 0,
+                  width: "100%",
+                  maxWidth: "100%",
+                  boxSizing: "border-box",
+                  borderLeft: "none",
+                  overflowX: "hidden",
+                  outline: "none",
+                  isolation: "isolate",
+                  zIndex: 20,
+                  background: side.background ?? "var(--agents-bg-surface)",
+                }
               : { width: side.narrowedWidth ?? side.width, background: side.background }
           }
         >
           {side.content}
         </div>
       ) : null}
+      {isMainCovered ? toggleButton : null}
     </div>
   );
 };

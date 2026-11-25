@@ -287,7 +287,8 @@
       "placeholders": [],
       "contexts": [],
       "usedIn": [
-        "src/chat/CanvasPane/CanvasPane.tsx"
+        "src/chat/CanvasPane/CanvasPane.tsx",
+        "src/provider/components/default-components.tsx"
       ]
     },
     {
@@ -885,7 +886,8 @@
       "placeholders": [],
       "contexts": [],
       "usedIn": [
-        "src/chat/ConversationView.tsx"
+        "src/chat/ConversationView.tsx",
+        "src/provider/components/default-components.tsx"
       ]
     },
     {

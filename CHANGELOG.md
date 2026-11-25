@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.5.1
+
+**The default split view works while the canvas covers the chat** (a split narrower than `coversBelowWidth`), so a host
+no longer needs its own `SplitView` for it. npm `@mgamadeus/ddd-agents` 0.5.1 in lockstep; no PHP change.
+
+- **Named toggle:** the divider toggle carries a translated name (`Close canvas` / `Re-open canvas`, keys already in
+  `i18n-keys.json`) and an icon (`closeCanvas` / `maximize`). While the canvas covers the chat it floats over the
+  canvas's top end (`agents-split-view__toggle--floating`) instead of disappearing. Side by side it stays the strip on
+  the divider.
+- **Covered chat is inert:** the covered main pane gets `inert` and `aria-hidden`, so Tab no longer reaches it. The
+  focus moves into the canvas when it covers the chat, and back to the element last focused in the chat when the
+  canvas closes or the split widens.
+- **Full width:** the covering pane takes the full width of the split (`inset: 0`, `box-sizing: border-box`, no
+  divider border, no horizontal overflow), sits in its own stacking context (`isolation: isolate`, z-index 20) with an
+  opaque background, and the split clips while covered.
+- The side-by-side layout is unchanged.
+
 ## 0.5.0
 
 Agent.UI without tables, screen pictures, the realtime port, and host adaptability. A minor with removals. Requires
