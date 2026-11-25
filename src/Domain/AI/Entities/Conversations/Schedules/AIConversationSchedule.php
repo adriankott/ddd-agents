@@ -625,14 +625,17 @@ class AIConversationSchedule extends Entity
      * How often the cron fires within a window of days from `$from` — pure iteration over the cron's
      * occurrences (no repo contact), capped at `$countCap` so a runaway expression cannot loop unbounded.
      * 0 for a one-time schedule (no cron to iterate).
+     *
+     * The window is N WALL-CLOCK days in the schedule's zone ({@see computeWallClockWindowEnd()}): from `$from` to the
+     * same local time N days later. A day of a summer-time change is 23 or 25 elapsed hours long; counting elapsed
+     * hours would let a cron with four fixed times of day count five on the eve of the change in spring.
      */
     public function countCronFiringsWithinDays(DateTime $from, int $days, int $countCap = 500): int
     {
         if ($this->isOneTime() || trim((string)($this->schedule ?? '')) === '') {
             return 0;
         }
-        // The window is N × 24 h of ELAPSED time from $from (not local calendar days) — unchanged by the zone.
-        $windowEndTimestamp = $from->getTimestamp() + $days * 86400;
+        $windowEndTimestamp = $this->computeWallClockWindowEnd($from, $days)->getTimestamp();
         $firingCount = 0;
         $occurrenceCursor = $from;
         while ($firingCount < $countCap) {
@@ -646,6 +649,19 @@ class AIConversationSchedule extends Entity
     }
 
     /**
+     * The end of a window of `$days` wall-clock days from `$from` in the schedule's zone
+     * ({@see getCronTimezoneIdentifier()}): the same local time `$days` calendar days later — 24 elapsed hours on a
+     * normal day, 23 on the day of the change to summer time, 25 on the day of the change back. A local time the
+     * change skips lands on the next existing one (PHP's reading of the gap).
+     */
+    public function computeWallClockWindowEnd(DateTime $from, int $days): \DateTimeImmutable
+    {
+        return (new \DateTimeImmutable('@' . $from->getTimestamp()))
+            ->setTimezone(new \DateTimeZone($this->getCronTimezoneIdentifier()))
+            ->modify('+' . $days . ' days');
+    }
+
+    /**
      * The upcoming fire moments within a window of `$days` from `$from` — pure schedule math (no repo contact),
      * the datetime-returning sibling of {@see countCronFiringsWithinDays()} (the agenda strip's
      * source). A RECURRING schedule iterates its cron, capped at `$countCap` so a runaway expression
@@ -656,8 +672,8 @@ class AIConversationSchedule extends Entity
      */
     public function computeCronOccurrencesWithinDays(DateTime $from, int $days, int $countCap = 50): array
     {
-        // The window is N × 24 h of ELAPSED time from $from (not local calendar days) — unchanged by the zone.
-        $windowEndTimestamp = $from->getTimestamp() + $days * 86400;
+        // The same window as the count: N wall-clock days in the schedule's zone.
+        $windowEndTimestamp = $this->computeWallClockWindowEnd($from, $days)->getTimestamp();
         if ($this->isOneTime()) {
             if ($this->iterationsUsed > 0) {
                 // Already fired — its single occurrence is history, not an upcoming one.

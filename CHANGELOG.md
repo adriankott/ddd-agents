@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.5.10
+
+**Schedules: the frequency floor counts per wall-clock day, a skip for a running previous run gives its iteration
+back, a dry run says "would expire"; the installation check probes the database with a short connect timeout; package
+tests for the creation rules of the task tools and the occurrence of a schedule.** The creation-rules and occurrence
+tests were contributed by an application team. npm `@mgamadeus/ddd-agents` 0.5.10 in lockstep (no web change).
+
+- Frequency floor (DST): `AIConversationScheduleCreationLimits::countCronFiringsPerDay()` counted the firings within 24
+  ELAPSED hours. On the eve of the change to summer time those span 25 wall-clock hours, so a cron with four fixed times
+  of day counted five in the hour before its evening firing and `createRecurringTaskSchedule` / `updateTaskSchedule`
+  refused it (`0 6,10,14,18 * * *`, Europe/Berlin, 2027-03-27 17:30: 5; 16:30 and 18:30: 4); on the eve of the change
+  back an hour counted three. The window is now 24 wall-clock hours in the schedule's zone (from now to the same local
+  time the next day, `AIConversationSchedule::computeWallClockWindowEnd()`), so N fixed times of day count N at every
+  hour of the year. The rule stays "at most 4 firings per day". `countCronFiringsWithinDays()` and
+  `computeCronOccurrencesWithinDays()` use the same wall-clock window (monthly cost estimate, agenda: N calendar days
+  instead of N × 24 h).
+- Occurrence skip for a previous run in progress: the claim had already counted the iteration and moved the anchor; the
+  not-eligible and pot skips gave the iteration back, this one did not, so a recurring schedule with `maxRuns` lost
+  one real run per such skip. It now refunds through `refundClaimedOccurrence($schedule, reArmNow: false)` like the
+  other skips: the anchor stays on the next slot (no immediate retry); a one-time schedule is left as it is.
+- `app:agent:fire-due-schedules --dry-run`: an expired schedule printed "transitioned to EXPIRED" and was counted as
+  expired although nothing was written. It now prints `Expired (dry-run): schedule N passed its ttl/maxIterations —
+  would expire` and counts nothing, as a due schedule's "would fire".
+- `app:agent:check-installation`, check `missingTables`: the tables are read over a probe connection of its own — the
+  default connection's parameters (read without opening it) plus a connect timeout as a driver option of the probe
+  only (`PDO::ATTR_TIMEOUT` for `pdo_mysql` / `pdo_pgsql`, `MYSQLI_OPT_CONNECT_TIMEOUT` for `mysqli`), connected once
+  (no second attempt of the platform detection), closed afterwards. New key `databaseConnectTimeoutSeconds` (default
+  5, at least 1) in `config/app/AI/installationCheck.php`. A host that does not answer is the existing WARNING, now
+  naming the timeout. The command probes before it reads its default account and skips that read when the probe gets
+  no answer (the second wait). With an unreachable host the command took about 181 s; now about the timeout.
+  New value object `AgentInstallationDatabaseProbe`; `AgentInstallationCheckService::findDatabaseProbe()`,
+  `getDatabaseConnectTimeoutSeconds()`, override points `buildProbeConnectionParams()`, `findDefaultConnectionParams()`.
+- Tests: `AgentTaskSchedulesMCPPackageCreationRulesTest` (52 cases: active cap, frequency floor incl. a zone with
+  summer time, daily creation cap, `maxRuns`, title, report channel, zone, one-time moment, scheduled-run guard,
+  background start), `AIConversationSchedulesServiceOccurrenceSpawnTest` (the run a claimed occurrence starts and the
+  order and writes of the guards), `AgentFireDueSchedulesCommandPathsTest` (rows gone or inactive, expiry, dry run,
+  lost claim, throwing spawn, late one-time), `AIConversationScheduleExpiryBoundariesTest`,
+  `AIConversationScheduleCronFiringsPerDayTest` (both summer-time changes in Europe/Berlin and America/New_York, a
+  normal day), `AgentInstallationDatabaseProbeTimeoutTest` (an unreachable TEST-NET host with a timeout of 1 s on
+  MariaDB and PostgreSQL drivers, the probe's parameters).
+
 ## 0.5.9
 
 **Host guards: the installation check sees which class runs under a command's names, two rights checks, a test case

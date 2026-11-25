@@ -137,9 +137,12 @@ class AgentFireDueSchedulesCommand extends AgentConsoleCommand
         }
         $expiryTransition = $schedule->buildTransitionTo(AIConversationScheduleTransition::OPERATION_EXPIRE, new DateTime());
         if ($expiryTransition->isAllowed) {
-            if (!$dryRun) {
-                $aIConversationSchedulesService->transitionStatus($schedule, AIConversationScheduleStatus::EXPIRED);
+            if ($dryRun) {
+                // written and counted as nothing, like a due schedule of a dry run
+                $output->writeln("Expired (dry-run): schedule {$dueScheduleId} passed its ttl/maxIterations — would expire");
+                return;
             }
+            $aIConversationSchedulesService->transitionStatus($schedule, AIConversationScheduleStatus::EXPIRED);
             $this->outcomeCounts['expired']++;
             $output->writeln("Expired: schedule {$dueScheduleId} passed its ttl/maxIterations — transitioned to EXPIRED");
             return;

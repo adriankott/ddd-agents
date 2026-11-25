@@ -7,6 +7,7 @@ namespace DDD\Domain\AI\Services\Installation;
 use DDD\Domain\AI\Entities\Conversations\Entitlements\AgentRoleMappedAccountRights;
 use DDD\Domain\AI\Entities\Discovery\AgentSourceRoot;
 use DDD\Domain\AI\Entities\Installation\AgentFeatureTableConditions;
+use DDD\Domain\AI\Entities\Installation\AgentInstallationDatabaseProbe;
 use DDD\Domain\AI\Entities\Installation\AgentInstallationFinding;
 use DDD\Domain\AI\Entities\Installation\AgentInstallationFindings;
 use DDD\Domain\AI\Entities\Installation\AgentPackageRename;
@@ -26,11 +27,13 @@ use DDD\Domain\AI\Services\Skills\AISkillSourcesService;
 use DDD\Domain\AI\Services\Skills\AISkillsService;
 use DDD\Domain\AI\Services\Skills\MCPPackageIdsService;
 use DDD\Domain\Base\Repo\DB\Database\DatabaseModel;
+use DDD\Domain\Base\Repo\DB\Dialect\DialectResolver;
 use DDD\Domain\Base\Repo\DB\Doctrine\EntityManagerFactory;
 use DDD\Domain\Common\Services\EntityModelGeneratorService;
 use DDD\Infrastructure\Libs\Config;
 use DDD\Infrastructure\Services\DDDService;
 use DDD\Infrastructure\Services\Service;
+use Doctrine\DBAL\DriverManager;
 use FilesystemIterator;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -64,7 +67,8 @@ use Throwable;
  *   is no MCP package (a bundle, a controller) — never read there;
  * - `toolOverlays` (WARNING): an entry of `AI.toolOverlays` with a key the overlay does not read, or for a tool name no
  *   bound package has;
- * - `missingTables` (BLOCKING): a table of a package entity the schema lacks (DB unreachable: one WARNING);
+ * - `missingTables` (BLOCKING): a table of a package entity the schema lacks (DB unreachable: one WARNING; the tables
+ *   are read over a probe connection of its own with a short connect timeout, {@see findDatabaseProbe()});
  * - `renamedConfigKeys` (WARNING): a config key a package renamed (`renames.json`, kind `configKey`) or removed
  *   ({@see REMOVED_CONFIG_KEYS_BY_VERSION}) still set;
  * - `consoleCommands` (WARNING; BLOCKING for a name the console lists and cannot build): a package command name the
@@ -153,6 +157,21 @@ class AgentInstallationCheckService extends Service
     /** @var string The folder of a source root that holds its MCP packages, bundles and controllers */
     public const string MCP_FOLDER = 'Presentation/Mcp';
 
+    /** @var string The config key (below {@see CONFIG_PATH}) of the probe connection's connect timeout in seconds */
+    public const string CONFIG_KEY_DATABASE_CONNECT_TIMEOUT_SECONDS = 'databaseConnectTimeoutSeconds';
+
+    /** @var int The probe connection's connect timeout when the config names none */
+    public const int DEFAULT_DATABASE_CONNECT_TIMEOUT_SECONDS = 5;
+
+    /**
+     * @var float A failure this close to the connect timeout (in seconds) counts as reaching it: the host did not
+     * answer at all
+     */
+    public const float CONNECT_TIMEOUT_MARGIN_SECONDS = 0.5;
+
+    /** @var AgentInstallationDatabaseProbe|null The probe of the current run; null = not probed yet */
+    protected ?AgentInstallationDatabaseProbe $databaseProbe = null;
+
     /** @var iterable<AgentInstallationCheckInterface> The added checks (by tag) */
     protected iterable $agentInstallationChecks = [];
 
@@ -211,6 +230,7 @@ class AgentInstallationCheckService extends Service
             }
         } finally {
             $this->consoleApplication = null;
+            $this->databaseProbe = null;
         }
         return $agentInstallationFindings;
     }
@@ -697,21 +717,23 @@ class AgentInstallationCheckService extends Service
         if ($requiredTableNamesByEntityClass === []) {
             return;
         }
-        try {
-            $liveTableNames = $this->findLiveTableNames();
-        } catch (Throwable $databaseFailure) {
+        $databaseProbe = $this->findDatabaseProbe();
+        if (!$databaseProbe->answered) {
             // the driver's text is left out: it can name the user, the host or the DSN
             $agentInstallationFindings->addFinding(
                 static::CHECK_MISSING_TABLES,
                 AgentInstallationFinding::SEVERITY_WARNING,
                 'database',
-                'The tables could not be checked: the database did not answer (' . (new ReflectionClass($databaseFailure))->getShortName()
+                'The tables could not be checked: the database did not answer ('
+                . ($databaseProbe->reachedConnectTimeout ? 'no answer within the connect timeout of ' : 'connect timeout of ')
+                . $databaseProbe->connectTimeoutSeconds . ' s, ' . $databaseProbe->failureClassShortName
                 . '; the driver\'s message is not shown, it can name the user, host or DSN).',
-                'Run the command where the database is reachable; the application log of the connection names the cause.'
+                'Run the command where the database is reachable; the application log of the connection names the cause. The'
+                . ' timeout is ' . static::CONFIG_KEY_DATABASE_CONNECT_TIMEOUT_SECONDS . ' of config/app/AI/installationCheck.php.'
             );
             return;
         }
-        $liveTableNamesInLowerCase = array_flip(array_map('strtolower', $liveTableNames));
+        $liveTableNamesInLowerCase = array_flip(array_map('strtolower', $databaseProbe->liveTableNames));
         foreach ($requiredTableNamesByEntityClass as $entityClassName => $tableName) {
             if (isset($liveTableNamesInLowerCase[strtolower($tableName)])) {
                 continue;
@@ -810,18 +832,116 @@ class AgentInstallationCheckService extends Service
     }
 
     /**
-     * The table names of the default connection, without a schema prefix.
+     * The probe of the database for this run, made once and kept until the run ends: the table names over a connection
+     * of its own with the connect timeout of {@see getDatabaseConnectTimeoutSeconds()}. The application's connection is
+     * never opened by the probe. A caller outside a run (the command, before it reads its default account) probes once
+     * and the run reuses that probe.
+     */
+    public function findDatabaseProbe(): AgentInstallationDatabaseProbe
+    {
+        if ($this->databaseProbe !== null) {
+            return $this->databaseProbe;
+        }
+        $connectTimeoutSeconds = $this->getDatabaseConnectTimeoutSeconds();
+        $probeStartedAt = microtime(true);
+        try {
+            $liveTableNames = $this->findLiveTableNames();
+            $this->databaseProbe = AgentInstallationDatabaseProbe::createAnswered($liveTableNames, $connectTimeoutSeconds, microtime(true) - $probeStartedAt);
+        } catch (Throwable $databaseFailure) {
+            $elapsedSeconds = microtime(true) - $probeStartedAt;
+            $this->databaseProbe = AgentInstallationDatabaseProbe::createFailed(
+                (new ReflectionClass($databaseFailure))->getShortName(),
+                $elapsedSeconds >= $connectTimeoutSeconds - static::CONNECT_TIMEOUT_MARGIN_SECONDS,
+                $connectTimeoutSeconds,
+                $elapsedSeconds
+            );
+        }
+        return $this->databaseProbe;
+    }
+
+    /** The connect timeout of the probe connection: `databaseConnectTimeoutSeconds` of the config, at least 1 s */
+    public function getDatabaseConnectTimeoutSeconds(): int
+    {
+        $installationCheckConfig = Config::get(static::CONFIG_PATH);
+        $configuredTimeout = is_array($installationCheckConfig) ? ($installationCheckConfig[static::CONFIG_KEY_DATABASE_CONNECT_TIMEOUT_SECONDS] ?? null) : null;
+        if (!is_numeric($configuredTimeout)) {
+            return static::DEFAULT_DATABASE_CONNECT_TIMEOUT_SECONDS;
+        }
+        return max(1, (int)$configuredTimeout);
+    }
+
+    /**
+     * The table names of the default connection's database, without a schema prefix, read over a probe connection of
+     * its own ({@see buildProbeConnectionParams()}) that is closed afterwards.
      *
      * @return string[]
      */
     protected function findLiveTableNames(): array
     {
-        $tableNames = [];
-        foreach (EntityManagerFactory::getInstance()->getConnection()->createSchemaManager()->listTableNames() as $qualifiedTableName) {
-            $tableNameParts = explode('.', (string)$qualifiedTableName);
-            $tableNames[] = trim((string)end($tableNameParts), '"`');
+        $probeConnection = DriverManager::getConnection($this->buildProbeConnectionParams());
+        try {
+            // connect once first: without a known server version, the platform detection of DBAL 3 retries a failed
+            // connect without the database name, which would cost the timeout twice
+            $probeConnection->getNativeConnection();
+            $tableNames = [];
+            foreach ($probeConnection->createSchemaManager()->listTableNames() as $qualifiedTableName) {
+                $tableNameParts = explode('.', (string)$qualifiedTableName);
+                $tableNames[] = trim((string)end($tableNameParts), '"`');
+            }
+            return $tableNames;
+        } finally {
+            $probeConnection->close();
         }
-        return $tableNames;
+    }
+
+    /**
+     * The parameters of the probe connection: those of the default connection (its primary for a primary/replica
+     * connection), without a wrapper class or a shared PDO, plus the connect timeout as a driver option of the probe only
+     * — `PDO::ATTR_TIMEOUT` for `pdo_mysql` and `pdo_pgsql` (the PostgreSQL driver turns it into `connect_timeout`),
+     * `MYSQLI_OPT_CONNECT_TIMEOUT` for `mysqli`. Another driver gets no timeout option.
+     *
+     * @return array<string, mixed>
+     */
+    protected function buildProbeConnectionParams(): array
+    {
+        $probeConnectionParams = $this->findDefaultConnectionParams();
+        if (isset($probeConnectionParams['primary']) && is_array($probeConnectionParams['primary'])) {
+            $probeConnectionParams = array_merge($probeConnectionParams, $probeConnectionParams['primary']);
+        }
+        unset($probeConnectionParams['primary'], $probeConnectionParams['replica'], $probeConnectionParams['wrapperClass'], $probeConnectionParams['pdo']);
+        if (!isset($probeConnectionParams['serverVersion']) && is_string($probeConnectionParams['server_version'] ?? null) && $probeConnectionParams['server_version'] !== '') {
+            $probeConnectionParams['serverVersion'] = $probeConnectionParams['server_version'];
+        }
+        $driverOptions = isset($probeConnectionParams['driverOptions']) && is_array($probeConnectionParams['driverOptions'])
+            ? $probeConnectionParams['driverOptions']
+            : [];
+        $connectTimeoutSeconds = $this->getDatabaseConnectTimeoutSeconds();
+        $driverName = (string)($probeConnectionParams['driver'] ?? '');
+        if (in_array($driverName, ['pdo_mysql', 'pdo_pgsql'], true)) {
+            $driverOptions[\PDO::ATTR_TIMEOUT] = $connectTimeoutSeconds;
+        } elseif ($driverName === 'mysqli' && defined('MYSQLI_OPT_CONNECT_TIMEOUT')) {
+            $driverOptions[\MYSQLI_OPT_CONNECT_TIMEOUT] = $connectTimeoutSeconds;
+        }
+        $probeConnectionParams['driverOptions'] = $driverOptions;
+        return $probeConnectionParams;
+    }
+
+    /**
+     * The parameters of the application's default connection, read without opening it: those of the entity manager
+     * this process already has, else the framework's configuration of the default scope as its factory builds them.
+     * `EntityManagerFactory::getInstance()` is never called here — it pings, and the ping is the wait the probe bounds.
+     *
+     * @return array<string, mixed>
+     */
+    protected function findDefaultConnectionParams(): array
+    {
+        $existingEntityManager = EntityManagerFactory::getExistingInstance(EntityManagerFactory::SCOPE_DEFAULT);
+        if ($existingEntityManager !== null) {
+            return $existingEntityManager->getConnection()->getParams();
+        }
+        $configuredSettings = (new ReflectionMethod(EntityManagerFactory::class, 'getDBConfigForScope'))->invoke(null, EntityManagerFactory::SCOPE_DEFAULT);
+        $configuredConnectionParams = (array)($configuredSettings['connectionParams'] ?? []);
+        return DialectResolver::forDriver((string)($configuredConnectionParams['driver'] ?? ''))->connectionParams($configuredConnectionParams);
     }
 
     /**

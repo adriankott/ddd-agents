@@ -19,6 +19,11 @@ declare(strict_types=1);
  *
  * renamesStateFile: the path of the application's `.ddd-renames.json` (absolute, or relative to the project directory)
  * for `pendingRenames`; null = the first one in the project directory or a parent directory up to the repository root.
+ *
+ * databaseConnectTimeoutSeconds: the connect timeout of the check's own probe connection (`missingTables`, and the
+ * command's read of its default account, which is skipped when the probe gets no answer); at least 1. The probe copies
+ * the default connection's parameters and adds the timeout as a driver option of its own: the application's connection
+ * is left as it is.
  */
 return [
     'skippedChecks' => [],
@@ -28,4 +33,5 @@ return [
     'acceptedSkillOnlyRights' => [],
     'acceptedMissingTables' => [],
     'renamesStateFile' => null,
+    'databaseConnectTimeoutSeconds' => 5,
 ];

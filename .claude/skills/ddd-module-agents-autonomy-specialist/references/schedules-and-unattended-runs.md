@@ -48,7 +48,8 @@ line, every minute to every five minutes (the entry skill's host duties). A host
    `AIConversationSchedulesService::DUE_SCHEDULES_BATCH_LIMIT`.
 2. Load each one fresh (no registry cache); skip it when it is no longer active.
 3. **Expiry is the caller's step:** when `buildTransitionTo(AIConversationScheduleTransition::OPERATION_EXPIRE, now)`
-   is allowed (TTL passed or quota used), `transitionStatus()` to `EXPIRED` and do not fire.
+   is allowed (TTL passed or quota used), `transitionStatus()` to `EXPIRED` and do not fire. A dry run
+   (`--dry-run`) writes nothing, prints "would expire" and counts nothing, as it prints "would fire" for a due one.
 4. `claimFireOccurrence()` — one compare-and-set on `nextRunAt`: it moves the anchor to the next occurrence (with the
    failure backoff when `failureStreak` is above zero), stamps `lastFiredAt` and counts `iterationsUsed`. False = another
    process or a concurrent pause won; skip.
@@ -56,7 +57,7 @@ line, every minute to every five minutes (the entry skill's host duties). A host
 
 | Check, in order | Outcome |
 |---|---|
-| the newest run of the schedule is still in progress | `OCCURRENCE_SKIP_REASON_PREVIOUS_RUN_IN_PROGRESS`; nothing refunded |
+| the newest run of the schedule is still in progress | recurring: the occurrence is refunded, the anchor stays on the next slot (no re-arm); one-time: left as it is; `OCCURRENCE_SKIP_REASON_PREVIOUS_RUN_IN_PROGRESS` |
 | the agent space is gone (or a schedule without one is not allowed: `AgentSpacesService::isScheduleWithoutAgentSpaceAllowed()`, default allowed — see the agent-space reference of the entry skill `ddd-module-agents-specialist`) | the schedule is closed CANCELLED with `AGENT_SPACE_ENDED`; `OCCURRENCE_SKIP_REASON_AGENT_SPACE_MISSING` |
 | eligibility, read fresh, refuses `scheduleFire` | recurring: the occurrence is refunded; `OCCURRENCE_SKIP_REASON_AGENT_SPACE_NOT_ELIGIBLE` |
 | the budget pot is exhausted | one notice per month to the owner; one-time: EXPIRED, recurring: refunded; `OCCURRENCE_SKIP_REASON_BUDGET_POT_EXHAUSTED` |
@@ -64,7 +65,8 @@ line, every minute to every five minutes (the entry skill's host duties). A host
 
 The package does not catch an exception of the spawn: the command catches per schedule and goes on with the next.
 `refundClaimedOccurrence()` gives a claimed occurrence back (`reArmNow: true` fires it again at once, for an
-infrastructure failure).
+infrastructure failure). Every skip of a recurring schedule that started no run refunds with `reArmNow: false`, so a
+schedule with `maxRuns` loses no run to a skip.
 
 Manual fires go through the same tail: `fireScheduleNow()` (a recurring schedule, at most once per hour),
 `startScheduleNow()` (a due one-time schedule that never fired), `fireEvalScheduleNow()` (eval schedules only).
@@ -172,7 +174,7 @@ owner's resume of a platform-paused row and of a row whose scope is not eligible
 ## Time zones
 
 The cron digits are local time of the schedule's own `timezone` (`getCronTimezoneIdentifier()`, UTC when empty). The
-next occurrence, the backoff and `countCronFiringsWithinDays()` all use it; a repeated autumn hour fires once
+next occurrence, the backoff, `countCronFiringsWithinDays()` and `computeCronOccurrencesWithinDays()` all use it; a repeated autumn hour fires once
 (`isRepeatedLocalOccurrence()`), and a local time inside the skipped spring hour fires once at the next existing local
 time, as the cron library places it (02:30 fires at 03:30 on that day). A new
 schedule takes its zone from `AgentSpacesService::findTimezoneForNewSchedule()`. How the run's clock is shown to the
@@ -183,6 +185,13 @@ model belongs to the context skill `ddd-module-agents-context-specialist`.
 - `AIConversationScheduleCreationLimits` holds the limits a schedule-creating tool applies (active schedules per space,
   cron firings per day, recurring schedules created per day, runs per schedule, title length). `createSchedule()` does
   not enforce them; the tool does.
+- **The frequency floor counts per wall-clock day.** `countCronFiringsPerDay()` counts the firings from now to the
+  same local time the next day in the schedule's zone (`AIConversationSchedule::computeWallClockWindowEnd()`): 24
+  elapsed hours on a normal day, 23 on the day of the change to summer time, 25 on the day back. A cron with N fixed
+  times of day therefore counts N at every hour of the year (counted in elapsed hours, `0 6,10,14,18 * * *` in
+  Europe/Berlin counted 5 on the eve of the spring change between 17:00 and 18:00 and was refused). An interval cron
+  counts the slots of that wall-clock day (hourly: 23 on the spring day). The window of `countCronFiringsWithinDays()`
+  and `computeCronOccurrencesWithinDays()` is N wall-clock days the same way (the monthly cost estimate, the agenda).
 - **A scheduled run never administers schedules.** The purpose says so, and every tool call of the run and of its
   sub-agents carries the `scheduleId` in `AgentToolCallProvenance`. The package's schedule tools refuse such a call; a
   host's own create, change, pause, resume and delete tools must refuse a call whose provenance has a `scheduleId` — otherwise a

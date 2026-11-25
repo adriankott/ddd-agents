@@ -49,12 +49,19 @@ class AgentCheckInstallationCommand extends AgentConsoleCommand
 
     /**
      * The default account for console work, or null when it cannot be read: the check runs also against a database
-     * that does not answer (the table check then reports it as a finding).
+     * that does not answer (the table check then reports it as a finding). The database is probed first with the
+     * check's short connect timeout ({@see AgentInstallationCheckService::findDatabaseProbe()}); when the probe gets
+     * no answer the account is not read, so the application's connection never waits for its own connect timeout.
      *
      * @return Account|null
      */
     protected function findDefaultAccountForConsoleWork(): ?Account
     {
+        /** @var AgentInstallationCheckService $agentInstallationCheckService */
+        $agentInstallationCheckService = DDDService::instance()->getService(AgentInstallationCheckService::class);
+        if (!$agentInstallationCheckService->findDatabaseProbe()->answered) {
+            return null;
+        }
         try {
             return parent::findDefaultAccountForConsoleWork();
         } catch (Throwable) {

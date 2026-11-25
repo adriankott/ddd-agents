@@ -81,8 +81,10 @@ class AIConversationScheduleCreationLimits extends ValueObject
     }
 
     /**
-     * How often the schedule's cron fires within the day after `$now`, in the schedule's zone. An unparseable
-     * expression counts 0 — the cron validation of the create / edit answers it with its own message.
+     * How often the schedule's cron fires within the day after `$now`: from `$now` to the same local time the next day
+     * in the schedule's zone (24 wall-clock hours, {@see AIConversationSchedule::computeWallClockWindowEnd()}), so a
+     * cron with N fixed times of day counts N on the two days of a summer-time change as on any other day. An
+     * unparseable expression counts 0 — the cron validation of the create / edit answers it with its own message.
      */
     public static function countCronFiringsPerDay(AIConversationSchedule $schedule, DateTime $now): int
     {

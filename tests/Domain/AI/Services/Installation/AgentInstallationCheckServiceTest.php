@@ -232,7 +232,7 @@ class AgentInstallationCheckServiceTest extends UnitTestCase
 
         self::assertSame(['database'], $findings->getSubjects());
         $message = $findings->getElements()[0]->message;
-        self::assertStringContainsString('the database did not answer (RuntimeException;', $message);
+        self::assertStringContainsString('the database did not answer (connect timeout of 5 s, RuntimeException;', $message);
         foreach (['agent_app', 'db.internal.example', 'secret', 'SQLSTATE', 'mysql://'] as $leakedPart) {
             self::assertStringNotContainsString($leakedPart, $message);
         }

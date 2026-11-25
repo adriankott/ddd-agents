@@ -1027,8 +1027,9 @@ class AIConversationSchedulesService extends EntitiesService
     }
 
     /**
-     * REFUND one occurrence a claim ({@see claimFireOccurrence}) consumed but that never ran — the pot-exhausted
-     * skip of a recurring schedule (`$reArmNow` false: the next cron occurrence stands) and the
+     * REFUND one occurrence a claim ({@see claimFireOccurrence}) consumed but that never ran — the skips of a
+     * recurring schedule for a previous run in progress, a scope that is not eligible and an exhausted pot
+     * (`$reArmNow` false: the next cron occurrence stands) and the
      * dispatch-infrastructure-down catch of the immediate-fire callers (`$reArmNow` true: `nextRunAt` = NOW so
      * the due-schedules cron fires it as soon as the infrastructure is back). ONE RELATIVE SQL UPDATE
      * (`iterationsUsed - 1`, floored at 0) instead of writing the loaded value back absolutely: a concurrent
@@ -1109,7 +1110,7 @@ class AIConversationSchedulesService extends EntitiesService
      * Spawn the run conversation for a schedule whose occurrence the caller has ALREADY claimed
      * ({@see claimFireOccurrence}) — the shared fire tail of the cron command and the admin `fire-now`:
      * guardrails first (the previous run still in progress → SKIP this occurrence, streak untouched — a long run
-     * is not a failure; a space that no longer exists → SKIP and the schedule is closed; a space or account that is
+     * is not a failure; a recurring row gets the claimed iteration back, its anchor stays on the next slot; a space that no longer exists → SKIP and the schedule is closed; a space or account that is
      * not eligible → SKIP), then ONE new run conversation via the ADMIN drive scope (it runs as the schedule's
      * account, appends the seed user message — task + the previous run's summary-outcome line — stamps
      * scheduleId/initiatorType/runSettings at creation and dispatches the async turn worker; budget stays enforced
@@ -1131,6 +1132,12 @@ class AIConversationSchedulesService extends EntitiesService
         $aIConversationsService = AIConversation::getService();
         $previousRunConversation = $aIConversationsService->findNewestScheduleRunConversation((int)$schedule->id);
         if ($previousRunConversation !== null && $previousRunConversation->isRunInProgress()) {
+            // The claim already counted the iteration: a recurring row gets it back like the skips below, or a
+            // schedule with maxRuns would lose one real run per such skip. The anchor stays moved (no re-arm): the
+            // next chance is the next slot, not an immediate retry while the previous run still works.
+            if (!$schedule->isOneTime()) {
+                $this->refundClaimedOccurrence($schedule, reArmNow: false);
+            }
             return AIConversationScheduleOccurrenceSpawn::skipped(static::OCCURRENCE_SKIP_REASON_PREVIOUS_RUN_IN_PROGRESS);
         }
         $agentSpace = $this->findAgentSpaceOfSchedule($schedule);
