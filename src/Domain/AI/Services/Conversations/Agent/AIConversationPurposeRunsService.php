@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DDD\Domain\AI\Services\Conversations\Agent;
 
+use DDD\Domain\AI\Entities\Conversations\Subjects\AIConversationSubject;
 use DDD\Infrastructure\Exceptions\BadRequestException;
 use DDD\Domain\AI\Entities\Conversations\Messages\RunSettings;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessages;
@@ -650,19 +651,53 @@ class AIConversationPurposeRunsService extends Service
      * only), with the purpose's start hook run and its context budget healed where nothing is set yet; null when
      * none exists and the caller starts a fresh one. The singleton is kept per space, so the space is required: a
      * purposed conversation at account level keeps none and is never resumed here.
+     *
+     * A conversation that works on a subject ({@see AIConversationSubject}) is never this singleton; its own is
+     * {@see resumeSingletonPurposedConversationOfSubject()}.
      */
     public function resumeSingletonPurposedConversation(AgentSpace $agentSpace, string $purposeName, AIConversationPurpose $aIConversationPurpose): ?AIConversation
     {
+        return $this->resumeSingletonPurposedConversationOfAgentSpace($agentSpace, $purposeName, $aIConversationPurpose, null);
+    }
+
+    /**
+     * {@see resumeSingletonPurposedConversation()} for one record: the open conversation of the space, purpose AND
+     * subject (one conversation per record), resumed the same way. Where the subject table is missing (a host before
+     * the DDL) the subject is ignored and the singleton of the space and purpose is resumed, as before.
+     */
+    public function resumeSingletonPurposedConversationOfSubject(
+        AgentSpace $agentSpace,
+        string $purposeName,
+        AIConversationPurpose $aIConversationPurpose,
+        AIConversationSubject $aIConversationSubject
+    ): ?AIConversation {
+        return $this->resumeSingletonPurposedConversationOfAgentSpace($agentSpace, $purposeName, $aIConversationPurpose, $aIConversationSubject);
+    }
+
+    /** The body of both resumes; null subject = the singleton of the space and purpose. */
+    protected function resumeSingletonPurposedConversationOfAgentSpace(
+        AgentSpace $agentSpace,
+        string $purposeName,
+        AIConversationPurpose $aIConversationPurpose,
+        ?AIConversationSubject $aIConversationSubject
+    ): ?AIConversation {
         // Singleton: RESUME the existing active purposed conversation (rights-gated find → the customer's own only).
         // A purpose whose finished conversation stays the singleton returns
         // its COMPLETED conversation too: the owner reopens the finished conversation to read it, nothing is started.
         /** @var AIConversationsService $aIConversationsService */
         $aIConversationsService = DDDService::instance()->getService(AIConversationsService::class);
-        $existingPurposedConversation = $aIConversationsService->findNewestPurposedConversationOfAgentSpace(
-            $agentSpace,
-            $purposeName,
-            includeCompleted: $aIConversationPurpose->completedConversationStaysSingleton
-        );
+        $existingPurposedConversation = $aIConversationSubject !== null
+            ? $aIConversationsService->findNewestPurposedConversationOfAgentSpaceForSubject(
+                $agentSpace,
+                $purposeName,
+                $aIConversationSubject,
+                $aIConversationPurpose->completedConversationStaysSingleton
+            )
+            : $aIConversationsService->findNewestPurposedConversationOfAgentSpace(
+                $agentSpace,
+                $purposeName,
+                includeCompleted: $aIConversationPurpose->completedConversationStaysSingleton
+            );
         if ($existingPurposedConversation instanceof AIConversation) {
             $aIConversationPurpose->afterPurposedStart($agentSpace);
             // a singleton started BEFORE its purpose declared a context budget (or before the budget was

@@ -35,6 +35,7 @@ class AgentConversationControllerTraitsTest extends TestCase
         'getAIConversationRunState' => ['GET', '/{aiConversationId}/runState'],
         'getAccountRealtimeMessages' => ['GET', '/realtimeMessages'],
         'postMessage' => ['POST', '/{aiConversationId}/postMessage'],
+        'startPurpose' => ['POST', '/startPurpose'],
         'injectSignal' => ['POST', '/{aiConversationId}/injectSignal'],
         'retryFailedRun' => ['POST', '/{aiConversationId}/retry'],
         'patchTitle' => ['PATCH', '/{aiConversationId}/title'],

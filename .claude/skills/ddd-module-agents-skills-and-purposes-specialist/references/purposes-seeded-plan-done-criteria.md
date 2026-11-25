@@ -109,6 +109,40 @@ written as the start signal, so the agent speaks first. The singleton is kept pe
 it with `AIConversationAgentService::driveConversation()` and the purpose name. Which route a host exposes and how a
 start is scoped is the entry skill's (`ddd-module-agents-specialist`).
 
+## One conversation per record: the subject
+
+A purpose that works on one record at a time (one support ticket, one order) starts with a subject:
+`AIConversationSubject::of($entityClass, $entityId)` (`src/Domain/AI/Entities/Conversations/Subjects/`), then
+`AIConversationAgentService::startOrResumePurposedConversationOfSubject($scope, $agentSpace, $purposeName, $subject, …)`.
+
+- The singleton is kept per space, purpose AND subject
+  (`AIConversationsService::findNewestPurposedConversationOfAgentSpaceForSubject()`): the same record reopens its open
+  conversation, another record gets a new one. Same validation and gating as the plain start.
+- A start WITHOUT a subject never resumes a conversation of a record
+  (`findNewestPurposedConversationOfAgentSpace()` leaves out every conversation with a subject row), so existing
+  callers keep one conversation per space and purpose.
+- The subject is stored in its own table `AIConversationSubjectBindings` (`AIConversationSubjectBinding`, one row per
+  conversation, FK with ON DELETE CASCADE, index on space + purpose + class + id), not as a column of
+  `AIConversations`: every conversation read selects all columns of that table, so a new column there would break
+  every read until the DDL ran. Without the table (`AIConversationSubjectBindingsService::isBindingTableAvailable()`,
+  information_schema, a "missing" answer is asked again after 60 s) a subject is ignored and nothing fails.
+- Two starts for the same record at the same moment run one after the other under the entry-point start lock
+  (`lockEntryPointStart()` with the key `purpose:<md5>`).
+- The caller checks that the account may read the record: `AIConversationSubject::findReadableSubjectEntity()` (the
+  class must be an entity class with an `EntitiesService`; the record is read under the caller's read rights; 400 for a
+  malformed class, 404 for an unknown or unreadable record).
+
+### The route
+
+`POST …/startPurpose` (`AgentConversationWritesTrait::startPurpose()`, body `buildPurposeStartedResponse()`), body
+`purposeId`, `agentSpaceId` (optional), `subject` (optional; `subjectEntityClass`, `subjectEntityId`), `prefill` (optional, ≤ 4,000 characters, the
+kickoff appendix of a new conversation). Answer: `aiConversationId`, `resumedExistingConversation`, `prefillDelivered`.
+Scope CUSTOMER, so `startableViaApi` and `requiredFeatureFlags` apply exactly as with the PHP starter. The space comes
+from `findAgentSpaceOfPurposeStartRequest()` (default: the body's `agentSpaceId` under read rights, 400 without one);
+a host with one personal space per account overrides it. Web: `AgentsConversationClient.startPurpose(request)` (optional on the port) →
+`StartedPurposeConversation` (`conversationId`, `resumedExisting`, `prefillDelivered`); the host opens the conversation
+by its id.
+
 ## The hooks of the purpose class
 
 The base class implements every hook as "nothing". Override only what the purpose needs.

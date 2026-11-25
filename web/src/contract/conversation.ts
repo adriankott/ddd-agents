@@ -263,6 +263,39 @@ export interface StartedConversation {
   reopenedExisting: boolean;
 }
 
+/**
+ * The record a purposed conversation works on: the entity class as the record's `objectType` and its id. The server
+ * checks both (a record the user cannot read answers 404).
+ */
+export interface PurposeSubject {
+  /** generic — the record's entity class, e.g. `App\\Domain\\Support\\Entities\\Tickets\\SupportTicket` */
+  entityClass: string;
+  /** generic */
+  entityId: number;
+}
+
+/** The start of a purposed conversation (`startPurpose`). */
+export interface PurposeStartRequest {
+  /** generic — the purpose's name, e.g. `Support.AnswerTicket` */
+  purposeId: string;
+  /** generic — the space the purpose runs in; omitted when the application's route answers its own space */
+  agentSpaceKey?: number;
+  /** generic — with a subject the open conversation of the same space, purpose and record is reopened */
+  subject?: PurposeSubject;
+  /** generic — text added to the kickoff of a NEW conversation (at most 4,000 characters) */
+  prefill?: string;
+}
+
+/** The conversation a purposed start opened or reopened; the client opens it by its id. */
+export interface StartedPurposeConversation {
+  /** generic */
+  conversationId: number;
+  /** generic — the open conversation of the same space, purpose (and subject) was reopened */
+  resumedExisting: boolean;
+  /** generic — the prefill reached the kickoff (false on a reopen and without a prefill) */
+  prefillDelivered: boolean;
+}
+
 /** The answer of a post: the conversation's messages so far (the reply arrives through live updates). */
 export interface PostedMessage {
   /** generic */

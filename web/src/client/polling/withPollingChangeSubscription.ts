@@ -18,7 +18,9 @@ import type {
   ConversationSubscriptionEndReason,
   PostedMessage,
   SelectableModel,
+  PurposeStartRequest,
   StartedConversation,
+  StartedPurposeConversation,
 } from "../../contract/conversation";
 import {
   createPollingConversationChangeSubscription,
@@ -42,6 +44,7 @@ class PollingAgentsConversationClient implements AgentsConversationClientWithCha
   readonly getMessageSentPayload?: (conversationId: number, messageId: number) => Promise<ConversationMessageSentPayload>;
   readonly getConversationRunState?: (conversationId: number) => Promise<ConversationRunStateRead>;
   readonly getAccountRealtimeMessages?: (clientId?: string) => Promise<AccountRealtimeRead>;
+  readonly startPurpose?: (request: PurposeStartRequest) => Promise<StartedPurposeConversation>;
 
   constructor(
     protected readonly binding: AgentsConversationClient,
@@ -53,6 +56,7 @@ class PollingAgentsConversationClient implements AgentsConversationClientWithCha
     this.getMessageSentPayload = binding.getMessageSentPayload?.bind(binding);
     this.getConversationRunState = binding.getConversationRunState?.bind(binding);
     this.getAccountRealtimeMessages = binding.getAccountRealtimeMessages?.bind(binding);
+    this.startPurpose = binding.startPurpose?.bind(binding);
   }
 
   getConversationMetadata = (conversationId: number): Promise<AgentsConversation> =>

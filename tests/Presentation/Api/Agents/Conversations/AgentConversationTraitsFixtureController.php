@@ -10,6 +10,8 @@ use DDD\Presentation\Api\Agents\Conversations\Controller\AgentConversationReadsT
 use DDD\Presentation\Api\Agents\Conversations\Controller\AgentConversationStartTrait;
 use DDD\Presentation\Api\Agents\Conversations\Controller\AgentConversationWritesTrait;
 use DDD\Presentation\Api\Agents\Conversations\Controller\AgentSelectableModelsTrait;
+use DDD\Presentation\Api\Agents\Conversations\Dtos\AIConversationStartPurposePostRequestDto;
+use DDD\Presentation\Api\Agents\Conversations\Dtos\AIConversationStartPurposePostResponseDto;
 use DDD\Presentation\Api\Agents\Conversations\Dtos\AIConversationStartWithMessagePostRequestDto;
 use DDD\Presentation\Api\Agents\Conversations\Dtos\AIConversationStartWithMessagePostResponseDto;
 
@@ -44,5 +46,25 @@ class AgentConversationTraitsFixtureController
         AIConversationAgentService $aiConversationAgentService
     ): AIConversationStartWithMessagePostResponseDto {
         return $this->buildConversationStartedResponse($requestDto, $agentSpace, $aiConversationAgentService);
+    }
+
+    public function callFindAgentSpaceOfPurposeStartRequest(AIConversationStartPurposePostRequestDto $requestDto): AgentSpace
+    {
+        return $this->findAgentSpaceOfPurposeStartRequest($requestDto);
+    }
+
+    /** @var string|null The only subject class a purposed start may name; null = every entity class (the default) */
+    public ?string $onlyAllowedSubjectEntityClass = null;
+
+    protected function isSubjectEntityClassAllowedForPurposeStart(string $purposeName, string $subjectEntityClass): bool
+    {
+        return $this->onlyAllowedSubjectEntityClass === null || $subjectEntityClass === $this->onlyAllowedSubjectEntityClass;
+    }
+
+    public function callBuildPurposeStartedResponse(
+        AIConversationStartPurposePostRequestDto $requestDto,
+        AIConversationAgentService $aiConversationAgentService
+    ): AIConversationStartPurposePostResponseDto {
+        return $this->buildPurposeStartedResponse($requestDto, $aiConversationAgentService);
     }
 }

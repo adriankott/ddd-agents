@@ -17,8 +17,10 @@ import type {
   ConversationSignal,
   ConversationSubscriptionEndReason,
   PostedMessage,
+  PurposeStartRequest,
   SelectableModel,
   StartedConversation,
+  StartedPurposeConversation,
 } from "../contract/conversation";
 
 /**
@@ -82,6 +84,12 @@ export interface AgentsConversationClient {
     model?: string;
     attachments?: ConversationAttachmentReference[];
   }) => Promise<StartedConversation>;
+
+  /**
+   * Start a purposed conversation (`POST …/startPurpose`), or reopen its open one; the chat then opens the answered
+   * conversation by its id. Optional: a binding without it offers no purposed start.
+   */
+  startPurpose?: (request: PurposeStartRequest) => Promise<StartedPurposeConversation>;
 
   /** Post the owner's message. Allowed while a turn runs: the server answers it in the next turn. */
   postMessage: (

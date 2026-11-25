@@ -20,8 +20,10 @@ import {
   type ConversationSearchOptions,
   type ConversationSignal,
   type PostedMessage,
+  type PurposeStartRequest,
   type SelectableModel,
   type StartedConversation,
+  type StartedPurposeConversation,
 } from "../../contract/conversation";
 import { type AgentUIState, createAgentUIClientId } from "../../ui/agent-ui-state";
 import type { AgentUIClientBinding } from "../../ui/AgentUIClient";
@@ -58,6 +60,7 @@ import type {
   WireConversationsResponse,
   WireConversationStartResponse,
   WireErrorBody,
+  WirePurposeStartResponse,
   WireSelectableModelsResponse,
 } from "./agents-http-wire";
 
@@ -343,6 +346,31 @@ class AgentsHttpConversationClient implements AgentsConversationClient {
       conversation: mapWireConversation(wireConversation),
       messages: reopenedExisting ? [] : readWireSetElements(wireConversation.messages).map(mapWireConversationMessage),
       reopenedExisting,
+    };
+  };
+
+  startPurpose = async (request: PurposeStartRequest): Promise<StartedPurposeConversation> => {
+    const response = await this.request<WirePurposeStartResponse>({
+      operation: "startPurpose",
+      method: "POST",
+      path: "/startPurpose",
+      body: {
+        purposeId: request.purposeId,
+        ...(request.agentSpaceKey ? { agentSpaceId: request.agentSpaceKey } : {}),
+        ...(request.subject
+          ? { subject: { subjectEntityClass: request.subject.entityClass, subjectEntityId: request.subject.entityId } }
+          : {}),
+        ...(request.prefill ? { prefill: request.prefill } : {}),
+      },
+    });
+    const conversationId = Number(response.aiConversationId ?? 0);
+    if (!Number.isInteger(conversationId) || conversationId < 1) {
+      throw new AgentsClientError("other", { message: "The purposed start answered no conversation id." });
+    }
+    return {
+      conversationId,
+      resumedExisting: response.resumedExistingConversation === true,
+      prefillDelivered: response.prefillDelivered === true,
     };
   };
 

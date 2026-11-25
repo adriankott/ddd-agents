@@ -35,6 +35,7 @@ use DDD\Infrastructure\Services\DDDService;
 use DDD\Presentation\Api\Agents\Conversations\Dtos\AIConversationInjectSignalPostRequestDto;
 use DDD\Presentation\Api\Agents\Conversations\Dtos\AIConversationPostMessagePostRequestDto;
 use DDD\Presentation\Api\Agents\Conversations\Dtos\AIConversationStartWithMessagePostRequestDto;
+use DDD\Presentation\Api\Agents\Conversations\Dtos\AIConversationStartPurposePostRequestDto;
 use DDD\Presentation\Base\Dtos\RequestDto;
 use Throwable;
 
@@ -89,6 +90,57 @@ trait AgentConversationControllerHooksTrait
         if ($requestedAgentSpaceId === null) {
             return null;
         }
+        return $this->findReadableAgentSpaceOfRequest($requestedAgentSpaceId);
+    }
+
+    /**
+     * The space a purposed start ({@see AgentConversationWritesTrait::startPurpose()}) runs in. A purpose always runs
+     * in a space (its singleton is kept per space), so there is no account-level answer.
+     *
+     * The default reads the request's `agentSpaceId` under the caller's read rights like
+     * {@see self::findAgentSpaceOfStartRequest()} and refuses a request without one (HTTP 400). An application with
+     * one fixed space per account (a personal space) overrides this method and answers it when the request names none.
+     *
+     * @param AIConversationStartPurposePostRequestDto $requestDto
+     * @return AgentSpace
+     * @throws BadRequestException when the request names no space
+     * @throws ForbiddenException when the request names a space the caller cannot read
+     */
+    protected function findAgentSpaceOfPurposeStartRequest(AIConversationStartPurposePostRequestDto $requestDto): AgentSpace
+    {
+        $requestedAgentSpaceId = $requestDto->agentSpaceId ?? null;
+        if ($requestedAgentSpaceId === null) {
+            throw new BadRequestException('A purpose runs in an agent space: the request names none (agentSpaceId).');
+        }
+        return $this->findReadableAgentSpaceOfRequest($requestedAgentSpaceId);
+    }
+
+    /**
+     * Whether a client may name a record of `$subjectEntityClass` as the subject of a purposed start of `$purposeName`
+     * ({@see AgentConversationWritesTrait::startPurpose()}). The record itself is read under the caller's read rights
+     * afterwards; this hook narrows which entity classes a client may name at all, so a class without read rights is
+     * no probe for which ids exist. Default: every entity class. An application lists the classes its purposes work on
+     * (e.g. the support ticket class for a ticket purpose); a refused class answers 404 like an unknown record.
+     *
+     * @param string $purposeName
+     * @param string $subjectEntityClass fully qualified, without a leading backslash
+     * @return bool
+     */
+    protected function isSubjectEntityClassAllowedForPurposeStart(string $purposeName, string $subjectEntityClass): bool
+    {
+        return true;
+    }
+
+    /**
+     * The space of a request's id under the caller's read rights; an id the caller cannot read is refused
+     * (ForbiddenException, HTTP 403) the same way as an unknown one.
+     *
+     * @param int $requestedAgentSpaceId
+     * @return AgentSpace
+     * @throws ForbiddenException
+     */
+    protected function findReadableAgentSpaceOfRequest(int $requestedAgentSpaceId): AgentSpace
+    {
         /** @var AgentSpacesService $agentSpacesService */
         $agentSpacesService = DDDService::instance()->getService(AgentSpacesService::class);
         try {

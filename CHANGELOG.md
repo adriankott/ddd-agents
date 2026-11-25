@@ -1,5 +1,47 @@
 # Changelog
 
+## 0.6.9
+
+**Purposes: one conversation per record, and a purposed start route for the client.** npm `@mgamadeus/ddd-agents` 0.6.9 in
+lockstep (`startPurpose` on the client port).
+
+- **Subject of a purposed conversation.** `AIConversationSubject` (`subjectEntityClass` + `subjectEntityId`) names the
+  record a purposed conversation works on. `AIConversationAgentService::startOrResumePurposedConversationOfSubject()`
+  keeps the singleton per space, purpose AND subject (the same record reopens its open conversation, another record
+  starts a new one) and binds the new conversation to its subject. The existing `startOrResumePurposedConversation()`,
+  `getOrStartPurposedConversation()`, `resumeSingletonPurposedConversation()` and
+  `findNewestPurposedConversationOfAgentSpace()` keep their signatures; the last now leaves out conversations that
+  work on a subject, so a start without a subject behaves as before. New: `resumeSingletonPurposedConversationOfSubject()`,
+  `findNewestPurposedConversationOfAgentSpaceForSubject()`, `AIConversationSubjectBindingsService`.
+- **Schema:** one new table, `AIConversationSubjectBindings` (one row per conversation: `aiConversationId` unique with a
+  cascading foreign key, `agentSpaceId`, `purposeName`, `subjectEntityClass`, `subjectEntityId`, index on the four).
+  Not a column of `AIConversations`: every conversation read selects all its columns. Apply it with the schema diff;
+  until then a subject is ignored (no reuse by subject) and nothing fails
+  (`AIConversationSubjectBindingsService::isBindingTableAvailable()`). The eval purge leaves the rows to the foreign key.
+- **Route `POST …/startPurpose`** in `AgentConversationWritesTrait` (no new controller): `purposeId`, `agentSpaceId?`,
+  `subject?`, `prefill?` → `aiConversationId`, `resumedExistingConversation`, `prefillDelivered`. Scope CUSTOMER: the
+  purpose must be `startableViaApi` and its `requiredFeatureFlags` available to the space, as with the PHP starter. A
+  subject the caller cannot read answers 404, a malformed one 400. New hook
+  `findAgentSpaceOfPurposeStartRequest()` (default: the body's `agentSpaceId` under read rights; 400 without one), a
+  host with a personal space per account overrides it. Hook `isSubjectEntityClassAllowedForPurposeStart()` (default: every entity
+  class) narrows the classes a client may name as a subject; a refused class answers 404 like an unknown record. An
+  application whose entities carry no read rights lists its subject classes there, so the route is no probe for
+  which ids exist. A host that adds the trait gets the route; one that redeclares
+  routes lists it in its own route order.
+- **Reopen of a purposed entry point.** `AIConversationsService::findReopenablePurposedConversationForEntryPoint()`
+  (account, space, entry point key, purpose, now): the entry point's reopen window, partition and checks, for a
+  conversation of that purpose. `findReopenableConversationForEntryPoint()` keeps reopening only conversations without
+  a purpose, so an application that drives a purposed conversation from an entry point asks the new read before it
+  starts one (before, every click started a new conversation). A purposed start that names its record uses the subject
+  lookup instead.
+- **Web:** `AgentsConversationClient.startPurpose?(request: PurposeStartRequest): Promise<StartedPurposeConversation>`
+  (optional on the port; the HTTP binding and the polling wrapper have it). New contract types `PurposeSubject`,
+  `PurposeStartRequest`, `StartedPurposeConversation`.
+- Tests: the reuse by subject, another subject, no subject, a closed conversation of a subject, the binding once per
+  conversation and a host without the table (MariaDB and PostgreSQL); the route refuses a request without a space, an
+  unreadable subject (404), a subject class the application does not allow (404) and a malformed subject class (400), hands a readable subject to the starter with scope
+  CUSTOMER, reports a reopen and the prefill cap; the HTTP binding's body and answer; the purposed and the plain reopen of an entry point (MariaDB and PostgreSQL).
+
 ## 0.6.8
 
 **Voice: four override points — the ring window of the open-calls read, ring target reachability with the agent space

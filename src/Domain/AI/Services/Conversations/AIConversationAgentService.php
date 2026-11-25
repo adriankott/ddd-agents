@@ -73,6 +73,7 @@ use DDD\Domain\AI\Entities\Conversations\Messages\AgentClientContext;
 use DDD\Domain\AI\Services\Conversations\Agent\AgentClientContextService;
 use DDD\Domain\AI\Entities\Conversations\Purposes\AgentPurposedConversationStart;
 use DDD\Domain\AI\Entities\Conversations\Purposes\AIConversationPurpose;
+use DDD\Domain\AI\Entities\Conversations\Subjects\AIConversationSubject;
 use DDD\Domain\AI\Services\Mandates\AgentMandatesService;
 use DDD\Domain\AI\Services\Conversations\Purposes\AIConversationPurposesService;
 use DDD\Domain\AI\Entities\Conversations\Messages\CompactionSettings;
@@ -1009,6 +1010,9 @@ class AIConversationAgentService extends Service implements AgentModelCallRunner
      * Ignored when the singleton is RESUMED — the conversation alone; a caller that passes an appendix asks
      * {@see startOrResumePurposedConversation()}, which tells it whether the appendix was delivered.
      *
+     * The start of a purposed conversation for one record (one conversation per record) is
+     * {@see startOrResumePurposedConversationOfSubject()}.
+     *
      * @throws BadRequestException on an unknown/unregistered purpose, and every refusal of {@see driveConversation()}.
      */
     public function getOrStartPurposedConversation(
@@ -1043,7 +1047,72 @@ class AIConversationAgentService extends Service implements AgentModelCallRunner
         /** @var AIConversationPurposeRunsService $aIConversationPurposeRunsService */
         $aIConversationPurposeRunsService = DDDService::instance()->getService(AIConversationPurposeRunsService::class);
         $aIConversationPurpose = $aIConversationPurposeRunsService->findStartablePurposeForAgentSpace($scope, $agentSpace, $purposeName);
-        $existingPurposedConversation = $aIConversationPurposeRunsService->resumeSingletonPurposedConversation($agentSpace, $purposeName, $aIConversationPurpose);
+        return $this->resumeOrStartPurposedConversation($scope, $agentSpace, $purposeName, $aIConversationPurpose, $async, $aiModelName, $kickoffSignalAppendix, $runSettings, null);
+    }
+
+    /**
+     * {@see startOrResumePurposedConversation()} for one record (`$aIConversationSubject`, {@see AIConversationSubject}):
+     * the singleton is kept per space, purpose AND subject, so every record gets its own conversation, and the new
+     * conversation is bound to its subject ({@see AIConversationSubjectBindingsService::bindSubjectToConversation()}).
+     * The purpose is validated and gated the same way. The caller has checked that the account may read the record
+     * ({@see AIConversationSubject::findReadableSubjectEntity()}).
+     *
+     * Two starts for the same record at the same moment (a double click, two tabs) run one after the other under a
+     * start lock of the account, space, purpose and subject: the second finds the conversation the first created.
+     * Where the subject table is missing (a host before the DDL) the start behaves like one without a subject.
+     *
+     * @throws BadRequestException on an unknown/unregistered purpose, and every refusal of {@see driveConversation()}.
+     */
+    public function startOrResumePurposedConversationOfSubject(
+        string $scope,
+        AgentSpace $agentSpace,
+        string $purposeName,
+        AIConversationSubject $aIConversationSubject,
+        bool $async = true,
+        ?string $aiModelName = null,
+        ?string $kickoffSignalAppendix = null,
+        ?RunSettings $runSettings = null
+    ): AgentPurposedConversationStart {
+        /** @var AIConversationPurposeRunsService $aIConversationPurposeRunsService */
+        $aIConversationPurposeRunsService = DDDService::instance()->getService(AIConversationPurposeRunsService::class);
+        $aIConversationPurpose = $aIConversationPurposeRunsService->findStartablePurposeForAgentSpace($scope, $agentSpace, $purposeName);
+        /** @var AIConversationsService $aIConversationsService */
+        $aIConversationsService = DDDService::instance()->getService(AIConversationsService::class);
+        $account = AuthService::instance()->getAccount();
+        $aIConversationEntryPointStartLock = $account instanceof Account
+            ? $aIConversationsService->lockEntryPointStart($account, $agentSpace, 'purpose:' . md5($purposeName . '|' . $aIConversationSubject->describe()))
+            : null;
+        try {
+            return $this->resumeOrStartPurposedConversation($scope, $agentSpace, $purposeName, $aIConversationPurpose, $async, $aiModelName, $kickoffSignalAppendix, $runSettings, $aIConversationSubject);
+        } finally {
+            if ($aIConversationEntryPointStartLock !== null) {
+                $aIConversationsService->unlockEntryPointStart($aIConversationEntryPointStartLock);
+            }
+        }
+    }
+
+    /**
+     * The body of {@see startOrResumePurposedConversation()} once the purpose is validated: resume the singleton of
+     * the space and purpose (and subject), else start a fresh purposed conversation and bind its subject.
+     *
+     * @throws BadRequestException every refusal of {@see driveConversation()}
+     */
+    protected function resumeOrStartPurposedConversation(
+        string $scope,
+        AgentSpace $agentSpace,
+        string $purposeName,
+        AIConversationPurpose $aIConversationPurpose,
+        bool $async,
+        ?string $aiModelName,
+        ?string $kickoffSignalAppendix,
+        ?RunSettings $runSettings,
+        ?AIConversationSubject $aIConversationSubject
+    ): AgentPurposedConversationStart {
+        /** @var AIConversationPurposeRunsService $aIConversationPurposeRunsService */
+        $aIConversationPurposeRunsService = DDDService::instance()->getService(AIConversationPurposeRunsService::class);
+        $existingPurposedConversation = $aIConversationSubject !== null
+            ? $aIConversationPurposeRunsService->resumeSingletonPurposedConversationOfSubject($agentSpace, $purposeName, $aIConversationPurpose, $aIConversationSubject)
+            : $aIConversationPurposeRunsService->resumeSingletonPurposedConversation($agentSpace, $purposeName, $aIConversationPurpose);
         if ($existingPurposedConversation instanceof AIConversation) {
             return AgentPurposedConversationStart::resumedExisting($existingPurposedConversation);
         }
@@ -1057,7 +1126,7 @@ class AIConversationAgentService extends Service implements AgentModelCallRunner
         $purposeStartSettings = $aIConversationPurposeRunsService->buildStartSettingsForNewPurposedConversation($aIConversationPurpose, $purposedConversationModelName, $runSettings);
         // None active → start a fresh purposed conversation, driven by the kickoff signal (signal-only start: the
         // agent speaks first). purposeName is stamped at creation → the PURPOSE_DIRECTIVE segment activates.
-        return AgentPurposedConversationStart::started($this->driveConversation(
+        $agentPurposedConversationStart = AgentPurposedConversationStart::started($this->driveConversation(
             $scope,
             null,
             $agentSpace,
@@ -1072,6 +1141,12 @@ class AIConversationAgentService extends Service implements AgentModelCallRunner
             contextRetentionSettings: $purposeStartSettings->contextRetentionSettings,
             runSettings: $purposeStartSettings->runSettings
         ));
+        if ($aIConversationSubject !== null) {
+            /** @var AIConversationSubjectBindingsService $aIConversationSubjectBindingsService */
+            $aIConversationSubjectBindingsService = DDDService::instance()->getService(AIConversationSubjectBindingsService::class);
+            $aIConversationSubjectBindingsService->bindSubjectToConversation($agentPurposedConversationStart->conversation, $aIConversationSubject);
+        }
+        return $agentPurposedConversationStart;
     }
 
     /**

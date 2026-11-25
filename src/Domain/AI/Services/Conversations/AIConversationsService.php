@@ -52,6 +52,8 @@ use DDD\Domain\AI\Services\Conversations\Agent\AIConversationModelCallsService;
 use DDD\Domain\AI\Repo\Argus\Conversations\ArgusAIConversationSummary;
 use DDD\Domain\AI\Repo\DB\Conversations\DBAIConversation;
 use DDD\Domain\AI\Repo\DB\Conversations\DBAIConversations;
+use DDD\Domain\AI\Entities\Conversations\Subjects\AIConversationSubject;
+use DDD\Domain\AI\Repo\DB\Conversations\Subjects\DBAIConversationSubjectBindingModel;
 use DDD\Domain\AI\Entities\Conversations\Eligibility\AgentAutomationEligibility;
 use DDD\Domain\AI\Entities\Conversations\Eligibility\AgentEligibilityLogContext;
 use DDD\Domain\AI\Services\Conversations\Eligibility\AgentAutomationEligibilityService;
@@ -652,6 +654,11 @@ class AIConversationsService extends EntitiesService
      * stays the singleton ({@see AIConversationPurpose::$completedConversationStaysSingleton}). The singleton of a
      * purpose is per space: the read filters the space, which fixes the account.
      *
+     * A conversation that works on a subject ({@see AIConversationSubject}) is never this singleton, so a start
+     * without a subject behaves as before subjects existed; the singleton of a record is
+     * {@see findNewestPurposedConversationOfAgentSpaceForSubject()}. Where the subject table is missing (a host before
+     * the DDL) every conversation counts, as before.
+     *
      * @param AgentSpace $agentSpace
      * @param string $purposeName
      * @param bool $includeCompleted
@@ -659,6 +666,8 @@ class AIConversationsService extends EntitiesService
      */
     public function findNewestPurposedConversationOfAgentSpace(AgentSpace $agentSpace, string $purposeName, bool $includeCompleted = false): ?AIConversation
     {
+        /** @var AIConversationSubjectBindingsService $aIConversationSubjectBindingsService */
+        $aIConversationSubjectBindingsService = DDDService::instance()->getService(AIConversationSubjectBindingsService::class);
         $repoClass = $this->getEntityRepoClassInstance();
         $queryBuilder = $repoClass::createQueryBuilder();
         $baseModelAlias = $repoClass::getBaseModelAlias();
@@ -671,7 +680,50 @@ class AIConversationsService extends EntitiesService
             $queryBuilder->andWhere("{$baseModelAlias}.runState NOT IN (:closedRunStates)")
                 ->setParameter('closedRunStates', AIConversationRunState::CLOSED);
         }
+        if ($aIConversationSubjectBindingsService->isBindingTableAvailable()) {
+            // a conversation of one record is never the singleton of the space and purpose
+            $queryBuilder->andWhere(
+                'NOT EXISTS (SELECT subjectBinding.id FROM ' . DBAIConversationSubjectBindingModel::class
+                . " subjectBinding WHERE subjectBinding.aiConversationId = {$baseModelAlias}.id)"
+            );
+        }
         return $repoClass->find($queryBuilder, false);
+    }
+
+    /**
+     * The singleton of a purposed start for one record: the newest conversation of the space and purpose stored for
+     * `$aIConversationSubject` ({@see AIConversationSubjectBindingsService::findNewestConversationIdOfSubject()}), by
+     * default only one still running, read under the caller's rights. Where the subject table is missing (a host
+     * before the DDL) the subject is ignored: {@see findNewestPurposedConversationOfAgentSpace()}, as before.
+     *
+     * @param AgentSpace $agentSpace
+     * @param string $purposeName
+     * @param AIConversationSubject $aIConversationSubject
+     * @param bool $includeCompleted
+     * @return AIConversation|null
+     */
+    public function findNewestPurposedConversationOfAgentSpaceForSubject(
+        AgentSpace $agentSpace,
+        string $purposeName,
+        AIConversationSubject $aIConversationSubject,
+        bool $includeCompleted = false
+    ): ?AIConversation {
+        /** @var AIConversationSubjectBindingsService $aIConversationSubjectBindingsService */
+        $aIConversationSubjectBindingsService = DDDService::instance()->getService(AIConversationSubjectBindingsService::class);
+        if (!$aIConversationSubjectBindingsService->isBindingTableAvailable()) {
+            return $this->findNewestPurposedConversationOfAgentSpace($agentSpace, $purposeName, $includeCompleted);
+        }
+        $conversationIdOfSubject = $aIConversationSubjectBindingsService->findNewestConversationIdOfSubject(
+            $agentSpace,
+            $purposeName,
+            $aIConversationSubject,
+            $includeCompleted
+        );
+        if ($conversationIdOfSubject === null) {
+            return null;
+        }
+        $conversationOfSubject = $this->find($conversationIdOfSubject, false);
+        return $conversationOfSubject instanceof AIConversation ? $conversationOfSubject : null;
     }
 
     /**
@@ -941,6 +993,55 @@ class AIConversationsService extends EntitiesService
      */
     public function findReopenableConversationForEntryPoint(Account $account, ?AgentSpace $agentSpace, string $entryPointKey, DateTime $now): ?AIConversation
     {
+        return $this->findReopenableConversationForEntryPointOfPurpose($account, $agentSpace, $entryPointKey, null, $now);
+    }
+
+    /**
+     * {@see findReopenableConversationForEntryPoint()} for a conversation an application started from an entry point
+     * WITH a purpose (it drives with `purposeName` and `entryPointKey`): the same window, partition and checks, but only
+     * a conversation of `$purposeName` is reopened. A purposed start that names its record should use the subject lookup
+     * instead ({@see AIConversationAgentService::startOrResumePurposedConversationOfSubject()}); this read serves a
+     * purposed entry point without a record.
+     *
+     * @param Account $account
+     * @param AgentSpace|null $agentSpace null = the account-level conversations of `$account`
+     * @param string $entryPointKey
+     * @param string $purposeName
+     * @param DateTime $now
+     * @return AIConversation|null
+     * @throws BadRequestException
+     * @throws InternalErrorException
+     * @throws InvalidArgumentException
+     * @throws ReflectionException
+     * @throws Exception
+     */
+    public function findReopenablePurposedConversationForEntryPoint(
+        Account $account,
+        ?AgentSpace $agentSpace,
+        string $entryPointKey,
+        string $purposeName,
+        DateTime $now
+    ): ?AIConversation {
+        return $this->findReopenableConversationForEntryPointOfPurpose($account, $agentSpace, $entryPointKey, $purposeName, $now);
+    }
+
+    /**
+     * The read of both: `$purposeName` null = conversations without a purpose (the package's entry-point start),
+     * else conversations of that purpose.
+     *
+     * @throws BadRequestException
+     * @throws InternalErrorException
+     * @throws InvalidArgumentException
+     * @throws ReflectionException
+     * @throws Exception
+     */
+    protected function findReopenableConversationForEntryPointOfPurpose(
+        Account $account,
+        ?AgentSpace $agentSpace,
+        string $entryPointKey,
+        ?string $purposeName,
+        DateTime $now
+    ): ?AIConversation {
         $repoClass = $this->getEntitySetRepoClassInstance();
         $queryBuilder = $repoClass::createQueryBuilder(true);
         $baseModelAlias = $repoClass::getBaseModelAlias();
@@ -957,7 +1058,6 @@ class AIConversationsService extends EntitiesService
             ->andWhere("{$baseModelAlias}.rootConversationId IS NULL")
             ->andWhere("{$baseModelAlias}.delegatedFromMessageId IS NULL")
             ->andWhere("{$baseModelAlias}.supervisedConversationId IS NULL")
-            ->andWhere("{$baseModelAlias}.purposeName IS NULL")
             ->andWhere("{$baseModelAlias}.initiatorType IS NULL")
             ->andWhere("{$baseModelAlias}.runState NOT IN (:entryPointClosedRunStates)")
             ->andWhere("COALESCE({$baseModelAlias}.lastInboundMessageAt, {$baseModelAlias}.created) >= :entryPointActiveSince")
@@ -966,6 +1066,11 @@ class AIConversationsService extends EntitiesService
             ->setParameter('entryPointActiveSince', $activeSince->format('Y-m-d H:i:s'))
             ->orderBy("{$baseModelAlias}.id", 'DESC')
             ->setMaxResults(self::ENTRY_POINT_REOPEN_CANDIDATE_LIMIT);
+        if ($purposeName === null) {
+            $queryBuilder->andWhere("{$baseModelAlias}.purposeName IS NULL");
+        } else {
+            $queryBuilder->andWhere("{$baseModelAlias}.purposeName = :entryPointPurposeName")->setParameter('entryPointPurposeName', $purposeName);
+        }
         $candidates = $repoClass->find($queryBuilder, false);
         if (!$candidates instanceof AIConversations || $candidates->isEmpty()) {
             return null;

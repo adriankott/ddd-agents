@@ -186,6 +186,44 @@ describe("createAgentsHttpConversationClient", () => {
     expect(reopened).toMatchObject({ reopenedExisting: true, messages: [] });
   });
 
+  test("a purposed start sends the purpose, the space, the subject and the prefill and answers the conversation id", async () => {
+    const { client, requests } = buildClient([
+      { body: { aiConversationId: 31, resumedExistingConversation: false, prefillDelivered: true } },
+      { body: { aiConversationId: 31, resumedExistingConversation: true, prefillDelivered: false } },
+      { body: { aiConversationId: 32, resumedExistingConversation: false, prefillDelivered: false } },
+    ]);
+
+    const started = await client.startPurpose?.({
+      purposeId: "Support.AnswerTicket",
+      agentSpaceKey: 4,
+      subject: { entityClass: "App\\Domain\\Support\\Entities\\Tickets\\SupportTicket", entityId: 13082 },
+      prefill: "Ticket #13082",
+    });
+    const reopened = await client.startPurpose?.({
+      purposeId: "Support.AnswerTicket",
+      agentSpaceKey: 4,
+      subject: { entityClass: "App\\Domain\\Support\\Entities\\Tickets\\SupportTicket", entityId: 13082 },
+    });
+    await client.startPurpose?.({ purposeId: "Support.Inbox" });
+
+    expect(requests[0].method).toBe("POST");
+    expect(requests[0].url.pathname).toBe("/api/agents/conversations/startPurpose");
+    expect(requests[0].body).toEqual({
+      purposeId: "Support.AnswerTicket",
+      agentSpaceId: 4,
+      subject: { subjectEntityClass: "App\\Domain\\Support\\Entities\\Tickets\\SupportTicket", subjectEntityId: 13082 },
+      prefill: "Ticket #13082",
+    });
+    expect(requests[2].body).toEqual({ purposeId: "Support.Inbox" });
+    expect(started).toEqual({ conversationId: 31, resumedExisting: false, prefillDelivered: true });
+    expect(reopened).toEqual({ conversationId: 31, resumedExisting: true, prefillDelivered: false });
+  });
+
+  test("a purposed start without a conversation id in the answer is refused", async () => {
+    const { client } = buildClient([{ body: {} }]);
+    await expect(client.startPurpose?.({ purposeId: "Support.AnswerTicket" })).rejects.toThrow("no conversation id");
+  });
+
   test("a post carries its attachments in the text, the model and the host's extra parameters", async () => {
     const { client, requests } = buildClient([{ body: { aiConversation: { id: 7, messages: [wireMessage] } } }], {
       extraRequestParameters: (operation) => (operation === "postMessage" ? { partition: "side" } : {}),

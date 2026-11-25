@@ -35,6 +35,7 @@ use DDD\Domain\AI\Services\Conversations\Agent\AgentToolCallImageStoreService;
 use DDD\Domain\AI\Services\Conversations\AIConversationMessagesService;
 use DDD\Domain\AI\Services\Conversations\Memories\AgentMemoryStoreService;
 use DDD\Domain\Base\Repo\DB\Dialect\Json\JsonPath;
+use DDD\Domain\AI\Repo\DB\Conversations\Subjects\DBAIConversationSubjectBindingModel;
 use DDD\Domain\Base\Repo\DB\Dialect\SqlDialect;
 use DDD\Domain\Base\Repo\DB\Doctrine\EntityManagerFactory;
 use DDD\Infrastructure\Services\DDDService;
@@ -222,6 +223,7 @@ class AIConversationEvalPurgeService extends Service
             "{$toolCallBatchTableName}.sourceUserMessageId" => 'the batch goes with its conversation',
             DBAIConversationDelegationBatchModel::getTableName() . '.spawnedByMessageId' => 'the batch goes with its parent conversation',
             DBAIConversationTraceEventModel::getTableName() . '.agentVoiceCallId' => 'the trace event goes with its conversation',
+            DBAIConversationSubjectBindingModel::getTableName() . '.aiConversationId' => 'the subject row goes with its conversation through the foreign key (ON DELETE CASCADE); the table may not exist yet in a host before the DDL, so no statement names it',
             DBAgentEvalSuiteCaseModel::getTableName() . '.aiConversationId' => 'the stored case of a suite run keeps the id of the conversation it ran as a plain number; the record outlives the conversation',
         ];
     }

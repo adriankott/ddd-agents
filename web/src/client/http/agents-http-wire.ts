@@ -149,6 +149,13 @@ export interface WireConversationStartResponse extends WireConversationResponse 
   reopenedExistingConversation?: boolean | null;
 }
 
+/** `AIConversationStartPurposePostResponseDto`. */
+export interface WirePurposeStartResponse {
+  aiConversationId?: number | null;
+  resumedExistingConversation?: boolean | null;
+  prefillDelivered?: boolean | null;
+}
+
 /** `AIConversationsGetResponseDto`. */
 export interface WireConversationsResponse {
   aiConversations?: WireSet<WireConversation> | null;

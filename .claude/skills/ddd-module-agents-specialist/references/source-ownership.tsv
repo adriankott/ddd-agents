@@ -155,6 +155,8 @@ src/Presentation/Api/Agents/Conversations/Dtos/AIConversationInjectSignalPostReq
 # skills-and-purposes (ddd-module-agents-skills-and-purposes-specialist): agent skills, catalog, loading, purposes, done criteria, variants, progress
 src/Domain/AI/**/Skills/**	skills-and-purposes
 src/Domain/AI/**/Purposes/**	skills-and-purposes
+src/Domain/AI/**/Subjects/**	skills-and-purposes
+src/Domain/AI/Services/Conversations/AIConversationSubjectBindingsService.php	skills-and-purposes
 src/Domain/AI/Entities/Conversations/Variants/**	skills-and-purposes
 src/Domain/AI/Entities/Conversations/Agent/Progress/**	skills-and-purposes
 src/Domain/AI/Entities/Conversations/Agent/OfferedSkillCatalog.php	skills-and-purposes
