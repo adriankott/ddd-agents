@@ -11,6 +11,7 @@ use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Entities\Conversations\Agent\AgentApplicationWording;
 use DDD\Domain\AI\Entities\Conversations\Agent\AgentToolCallProvenance;
 use DDD\Domain\AI\Entities\Conversations\Agent\TaskPlan;
+use DDD\Domain\AI\Entities\Conversations\Agent\Tools\AgentMetaTools;
 use DDD\Domain\AI\Entities\Conversations\Agent\TaskPlanItem;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
 use DDD\Domain\AI\Entities\Conversations\Agent\Tools\SendOwnerReportTool;
@@ -86,9 +87,11 @@ class AIConversationAuditRenderService extends Service
         foreach (($conversation->messages?->getElements() ?? []) as $i => $message) {
             $toolCall = isset($message->toolCall) ? $message->toolCall : null;
             $toolName = (string)($toolCall?->name ?? '');
-            // a WORKSPACE call saved nothing on the record: not in the ledger (the counts list it as a workspace change)
+            // a WORKSPACE call saved nothing on the record: not in the ledger (the counts list it as a workspace change);
+            // neither did a control tool that changes nothing (wait_for_sub_agents)
             if ($toolCall === null || $toolName === '' || self::isReadOnlyToolName($toolName) || $toolCall->changesOnlyTheWorkspace()
                 || in_array($toolName, TaskPlan::PLAN_TOOL_NAMES, true) || $toolName === 'load_skills'
+                || AgentMetaTools::isControlToolChangingNothing($toolName)
                 || $toolCall->status !== AIConversationMessage::STATUS_COMPLETED || $toolCall->wasRefusedAsDuplicate
             ) {
                 continue;

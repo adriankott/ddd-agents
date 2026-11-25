@@ -31,6 +31,7 @@ use DDD\Domain\AI\Entities\UsageLogs\AIUsageBookedCosts;
 use DDD\Domain\AI\Entities\Conversations\Usage\AIUsageBookedCostsStoredForm;
 use DDD\Domain\Base\Entities\ValueObject;
 use DDD\Infrastructure\Traits\Serializer\Attributes\HideProperty;
+use DDD\Domain\AI\Entities\Conversations\Agent\Tools\AgentMetaTools;
 use DDD\Domain\AI\Entities\Conversations\Agent\Tools\AskOwnerTool;
 use DDD\Domain\AI\Entities\Conversations\Agent\Tools\LoadSkillsTool;
 
@@ -1375,6 +1376,9 @@ class ToolCall extends ValueObject
         $toolName = (string)($this->name ?? '');
         if ($toolName === AskOwnerTool::NAME) {
             return false; // a recorded question — the widget comes at turn end, nothing on the record moves
+        }
+        if (AgentMetaTools::isControlToolChangingNothing($toolName)) {
+            return false; // wait_for_sub_agents only ends the turn
         }
         // a workspace change moves nothing the criteria read (domain data); like a read, only a widget row counts
         if ($toolName === '' || (!$this->isReadOnly() && !$this->changesOnlyTheWorkspace())) {

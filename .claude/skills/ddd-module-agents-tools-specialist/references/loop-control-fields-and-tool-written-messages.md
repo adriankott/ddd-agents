@@ -94,10 +94,15 @@ loop, context, skills-and-purposes, autonomy or widgets skill). Every meta tool:
 4. asks for loop work after the step through `afterStep()` returning an `AgentAfterStepRequest` (persist the task plan,
    send the owner report, end the turn without text), which the loop executes outside the dispatch's catch so a lost
    claim reaches the loop's single exit;
-5. never touches the loop: the dispatch stores the text, marks the call, raises the flags;
+5. never touches the loop: the dispatch stores the text, marks the call, raises the abort and the tool-less flag (a
+   turn parks for awaited delegations through `AgentCompletedToolCallFollowUpsService`, never through the dispatch);
 6. is listed in `AgentMetaTools::TOOL_CLASSES` and `AIConversationMessage::META_TOOL_NAMES`, and in each named list of
-   `AgentMetaTools` whose rule applies (repeat-guard exemptions, forced-step exclusions, compaction counts) — the
-   lists differ on purpose; a meta tool is never forked and never counts as an inline write;
+   `AgentMetaTools` whose rule applies (repeat-guard exemptions, forced-step exclusions, compaction counts, the
+   control tools that change nothing) — the lists differ on purpose; a meta tool is never forked and never counts as
+   an inline write. A tool with no effect (`DECLARED_EFFECT` null) that changes nothing on the record, like
+   `wait_for_sub_agents`, goes into `AgentMetaTools::CONTROL_TOOLS_CHANGING_NOTHING_NAMES`: without it a completed
+   call is an action the final answer must report, a line of the judge's write ledger and a reason for the plan's
+   re-sweep (`ToolCall::canHaveChangedTheRecordWhenCompleted()`);
 7. refuses under a purpose-seeded plan only through `AgentSeededPlanRefusingMetaTool::findSeededPlanRefusal()`;
 8. gets its own branch in `AgentToolCallDispatchService::dispatchToolCall()` that names it (or a work-request kind that
    branch already executes: a skill or tool load, a task-plan call) — without it the call falls through to the

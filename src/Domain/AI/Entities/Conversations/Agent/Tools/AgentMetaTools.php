@@ -98,6 +98,23 @@ class AgentMetaTools
     /** Not "work" for the stall recovery's forced tool choice: a forced step never picks one of them. */
     public const array NOT_WORK_FOR_THE_FORCED_STEP_NAMES = [LoadSkillsTool::NAME, DelegateTool::NAME, ...TaskPlan::PLAN_TOOL_NAMES, SendOwnerReportTool::NAME, WaitForSubAgentsTool::NAME, MessageSubAgentTool::NAME, FindWidgetsTool::NAME];
 
+    /**
+     * Control tools that change nothing: a completed call is no action the final answer must report
+     * ({@see \DDD\Domain\AI\Entities\Conversations\Agent\AgentModelInput::completedWritesAnswerContractHint()}), no line
+     * of the judge's write ledger ({@see \DDD\Domain\AI\Services\Conversations\AIConversationAuditRenderService::renderWriteLedger()})
+     * and cannot have changed the record ({@see \DDD\Domain\AI\Entities\Conversations\Messages\ToolCall::canHaveChangedTheRecordWhenCompleted()}).
+     * `wait_for_sub_agents` only ends the turn. `message_sub_agent` is not here: it is an instruction the answer may
+     * report, and on a sync drive the sub-agent's run it starts writes within the call, like `delegate`. Not a reason to
+     * keep a read reusable: the sub-agents may change the data while the turn waits.
+     */
+    public const array CONTROL_TOOLS_CHANGING_NOTHING_NAMES = [WaitForSubAgentsTool::NAME];
+
+    /** Whether $toolName is a control tool that changes nothing ({@see CONTROL_TOOLS_CHANGING_NOTHING_NAMES}). */
+    public static function isControlToolChangingNothing(string $toolName): bool
+    {
+        return in_array($toolName, self::CONTROL_TOOLS_CHANGING_NOTHING_NAMES, true);
+    }
+
     /** Never in the forced re-drive's set (a forced capability load or widget search is not work). */
     public const array NOT_IN_THE_FORCED_REDRIVE_NAMES = [LoadToolTool::NAME, FindWidgetsTool::NAME];
 

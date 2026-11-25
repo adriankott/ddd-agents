@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DDD\Domain\AI\Entities\Conversations\Agent;
 
+use DDD\Domain\AI\Entities\Conversations\Agent\Tools\AgentMetaTools;
 use DDD\Domain\AI\Entities\Conversations\Agent\Tools\AskOwnerTool;
 use DDD\Domain\AI\Entities\Conversations\Agent\Context\AgentContextSegment;
 use DDD\Domain\AI\Entities\Conversations\Agent\Context\AgentContextSegmentType;
@@ -1548,9 +1549,10 @@ class AgentModelInput extends ValueObject
             }
             // askOwner records a question — no outcome to report; listed, it asked for a report of "askOwner" in the very
             // step that should carry the draft above the widget (a status line instead of the draft)
-            // findWidgets searches the widget catalog — no outcome to report either
+            // findWidgets searches the widget catalog — no outcome to report either; a control tool that changes
+            // nothing (wait_for_sub_agents) neither
             if ($toolName === LoadSkillsTool::NAME || $toolName === DelegateTool::NAME || $toolName === AskOwnerTool::NAME
-                || $toolName === FindWidgetsTool::NAME
+                || $toolName === FindWidgetsTool::NAME || AgentMetaTools::isControlToolChangingNothing($toolName)
                 || in_array($toolName, TaskPlan::PLAN_TOOL_NAMES, true)
             ) {
                 continue;

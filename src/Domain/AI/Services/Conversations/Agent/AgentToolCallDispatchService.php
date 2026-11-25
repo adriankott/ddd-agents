@@ -113,9 +113,9 @@ class AgentToolCallDispatchService extends Service
         ?AgentConsoleStream $consoleStream,
         bool $asyncDelegations
     ): AgentToolCallAnswer {
-        // what this call asks of the loop — raised by the branches below, never lowered
+        // what this call asks of the loop — the two flags the branches below raise, never lower. The dispatch never
+        // parks the turn: an awaited delegation is raised after the call by AgentCompletedToolCallFollowUpsService
         $repeatedToolCallAbort = false;
-        $awaitingDelegates = false;
         $forceToolLessAnswerStep = false;
         // the answer a meta tool gave this call — its tool-less flag joins the loop's at the end
         $metaToolCallAnswer = null;
@@ -562,7 +562,7 @@ class AgentToolCallDispatchService extends Service
         $toolCall->platformNoteForModel = $toolPlatformNoteForModel;
         // a meta tool's answer raises the tool-less flag when it asks for it — never lowers it
         $forceToolLessAnswerStep = $forceToolLessAnswerStep || ($metaToolCallAnswer !== null && $metaToolCallAnswer->forcesToolLessAnswerStep);
-        return AgentToolCallAnswer::withFlags($repeatedToolCallAbort, $awaitingDelegates, $forceToolLessAnswerStep);
+        return AgentToolCallAnswer::withFlags($repeatedToolCallAbort, false, $forceToolLessAnswerStep);
     }
 
     /**

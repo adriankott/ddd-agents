@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.5.15
+
+**A completed `wait_for_sub_agents` is no longer an action of the turn: the final answer is not asked to report it,
+the judge's write ledger leaves it out and it starts no plan re-sweep; the dispatch's always-false `awaitingDelegates`
+is deprecated.** Package tests of the dispatch table of a tool call and of the loop's tool-name lists, contributed by an
+application team. npm `@mgamadeus/ddd-agents` 0.5.15 in lockstep (no web change).
+
+- **Control tools that change nothing:** new `AgentMetaTools::CONTROL_TOOLS_CHANGING_NOTHING_NAMES`
+  (`wait_for_sub_agents`) and `isControlToolChangingNothing()`, read by
+  `AgentModelInput::completedWritesAnswerContractHint()` (no "Completed so far in this turn: wait_for_sub_agents"),
+  `AIConversationAuditRenderService::renderWriteLedger()` and `ToolCall::canHaveChangedTheRecordWhenCompleted()` (false:
+  no re-sweep of the seeded plan's leaves after a wait). A wait still ends the reuse of the turn's reads: the
+  sub-agents may change the data while the turn waits. `message_sub_agent` stays an action, like `delegate`: the
+  answer may report the instruction, and on a sync drive the sub-agent's run it starts writes within the call.
+- **`AgentToolCallAnswer::$awaitingDelegates` deprecated:** `dispatchToolCall()` never raised it; a turn parks for
+  awaited delegations through `AgentToolCallFollowUpsOutcome::$awaitingDelegates`
+  (`AgentCompletedToolCallFollowUpsService`). The field and `withFlags()` stay; the loop still ORs the field in, so a
+  host's dispatch override that raises it keeps working. The comment over the dispatch's flags is corrected. No loop
+  change.
+- New package tests below `tests/Domain/AI/Services/Conversations/Agent/DispatchTable/` (repeat guard, meta-tool
+  branches, earlier calls, execution and catch arms) and `AgentMetaToolNameListsMembershipTest`, with the wait cases
+  adjusted to the fix.
+- Tools skill: the meta-tool contract names the new list and where a turn parks.
+
 ## 0.5.14
 
 **A failing decision site no longer takes the later sites and the request rows with it; the display summary names only
