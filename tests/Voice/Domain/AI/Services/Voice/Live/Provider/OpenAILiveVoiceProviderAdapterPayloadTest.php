@@ -7,6 +7,7 @@ namespace DDD\Tests\Agents\Voice\Domain\AI\Services\Voice\Live\Provider;
 use DDD\Domain\AI\Entities\Voice\AgentVoiceSettings;
 use DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceCall;
 use DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceSeedInputMessage;
+use DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceSeedInputMessages;
 use DDD\Domain\AI\Services\Voice\Live\OpenAILiveVoiceProviderAdapter;
 use DDD\Tests\Agents\Voice\Support\AgentVoiceUnitTestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -143,12 +144,12 @@ class OpenAILiveVoiceProviderAdapterPayloadTest extends AgentVoiceUnitTestCase
 
     public function testSeedRowsCarryOutputTextOnlyForTheAssistantAndBlankRowsAreDropped(): void
     {
-        $sessionCreationPayload = (new OpenAILiveVoiceProviderAdapter())->buildSessionCreationPayload('v=0', 'x', null, [
+        $sessionCreationPayload = (new OpenAILiveVoiceProviderAdapter())->buildSessionCreationPayload('v=0', 'x', null, AgentVoiceSeedInputMessages::fromMessages(
             AgentVoiceSeedInputMessage::create('developer', '  Opening  '),
             AgentVoiceSeedInputMessage::create('user', '   '),
             AgentVoiceSeedInputMessage::create('user', 'Hello'),
             AgentVoiceSeedInputMessage::create('assistant', 'Hi there'),
-        ]);
+        ));
 
         static::assertSame([
             ['type' => 'message', 'role' => 'developer', 'content' => [['type' => 'input_text', 'text' => 'Opening']]],
@@ -160,16 +161,80 @@ class OpenAILiveVoiceProviderAdapterPayloadTest extends AgentVoiceUnitTestCase
 
     public function testNoSeedRowsSendNoInputField(): void
     {
-        $sessionCreationPayload = (new OpenAILiveVoiceProviderAdapter())->buildSessionCreationPayload('v=0', 'x', null, [AgentVoiceSeedInputMessage::create('developer', ' ')]);
+        $sessionCreationPayload = (new OpenAILiveVoiceProviderAdapter())->buildSessionCreationPayload('v=0', 'x', null, AgentVoiceSeedInputMessages::fromMessages(AgentVoiceSeedInputMessage::create('developer', ' ')));
 
         static::assertArrayNotHasKey('input', $sessionCreationPayload['session']);
     }
 
+    public function testNoSetAndAnEmptySetBothSendNoInputField(): void
+    {
+        $withoutSet = (new OpenAILiveVoiceProviderAdapter())->buildSessionCreationPayload('v=0', 'x', null, null);
+        $withEmptySet = (new OpenAILiveVoiceProviderAdapter())->buildSessionCreationPayload('v=0', 'x', null, new AgentVoiceSeedInputMessages());
+        $withoutArgument = (new OpenAILiveVoiceProviderAdapter())->buildSessionCreationPayload('v=0', 'x', null);
+
+        static::assertArrayNotHasKey('input', $withoutSet['session']);
+        static::assertArrayNotHasKey('input', $withEmptySet['session']);
+        static::assertSame($withoutArgument, $withoutSet);
+        static::assertSame($withoutArgument, $withEmptySet);
+    }
+
+    /**
+     * The request without seed rows, byte for byte as the overlay sent it while the seed travelled as a list: the
+     * set changed the signature, not the wire.
+     */
+    public function testTheRequestWithoutSeedRowsIsByteIdenticalToTheListShapedOne(): void
+    {
+        $expectedRequest = '{"session":{"model":"gpt-live-1","instructions":"Be brief.","audio":{"output":{"voice":"marin"}},"delegation":{"type":"client"}},"transport":{"type":"webrtc","sdp":"v=0 offer"}}';
+
+        static::assertSame($expectedRequest, static::encodeRequest((new OpenAILiveVoiceProviderAdapter())->buildSessionCreationPayload('v=0 offer', 'Be brief.', null, null)));
+        static::assertSame($expectedRequest, static::encodeRequest((new OpenAILiveVoiceProviderAdapter())->buildSessionCreationPayload('v=0 offer', 'Be brief.', null, new AgentVoiceSeedInputMessages())));
+    }
+
+    /**
+     * The request with mixed roles, a blank row and untrimmed text, byte for byte as the overlay sent it while the
+     * seed travelled as a list: the rows keep the order of the set and the blank row is dropped.
+     */
+    public function testTheRequestWithSeedRowsIsByteIdenticalToTheListShapedOne(): void
+    {
+        $sessionCreationPayload = (new OpenAILiveVoiceProviderAdapter())->buildSessionCreationPayload('v=0 offer', 'Be brief.', null, AgentVoiceSeedInputMessages::fromMessages(
+            AgentVoiceSeedInputMessage::create('developer', '  Opening  '),
+            AgentVoiceSeedInputMessage::create('user', '   '),
+            AgentVoiceSeedInputMessage::create('user', 'Hello'),
+            AgentVoiceSeedInputMessage::create('assistant', 'Hi there — "quoted" / ünïcödé'),
+        ));
+
+        static::assertSame(
+            '{"session":{"model":"gpt-live-1","instructions":"Be brief.","audio":{"output":{"voice":"marin"}},"delegation":{"type":"client"},"input":['
+            . '{"type":"message","role":"developer","content":[{"type":"input_text","text":"Opening"}]},'
+            . '{"type":"message","role":"user","content":[{"type":"input_text","text":"Hello"}]},'
+            . '{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Hi there — \"quoted\" / ünïcödé"}]}'
+            . ']},"transport":{"type":"webrtc","sdp":"v=0 offer"}}',
+            static::encodeRequest($sessionCreationPayload)
+        );
+    }
+
+    public function testTwoSeedRowsWithTheSameRoleAndTextBothTravel(): void
+    {
+        $seedInputRows = (new OpenAILiveVoiceProviderAdapter())->buildSessionCreationPayload('v=0', 'x', null, AgentVoiceSeedInputMessages::fromMessages(
+            AgentVoiceSeedInputMessage::create('user', 'Yes.'),
+            AgentVoiceSeedInputMessage::create('assistant', 'Shall I book it?'),
+            AgentVoiceSeedInputMessage::create('user', 'Yes.'),
+        ))['session']['input'];
+
+        static::assertSame(['Yes.', 'Shall I book it?', 'Yes.'], array_column(array_column(array_column($seedInputRows, 'content'), 0), 'text'));
+    }
+
+    /** The request as the probes of the wire render it (JSON without escaped Unicode and slashes). */
+    protected static function encodeRequest(array $sessionCreationPayload): string
+    {
+        return json_encode($sessionCreationPayload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+
     public function testOneSeedRowIsCutTo6000Characters(): void
     {
-        $sessionCreationPayload = (new OpenAILiveVoiceProviderAdapter())->buildSessionCreationPayload('v=0', 'x', null, [
+        $sessionCreationPayload = (new OpenAILiveVoiceProviderAdapter())->buildSessionCreationPayload('v=0', 'x', null, AgentVoiceSeedInputMessages::fromMessages(
             AgentVoiceSeedInputMessage::create('developer', str_repeat('ä', 6001)),
-        ]);
+        ));
 
         static::assertSame(str_repeat('ä', 6000), $sessionCreationPayload['session']['input'][0]['content'][0]['text']);
     }
@@ -181,7 +246,7 @@ class OpenAILiveVoiceProviderAdapterPayloadTest extends AgentVoiceUnitTestCase
             $seedInputMessages[] = AgentVoiceSeedInputMessage::create('developer', str_repeat((string)$seedRowNumber, 6000));
         }
 
-        $seedInputRows = (new OpenAILiveVoiceProviderAdapter())->buildSessionCreationPayload('v=0', 'x', null, $seedInputMessages)['session']['input'];
+        $seedInputRows = (new OpenAILiveVoiceProviderAdapter())->buildSessionCreationPayload('v=0', 'x', null, AgentVoiceSeedInputMessages::fromMessages(...$seedInputMessages))['session']['input'];
 
         static::assertCount(4, $seedInputRows);
         static::assertSame(str_repeat('3', 6000), $seedInputRows[2]['content'][0]['text']);
@@ -195,7 +260,7 @@ class OpenAILiveVoiceProviderAdapterPayloadTest extends AgentVoiceUnitTestCase
             $seedInputMessages[] = AgentVoiceSeedInputMessage::create('user', 'row ' . $seedRowNumber);
         }
 
-        $seedInputRows = (new OpenAILiveVoiceProviderAdapter())->buildSessionCreationPayload('v=0', 'x', null, $seedInputMessages)['session']['input'];
+        $seedInputRows = (new OpenAILiveVoiceProviderAdapter())->buildSessionCreationPayload('v=0', 'x', null, AgentVoiceSeedInputMessages::fromMessages(...$seedInputMessages))['session']['input'];
 
         static::assertCount(128, $seedInputRows);
         static::assertSame('row 128', $seedInputRows[127]['content'][0]['text']);

@@ -9,6 +9,7 @@ use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Entities\Conversations\Eligibility\AgentEligibilityLogContext;
 use DDD\Domain\AI\Entities\Conversations\Purposes\AIConversationPurpose;
 use DDD\Domain\AI\Entities\Conversations\TraceEvents\AIConversationTraceEvent;
+use DDD\Domain\AI\Entities\Conversations\TraceEvents\AIConversationTraceEvents;
 use DDD\Domain\AI\Entities\Voice\AgentVoiceConfiguration;
 use DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceCall;
 use DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceCallReachableChannels;
@@ -324,19 +325,20 @@ class AgentVoiceCallStartsService extends Service
     {
         $ringStartedAtUnixMs = AIConversationTraceEvent::nowUnixMs();
         $deliveredRingCount = 0;
-        $ringTraceEvents = [];
+        $ringTraceEvents = AIConversationTraceEvents::newInstance();
         foreach ($ringTargetNames as $ringTargetName) {
             $targetRingStartedAtUnixMs = AIConversationTraceEvent::nowUnixMs();
             $ringDelivered = $this->ringCallOnTarget($ringTargetName, $agentVoiceCall, $agentSpace);
             $deliveredRingCount += $ringDelivered ? 1 : 0;
-            $ringTraceEvents[] = $this->buildRingTargetTraceEvent($ringTargetName, $agentVoiceCall, $ringDelivered, $targetRingStartedAtUnixMs);
+            $ringTargetTraceEvent = $this->buildRingTargetTraceEvent($ringTargetName, $agentVoiceCall, $ringDelivered, $targetRingStartedAtUnixMs);
+            $ringTraceEvents->add($ringTargetTraceEvent);
         }
         if ($deliveredRingCount === 0) {
             // Nothing was delivered: "it never rang" must not stay open until the ring deadline.
             $this->getAgentVoiceCallStoreService()->markCallEnded($agentVoiceCall, AgentVoiceCall::END_REASON_FAILED);
         }
         $selectedRingTargetCount = count($ringTargetNames);
-        $ringTraceEvents[] = $this->getAgentVoiceCallTraceEventsService()->buildTraceEventForCall(
+        $ringStartedTraceEvent = $this->getAgentVoiceCallTraceEventsService()->buildTraceEventForCall(
             $agentVoiceCall,
             AIConversationTraceEvent::SOURCE_VOICE_WORKER,
             static::TRACE_EVENT_RING_STARTED,
@@ -346,6 +348,7 @@ class AgentVoiceCallStartsService extends Service
             AIConversationTraceEvent::nowUnixMs() - $ringStartedAtUnixMs,
             $ringStartedAtUnixMs
         );
+        $ringTraceEvents->add($ringStartedTraceEvent);
         $this->recordRingTraceEvents($ringTraceEvents);
     }
 
@@ -373,16 +376,12 @@ class AgentVoiceCallStartsService extends Service
         );
     }
 
-    /**
-     * The trace events of a ring in one batched write.
-     *
-     * @param AIConversationTraceEvent[] $ringTraceEvents
-     */
-    protected function recordRingTraceEvents(array $ringTraceEvents): void
+    /** The trace events of a ring in one batched write, in the order of the set. */
+    protected function recordRingTraceEvents(AIConversationTraceEvents $ringTraceEvents): void
     {
         /** @var AIConversationTraceEventsService $aIConversationTraceEventsService */
         $aIConversationTraceEventsService = DDDService::instance()->getService(AIConversationTraceEventsService::class);
-        $aIConversationTraceEventsService->recordEvents($ringTraceEvents);
+        $aIConversationTraceEventsService->recordEvents($ringTraceEvents->getElements());
     }
 
     /**

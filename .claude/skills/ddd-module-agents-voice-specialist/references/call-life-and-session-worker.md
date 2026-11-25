@@ -65,7 +65,8 @@ instructions append-only. The worker:
   returns the answer to the session, and says what the agent does while the turn runs
   (`AgentVoiceTaskProgressSchedule::decideUpdateAt()` answers an `AgentVoiceTaskProgressUpdate`);
 - assembles the transcript deltas into sentences (`LiveTranscriptAssembler` completes each as a
-  `LiveTranscriptSentence`) and writes them as conversation rows;
+  `LiveTranscriptSentence` and answers the completed ones as the set `LiveTranscriptSentences`, in the order they
+  closed; two equal sentences are two) and writes them as conversation rows;
 - books the billed seconds;
 - asks every `limits.admissionRecheckSeconds` whether the call may go on.
 
@@ -123,7 +124,8 @@ A call whose worker is gone stays marked running. `app:agent:reap` closes such c
 sessions (`closeStaleChannelSessions()` → `AgentReapStuckConversationsCommand::closeStaleVoiceCalls()` →
 `AgentVoiceCallsService::closeStaleRunningCalls()`): a call still running `getRunningCallStaleAfterMinutes()` after
 its answer — twice `limits.maximumCallSeconds`, at least 120 minutes — is hung up at the provider and ended. The
-threshold never ends a call a worker still drives. Only the calls of the environment's own conversations are closed.
+threshold never ends a call a worker still drives. Only the calls of the environment's own conversations are closed;
+the sweep answers them as the set `AgentVoiceCalls`.
 
 - While `enabled` is false the sweep reads nothing and prints nothing.
 - It holds a lock of its own (`AgentReapStuckConversationsCommand::STALE_VOICE_CALLS_LOCK_NAME`): a run that finds the

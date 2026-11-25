@@ -8,6 +8,7 @@ use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Entities\Conversations\TraceEvents\AIConversationTraceEvent;
 use DDD\Domain\AI\Entities\Conversations\TraceEvents\AIConversationTraceEvents;
 use DDD\Domain\AI\Entities\Conversations\TurnEvents\AIConversationTurnEvent;
+use DDD\Domain\AI\Entities\Conversations\TurnEvents\AIConversationTurnEvents;
 use DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceCall;
 use DDD\Domain\AI\Entities\Voice\TraceEvents\AgentVoiceCallTraceSummaries;
 use DDD\Domain\AI\Entities\Voice\TraceEvents\AgentVoiceCallTraceSummary;
@@ -78,18 +79,23 @@ class AgentVoiceCallTraceEventsService extends Service
         if ($agentVoiceCalls->count() === 0) {
             return $callTraceSummaries;
         }
+        // Call id → the trace events of that call, in the order of the read.
         $traceEventsByCallId = [];
         foreach ($traceEvents?->getElements() ?? [] as $traceEvent) {
             if ($traceEvent->agentVoiceCallId !== null) {
-                $traceEventsByCallId[(int)$traceEvent->agentVoiceCallId][] = $traceEvent;
+                $traceEventsByCallId[(int)$traceEvent->agentVoiceCallId] ??= AIConversationTraceEvents::newInstance();
+                $traceEventsByCallId[(int)$traceEvent->agentVoiceCallId]->add($traceEvent);
             }
         }
-        $turnEndEvents = [];
+        $turnEndEvents = AIConversationTurnEvents::newInstance();
         try {
             /** @var AIConversationTurnEventsService $aIConversationTurnEventsService */
             $aIConversationTurnEventsService = DDDService::instance()->getService(AIConversationTurnEventsService::class);
-            $turnEndEvents = $aIConversationTurnEventsService->findForConversation((int)$conversation->id)
+            $turnEndEventsOfConversation = $aIConversationTurnEventsService->findForConversation((int)$conversation->id)
                 ?->ofKind(AIConversationTurnEvent::KIND_TURN_END) ?? [];
+            foreach ($turnEndEventsOfConversation as $turnEndEvent) {
+                $turnEndEvents->add($turnEndEvent);
+            }
         } catch (Throwable) {
             // Without the turn events the flag of a slow pickup is simply not computed.
         }
@@ -100,7 +106,7 @@ class AgentVoiceCallTraceEventsService extends Service
         foreach (array_reverse($agentVoiceCalls->getElements()) as $agentVoiceCall) {
             $callTraceSummary = $callTraceSummaryClassName::fromTraceEvents(
                 $agentVoiceCall,
-                $traceEventsByCallId[(int)$agentVoiceCall->id] ?? [],
+                $traceEventsByCallId[(int)$agentVoiceCall->id] ?? AIConversationTraceEvents::newInstance(),
                 $turnEndEvents
             );
             $callTraceSummaries->add($callTraceSummary);

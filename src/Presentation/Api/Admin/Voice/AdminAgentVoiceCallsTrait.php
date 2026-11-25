@@ -18,6 +18,7 @@ use DDD\Infrastructure\Exceptions\NotFoundException;
 use DDD\Infrastructure\Services\AuthService;
 use DDD\Infrastructure\Services\DDDService;
 use DDD\Presentation\Api\Admin\Voice\Dtos\AdminAgentVoiceCallDerivedValues;
+use DDD\Presentation\Api\Admin\Voice\Dtos\AdminAgentVoiceCallsDerivedValues;
 use DDD\Presentation\Api\Admin\Voice\Dtos\AdminAgentVoiceCallGetRequestDto;
 use DDD\Presentation\Api\Admin\Voice\Dtos\AdminAgentVoiceCallGetResponseDto;
 use DDD\Presentation\Api\Admin\Voice\Dtos\AdminAgentVoiceCallsGetRequestDto;
@@ -74,7 +75,8 @@ trait AdminAgentVoiceCallsTrait
     /**
      * @var (AIModelCall|null)[] The session model call the calls of one provider are priced with, keyed by the provider
      * name ('' = the configured default); null = none could be built. Kept for the request at hand, so that a page
-     * builds one per provider and not one per row; emptied when a route starts.
+     * builds one per provider and not one per row; emptied when a route starts. A keyed array, not a set: an
+     * implementation detail of the trait, never serialised and never returned.
      */
     protected array $sessionModelCallsOfVoiceProviders = [];
 
@@ -103,12 +105,14 @@ trait AdminAgentVoiceCallsTrait
         // One entry per call, in the order of the calls, after the read (the class's own query options are back). The
         // clock is read once: every row of the answer is judged at the same moment.
         $nowUnixTime = time();
+        $responseDto->agentVoiceCallDerivedValues = new AdminAgentVoiceCallsDerivedValues();
         foreach ($responseDto->agentVoiceCalls->getElements() as $agentVoiceCall) {
-            $responseDto->agentVoiceCallDerivedValues[] = AdminAgentVoiceCallDerivedValues::forCall(
+            $agentVoiceCallDerivedValues = AdminAgentVoiceCallDerivedValues::forCall(
                 $agentVoiceCall,
                 $this->findBookedCostsOfVoiceCall($agentVoiceCall),
                 $nowUnixTime
             );
+            $responseDto->agentVoiceCallDerivedValues->add($agentVoiceCallDerivedValues);
         }
 
         return $responseDto;

@@ -356,7 +356,7 @@ class AgentVoiceCallsServiceTest extends AgentVoiceIntegrationTestCase
 
         $closedCalls = $this->agentVoiceCallsService->closeStaleRunningCalls();
 
-        static::assertSame($expectedClosedCallIds, array_map(static fn (AgentVoiceCall $agentVoiceCall): int => (int)$agentVoiceCall->id, $closedCalls));
+        static::assertSame($expectedClosedCallIds, array_map(static fn (AgentVoiceCall $agentVoiceCall): int => (int)$agentVoiceCall->id, $closedCalls->getElements()));
         static::assertSame([[30, 31]], $this->conversationsService->environmentQuestions);
         $expectedEnds = array_map(static fn (int $callId): array => [$callId, 'reaped_stale'], $expectedClosedCallIds);
         static::assertSame($expectedEnds, $this->callStore->getArgumentsOf('markCallEnded'));
@@ -380,7 +380,7 @@ class AgentVoiceCallsServiceTest extends AgentVoiceIntegrationTestCase
         $staleCallWithoutSession = $this->buildStaleCall(2, 30, null);
         $this->callStore->staleRunningCalls = [$staleCall, $staleCallWithoutSession];
 
-        static::assertSame([$staleCall, $staleCallWithoutSession], $this->agentVoiceCallsService->closeStaleRunningCalls());
+        static::assertSame([$staleCall, $staleCallWithoutSession], $this->agentVoiceCallsService->closeStaleRunningCalls()->getElements());
         static::assertSame(['hangUp:session-1'], $this->agentVoiceCallsService->recordedReaches);
         static::assertSame('reaped_stale', $staleCall->endReason);
         static::assertSame('reaped_stale', $staleCallWithoutSession->endReason);

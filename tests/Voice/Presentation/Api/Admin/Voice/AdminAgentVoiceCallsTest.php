@@ -356,9 +356,9 @@ class AdminAgentVoiceCallsTest extends AgentVoiceIntegrationTestCase
 
         static::assertSame(['openAiLive', null], $this->providerNamesOfSessionModelCalls);
         static::assertSame([300.0, 120.0, 60.0], $this->pricedSessionSeconds);
-        static::assertContainsOnlyInstancesOf(AdminAgentVoiceCallDerivedValues::class, $responseDto->agentVoiceCallDerivedValues);
-        static::assertSame([7, 8, 9, 10], array_map([static::class, 'readCallIdOfDerivedValues'], $responseDto->agentVoiceCallDerivedValues));
-        static::assertSame([3.0, 1.2, 0.6, null], array_map([static::class, 'readAmountOfDerivedValues'], $responseDto->agentVoiceCallDerivedValues));
+        static::assertContainsOnlyInstancesOf(AdminAgentVoiceCallDerivedValues::class, $responseDto->agentVoiceCallDerivedValues->getElements());
+        static::assertSame([7, 8, 9, 10], array_map([static::class, 'readCallIdOfDerivedValues'], $responseDto->agentVoiceCallDerivedValues->getElements()));
+        static::assertSame([3.0, 1.2, 0.6, null], array_map([static::class, 'readAmountOfDerivedValues'], $responseDto->agentVoiceCallDerivedValues->getElements()));
     }
 
     public function testAPageBuildsTheSessionModelCallsAgainForEveryRequest(): void
@@ -457,10 +457,10 @@ class AdminAgentVoiceCallsTest extends AgentVoiceIntegrationTestCase
 
         $responseDto = $this->listCalls();
 
-        static::assertSame([7, 8, 9, 10], array_map([static::class, 'readCallIdOfDerivedValues'], $responseDto->agentVoiceCallDerivedValues));
+        static::assertSame([7, 8, 9, 10], array_map([static::class, 'readCallIdOfDerivedValues'], $responseDto->agentVoiceCallDerivedValues->getElements()));
         static::assertSame(
             [AgentVoiceCall::CALL_STATE_RINGING, AgentVoiceCall::CALL_STATE_IN_PROGRESS, AgentVoiceCall::CALL_STATE_ENDED, AgentVoiceCall::CALL_STATE_ENDED],
-            array_map([static::class, 'readCallStateOfDerivedValues'], $responseDto->agentVoiceCallDerivedValues)
+            array_map([static::class, 'readCallStateOfDerivedValues'], $responseDto->agentVoiceCallDerivedValues->getElements())
         );
     }
 
@@ -512,7 +512,7 @@ class AdminAgentVoiceCallsTest extends AgentVoiceIntegrationTestCase
         $listResponseDto = $this->listCalls();
         $detailResponseDto = $this->getCall(9);
 
-        static::assertSame([4.25, null, 0.5], array_map([static::class, 'readAmountOfDerivedValues'], $listResponseDto->agentVoiceCallDerivedValues));
+        static::assertSame([4.25, null, 0.5], array_map([static::class, 'readAmountOfDerivedValues'], $listResponseDto->agentVoiceCallDerivedValues->getElements()));
         static::assertSame(0.5, $detailResponseDto->bookedCosts?->amount);
         static::assertSame([], $this->providerNamesOfSessionModelCalls, 'the ledger answers: no catalog price is built');
         static::assertSame([], $this->pricedSessionSeconds);
@@ -531,8 +531,8 @@ class AdminAgentVoiceCallsTest extends AgentVoiceIntegrationTestCase
 
         $responseDto = $this->listCalls();
 
-        static::assertSame([7, 8, 9, 10], array_map([static::class, 'readCallIdOfDerivedValues'], $responseDto->agentVoiceCallDerivedValues));
-        static::assertSame([3.0, null, null, 1.0], array_map([static::class, 'readAmountOfDerivedValues'], $responseDto->agentVoiceCallDerivedValues));
+        static::assertSame([7, 8, 9, 10], array_map([static::class, 'readCallIdOfDerivedValues'], $responseDto->agentVoiceCallDerivedValues->getElements()));
+        static::assertSame([3.0, null, null, 1.0], array_map([static::class, 'readAmountOfDerivedValues'], $responseDto->agentVoiceCallDerivedValues->getElements()));
         static::assertSame(['openAiLive', 'retiredLive'], $this->providerNamesOfSessionModelCalls, 'a failing provider is asked once per request');
         static::assertSame([300.0, 100.0], $this->pricedSessionSeconds);
 

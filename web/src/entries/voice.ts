@@ -83,7 +83,6 @@ export {
 } from "../voice/ring/agent-voice-ring";
 export {
   AgentVoiceAccountRealtimeRingSource,
-  type AgentVoiceAccountRealtimePollStarter,
   type AgentVoiceRingSource,
   createAgentVoiceRingSource,
 } from "../voice/ring/agent-voice-ring-source";

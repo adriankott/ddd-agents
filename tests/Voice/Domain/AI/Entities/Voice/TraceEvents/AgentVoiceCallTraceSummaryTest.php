@@ -6,8 +6,10 @@ namespace DDD\Tests\Agents\Voice\Domain\AI\Entities\Voice\TraceEvents;
 
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
 use DDD\Domain\AI\Entities\Conversations\TraceEvents\AIConversationTraceEvent;
+use DDD\Domain\AI\Entities\Conversations\TraceEvents\AIConversationTraceEvents;
 use DDD\Domain\AI\Entities\Conversations\TraceEvents\Summaries\AIConversationTraceAnomaly;
 use DDD\Domain\AI\Entities\Conversations\TurnEvents\AIConversationTurnEvent;
+use DDD\Domain\AI\Entities\Conversations\TurnEvents\AIConversationTurnEvents;
 use DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceCall;
 use DDD\Domain\AI\Entities\Voice\TraceEvents\AgentVoiceCallTraceSummaries;
 use DDD\Domain\AI\Entities\Voice\TraceEvents\AgentVoiceCallTraceSummary;
@@ -39,7 +41,7 @@ class AgentVoiceCallTraceSummaryTest extends AgentVoiceUnitTestCase
         $agentVoiceCall->voiceProvider = 'openAiLive';
         $agentVoiceCall->endReason = AgentVoiceCall::END_REASON_COMPLETED;
 
-        $callTraceSummary = AgentVoiceCallTraceSummary::fromTraceEvents($agentVoiceCall, []);
+        $callTraceSummary = AgentVoiceCallTraceSummary::fromTraceEvents($agentVoiceCall, static::buildTraceEventSet([]));
 
         static::assertSame(7, $callTraceSummary->agentVoiceCallId);
         static::assertSame('OUTBOUND', $callTraceSummary->direction);
@@ -60,7 +62,7 @@ class AgentVoiceCallTraceSummaryTest extends AgentVoiceUnitTestCase
     {
         $agentVoiceCall = AgentVoiceCallFixtures::buildCallAt(AgentVoiceCallFixtures::NOW_UNIX_TIME, -100, -10, null, -10);
 
-        static::assertNull(AgentVoiceCallTraceSummary::fromTraceEvents($agentVoiceCall, [])->durationSeconds);
+        static::assertNull(AgentVoiceCallTraceSummary::fromTraceEvents($agentVoiceCall, static::buildTraceEventSet([]))->durationSeconds);
     }
 
     public function testAnEndBeforeTheAnswerIsNoNegativeDuration(): void
@@ -68,7 +70,7 @@ class AgentVoiceCallTraceSummaryTest extends AgentVoiceUnitTestCase
         $agentVoiceCall = $this->buildCall();
         $agentVoiceCall->endedAt = DateTime::fromTimestamp($agentVoiceCall->startedAt->getTimestamp() - 5);
 
-        static::assertSame(0, AgentVoiceCallTraceSummary::fromTraceEvents($agentVoiceCall, [])->durationSeconds);
+        static::assertSame(0, AgentVoiceCallTraceSummary::fromTraceEvents($agentVoiceCall, static::buildTraceEventSet([]))->durationSeconds);
     }
 
     public function testTheStoredEventNames(): void
@@ -90,7 +92,7 @@ class AgentVoiceCallTraceSummaryTest extends AgentVoiceUnitTestCase
 
     public function testEveryLatencyIsReadFromItsEvents(): void
     {
-        $callTraceSummary = AgentVoiceCallTraceSummary::fromTraceEvents($this->buildCall(), [
+        $callTraceSummary = AgentVoiceCallTraceSummary::fromTraceEvents($this->buildCall(), static::buildTraceEventSet([
             $this->buildEvent(AgentVoiceCallTraceSummary::EVENT_TYPE_RING_STARTED, 0),
             $this->buildEvent(AgentVoiceCallTraceSummary::EVENT_TYPE_ANSWER_CLAIMED, 4_000, durationMs: 120),
             $this->buildEvent(AgentVoiceCallTraceSummary::EVENT_TYPE_BRIEFING_COMPOSED, 4_500, durationMs: 300),
@@ -102,7 +104,7 @@ class AgentVoiceCallTraceSummaryTest extends AgentVoiceUnitTestCase
             $this->buildEvent(AgentVoiceCallTraceSummary::EVENT_TYPE_DEVICE_ANSWER_APPLIED, 5_400),
             $this->buildEvent(AgentVoiceCallTraceSummary::EVENT_TYPE_DEVICE_FIRST_AUDIO_PLAYED, 6_900),
             $this->buildEvent(AIConversationTraceEvent::EVENT_TYPE_TRACE_FLUSHED, 300_000),
-        ]);
+        ]));
 
         static::assertSame(4_000, $callTraceSummary->ringToAnswerMs);
         static::assertSame(120, $callTraceSummary->answerRequestMs);
@@ -120,12 +122,12 @@ class AgentVoiceCallTraceSummaryTest extends AgentVoiceUnitTestCase
 
     public function testTheFirstEventOfATypeCountsAndAWordWithoutOpenCountsFromTheAttach(): void
     {
-        $callTraceSummary = AgentVoiceCallTraceSummary::fromTraceEvents($this->buildCall(), [
+        $callTraceSummary = AgentVoiceCallTraceSummary::fromTraceEvents($this->buildCall(), static::buildTraceEventSet([
             $this->buildEvent(AgentVoiceCallTraceSummary::EVENT_TYPE_WORKER_ATTACHED, 1_000),
             $this->buildEvent(AgentVoiceCallTraceSummary::EVENT_TYPE_WORKER_ATTACHED, 2_000),
             $this->buildEvent(AgentVoiceCallTraceSummary::EVENT_TYPE_FIRST_AGENT_TRANSCRIPT, 1_800),
             $this->buildEvent(AgentVoiceCallTraceSummary::EVENT_TYPE_FIRST_AGENT_TRANSCRIPT, 3_000),
-        ]);
+        ]));
 
         static::assertSame(800, $callTraceSummary->firstAgentWordAfterOpenMs);
         static::assertNull($callTraceSummary->workerAttachAfterOpenMs);
@@ -133,11 +135,11 @@ class AgentVoiceCallTraceSummaryTest extends AgentVoiceUnitTestCase
 
     public function testNumbersOutOfOrderAreNotGuessed(): void
     {
-        $callTraceSummary = AgentVoiceCallTraceSummary::fromTraceEvents($this->buildCall(), [
+        $callTraceSummary = AgentVoiceCallTraceSummary::fromTraceEvents($this->buildCall(), static::buildTraceEventSet([
             $this->buildEvent(AgentVoiceCallTraceSummary::EVENT_TYPE_RING_STARTED, 5_000),
             $this->buildEvent(AgentVoiceCallTraceSummary::EVENT_TYPE_ANSWER_CLAIMED, 4_000),
             $this->buildEvent(AIConversationTraceEvent::EVENT_TYPE_TRACE_FLUSHED, 9_000),
-        ]);
+        ]));
 
         static::assertNull($callTraceSummary->ringToAnswerMs);
         static::assertNull($callTraceSummary->answerRequestMs);
@@ -151,15 +153,15 @@ class AgentVoiceCallTraceSummaryTest extends AgentVoiceUnitTestCase
 
         static::assertSame(
             [[AIConversationTraceAnomaly::CODE_TRACE_INCOMPLETE, 7, null, 'the call ended but its worker never wrote the final trace flush: events after the last tick may be missing']],
-            $this->collectAnomalies(AgentVoiceCallTraceSummary::fromTraceEvents($this->buildCall(), $attached))
+            $this->collectAnomalies(AgentVoiceCallTraceSummary::fromTraceEvents($this->buildCall(), static::buildTraceEventSet($attached)))
         );
-        static::assertSame([], $this->collectAnomalies(AgentVoiceCallTraceSummary::fromTraceEvents($runningCall, $attached)));
-        static::assertSame([], $this->collectAnomalies(AgentVoiceCallTraceSummary::fromTraceEvents($this->buildCall(), [])));
+        static::assertSame([], $this->collectAnomalies(AgentVoiceCallTraceSummary::fromTraceEvents($runningCall, static::buildTraceEventSet($attached))));
+        static::assertSame([], $this->collectAnomalies(AgentVoiceCallTraceSummary::fromTraceEvents($this->buildCall(), static::buildTraceEventSet([]))));
     }
 
     public function testTheMedianTurnGapCountsOnlyTheOwnerFollowedByTheAgent(): void
     {
-        $odd = AgentVoiceCallTraceSummary::fromTraceEvents($this->buildCall(), [
+        $odd = AgentVoiceCallTraceSummary::fromTraceEvents($this->buildCall(), static::buildTraceEventSet([
             $this->buildSentence(AIConversationMessage::ROLE_USER, 0, 1_000, 1),
             $this->buildSentence(AIConversationMessage::ROLE_ASSISTANT, 1_400, 3_000, 2),
             $this->buildSentence(AIConversationMessage::ROLE_ASSISTANT, 3_100, 4_000, 3),
@@ -168,14 +170,14 @@ class AgentVoiceCallTraceSummaryTest extends AgentVoiceUnitTestCase
             $this->buildSentence(AIConversationMessage::ROLE_USER, 9_000, 10_000, 6),
             $this->buildSentence(AIConversationMessage::ROLE_ASSISTANT, 9_800, 11_000, 7),
             $this->buildEvent(AIConversationTraceEvent::EVENT_TYPE_TRACE_FLUSHED, 20_000),
-        ]);
-        $even = AgentVoiceCallTraceSummary::fromTraceEvents($this->buildCall(), [
+        ]));
+        $even = AgentVoiceCallTraceSummary::fromTraceEvents($this->buildCall(), static::buildTraceEventSet([
             $this->buildSentence(AIConversationMessage::ROLE_ASSISTANT, 1_300, 2_000, 2),
             $this->buildSentence(AIConversationMessage::ROLE_USER, 0, 1_000, 1),
             $this->buildSentence(AIConversationMessage::ROLE_USER, 3_000, 4_000, 3),
             $this->buildSentence(AIConversationMessage::ROLE_ASSISTANT, 4_600, 5_000, 4),
             $this->buildEvent(AIConversationTraceEvent::EVENT_TYPE_TRACE_FLUSHED, 20_000),
-        ]);
+        ]));
 
         static::assertSame(400, $odd->medianTurnGapMs);
         static::assertSame(450, $even->medianTurnGapMs);
@@ -183,25 +185,25 @@ class AgentVoiceCallTraceSummaryTest extends AgentVoiceUnitTestCase
 
     public function testEachDelegationRoundTripIsMatchedToItsStartByTheDelegationId(): void
     {
-        $callTraceSummary = AgentVoiceCallTraceSummary::fromTraceEvents($this->buildCall(), [
+        $callTraceSummary = AgentVoiceCallTraceSummary::fromTraceEvents($this->buildCall(), static::buildTraceEventSet([
             $this->buildEvent(AIConversationTraceEvent::EVENT_TYPE_TASK_STARTED, 1_000, payload: ['correlationIds' => ['delegationId' => 'a']]),
             $this->buildEvent(AIConversationTraceEvent::EVENT_TYPE_TASK_STARTED, 2_000, payload: ['correlationIds' => ['delegationId' => 'b']]),
             $this->buildEvent(AIConversationTraceEvent::EVENT_TYPE_TASK_OUTCOME, 9_000, payload: ['correlationIds' => ['delegationId' => 'a']]),
             $this->buildEvent(AIConversationTraceEvent::EVENT_TYPE_TASK_OUTCOME, 12_000, payload: []),
             $this->buildEvent(AIConversationTraceEvent::EVENT_TYPE_TASK_OUTCOME, 13_000, payload: []),
             $this->buildEvent(AIConversationTraceEvent::EVENT_TYPE_TRACE_FLUSHED, 20_000),
-        ]);
+        ]));
 
         static::assertSame([8_000, 10_000], $callTraceSummary->delegationRoundTripsMs);
     }
 
     public function testTheAnswerHandedToTheVoiceModelIsFlaggedWhenCutOrCarryingAWidget(): void
     {
-        $callTraceSummary = AgentVoiceCallTraceSummary::fromTraceEvents($this->buildCall(), [
+        $callTraceSummary = AgentVoiceCallTraceSummary::fromTraceEvents($this->buildCall(), static::buildTraceEventSet([
             $this->buildEvent(AIConversationTraceEvent::EVENT_TYPE_TASK_OUTCOME, 1_000, payload: ['widgetInCommentary' => true, 'answerChars' => 500, 'commentaryChars' => 200], messageIndex: 9),
             $this->buildEvent(AIConversationTraceEvent::EVENT_TYPE_TASK_OUTCOME, 2_000, payload: ['answerChars' => 200, 'commentaryChars' => 200], messageIndex: 10),
             $this->buildEvent(AIConversationTraceEvent::EVENT_TYPE_TRACE_FLUSHED, 20_000),
-        ]);
+        ]));
 
         static::assertSame([
             [AIConversationTraceAnomaly::CODE_WIDGET_IN_COMMENTARY, 7, 9, 'the answer handed to the voice model carried a widget block'],
@@ -211,12 +213,12 @@ class AgentVoiceCallTraceSummaryTest extends AgentVoiceUnitTestCase
 
     public function testAShortOwnerRowIsFlaggedAsNoise(): void
     {
-        $callTraceSummary = AgentVoiceCallTraceSummary::fromTraceEvents($this->buildCall(), [
+        $callTraceSummary = AgentVoiceCallTraceSummary::fromTraceEvents($this->buildCall(), static::buildTraceEventSet([
             $this->buildEvent(AIConversationTraceEvent::EVENT_TYPE_TRANSCRIPT_SENTENCE_PERSISTED, 1_000, payload: ['role' => AIConversationMessage::ROLE_USER, 'chars' => 2], messageIndex: 3),
             $this->buildEvent(AIConversationTraceEvent::EVENT_TYPE_TRANSCRIPT_SENTENCE_PERSISTED, 2_000, payload: ['role' => AIConversationMessage::ROLE_USER, 'chars' => 3], messageIndex: 4),
             $this->buildEvent(AIConversationTraceEvent::EVENT_TYPE_TRANSCRIPT_SENTENCE_PERSISTED, 3_000, payload: ['role' => AIConversationMessage::ROLE_ASSISTANT, 'chars' => 1], messageIndex: 5),
             $this->buildEvent(AIConversationTraceEvent::EVENT_TYPE_TRACE_FLUSHED, 20_000),
-        ]);
+        ]));
 
         static::assertSame(
             [[AIConversationTraceAnomaly::CODE_NOISE_ROW, 7, 3, 'a caller row of 2 characters, most likely transcription noise']],
@@ -227,17 +229,17 @@ class AgentVoiceCallTraceSummaryTest extends AgentVoiceUnitTestCase
     public function testADelegationWithoutAReadBackIsFlaggedWithThePersonasName(): void
     {
         $this->declareAgentPersonaConfiguration(['agentName' => 'Mira']);
-        $withoutReadBack = AgentVoiceCallTraceSummary::fromTraceEvents($this->buildCall(), [
+        $withoutReadBack = AgentVoiceCallTraceSummary::fromTraceEvents($this->buildCall(), static::buildTraceEventSet([
             $this->buildSentence(AIConversationMessage::ROLE_USER, 0, 1_000, 1, occurredAtMs: 1_000),
             $this->buildEvent(AIConversationTraceEvent::EVENT_TYPE_TASK_STARTED, 1_500, messageIndex: 2),
             $this->buildEvent(AIConversationTraceEvent::EVENT_TYPE_TRACE_FLUSHED, 20_000),
-        ]);
-        $withReadBack = AgentVoiceCallTraceSummary::fromTraceEvents($this->buildCall(), [
+        ]));
+        $withReadBack = AgentVoiceCallTraceSummary::fromTraceEvents($this->buildCall(), static::buildTraceEventSet([
             $this->buildSentence(AIConversationMessage::ROLE_USER, 0, 1_000, 1, occurredAtMs: 1_000),
             $this->buildSentence(AIConversationMessage::ROLE_ASSISTANT, 1_200, 2_000, 2, occurredAtMs: 2_000),
             $this->buildEvent(AIConversationTraceEvent::EVENT_TYPE_TASK_STARTED, 2_500, messageIndex: 3),
             $this->buildEvent(AIConversationTraceEvent::EVENT_TYPE_TRACE_FLUSHED, 20_000),
-        ]);
+        ]));
 
         static::assertSame(
             [[AIConversationTraceAnomaly::CODE_NO_READ_BACK, 7, 2, 'the delegation started without Mira reading the request back']],
@@ -248,12 +250,12 @@ class AgentVoiceCallTraceSummaryTest extends AgentVoiceUnitTestCase
 
     public function testAReadBackHeldInTheBacklogIsFlagged(): void
     {
-        $callTraceSummary = AgentVoiceCallTraceSummary::fromTraceEvents($this->buildCall(), [
+        $callTraceSummary = AgentVoiceCallTraceSummary::fromTraceEvents($this->buildCall(), static::buildTraceEventSet([
             $this->buildSentence(AIConversationMessage::ROLE_USER, 0, 1_000, 1, occurredAtMs: 1_000),
             $this->buildEvent(AIConversationTraceEvent::EVENT_TYPE_TASK_STARTED, 2_000, messageIndex: 2),
             $this->buildEvent(AIConversationTraceEvent::EVENT_TYPE_TRANSCRIPT_BACKLOG_PUSHED, 3_000, payload: ['role' => AIConversationMessage::ROLE_ASSISTANT, 'startMs' => 1_000, 'endMs' => 2_500]),
             $this->buildEvent(AIConversationTraceEvent::EVENT_TYPE_TRACE_FLUSHED, 20_000),
-        ]);
+        ]));
 
         static::assertSame(
             [[AIConversationTraceAnomaly::CODE_READ_BACK_IN_BACKLOG, 7, 2, 'the read-back of the agent began before the delegation and was held in the backlog while the turn ran']],
@@ -263,12 +265,12 @@ class AgentVoiceCallTraceSummaryTest extends AgentVoiceUnitTestCase
 
     public function testABacklogRowSpokenBeforeTheRowAboveItIsFlagged(): void
     {
-        $callTraceSummary = AgentVoiceCallTraceSummary::fromTraceEvents($this->buildCall(), [
+        $callTraceSummary = AgentVoiceCallTraceSummary::fromTraceEvents($this->buildCall(), static::buildTraceEventSet([
             $this->buildEvent(AIConversationTraceEvent::EVENT_TYPE_TRANSCRIPT_SENTENCE_PERSISTED, 1_000, payload: ['role' => AIConversationMessage::ROLE_ASSISTANT, 'spokenFromMs' => 5_000, 'spokenUntilMs' => 6_000], messageIndex: 4),
             $this->buildEvent(AIConversationTraceEvent::EVENT_TYPE_TRANSCRIPT_SENTENCE_PERSISTED, 2_000, payload: ['role' => AIConversationMessage::ROLE_ASSISTANT, 'spokenFromMs' => 3_000, 'spokenUntilMs' => 4_000, 'fromBacklog' => true], messageIndex: 5),
             $this->buildEvent(AIConversationTraceEvent::EVENT_TYPE_TRANSCRIPT_SENTENCE_PERSISTED, 3_000, payload: ['role' => AIConversationMessage::ROLE_ASSISTANT, 'spokenFromMs' => 7_000, 'spokenUntilMs' => 8_000, 'fromBacklog' => true], messageIndex: 6),
             $this->buildEvent(AIConversationTraceEvent::EVENT_TYPE_TRACE_FLUSHED, 20_000),
-        ]);
+        ]));
 
         static::assertSame(
             [[AIConversationTraceAnomaly::CODE_ROW_ORDER_INVERTED, 7, 5, 'this row came from the backlog and was spoken before the row above it']],
@@ -288,15 +290,15 @@ class AgentVoiceCallTraceSummaryTest extends AgentVoiceUnitTestCase
 
         static::assertSame(
             [[AIConversationTraceAnomaly::CODE_SLOW_PICKUP, 7, 2, 'the turn worker picked the turn up 1001 ms after its dispatch']],
-            $this->collectAnomalies(AgentVoiceCallTraceSummary::fromTraceEvents($this->buildCall(), $events, [$slowTurnEnd, $otherTurnEnd]))
+            $this->collectAnomalies(AgentVoiceCallTraceSummary::fromTraceEvents($this->buildCall(), static::buildTraceEventSet($events), static::buildTurnEventSet([$slowTurnEnd, $otherTurnEnd])))
         );
-        static::assertSame([], $this->collectAnomalies(AgentVoiceCallTraceSummary::fromTraceEvents($this->buildCall(), $events, [$fastTurnEnd])));
+        static::assertSame([], $this->collectAnomalies(AgentVoiceCallTraceSummary::fromTraceEvents($this->buildCall(), static::buildTraceEventSet($events), static::buildTurnEventSet([$fastTurnEnd]))));
     }
 
     public function testTheHeadersAreAnObjectSet(): void
     {
         $callTraceSummaries = new AgentVoiceCallTraceSummaries();
-        $callTraceSummary = AgentVoiceCallTraceSummary::fromTraceEvents($this->buildCall(), []);
+        $callTraceSummary = AgentVoiceCallTraceSummary::fromTraceEvents($this->buildCall(), static::buildTraceEventSet([]));
         $callTraceSummaries->add($callTraceSummary);
 
         static::assertSame($callTraceSummary, $callTraceSummaries->first());
@@ -309,6 +311,32 @@ class AgentVoiceCallTraceSummaryTest extends AgentVoiceUnitTestCase
             static fn (AIConversationTraceAnomaly $anomaly): array => [$anomaly->code, $anomaly->agentVoiceCallId, $anomaly->messageIndex, $anomaly->detail],
             $callTraceSummary->anomalies->getElements()
         );
+    }
+
+    /**
+     * The trace events as the set the header is built from, in the given order.
+     *
+     * @param AIConversationTraceEvent[] $traceEvents
+     */
+    protected static function buildTraceEventSet(array $traceEvents): AIConversationTraceEvents
+    {
+        $traceEventSet = new AIConversationTraceEvents();
+        $traceEventSet->add(...$traceEvents);
+
+        return $traceEventSet;
+    }
+
+    /**
+     * The turn-end events as the set the header is built from, in the given order.
+     *
+     * @param AIConversationTurnEvent[] $turnEndEvents
+     */
+    protected static function buildTurnEventSet(array $turnEndEvents): AIConversationTurnEvents
+    {
+        $turnEventSet = new AIConversationTurnEvents();
+        $turnEventSet->add(...$turnEndEvents);
+
+        return $turnEventSet;
     }
 
     /** A call answered at the fixed now minus 400 s and ended 300 s later. */

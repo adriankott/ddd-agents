@@ -1,5 +1,83 @@
 # Changelog
 
+## 0.6.1
+
+**The voice channel's lists become object sets, and an application's own voice channel provider wins.** Changes only
+the voice signatures released with 0.6.0 one release ago (an application binding voice adapts its overrides); nothing
+changes for an application with voice off. npm `@mgamadeus/ddd-agents` 0.6.1 in lockstep.
+
+- **Changed: a list of objects on a public or protected signature or on a DTO of the voice channel is an object set,**
+  no longer `X[]`, and each element class has a deliberate `uniqueKey()`. New sets: `AgentVoiceSeedInputMessages` (the
+  seed rows of a session), `LiveTranscriptSentences` (the completed sentences of a call),
+  `AgentVoiceCallTraceSpokenSentences` and `AgentVoiceCallTraceBacklogPushes` (the call header of the trace view):
+  every element is held under its own object, so two equal rows are two rows, in the order they were added.
+  `AdminAgentVoiceCallsDerivedValues` (the admin list) holds one entry per call under the call's id. The first trace
+  event of each type is the value object `AgentVoiceCallTraceFirstEvents`, where a keyed array was handed on. An array
+  stays only as state of a service that is never serialised and never returned (the buffers of the session worker, two
+  memos), and its comment says so; scalar lists and wire, storage and config documents stay arrays. What the provider
+  and a ringing client receive is unchanged.
+- **Changed signatures** (`array` in 0.6.0):
+  - the seed rows: `AgentVoiceSessionContext::buildLiveCreationSeedInputMessages()`, `buildLiveSeedInputMessages()` and
+    the override point `buildApplicationSeedInputMessages()` return `AgentVoiceSeedInputMessages`;
+    `RealtimeVoiceProviderAdapter::buildSessionCreationPayload()` (and `OpenAILiveVoiceProviderAdapter`) takes
+    `?AgentVoiceSeedInputMessages $seedInputMessages = null`;
+  - the sentences: `LiveTranscriptAssembler::appendFragment()`, `closeIdleSentences()`, `closeAllSentences()`,
+    `closeOpenCallerSentence()` and `closeOpenSentenceForRole()` return `LiveTranscriptSentences`;
+    `AgentLiveVoiceSessionsService::persistCompletedSentences()` takes it;
+  - the calls: `AgentVoiceCalls::getOpenCallsAt()` and `getRunningCalls()` return a set of the same class;
+    `AgentVoiceCallsService::closeStaleRunningCalls()` returns `AgentVoiceCalls`; `AgentVoiceCallEndsService`:
+    `findOpenCalls()` returns it, `findOpenCallOfConversation()` and `collectCallIds()` take it;
+    `AgentVoiceCalls::buildLlmMarkdownSummaryLine()` has no list parameter any more (`bool $onlyOpenCalls` alone);
+  - the trace: `AgentVoiceCallTraceSummary::fromTraceEvents()` takes `AIConversationTraceEvents` and
+    `?AIConversationTurnEvents` (null = none); its protected readers take `AgentVoiceCallTraceFirstEvents` and the
+    sets; `AgentVoiceCallStartsService::recordRingTraceEvents()` takes `AIConversationTraceEvents`;
+    `AgentVoiceTaskProgressSchedule::passLinesOn()` takes `AgentActivityLines`.
+- **Changed: the answer of the admin list of calls.** `agentVoiceCallDerivedValues` is an object set
+  (`AdminAgentVoiceCallsDerivedValues`): on the wire an object with `elements`, like `agentVoiceCalls`, where 0.6.0
+  answered a plain list. The entries (`callId`, `callState`, `bookedCosts`) and the answer of one call are unchanged.
+- **Changed: an application's own voice channel provider wins without a warning.** `AgentVoiceChannelService` asks an
+  application's providers first, in container order, and the package's own provider
+  (`AgentVoiceChannelProviderService`) last: it is the fallback. The package's provider is recognised by its class (an
+  object of exactly that class; a subclass is an application's provider) and is not counted: the `voiceChannel`
+  WARNING "several providers" of `app:agent:check-installation` and the log line per process come only with two or
+  more providers of the application's own (`getRegisteredApplicationVoiceChannelProviderClassNames()`). In 0.6.0 one
+  provider of the application's own beside the package's already warned, and the first available one in container
+  order answered.
+- **New: the voice transports in the copy sources,** as a commented block headed "only when voice is enabled": the
+  transports `voice_live_session` and `voice_ring_deadline` with their routing in the Messenger template of the
+  installation skill (`templates/messenger.yaml`), and their two consumers in `examples/workers.yaml`. As shipped, both
+  files still hold the six agent transports only.
+- **Changed (web): the ring source takes the poll.** `createAgentVoiceRingSource(accountRealtimePoll)` subscribes to
+  the application's running poll and never stops it; the application creates and stops the poll. The form of 0.6.0
+  that took a function starting a poll of its own is gone.
+- **An application that overrides `buildApplicationSeedInputMessages()`** returns `AgentVoiceSeedInputMessages`
+  (`AgentVoiceSeedInputMessages::fromMessages()`, an empty set for none); an override that still declares the return
+  type `array` no longer loads.
+- **An application with a provider adapter of its own** declares
+  `?AgentVoiceSeedInputMessages $seedInputMessages = null` in `buildSessionCreationPayload()` and reads the rows from
+  the set (`getElements()`).
+- **An application that calls or overrides** `closeStaleRunningCalls()`, `getOpenCallsAt()`, `getRunningCalls()`, the
+  assembler's methods, `persistCompletedSentences()`, `AgentVoiceCallTraceSummary::fromTraceEvents()`, the protected
+  methods of `AgentVoiceCallEndsService` named above, `recordRingTraceEvents()` or `passLinesOn()` hands on and
+  receives the sets; an override of `buildLlmMarkdownSummaryLine()` drops the list parameter.
+- **An application whose client reads the admin list** reads `agentVoiceCallDerivedValues.elements`.
+- **An application with a voice channel provider of its own** needs no change: its provider is asked first, and the
+  warning it read in 0.6.0 is gone. An application that overrides the protected
+  `getRegisteredVoiceChannelProviderClassNames()` of `AgentVoiceChannelInstallationCheckService` renames the override
+  to `getRegisteredApplicationVoiceChannelProviderClassNames()`.
+
+**Found after the 0.6.0 release (also applies to 0.6.0):**
+
+- **New protected methods on `AgentReapStuckConversationsCommand`** (the voice sweep, among them
+  `getAgentVoiceCallsService()`): an application command that extends it and already has a method of the same name with
+  another return type no longer loads, and every console command dies at boot (`cache:clear` of `post-update-cmd`
+  first). Rename the application's method before updating.
+- **`app:entity:show-sql`** is ambiguous for the short name `AgentVoiceCall` while the application still has a call
+  class of its own: pass the full class name of the application's class to check its table.
+- **Web specs:** the specs type-check (`_AgentChatActivityStack.spec.tsx`, `_widget-preview-requests.spec.ts`,
+  `_custom-visualization-sandbox-aliases.spec.tsx`, `_createAgentsHttpConversationClient.spec.ts`); no shipped code
+  changes.
+
 ## 0.6.0
 
 **The voice channel: the owner talks to the agent in the application's window, and the agent rings the owner's open

@@ -11,6 +11,7 @@ use DDD\Domain\AI\Entities\Conversations\TraceEvents\Summaries\AIConversationMes
 use DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceCall;
 use DDD\Domain\AI\Entities\Voice\Calls\LiveTranscriptBacklogSentence;
 use DDD\Domain\AI\Entities\Voice\Calls\LiveTranscriptSentence;
+use DDD\Domain\AI\Entities\Voice\Calls\LiveTranscriptSentences;
 use DDD\Domain\AI\Entities\Voice\TraceEvents\AgentVoiceCallTraceSummary;
 use DDD\Domain\AI\Exceptions\Conversations\MessageIndexLockUnavailableException;
 use DDD\Domain\AI\Services\Voice\SessionWorker\AgentLiveVoiceSessionsService;
@@ -84,9 +85,9 @@ class AgentLiveVoiceSessionTranscriptTest extends AgentLiveVoiceSessionWorkerTes
         $worker = $this->buildWorker();
         $agentVoiceCall = static::buildRunningCall(conversationId: null);
 
-        $worker->runWorkerStep('persistCompletedSentences', $agentVoiceCall, [
+        $worker->runWorkerStep('persistCompletedSentences', $agentVoiceCall, LiveTranscriptSentences::fromSentences(
             LiveTranscriptSentence::create(AIConversationMessage::ROLE_USER, 'Anybody there?', 0, 500),
-        ]);
+        ));
 
         static::assertSame([], $worker->agentVoiceCallsService->persistedTranscripts);
         static::assertSame([], $worker->getWorkerState('transcriptBacklog'));
@@ -97,9 +98,9 @@ class AgentLiveVoiceSessionTranscriptTest extends AgentLiveVoiceSessionWorkerTes
         $worker = $this->buildWorkerWithConversation();
         $worker->setWorkerState('pendingAgentTaskAfterMessageIndex', 3);
 
-        $worker->runWorkerStep('persistCompletedSentences', static::buildRunningCall(), [
+        $worker->runWorkerStep('persistCompletedSentences', static::buildRunningCall(), LiveTranscriptSentences::fromSentences(
             LiveTranscriptSentence::create(AIConversationMessage::ROLE_USER, 'And on Sunday?', 5000, 5600),
-        ]);
+        ));
 
         static::assertSame([], $worker->agentVoiceCallsService->persistedTranscripts);
         static::assertSameValueObjects([
@@ -118,9 +119,9 @@ class AgentLiveVoiceSessionTranscriptTest extends AgentLiveVoiceSessionWorkerTes
         $agentVoiceCall = static::buildRunningCall();
         $this->fixedAIConversationsService->freshRunStates = [AIConversationRunState::RUNNING, AIConversationRunState::RUNNING, AIConversationRunState::IDLE];
 
-        $worker->runWorkerStep('persistCompletedSentences', $agentVoiceCall, [
+        $worker->runWorkerStep('persistCompletedSentences', $agentVoiceCall, LiveTranscriptSentences::fromSentences(
             LiveTranscriptSentence::create(AIConversationMessage::ROLE_USER, 'Is it done?', 0, 500),
-        ]);
+        ));
         static::assertSame([], $worker->agentVoiceCallsService->persistedTranscripts);
         static::assertTrue($worker->getWorkerState('foreignTurnObservedRunning'));
 
@@ -233,11 +234,11 @@ class AgentLiveVoiceSessionTranscriptTest extends AgentLiveVoiceSessionWorkerTes
         $worker->setWorkerState('pendingAgentTaskAfterMessageIndex', 4);
         $worker->setWorkerState('progressCommentarySentAtSessionMs', 4000);
 
-        $worker->runWorkerStep('persistCompletedSentences', static::buildRunningCall(), [
+        $worker->runWorkerStep('persistCompletedSentences', static::buildRunningCall(), LiveTranscriptSentences::fromSentences(
             LiveTranscriptSentence::create(AIConversationMessage::ROLE_ASSISTANT, 'One moment, I am checking.', 3000, 4000),
             LiveTranscriptSentence::create(AIConversationMessage::ROLE_ASSISTANT, 'I am reading the reviews now.', 5000, 6500),
             LiveTranscriptSentence::create(AIConversationMessage::ROLE_USER, 'Okay, thanks.', 7000, 7800),
-        ]);
+        ));
 
         static::assertSame([false, true, false], array_column($worker->getWorkerState('transcriptBacklog'), 'isProgress'));
     }
@@ -247,9 +248,9 @@ class AgentLiveVoiceSessionTranscriptTest extends AgentLiveVoiceSessionWorkerTes
         $worker = $this->buildWorkerWithConversation();
         $worker->setWorkerState('pendingAgentTaskAfterMessageIndex', 4);
 
-        $worker->runWorkerStep('persistCompletedSentences', static::buildRunningCall(), [
+        $worker->runWorkerStep('persistCompletedSentences', static::buildRunningCall(), LiveTranscriptSentences::fromSentences(
             LiveTranscriptSentence::create(AIConversationMessage::ROLE_ASSISTANT, 'Let me look that up.', 5000, 6000),
-        ]);
+        ));
 
         static::assertSame([false], array_column($worker->getWorkerState('transcriptBacklog'), 'isProgress'));
     }

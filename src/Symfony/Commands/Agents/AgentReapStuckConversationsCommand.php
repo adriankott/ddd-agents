@@ -220,12 +220,12 @@ class AgentReapStuckConversationsCommand extends AgentConsoleCommand
         try {
             $agentVoiceCallsService = $this->getAgentVoiceCallsService();
             $closedVoiceCalls = $agentVoiceCallsService->closeStaleRunningCalls();
-            foreach ($closedVoiceCalls as $closedVoiceCall) {
+            foreach ($closedVoiceCalls->getElements() as $closedVoiceCall) {
                 $output->writeln($this->buildClosedStaleVoiceCallLine($closedVoiceCall));
             }
             $output->writeln(sprintf(
                 'Reaper: closed %d stale voice call(s) (still marked running %d minutes after their answer).',
-                count($closedVoiceCalls),
+                $closedVoiceCalls->count(),
                 $agentVoiceCallsService->getRunningCallStaleAfterMinutes()
             ));
         } finally {

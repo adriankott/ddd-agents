@@ -6,6 +6,7 @@ namespace DDD\Tests\Agents\Voice\Domain\AI\Services\Voice\Providers;
 
 use DDD\Domain\AI\Entities\Voice\AgentVoiceSettings;
 use DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceCall;
+use DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceSeedInputMessages;
 use DDD\Domain\AI\Services\Voice\Live\LiveSessionCreationResponse;
 use DDD\Domain\AI\Services\Voice\Providers\RealtimeVoiceProviderAdapter;
 use DDD\Infrastructure\Exceptions\BadGatewayException;
@@ -41,7 +42,7 @@ class FixedAppendCapRealtimeVoiceProviderAdapter extends RealtimeVoiceProviderAd
         return 'fixed-model';
     }
 
-    public function buildSessionCreationPayload(string $sdpOffer, string $liveInstructions, ?AgentVoiceSettings $effectiveVoiceSettings, array $seedInputMessages = []): array
+    public function buildSessionCreationPayload(string $sdpOffer, string $liveInstructions, ?AgentVoiceSettings $effectiveVoiceSettings, ?AgentVoiceSeedInputMessages $seedInputMessages = null): array
     {
         return [];
     }

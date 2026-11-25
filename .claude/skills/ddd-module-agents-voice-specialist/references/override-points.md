@@ -75,8 +75,10 @@ A subclass of `RealtimeVoiceProviderAdapter`, registered by name in `provider.ad
 (`hangUpSession()`), its size limits. The session is driven by the model; the seam knows no tool definitions and no
 per-turn events. An adapter reads its key from the environment variable its settings name.
 
-`buildSessionCreationPayload()` gets the seed rows as a list of `AgentVoiceSeedInputMessage` (a role and a text), the
-most important first; it caps their count and size and is the one place that turns them into the provider's shape.
+`buildSessionCreationPayload()` gets the seed rows as the set `AgentVoiceSeedInputMessages` (each row an
+`AgentVoiceSeedInputMessage`: a role and a text; null means no rows), the most important first; it caps their count
+and size and is the one place that turns them into the provider's shape. The set keeps every row under its own
+object: two equal rows are two rows, in the order they were added.
 
 A second endpoint of a provider the package ships an adapter for is a subclass of that adapter under its own name,
 never the same class under a second name.
@@ -116,7 +118,8 @@ subclass of `AgentVoiceSessionContext`), a source of its own for one block (`fin
 (`getSilenceCheckPromptName()`, `getGoodbyePromptName()`, `getBudgetEndPromptName()` and their siblings).
 
 Further seed rows of the application are `buildApplicationSeedInputMessages()` of its subclass of
-`AgentVoiceSessionContext`: a list of `AgentVoiceSeedInputMessage`, placed after the package's own rows.
+`AgentVoiceSessionContext`: it returns the set `AgentVoiceSeedInputMessages` (built with
+`AgentVoiceSeedInputMessages::fromMessages()`, an empty set for none), placed after the package's own rows.
 
 A sentence itself is changed by replacing its prompt file in the application's config folder
 (`config/app/AI/Prompts/AI/Voice/`), not by code.
@@ -135,10 +138,17 @@ an application calls from its own redeclared route, and each request DTO is read
 
 `AgentReapStuckConversationsCommand`: `closeStaleChannelSessions()` (an application with a channel of its own adds
 its sweep and calls the parent), `closeStaleVoiceCalls()`, `buildClosedStaleVoiceCallLine()`. The age at which a
-running call counts as stale is `AgentVoiceCallsService::getRunningCallStaleAfterMinutes()`.
+running call counts as stale is `AgentVoiceCallsService::getRunningCallStaleAfterMinutes()`; the sweep itself,
+`closeStaleRunningCalls()`, answers the closed calls as the set `AgentVoiceCalls`.
 
 ## Adding an override point
 
 Package maintainer: a new point is a `protected` method with a default, named in the class docblock's list of
 override points and in this file; a service the method needs is fetched through a small `protected` getter. No
 closure parameter, no returned closure. A decision more than one caller needs stays in ONE method the others ask.
+
+A list of objects on a public or protected signature or on a DTO is an object set, never an array of objects, and
+the element class says in its `uniqueKey()` what makes an element one: the object itself where two equal elements are
+two and the order counts (seed rows, sentences), a content key where the content is the identity (the derived values
+of a call: the call's id). An array stays only as state of a service that is never serialised and never returned,
+with a comment that says so; scalar lists and wire, storage and config documents stay arrays.

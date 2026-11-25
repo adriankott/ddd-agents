@@ -139,11 +139,7 @@ class AgentVoiceCallsMCPPackage extends MCPPackage
         $responseDto->onlyRunning = $requestDto->onlyRunning;
         $responseDto->currentConversationId = $callProvenance->rootConversationId ?? $callProvenance->conversationId;
         if ($requestDto->onlyRunning) {
-            $openVoiceCalls = AgentVoiceCalls::newInstance();
-            foreach ($agentVoiceCallsService->findOpenCallsOfAccountId($ownerAccountId)->getOpenCallsAt(time()) as $openVoiceCall) {
-                $openVoiceCalls->add($openVoiceCall);
-            }
-            $responseDto->voiceCalls = $openVoiceCalls;
+            $responseDto->voiceCalls = $agentVoiceCallsService->findOpenCallsOfAccountId($ownerAccountId)->getOpenCallsAt(time());
             return $responseDto;
         }
         // The query options are kept per class and outlive this call inside the agent's process: the change is scoped

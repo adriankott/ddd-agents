@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import { installWidgetPreviewRequests, widgetPreviewRequestKey } from "./widget-preview-requests";
 import type { WidgetPreviewResponse } from "./widget-preview.types";
 
@@ -51,14 +51,14 @@ describe.each(["fetch", "xhr"] as const)("installWidgetPreviewRequests through %
   const PageXMLHttpRequest = window.XMLHttpRequest;
   let network: ReturnType<typeof vi.fn>;
   let restore: (() => void) | undefined;
-  let missing: ReturnType<typeof vi.fn>;
-  let failed: ReturnType<typeof vi.fn>;
+  let missing: Mock<(requestKey: string) => void>;
+  let failed: Mock<(requestKey: string) => void>;
 
   beforeEach(() => {
     network = vi.fn(async () => new Response("{}"));
     window.fetch = network as unknown as typeof window.fetch;
-    missing = vi.fn();
-    failed = vi.fn();
+    missing = vi.fn<(requestKey: string) => void>();
+    failed = vi.fn<(requestKey: string) => void>();
     restore = installWidgetPreviewRequests(responses, missing, failed);
   });
   afterEach(() => {

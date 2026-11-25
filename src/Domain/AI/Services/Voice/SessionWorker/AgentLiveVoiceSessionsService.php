@@ -24,6 +24,7 @@ use DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceTaskProgressSchedule;
 use DDD\Domain\AI\Entities\Voice\Calls\LiveTranscriptAssembler;
 use DDD\Domain\AI\Entities\Voice\Calls\LiveTranscriptBacklogSentence;
 use DDD\Domain\AI\Entities\Voice\Calls\LiveTranscriptSentence;
+use DDD\Domain\AI\Entities\Voice\Calls\LiveTranscriptSentences;
 use DDD\Domain\AI\Entities\Voice\TraceEvents\AgentVoiceCallTraceSummary;
 use DDD\Domain\AI\Exceptions\Conversations\MessageIndexLockUnavailableException;
 use DDD\Domain\AI\Exceptions\Voice\LiveSessionGoneException;
@@ -240,7 +241,8 @@ class AgentLiveVoiceSessionsService extends Service
 
     /**
      * @var AgentVoiceCallerRequestSentence[] The caller's most recent completed sentences — the delegation event
-     * carries NO task text, so the task is composed from these.
+     * carries NO task text, so the task is composed from these. An array, not a set: an implementation detail of the
+     * worker, never serialised and never returned.
      */
     protected array $recentCallerSentences = [];
 
@@ -273,7 +275,8 @@ class AgentLiveVoiceSessionsService extends Service
      * @var LiveTranscriptBacklogSentence[] Transcript sentences held back WHILE an agent task runs (the turn worker
      * owns the message index sequence then). {@see LiveTranscriptBacklogSentence::$isProgress}: an agent sentence
      * classified as a progress sentence when it was pushed ({@see isProgressSentence()}) — flushed as a trace event,
-     * never as a chat row.
+     * never as a chat row. An array, not a set: an implementation detail of the worker, never serialised and never
+     * returned.
      */
     protected array $transcriptBacklog = [];
 
@@ -360,7 +363,8 @@ class AgentLiveVoiceSessionsService extends Service
 
     /**
      * @var AIConversationTraceEvent[] Conversation-trace events not written yet — flushed as ONE batched insert per
-     * watcher tick and at every exit, never on the event path itself.
+     * watcher tick and at every exit, never on the event path itself. An array, not a set: an implementation detail of
+     * the worker, never serialised and never returned.
      */
     protected array $traceEventBuffer = [];
 
@@ -1205,12 +1209,10 @@ class AgentLiveVoiceSessionsService extends Service
     /**
      * Completed sentences → the call's conversation (USER for the caller, ASSISTANT for the agent), or held back while
      * an agent task owns the message index. The caller's sentences are also remembered for the next delegation.
-     *
-     * @param LiveTranscriptSentence[] $completedSentences
      */
-    protected function persistCompletedSentences(AgentVoiceCall $agentVoiceCall, array $completedSentences): void
+    protected function persistCompletedSentences(AgentVoiceCall $agentVoiceCall, LiveTranscriptSentences $completedSentences): void
     {
-        foreach ($completedSentences as $completedSentence) {
+        foreach ($completedSentences->getElements() as $completedSentence) {
             if ($this->keepCompletedSentenceOutOfTheConversation($agentVoiceCall, $completedSentence)) {
                 continue;
             }

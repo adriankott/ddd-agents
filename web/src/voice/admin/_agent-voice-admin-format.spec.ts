@@ -17,12 +17,12 @@ const callsResponse: AgentVoiceAdminCallsResponse = JSON.parse(`{
     { "voiceProvider": "openAiLive", "accountId": 12, "direction": "INBOUND", "startedAt": "2026-11-18 10:53:20", "aiConversationId": 4712, "bookedSeconds": 3540, "objectType": "AgentVoiceCall", "id": 8816 },
     { "voiceProvider": "openAiLive", "accountId": 12, "direction": "OUTBOUND", "startedAt": "2026-11-18 11:06:40", "endedAt": "2026-11-18 11:09:45", "endReason": "COMPLETED", "aiConversationId": 4711, "bookedSeconds": 180, "objectType": "AgentVoiceCall", "id": 8815 }
   ], "objectType": "AgentVoiceCalls" },
-  "agentVoiceCallDerivedValues": [
+  "agentVoiceCallDerivedValues": { "elements": [
     { "callId": 8818, "callState": "RINGING", "objectType": "AdminAgentVoiceCallDerivedValues" },
     { "callId": 8817, "callState": "IN_PROGRESS", "bookedCosts": { "currency": { "isoCode": "USD", "displaySymbolBeforeAmount": false, "objectType": "Currency" }, "amount": 0.16199999999999998, "objectType": "MoneyAmount" }, "objectType": "AdminAgentVoiceCallDerivedValues" },
     { "callId": 8816, "callState": "ENDED", "bookedCosts": { "currency": { "isoCode": "USD", "displaySymbolBeforeAmount": false, "objectType": "Currency" }, "amount": 2.1239999999999997, "objectType": "MoneyAmount" }, "objectType": "AdminAgentVoiceCallDerivedValues" },
     { "callId": 8815, "callState": "ENDED", "bookedCosts": { "currency": { "isoCode": "USD", "displaySymbolBeforeAmount": false, "objectType": "Currency" }, "amount": 0.10799999999999998, "objectType": "MoneyAmount" }, "objectType": "AdminAgentVoiceCallDerivedValues" }
-  ]
+  ], "objectType": "AdminAgentVoiceCallsDerivedValues" }
 }`);
 
 /** The detail answer of the backend for call 8815. */
@@ -57,7 +57,7 @@ describe("the status maps of the admin call screens", () => {
   });
 
   it("have a status for every state and direction the backend answers in its examples", () => {
-    const answeredStates = [...callsResponse.agentVoiceCallDerivedValues.map(derivedValues => derivedValues.callState), callResponse.callState];
+    const answeredStates = [...(callsResponse.agentVoiceCallDerivedValues.elements ?? []).map(derivedValues => derivedValues.callState), callResponse.callState];
     for (const callState of answeredStates) expect(callState in format.AGENT_VOICE_CALL_STATE, callState).toBe(true);
     for (const call of callsResponse.agentVoiceCalls.elements ?? []) expect(call.direction in format.AGENT_VOICE_CALL_DIRECTION, call.direction).toBe(true);
     expect(String(callResponse.endReason) in format.AGENT_VOICE_CALL_END_REASON).toBe(true);
@@ -89,11 +89,21 @@ describe("the helpers of the admin call screens", () => {
     expect(derivedValuesByCallId.get(8816)?.callState).toBe("ENDED");
     expect(derivedValuesByCallId.get(8815)?.bookedCosts?.amount).toBe(0.10799999999999998);
     expect(derivedValuesByCallId.get(9999)).toBe(undefined);
-    const withoutOneEntry = format.agentVoiceAdminCallDerivedValuesByCallIdOf(callsResponse.agentVoiceCallDerivedValues.slice(1));
+    const withoutOneEntry = format.agentVoiceAdminCallDerivedValuesByCallIdOf({ elements: callsResponse.agentVoiceCallDerivedValues.elements?.slice(1) });
     expect(withoutOneEntry.get(8818)).toBe(undefined);
     expect(withoutOneEntry.size).toBe(3);
     expect(format.agentVoiceAdminCallDerivedValuesByCallIdOf(undefined).size).toBe(0);
     expect(format.agentVoiceAdminCallDerivedValuesByCallIdOf(null).size).toBe(0);
+  });
+
+  it("join nothing for the set of an answer without a call, a set without elements and the former list shape", () => {
+    const answerWithoutCall: AgentVoiceAdminCallsResponse = JSON.parse(
+      `{ "agentVoiceCalls": { "elements": [], "objectType": "AgentVoiceCalls" }, "agentVoiceCallDerivedValues": { "elements": [], "objectType": "AdminAgentVoiceCallsDerivedValues" } }`
+    );
+    expect(format.agentVoiceAdminCallDerivedValuesByCallIdOf(answerWithoutCall.agentVoiceCallDerivedValues).size).toBe(0);
+    expect(format.agentVoiceAdminCallDerivedValuesByCallIdOf({}).size).toBe(0);
+    const formerListShape = JSON.parse(`[{ "callId": 8818, "callState": "RINGING", "objectType": "AdminAgentVoiceCallDerivedValues" }]`) as AgentVoiceAdminCallsResponse["agentVoiceCallDerivedValues"];
+    expect(format.agentVoiceAdminCallDerivedValuesByCallIdOf(formerListShape).size).toBe(0);
   });
 
   it("take the duration from the two times, the same the backend answers, and none without both", () => {

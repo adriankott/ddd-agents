@@ -209,8 +209,17 @@ enum. Skill: `ddd-module-agents-voice-specialist` — load it before changing vo
   text only.
 - **What voice hands on is a value object, never a keyed array:** seed rows (`AgentVoiceSeedInputMessage`), completed
   sentences (`LiveTranscriptSentence`), the ring (`AgentVoiceRingPayload` with `AgentVoiceRingCallerContext`, rendered
-  only in `toPayloadJson()`), task answers (`AgentCallTaskStart`, `AgentCallTaskOutcome`). A collection is a typed
-  list.
+  only in `toPayloadJson()`), task answers (`AgentCallTaskStart`, `AgentCallTaskOutcome`).
+- **A list of objects on a public or protected signature or on a DTO is an object set, never `X[]`**
+  (`AgentVoiceSeedInputMessages`, `LiveTranscriptSentences`, `AgentVoiceCalls`, `AdminAgentVoiceCallsDerivedValues`,
+  the trace summary's sets), and its element class has a deliberate `uniqueKey()`: the object itself
+  (`spl_object_id`) where two equal elements are two elements and the order counts (sentences, seed rows, pushes),
+  a content key where the content is the identity (the derived values of a call: the call's id). An array stays only
+  as state of a service that is never serialised and never returned, and its comment says exactly that. Scalar lists,
+  wire and storage documents and config documents stay arrays.
+- **The package's own voice channel provider is the fallback** (`AgentVoiceChannelService`): an application's
+  provider is asked first and the package's last, recognised by its class; only an application's providers are
+  counted for the "several providers" warning.
 - **Who is rung:** a ring starts only while a client of the account listens (`isClientListening()` of the account
   audience). A bound transport answers; without its answer a fresh presence statement counts, and the account-level
   realtime read states it for a client that only polls (`stampUIClientOfAccount()`: a cache entry per account, written
@@ -231,7 +240,9 @@ enum. Skill: `ddd-module-agents-voice-specialist` — load it before changing vo
 
 `AgentMessengerTransports` lists six transports and the routing. The framework registers neither; the host copies them
 into its messenger configuration and runs one consumer per transport (`examples/workers.yaml`). The voice channel has
-two transports of its own (`AgentVoiceMessengerTransports`), copied only by an application that switches voice on.
+two transports of its own (`AgentVoiceMessengerTransports`), copied only by an application that switches voice on:
+the Messenger template of the installation skill and `examples/workers.yaml` carry them as a commented block headed
+"only when voice is enabled".
 
 ## Table prefix
 

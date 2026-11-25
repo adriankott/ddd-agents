@@ -46,4 +46,14 @@ class AdminAgentVoiceCallDerivedValues extends ValueObject
 
         return $agentVoiceCallDerivedValues;
     }
+
+    /**
+     * The key of an entry in {@see AdminAgentVoiceCallsDerivedValues} is the id of its call: the identity of an entry
+     * is the call it describes, so the list holds one entry per call. An entry without a call id is keyed by the
+     * object itself.
+     */
+    public function uniqueKey(): string
+    {
+        return static::uniqueKeyStatic($this->callId ?? spl_object_id($this));
+    }
 }

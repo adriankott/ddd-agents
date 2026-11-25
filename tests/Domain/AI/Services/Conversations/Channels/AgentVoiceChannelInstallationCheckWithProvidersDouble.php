@@ -14,8 +14,8 @@ class AgentVoiceChannelInstallationCheckWithProvidersDouble extends AgentVoiceCh
     {
     }
 
-    protected function getRegisteredVoiceChannelProviderClassNames(): array
+    protected function getRegisteredApplicationVoiceChannelProviderClassNames(): array
     {
-        return $this->agentVoiceChannelService->getRegisteredVoiceChannelProviderClassNames();
+        return $this->agentVoiceChannelService->getRegisteredApplicationVoiceChannelProviderClassNames();
     }
 }

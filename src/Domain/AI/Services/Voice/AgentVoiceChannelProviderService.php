@@ -22,7 +22,8 @@ use Throwable;
  * of the answered call on a conversation, whether a ring reaches the owner right now (the `voiceAppRing` variant
  * dimension), and the task texts of a conversation's calls. Available while the voice channel can run in the
  * installation ({@see AgentVoiceCallAdmissionService::canVoiceRunHere()}); an application registers nothing, and it
- * keeps no subclass of the core's `AgentVoiceChannelService` beside this provider.
+ * keeps no subclass of the core's `AgentVoiceChannelService` beside this provider. It is the fallback of the seam: an
+ * application's own provider is asked before it, and it is not counted among the providers an application registered.
  *
  * Override point of an application's subclass at the same path: {@see isCallReachReadingAskedFor()}, for an
  * application that asks its own class which dimensions it answers. The reading itself and its dimensions are those of
@@ -36,7 +37,7 @@ class AgentVoiceChannelProviderService extends Service implements AgentVoiceChan
     /**
      * @var array<string, array{0: int, 1: AgentVoiceCallReachableChannels|null}> conversation object + id → [unix time, reading].
      * In memory only, and keyed by the conversation OBJECT, so a later job that loads the conversation again reads
-     * afresh.
+     * afresh. A keyed array, not a set: an implementation detail of the service, never serialised and never returned.
      */
     protected array $voiceCallReachProbeMemoByConversationKey = [];
 

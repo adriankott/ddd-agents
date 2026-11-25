@@ -8,6 +8,7 @@ use DDD\Domain\AI\Entities\Conversations\TraceEvents\AIConversationTraceEvent;
 use DDD\Domain\AI\Entities\Voice\AgentVoiceConfiguration;
 use DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceCall;
 use DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceCallEnd;
+use DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceCalls;
 use DDD\Domain\AI\Services\Conversations\TraceEvents\AIConversationTraceEventsService;
 use DDD\Infrastructure\Services\DDDService;
 use DDD\Infrastructure\Services\Service;
@@ -111,16 +112,14 @@ class AgentVoiceCallEndsService extends Service
 
     /**
      * The open call of this conversation: a running one before a ringing one (the open calls come newest first).
-     *
-     * @param AgentVoiceCall[] $openCalls
      */
-    protected function findOpenCallOfConversation(array $openCalls, ?int $currentConversationId, int $nowUnixTime): ?AgentVoiceCall
+    protected function findOpenCallOfConversation(AgentVoiceCalls $openCalls, ?int $currentConversationId, int $nowUnixTime): ?AgentVoiceCall
     {
         if ($currentConversationId === null) {
             return null;
         }
         $ringingCallOfConversation = null;
-        foreach ($openCalls as $openCall) {
+        foreach ($openCalls->getElements() as $openCall) {
             if ($openCall->aiConversationId !== $currentConversationId) {
                 continue;
             }
@@ -134,20 +133,17 @@ class AgentVoiceCallEndsService extends Service
     }
 
     /**
-     * @param AgentVoiceCall[] $agentVoiceCalls
+     * The ids of the given calls, in their order.
+     *
      * @return int[]
      */
-    protected function collectCallIds(array $agentVoiceCalls): array
+    protected function collectCallIds(AgentVoiceCalls $agentVoiceCalls): array
     {
-        return array_map(static fn (AgentVoiceCall $agentVoiceCall): int => (int)$agentVoiceCall->id, $agentVoiceCalls);
+        return array_map(static fn (AgentVoiceCall $agentVoiceCall): int => (int)$agentVoiceCall->id, $agentVoiceCalls->getElements());
     }
 
-    /**
-     * The owner account's calls that ring or run now ({@see AgentVoiceCallsService::findOpenCallsOfAccountId()}).
-     *
-     * @return AgentVoiceCall[]
-     */
-    protected function findOpenCalls(int $ownerAccountId): array
+    /** The owner account's calls that ring or run now ({@see AgentVoiceCallsService::findOpenCallsOfAccountId()}). */
+    protected function findOpenCalls(int $ownerAccountId): AgentVoiceCalls
     {
         return $this->getAgentVoiceCallsService()->findOpenCallsOfAccountId($ownerAccountId)->getOpenCallsAt(time());
     }

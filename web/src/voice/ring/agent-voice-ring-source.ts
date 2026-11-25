@@ -13,17 +13,6 @@ export interface AgentVoiceRingSource {
   subscribe(onRing: (ring: AgentVoiceRing) => void, onRingCleared: (callId: number) => void): () => void;
 }
 
-/**
- * Starts the account realtime poll (`createAccountRealtimePoll` of `./ui`) with the arrival hook the ring source hands in:
- * `onMessage => createAccountRealtimePoll({ readAccountRealtime: client.getAccountRealtimeMessages, onMessage })`.
- * For an application that wants the poll to run only while a ring can show: the ring source starts it with its first
- * subscriber and stops it with its last. An application that reads further message types from the same poll passes
- * the poll itself instead and subscribes to it beside the ring source.
- */
-export type AgentVoiceAccountRealtimePollStarter = (
-  onMessage: (message: AgentRealtimeMessageDelivery) => void,
-) => AccountRealtimePoll;
-
 interface AgentVoiceRingSubscriber {
   onRing: (ring: AgentVoiceRing) => void;
   onRingCleared: (callId: number) => void;
@@ -41,22 +30,19 @@ interface AgentVoiceKnownRing {
  * declined on another client, canceled, past its deadline) as a cleared ring. A subscriber is told `onRingCleared`
  * only for a ring it was handed, as an arrival or in the hand-over when it subscribed.
  *
- * It listens while somebody is subscribed. Given the poll itself, it subscribes to it with the first subscriber and
- * leaves it with the last; the poll stays the application's, which stops it. Given a function that starts the poll, it
- * starts the poll with the first subscriber and stops it with the last.
+ * It listens while somebody is subscribed: it subscribes to the poll with the first subscriber and leaves it with the
+ * last. The poll stays the application's, which creates and stops it; the ring source never stops it.
  */
 export class AgentVoiceAccountRealtimeRingSource implements AgentVoiceRingSource {
-  protected readonly accountRealtimePollOrStarter: AccountRealtimePoll | AgentVoiceAccountRealtimePollStarter;
+  protected readonly accountRealtimePoll: AccountRealtimePoll;
   protected readonly subscribers = new Set<AgentVoiceRingSubscriber>();
   /** The rings delivered while it listens, by call: a subscriber that comes later still gets the ones in their deadline. */
   protected readonly knownRingsByCallId = new Map<number, AgentVoiceKnownRing>();
-  /** The poll a starter created; this source stops it. Undefined for a poll of the application. */
-  protected startedAccountRealtimePoll: AccountRealtimePoll | undefined;
   /** Set while it listens to the poll. */
   protected unsubscribeFromAccountRealtimePoll: (() => void) | undefined;
 
-  constructor(accountRealtimePollOrStarter: AccountRealtimePoll | AgentVoiceAccountRealtimePollStarter) {
-    this.accountRealtimePollOrStarter = accountRealtimePollOrStarter;
+  constructor(accountRealtimePoll: AccountRealtimePoll) {
+    this.accountRealtimePoll = accountRealtimePoll;
   }
 
   subscribe(onRing: (ring: AgentVoiceRing) => void, onRingCleared: (callId: number) => void): () => void {
@@ -104,28 +90,12 @@ export class AgentVoiceAccountRealtimeRingSource implements AgentVoiceRingSource
     subscriber.onRing(knownRing.ring);
   }
 
-  /**
-   * The poll hands over the messages open now, then every arrival and every clear. A started poll delivers its
-   * arrivals through the hook it was started with, so only the clears are subscribed there.
-   */
+  /** The poll hands over the messages open now, then every arrival and the clear of every message it handed over. */
   protected listenToAccountRealtimePoll(): void {
-    const accountRealtimePollOrStarter = this.accountRealtimePollOrStarter;
-    if (typeof accountRealtimePollOrStarter !== "function") {
-      this.unsubscribeFromAccountRealtimePoll = accountRealtimePollOrStarter.subscribe({
-        onMessage: (message) => {
-          this.acceptRealtimeMessage(message);
-        },
-        onMessageCleared: (message) => {
-          this.acceptClearedRealtimeMessage(message);
-        },
-      });
-      return;
-    }
-    const startedAccountRealtimePoll = accountRealtimePollOrStarter((message) => {
-      this.acceptRealtimeMessage(message);
-    });
-    this.startedAccountRealtimePoll = startedAccountRealtimePoll;
-    this.unsubscribeFromAccountRealtimePoll = startedAccountRealtimePoll.subscribe({
+    this.unsubscribeFromAccountRealtimePoll = this.accountRealtimePoll.subscribe({
+      onMessage: (message) => {
+        this.acceptRealtimeMessage(message);
+      },
       onMessageCleared: (message) => {
         this.acceptClearedRealtimeMessage(message);
       },
@@ -135,18 +105,14 @@ export class AgentVoiceAccountRealtimeRingSource implements AgentVoiceRingSource
   protected leaveAccountRealtimePoll(): void {
     this.unsubscribeFromAccountRealtimePoll?.();
     this.unsubscribeFromAccountRealtimePoll = undefined;
-    this.startedAccountRealtimePoll?.stop();
-    this.startedAccountRealtimePoll = undefined;
     this.knownRingsByCallId.clear();
   }
 }
 
 /**
  * The ring source over the account realtime poll of `./ui`:
- * `createAgentVoiceRingSource(createAccountRealtimePoll({ readAccountRealtime, … }))`. A function that starts the poll
- * (`AgentVoiceAccountRealtimePollStarter`) is taken as well. An application with its own ring transport passes its own
- * `AgentVoiceRingSource` instead.
+ * `createAgentVoiceRingSource(createAccountRealtimePoll({ readAccountRealtime, … }))`. An application with its own
+ * ring transport passes its own `AgentVoiceRingSource` instead.
  */
-export const createAgentVoiceRingSource = (
-  accountRealtimePollOrStarter: AccountRealtimePoll | AgentVoiceAccountRealtimePollStarter,
-): AgentVoiceRingSource => new AgentVoiceAccountRealtimeRingSource(accountRealtimePollOrStarter);
+export const createAgentVoiceRingSource = (accountRealtimePoll: AccountRealtimePoll): AgentVoiceRingSource =>
+  new AgentVoiceAccountRealtimeRingSource(accountRealtimePoll);

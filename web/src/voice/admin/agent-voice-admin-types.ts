@@ -52,6 +52,7 @@ export interface AgentVoiceAdminCall {
   changeHistory?: AgentVoiceAdminChangeHistory | null;
 }
 
+/** A set as the routes answer it: its entries are `elements`. */
 export interface AgentVoiceAdminElements<T> {
   elements?: T[];
 }
@@ -81,8 +82,11 @@ export interface AgentVoiceAdminCallDerivedValues {
 /** `GET /calls`: the calls the signed-in account may read, newest first. The answer carries no total count. */
 export interface AgentVoiceAdminCallsResponse {
   agentVoiceCalls: AgentVoiceAdminElements<AgentVoiceAdminCall>;
-  /** One entry per call of `agentVoiceCalls.elements`, in the same order; joined by `callId`. */
-  agentVoiceCallDerivedValues: AgentVoiceAdminCallDerivedValues[];
+  /**
+   * A set like `agentVoiceCalls`: one entry per call of `agentVoiceCalls.elements`, in the same order; joined by
+   * `callId`. An answer without a call carries the set with no entry.
+   */
+  agentVoiceCallDerivedValues: AgentVoiceAdminElements<AgentVoiceAdminCallDerivedValues>;
 }
 
 /** `GET /calls/{callId}`: one call with what a screen would otherwise compute or look up. */

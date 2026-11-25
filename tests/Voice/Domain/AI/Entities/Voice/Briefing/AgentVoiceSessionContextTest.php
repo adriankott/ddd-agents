@@ -6,6 +6,7 @@ namespace DDD\Tests\Agents\Voice\Domain\AI\Entities\Voice\Briefing;
 
 use DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceCall;
 use DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceSeedInputMessage;
+use DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceSeedInputMessages;
 use DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceSessionContext;
 use DDD\Domain\AI\Entities\Voice\Prompts\AgentVoiceAIPromptNames;
 use DDD\Domain\AI\Entities\Voice\Prompts\AgentVoicePromptText;
@@ -146,13 +147,13 @@ class AgentVoiceSessionContextTest extends AgentVoiceUnitTestCase
     {
         $seedInputMessages = static::buildFullContext(AgentVoiceCall::DIRECTION_INBOUND)->buildLiveCreationSeedInputMessages();
 
-        static::assertSameValueObjects([
+        static::assertSameValueObjects(AgentVoiceSeedInputMessages::fromMessages(
             AgentVoiceSeedInputMessage::create('developer', 'Start of the call: you speak first, right now, before the caller says anything — confirm briefly and warmly that they are connected and ask what this is about, in one or two short sentences. ' . static::MIRRORED_GERMAN . ' Then stop and listen.'),
             AgentVoiceSeedInputMessage::create('developer', "Your character — applies on a call exactly as in the chat:\nWarm and quick."),
             AgentVoiceSeedInputMessage::create('developer', "The owner's standing rules — follow them:\n- Never call before nine."),
             AgentVoiceSeedInputMessage::create('developer', "What was last discussed with the owner:\nThe menu update."),
             AgentVoiceSeedInputMessage::create('developer', "The owner's product scope (context only, do not recite):\nListings and reviews."),
-        ], $seedInputMessages);
+        ), $seedInputMessages);
     }
 
     public function testTheOpeningRowOfACallTheAgentStartedSaysWhyItCalls(): void
@@ -175,7 +176,7 @@ class AgentVoiceSessionContextTest extends AgentVoiceUnitTestCase
         $agentVoiceSessionContext->productCapabilities = 'Listings.';
 
         static::assertSameValueObjects(
-            [AgentVoiceSeedInputMessage::create('developer', "The owner's product scope (context only, do not recite):\nListings.")],
+            AgentVoiceSeedInputMessages::fromMessages(AgentVoiceSeedInputMessage::create('developer', "The owner's product scope (context only, do not recite):\nListings.")),
             $agentVoiceSessionContext->buildLiveSeedInputMessages()
         );
         static::assertCount(2, $agentVoiceSessionContext->buildLiveCreationSeedInputMessages());
@@ -202,10 +203,10 @@ class AgentVoiceSessionContextTest extends AgentVoiceUnitTestCase
             $liveInstructions
         );
         static::assertSameValueObjects(
-            [
+            AgentVoiceSeedInputMessages::fromMessages(
                 AgentVoiceSeedInputMessage::create('developer', "The owner's product scope (context only, do not recite):\nListings."),
                 AgentVoiceSeedInputMessage::create('developer', 'Workspace notes of North'),
-            ],
+            ),
             $applicationContext->buildLiveSeedInputMessages()
         );
         static::assertStringStartsWith('The owner opened this call from inside the application and is signed in (account 0).', $liveInstructions);

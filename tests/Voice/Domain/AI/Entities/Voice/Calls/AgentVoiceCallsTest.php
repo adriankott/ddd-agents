@@ -6,6 +6,8 @@ namespace DDD\Tests\Agents\Voice\Domain\AI\Entities\Voice\Calls;
 
 use DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceCall;
 use DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceCalls;
+use DDD\Tests\Agents\Voice\Doubles\AnotherMediumAgentVoiceCall;
+use DDD\Tests\Agents\Voice\Doubles\KioskCountingAgentVoiceCalls;
 use DDD\Tests\Agents\Voice\Support\AgentVoiceCallFixtures;
 use DDD\Tests\Agents\Voice\Support\AgentVoiceUnitTestCase;
 
@@ -82,8 +84,8 @@ class AgentVoiceCallsTest extends AgentVoiceUnitTestCase
 
         static::assertSame('Calls — 0 total (0 inbound, 0 outbound), newest first:', $agentVoiceCalls->buildLlmMarkdown(AgentVoiceCallFixtures::NOW_UNIX_TIME, null, false));
         static::assertSame('Calls ringing or running right now — 0 total (0 inbound, 0 outbound), newest first:', $agentVoiceCalls->buildLlmMarkdown(AgentVoiceCallFixtures::NOW_UNIX_TIME, 30, true));
-        static::assertSame([], $agentVoiceCalls->getOpenCallsAt(AgentVoiceCallFixtures::NOW_UNIX_TIME));
-        static::assertSame([], $agentVoiceCalls->getRunningCalls());
+        static::assertCount(0, $agentVoiceCalls->getOpenCallsAt(AgentVoiceCallFixtures::NOW_UNIX_TIME));
+        static::assertCount(0, $agentVoiceCalls->getRunningCalls());
     }
 
     public function testToLlmMarkdownIsTheLogReadNowWithoutAMarker(): void
@@ -115,7 +117,7 @@ class AgentVoiceCallsTest extends AgentVoiceUnitTestCase
         $agentVoiceCalls->add($endedCall);
 
         static::assertSame([9, 8, 7], static::collectCallIds($agentVoiceCalls->getOpenCallsAt($nowUnixTime)));
-        static::assertSame([], $agentVoiceCalls->getOpenCallsAt($nowUnixTime + 100000));
+        static::assertCount(0, $agentVoiceCalls->getOpenCallsAt($nowUnixTime + 100000));
     }
 
     public function testTheRunningCalls(): void
@@ -129,14 +131,47 @@ class AgentVoiceCallsTest extends AgentVoiceUnitTestCase
         static::assertSame([8, 7], static::collectCallIds($agentVoiceCalls->getRunningCalls()));
     }
 
+    public function testTheOpenAndTheRunningCallsAreASetOfTheReceiversClassInItsOrder(): void
+    {
+        $nowUnixTime = AgentVoiceCallFixtures::NOW_UNIX_TIME;
+        $agentVoiceCalls = $this->buildKioskCallLogAt($nowUnixTime);
+
+        $openCalls = $agentVoiceCalls->getOpenCallsAt($nowUnixTime);
+        $runningCalls = $agentVoiceCalls->getRunningCalls();
+
+        static::assertSame(KioskCountingAgentVoiceCalls::class, $openCalls::class);
+        static::assertSame(KioskCountingAgentVoiceCalls::class, $runningCalls::class);
+        static::assertSame(AgentVoiceCalls::class, (new AgentVoiceCalls())->getOpenCallsAt($nowUnixTime)::class);
+        static::assertSame([3, 9, 8], static::collectCallIds($openCalls));
+        static::assertSame([3, 8], static::collectCallIds($runningCalls));
+        static::assertNotSame($agentVoiceCalls, $openCalls, 'a set of its own, the receiver keeps its calls');
+        static::assertCount(5, $agentVoiceCalls);
+    }
+
+    public function testTheSummaryLineCountsTheSetItIsCalledOn(): void
+    {
+        $nowUnixTime = AgentVoiceCallFixtures::NOW_UNIX_TIME;
+        $agentVoiceCalls = $this->buildKioskCallLogAt($nowUnixTime);
+
+        static::assertSame('Calls — 5 total (3 inbound, 2 outbound), newest first: (2 by kiosk)', explode("\n", $agentVoiceCalls->buildLlmMarkdown($nowUnixTime, null, false))[0]);
+        static::assertSame(
+            'Calls ringing or running right now — 3 total (2 inbound, 1 outbound), newest first: (1 by kiosk)',
+            explode("\n", $agentVoiceCalls->getOpenCallsAt($nowUnixTime)->buildLlmMarkdown($nowUnixTime, null, true))[0]
+        );
+        static::assertSame(
+            'Calls — 2 total (2 inbound, 0 outbound), newest first: (1 by kiosk)',
+            static::invokeMethod($agentVoiceCalls->getRunningCalls(), 'buildLlmMarkdownSummaryLine', [false])
+        );
+        static::assertSame('Calls — 0 total (0 inbound, 0 outbound), newest first:', static::invokeMethod(new AgentVoiceCalls(), 'buildLlmMarkdownSummaryLine', [false]));
+    }
+
     /**
-     * @param AgentVoiceCall[] $agentVoiceCalls
      * @return array<int, int|string|null>
      */
-    protected static function collectCallIds(array $agentVoiceCalls): array
+    protected static function collectCallIds(AgentVoiceCalls $agentVoiceCalls): array
     {
         $callIds = [];
-        foreach ($agentVoiceCalls as $agentVoiceCall) {
+        foreach ($agentVoiceCalls->getElements() as $agentVoiceCall) {
             $callIds[] = $agentVoiceCall->id;
         }
         return $callIds;
@@ -161,6 +196,29 @@ class AgentVoiceCallsTest extends AgentVoiceUnitTestCase
         $callOnAnotherConversation = AgentVoiceCallFixtures::buildCallAt($nowUnixTime, -100, null, -20);
         $callOnAnotherConversation->aiConversationId = 40;
         $agentVoiceCalls->add($callOnAnotherConversation);
+        return $agentVoiceCalls;
+    }
+
+    /**
+     * Five calls in the set of an application with a kiosk medium, newest first: #3 a running kiosk call, #9 rings
+     * (outbound), #8 runs, #4 an ended outbound kiosk call, #5 an ended call. Three are inbound, two by kiosk.
+     */
+    protected function buildKioskCallLogAt(int $nowUnixTime): KioskCountingAgentVoiceCalls
+    {
+        $agentVoiceCalls = new KioskCountingAgentVoiceCalls();
+        $runningKioskCall = AgentVoiceCallFixtures::buildCallAt($nowUnixTime, -60, null, -50, null, AnotherMediumAgentVoiceCall::class);
+        $runningKioskCall->id = 3;
+        $ringingCall = AgentVoiceCallFixtures::buildCallAt($nowUnixTime, -5, 60);
+        $ringingCall->id = 9;
+        $ringingCall->direction = AgentVoiceCall::DIRECTION_OUTBOUND;
+        $runningCall = AgentVoiceCallFixtures::buildCallAt($nowUnixTime, -100, null, -90);
+        $runningCall->id = 8;
+        $endedKioskCall = AgentVoiceCallFixtures::buildCallAt($nowUnixTime, -300, null, -250, -200, AnotherMediumAgentVoiceCall::class);
+        $endedKioskCall->id = 4;
+        $endedKioskCall->direction = AgentVoiceCall::DIRECTION_OUTBOUND;
+        $endedCall = AgentVoiceCallFixtures::buildCallAt($nowUnixTime, -400, null, -350, -300);
+        $endedCall->id = 5;
+        $agentVoiceCalls->add($runningKioskCall, $ringingCall, $runningCall, $endedKioskCall, $endedCall);
         return $agentVoiceCalls;
     }
 }

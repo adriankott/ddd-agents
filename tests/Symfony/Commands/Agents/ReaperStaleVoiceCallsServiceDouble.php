@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DDD\Tests\Agents\Symfony\Commands\Agents;
 
 use DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceCall;
+use DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceCalls;
 use DDD\Domain\AI\Services\Voice\AgentVoiceCallsService;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -39,7 +40,7 @@ class ReaperStaleVoiceCallsServiceDouble extends AgentVoiceCallsService
     {
     }
 
-    public function closeStaleRunningCalls(): array
+    public function closeStaleRunningCalls(): AgentVoiceCalls
     {
         $this->sweepCount++;
         $this->recoveryPassLog->record('voice-sweep');
@@ -51,7 +52,10 @@ class ReaperStaleVoiceCallsServiceDouble extends AgentVoiceCallsService
         if ($this->sweepFailure !== null) {
             throw $this->sweepFailure;
         }
-        return $this->closedCalls;
+        $closedCalls = new AgentVoiceCalls();
+        $closedCalls->add(...$this->closedCalls);
+
+        return $closedCalls;
     }
 
     public function getRunningCallStaleAfterMinutes(): int

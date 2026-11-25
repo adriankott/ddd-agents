@@ -35,7 +35,7 @@ class FakeBaseApi {
   }
 }
 
-const emptyCallsResponse: AgentVoiceAdminCallsResponse = { agentVoiceCalls: { elements: [] }, agentVoiceCallDerivedValues: [] };
+const emptyCallsResponse: AgentVoiceAdminCallsResponse = { agentVoiceCalls: { elements: [] }, agentVoiceCallDerivedValues: { elements: [] } };
 
 describe("the filters of the call list", () => {
   it("narrow nothing without a filter", () => {

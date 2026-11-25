@@ -23,6 +23,7 @@ import type {
   AgentVoiceAdminCallDirection,
   AgentVoiceAdminCallEndReason,
   AgentVoiceAdminCallState,
+  AgentVoiceAdminElements,
   AgentVoiceAdminMoneyAmount,
 } from "./agent-voice-admin-types";
 
@@ -169,14 +170,15 @@ export const agentVoiceAdminCallDurationInSecondsOf = (
 };
 
 /**
- * What the server derived for the list's calls (the state, the costs), by call id. A call the answer names no entry
- * for has none here: its row then shows no state and no costs.
+ * What the server derived for the list's calls (the state, the costs), by call id: reads the set the list answer
+ * carries (`AgentVoiceAdminCallsResponse.agentVoiceCallDerivedValues`). A call the answer names no entry for has none
+ * here: its row then shows no state and no costs.
  */
 export const agentVoiceAdminCallDerivedValuesByCallIdOf = (
-  agentVoiceCallDerivedValues: readonly AgentVoiceAdminCallDerivedValues[] | null | undefined,
+  agentVoiceCallDerivedValues: AgentVoiceAdminElements<AgentVoiceAdminCallDerivedValues> | null | undefined,
 ): ReadonlyMap<number, AgentVoiceAdminCallDerivedValues> => {
   const derivedValuesByCallId = new Map<number, AgentVoiceAdminCallDerivedValues>();
-  for (const derivedValuesOfCall of agentVoiceCallDerivedValues ?? [])
+  for (const derivedValuesOfCall of agentVoiceCallDerivedValues?.elements ?? [])
     derivedValuesByCallId.set(derivedValuesOfCall.callId, derivedValuesOfCall);
   return derivedValuesByCallId;
 };

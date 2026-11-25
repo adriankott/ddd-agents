@@ -19,12 +19,12 @@ class AdminAgentVoiceCallsGetResponseDto extends RestResponseDto
     public AgentVoiceCalls $agentVoiceCalls;
 
     /**
-     * @var AdminAgentVoiceCallDerivedValues[] What the server derives per call: one entry per call of
+     * @var AdminAgentVoiceCallsDerivedValues What the server derives per call: one entry per call of
      * {@see self::$agentVoiceCalls}, in the same order, each with the call's id, the state of the call at the time of
      * the answer (`RINGING`, `IN_PROGRESS`, `ENDED`; one reading of the clock for all rows) and the costs of its booked
      * seconds at the catalog's present price per session second (no costs in an entry = no price known, or nothing
      * booked; not a read of an application's cost ledger)
      */
     #[Parameter(in: Parameter::RESPONSE, required: true)]
-    public array $agentVoiceCallDerivedValues = [];
+    public AdminAgentVoiceCallsDerivedValues $agentVoiceCallDerivedValues;
 }

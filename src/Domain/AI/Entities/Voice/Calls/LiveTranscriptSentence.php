@@ -38,4 +38,14 @@ class LiveTranscriptSentence extends ValueObject
 
         return $liveTranscriptSentence;
     }
+
+    /**
+     * The key of a sentence in {@see LiveTranscriptSentences} is the object itself, never its content: a speaker who
+     * says the same words in the same span twice has said two sentences, and the set keeps them in the order they
+     * were completed.
+     */
+    public function uniqueKey(): string
+    {
+        return static::uniqueKeyStatic(spl_object_id($this));
+    }
 }

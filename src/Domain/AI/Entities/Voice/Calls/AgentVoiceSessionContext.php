@@ -190,12 +190,13 @@ class AgentVoiceSessionContext extends ValueObject
     /**
      * The whole seed of a session: the opening row FIRST, then the briefing blocks. The adapter fills the seed in this
      * order up to its size limit, so the row that must never be cut goes first.
-     *
-     * @return AgentVoiceSeedInputMessage[]
      */
-    public function buildLiveCreationSeedInputMessages(): array
+    public function buildLiveCreationSeedInputMessages(): AgentVoiceSeedInputMessages
     {
-        return [$this->buildLiveOpeningSeedInputMessage(), ...$this->buildLiveSeedInputMessages()];
+        return AgentVoiceSeedInputMessages::fromMessages(
+            $this->buildLiveOpeningSeedInputMessage(),
+            ...$this->buildLiveSeedInputMessages()->getElements()
+        );
     }
 
     /**
@@ -203,10 +204,8 @@ class AgentVoiceSessionContext extends ValueObject
      * directives, what was last discussed and the product scope, then the application's rows (the call task is in the
      * instructions, {@see buildLiveCallTaskBlock()}). They sit where a live model keeps context instead of rules. Empty
      * blocks are skipped; the adapter caps count and size.
-     *
-     * @return AgentVoiceSeedInputMessage[]
      */
-    public function buildLiveSeedInputMessages(): array
+    public function buildLiveSeedInputMessages(): AgentVoiceSeedInputMessages
     {
         $seedInputMessages = [];
         if ($this->characterCore !== null && trim($this->characterCore) !== '') {
@@ -234,7 +233,10 @@ class AgentVoiceSessionContext extends ValueObject
             );
         }
 
-        return [...$seedInputMessages, ...$this->buildApplicationSeedInputMessages()];
+        return AgentVoiceSeedInputMessages::fromMessages(
+            ...$seedInputMessages,
+            ...$this->buildApplicationSeedInputMessages()->getElements()
+        );
     }
 
     /** The opening block: who is on the line and how the call opens, by who started the call. */
@@ -285,12 +287,10 @@ class AgentVoiceSessionContext extends ValueObject
 
     /**
      * Override point: further seed rows, after the product scope. Empty in the base.
-     *
-     * @return AgentVoiceSeedInputMessage[]
      */
-    protected function buildApplicationSeedInputMessages(): array
+    protected function buildApplicationSeedInputMessages(): AgentVoiceSeedInputMessages
     {
-        return [];
+        return new AgentVoiceSeedInputMessages();
     }
 
     /** The prompt of the opening block of a call the owner started. */

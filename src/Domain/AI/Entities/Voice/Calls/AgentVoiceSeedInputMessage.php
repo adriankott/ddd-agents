@@ -37,4 +37,13 @@ class AgentVoiceSeedInputMessage extends ValueObject
 
         return $agentVoiceSeedInputMessage;
     }
+
+    /**
+     * The key of a row in {@see AgentVoiceSeedInputMessages} is the object itself, never its content: two rows with
+     * the same role and text are two rows, and the set keeps them in the order they were added.
+     */
+    public function uniqueKey(): string
+    {
+        return static::uniqueKeyStatic(spl_object_id($this));
+    }
 }

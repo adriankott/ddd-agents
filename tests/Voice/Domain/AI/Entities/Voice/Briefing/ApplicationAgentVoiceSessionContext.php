@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DDD\Tests\Agents\Voice\Domain\AI\Entities\Voice\Briefing;
 
 use DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceSeedInputMessage;
+use DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceSeedInputMessages;
 use DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceSessionContext;
 
 /**
@@ -20,9 +21,11 @@ class ApplicationAgentVoiceSessionContext extends AgentVoiceSessionContext
         return $this->workspaceName !== null ? ['The call is about the workspace ' . $this->workspaceName . '.', ''] : [];
     }
 
-    protected function buildApplicationSeedInputMessages(): array
+    protected function buildApplicationSeedInputMessages(): AgentVoiceSeedInputMessages
     {
-        return $this->workspaceName !== null ? [AgentVoiceSeedInputMessage::create('developer', 'Workspace notes of ' . $this->workspaceName)] : [];
+        return $this->workspaceName !== null
+            ? AgentVoiceSeedInputMessages::fromMessages(AgentVoiceSeedInputMessage::create('developer', 'Workspace notes of ' . $this->workspaceName))
+            : new AgentVoiceSeedInputMessages();
     }
 
     protected function getOpeningPromptParameters(): array

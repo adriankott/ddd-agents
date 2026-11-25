@@ -7,6 +7,7 @@ namespace DDD\Domain\AI\Services\Conversations\Channels;
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Entities\Conversations\Channels\AgentCallTaskTexts;
 use DDD\Domain\AI\Entities\Conversations\Variants\AIConversationVariants;
+use DDD\Domain\AI\Services\Voice\AgentVoiceChannelProviderService;
 use DDD\Infrastructure\Exceptions\BadRequestException;
 use DDD\Infrastructure\Exceptions\InternalErrorException;
 use DDD\Infrastructure\Services\DDDService;
@@ -23,8 +24,12 @@ use Throwable;
  * conversation's calls.
  *
  * Each question goes to the voice channel provider ({@see AgentVoiceChannelProvider}, registered by its tag): exactly
- * one is asked — the first in container order that is available; more than one registered provider is a WARNING of
- * `app:agent:check-installation` and logged once. Without an available provider every answer is "no voice channel".
+ * one is asked. An application's own providers are asked first, in container order; the package's own provider
+ * ({@see AgentVoiceChannelProviderService}) is the fallback and is asked last, so an application's provider wins
+ * while it is available ({@see findActiveVoiceChannelProvider()}, the one place that orders them). The package's
+ * provider is not counted: only two or more providers of an application are a WARNING of
+ * `app:agent:check-installation` and logged once ({@see getRegisteredApplicationVoiceChannelProviderClassNames()},
+ * the one place that counts them). Without an available provider every answer is "no voice channel".
  * An application may still put a same-path subclass under its own root namespace instead; the core resolves this
  * service only through `DDDService::instance()->getService(AgentVoiceChannelService::class)`.
  */
@@ -60,19 +65,64 @@ class AgentVoiceChannelService extends Service
     }
 
     /**
-     * The one provider asked: the first available in container order; null = none (the defaults answer). More than
-     * one registered provider is logged once per process.
+     * The class names of the registered providers that are an application's: every registered provider but the
+     * package's own ({@see isPackageVoiceChannelProvider()}), in container order. The one place that counts the
+     * providers: two or more of these are what the installation check and the log line of this service report.
+     *
+     * @return string[]
+     */
+    public function getRegisteredApplicationVoiceChannelProviderClassNames(): array
+    {
+        $applicationProviderClassNames = [];
+        foreach ($this->agentVoiceChannelProviders as $agentVoiceChannelProvider) {
+            if (!$this->isPackageVoiceChannelProvider($agentVoiceChannelProvider)) {
+                $applicationProviderClassNames[] = get_class($agentVoiceChannelProvider);
+            }
+        }
+        return $applicationProviderClassNames;
+    }
+
+    /**
+     * The one provider asked; null = none (the defaults answer). The one place that orders the providers: an
+     * application's providers are asked first, in container order, and the package's own provider last, so an
+     * application's provider wins while it is available and the package's answers when the application has none or
+     * none of its own is available. Two or more providers of an application are logged once per process; the
+     * package's provider beside one of an application is not.
      */
     public function findActiveVoiceChannelProvider(): ?AgentVoiceChannelProvider
     {
-        $registeredProviderClassNames = $this->getRegisteredVoiceChannelProviderClassNames();
-        if (count($registeredProviderClassNames) > 1) {
+        $applicationProviderClassNames = $this->getRegisteredApplicationVoiceChannelProviderClassNames();
+        if (count($applicationProviderClassNames) > 1) {
             $this->reportWarningOnce(
                 'several-providers',
-                'Several voice channel providers are registered (' . implode(', ', $registeredProviderClassNames) . '); only the first available one is asked.'
+                'Several voice channel providers of the application are registered (' . implode(', ', $applicationProviderClassNames) . '); only the first available one is asked.'
             );
         }
+        return $this->findFirstAvailableVoiceChannelProvider(false) ?? $this->findFirstAvailableVoiceChannelProvider(true);
+    }
+
+    /**
+     * Whether `$agentVoiceChannelProvider` is the package's own provider: an object of exactly the class
+     * {@see AgentVoiceChannelProviderService}. Recognised by the class, never by a name or a tag an application could
+     * give its own provider. A subclass of it is an application's provider (the application's class is the one that
+     * answers, also when the container holds the package's class beside it).
+     */
+    protected function isPackageVoiceChannelProvider(AgentVoiceChannelProvider $agentVoiceChannelProvider): bool
+    {
+        return get_class($agentVoiceChannelProvider) === AgentVoiceChannelProviderService::class;
+    }
+
+    /**
+     * The first available provider in container order among the application's providers (`$amongPackageProviders`
+     * false) or among the package's own (true). A provider whose availability check throws is passed over and logged
+     * once per process.
+     */
+    protected function findFirstAvailableVoiceChannelProvider(bool $amongPackageProviders): ?AgentVoiceChannelProvider
+    {
         foreach ($this->agentVoiceChannelProviders as $agentVoiceChannelProvider) {
+            if ($this->isPackageVoiceChannelProvider($agentVoiceChannelProvider) !== $amongPackageProviders) {
+                continue;
+            }
             try {
                 if ($agentVoiceChannelProvider->isVoiceChannelAvailable()) {
                     return $agentVoiceChannelProvider;

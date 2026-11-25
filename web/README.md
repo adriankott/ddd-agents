@@ -299,9 +299,7 @@ What the application passes to `AgentVoiceCallProvider`:
   `createAgentVoiceRingSource(accountRealtimePoll)` listens to the account realtime poll of `/ui` while the incoming
   call is mounted: a ring message that arrives rings, and one a read finds gone (answered or declined on another
   client, canceled) ends the ring on this client with that read instead of at its deadline. The poll stays the
-  application's, which stops it. Given a function instead,
-  `createAgentVoiceRingSource((onMessage) => createAccountRealtimePoll({ readAccountRealtime, onMessage }))`, the ring
-  source starts the poll with its first subscriber and stops it with its last. An application with its own transport
+  application's, which creates and stops it; the ring source never stops it. An application with its own transport
   passes its own source (and reports a cleared ring through `onRingCleared`). Without a ring source nothing rings. The
   backend rings an account only while it knows one of its clients: the account read of the poll states the client's id
   (see `/ui`), with or without a `uiClient`.

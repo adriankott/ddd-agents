@@ -394,9 +394,10 @@ describe("createAgentsHttpConversationClient", () => {
       .mockRejectedValueOnce(Object.assign(new Error("aborted"), { name: "AbortError" }));
     const client = createAgentsHttpConversationClient({ baseUrl: "/c", fetch: failingFetch as unknown as typeof fetch, polling: false });
 
-    const networkFailure = await client.getConversationMetadata(1).catch((failure: unknown) => failure as AgentsClientError);
+    const networkFailure = await client.getConversationMetadata(1).catch((failure: unknown) => failure);
     const abortedFailure = await client.getConversationMetadata(1).catch((failure: unknown) => failure as AgentsClientError);
 
+    if (!(networkFailure instanceof AgentsClientError)) throw new Error("the transport failure did not reject with an AgentsClientError");
     expect(networkFailure.kind).toBe("network");
     expect(abortedFailure).toMatchObject({ kind: "other", code: "REQUEST_ABORTED" });
   });

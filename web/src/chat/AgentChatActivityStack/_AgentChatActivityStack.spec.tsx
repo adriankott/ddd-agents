@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import type { ActivityTicker } from "../controller/use-activity-ticker";
 import type { ActivityTickerLine } from "../controller/activity-ticker";
 import { DEFAULT_AGENT_CHAT_ACTIVITY_TIMING } from "../controller/chat-activity-timing";
+import { createAgentsChatStore } from "../store/create-agents-chat-store";
 import { AgentChatActivityIndicator } from "../AgentChatActivityIndicator/AgentChatActivityIndicator";
 import { ACTIVITY_STACK_VISIBLE_LINES, AgentChatActivityStack } from "./AgentChatActivityStack";
 
@@ -23,6 +24,9 @@ const ticker = (phase: ActivityTicker["phase"], lines: ActivityTickerLine[]): Ac
   historyTurns: [],
 });
 
+/** The chat's state the activity components may read; these specs need none of it. */
+const chatProps = { chatStore: createAgentsChatStore(), unansweredWidgetMessageId: null };
+
 const renderStack = (activityTicker: ActivityTicker, extra: { active?: boolean; failed?: boolean } = {}) =>
   render(
     <AgentChatActivityStack
@@ -31,6 +35,7 @@ const renderStack = (activityTicker: ActivityTicker, extra: { active?: boolean; 
       activityTicker={activityTicker}
       isAgentWorkingOnTask
       agentSpaceKey={1}
+      {...chatProps}
       activityTiming={{ ...DEFAULT_AGENT_CHAT_ACTIVITY_TIMING, linePaceMs: 2000, successBeatMs: 900 }}
     />,
   );
@@ -69,11 +74,11 @@ describe("AgentChatActivityStack", () => {
     expect(stack.style.getPropertyValue("--agents-activity-stack-move-duration")).toBe("500ms");
 
     rerender(
-      <AgentChatActivityStack active={false} failed={false} activityTicker={ticker("idle", [])} isAgentWorkingOnTask={false} agentSpaceKey={1} />,
+      <AgentChatActivityStack active={false} failed={false} activityTicker={ticker("idle", [])} isAgentWorkingOnTask={false} agentSpaceKey={1} {...chatProps} />,
     );
     expect(container.firstChild).toBeNull();
     rerender(
-      <AgentChatActivityStack active failed activityTicker={ticker("live", [line(1, "A")])} isAgentWorkingOnTask agentSpaceKey={1} />,
+      <AgentChatActivityStack active failed activityTicker={ticker("live", [line(1, "A")])} isAgentWorkingOnTask agentSpaceKey={1} {...chatProps} />,
     );
     expect(container.firstChild).toBeNull();
   });
@@ -81,7 +86,7 @@ describe("AgentChatActivityStack", () => {
 
 describe("AgentChatActivityIndicator dots", () => {
   it("keeps the bouncing dots by default and offers the calm ones", () => {
-    const props = { active: true, failed: false, activityTicker: ticker("live", []), isAgentWorkingOnTask: true, agentSpaceKey: 1 };
+    const props = { active: true, failed: false, activityTicker: ticker("live", []), isAgentWorkingOnTask: true, agentSpaceKey: 1, ...chatProps };
     const { container, rerender } = render(<AgentChatActivityIndicator {...props} />);
     expect(container.querySelector('[data-agents-activity-dots="bounce"]')).not.toBeNull();
     rerender(<AgentChatActivityIndicator {...props} dotsVariant="pulse" />);

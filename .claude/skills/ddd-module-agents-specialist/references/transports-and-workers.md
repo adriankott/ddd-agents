@@ -25,7 +25,8 @@ The message classes are persisted names: a message waiting in a queue during a d
 The optional voice channel has two transports of its own, `voice_live_session` and `voice_ring_deadline`
 (`AgentVoiceMessengerTransports`), which only an application that switches voice on copies; their pools have other
 rules than the six above (one process per running call, a stop grace above the longest call):
-`ddd-module-agents-voice-specialist`.
+`ddd-module-agents-voice-specialist`. The template and the example list below carry them as a commented block headed
+"only when voice is enabled".
 
 ## What the host writes
 

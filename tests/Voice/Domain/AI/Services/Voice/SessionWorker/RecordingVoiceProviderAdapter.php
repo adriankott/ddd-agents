@@ -6,6 +6,7 @@ namespace DDD\Tests\Agents\Voice\Domain\AI\Services\Voice\SessionWorker;
 
 use DDD\Domain\AI\Entities\Voice\AgentVoiceSettings;
 use DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceCall;
+use DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceSeedInputMessages;
 use DDD\Domain\AI\Services\Voice\Live\LiveSessionCreationResponse;
 use DDD\Domain\AI\Services\Voice\Providers\RealtimeVoiceProviderAdapter;
 use LogicException;
@@ -52,7 +53,7 @@ class RecordingVoiceProviderAdapter extends RealtimeVoiceProviderAdapter
         string $sdpOffer,
         string $liveInstructions,
         ?AgentVoiceSettings $effectiveVoiceSettings,
-        array $seedInputMessages = []
+        ?AgentVoiceSeedInputMessages $seedInputMessages = null
     ): array {
         throw new LogicException('The session worker never creates a session.');
     }

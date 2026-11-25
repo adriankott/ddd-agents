@@ -255,7 +255,7 @@ The folder [templates/](templates/) holds the files a host copies:
 | File | For |
 |---|---|
 | `templates/AgentUsageEnvelopeMiddleware.php`, `templates/AgentConversationOverheadCostsMiddleware.php` | the worker middlewares |
-| `templates/messenger.yaml` | the transport block |
+| `templates/messenger.yaml` | the transport block; the two voice transports as a commented block |
 | `templates/crons.sh` | the cron list: the package's scheduled commands and the three host commands above |
 
 Each PHP template names its placeholders in its first lines (`// placeholder {{NAME}} sample: Value`); with the

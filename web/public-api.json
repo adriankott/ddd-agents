@@ -1104,7 +1104,6 @@
       "useIsAgentVoiceCallActive"
     ],
     "types": [
-      "AgentVoiceAccountRealtimePollStarter",
       "AgentVoiceAdminCall",
       "AgentVoiceAdminCallDerivedValues",
       "AgentVoiceAdminCallDirection",

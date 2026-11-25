@@ -7,7 +7,7 @@ namespace DDD\Domain\AI\Services\Voice\Providers;
 use DDD\Domain\AI\Entities\Voice\AgentVoiceConfiguration;
 use DDD\Domain\AI\Entities\Voice\AgentVoiceSettings;
 use DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceCall;
-use DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceSeedInputMessage;
+use DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceSeedInputMessages;
 use DDD\Domain\AI\Entities\Voice\Prompts\AgentVoiceAIPromptNames;
 use DDD\Domain\AI\Entities\Voice\Prompts\AgentVoicePromptText;
 use DDD\Domain\AI\Services\Voice\Live\LiveSessionCreationResponse;
@@ -168,14 +168,14 @@ abstract class RealtimeVoiceProviderAdapter extends Service
      * The request that creates the session of a call: the instructions, the voice of the call's settings, the seed
      * rows and the client's offer.
      *
-     * @param AgentVoiceSeedInputMessage[] $seedInputMessages the seed rows, the most important first
+     * @param AgentVoiceSeedInputMessages|null $seedInputMessages the seed rows, the most important first; null = none
      * @return array<string, mixed>
      */
     abstract public function buildSessionCreationPayload(
         string $sdpOffer,
         string $liveInstructions,
         ?AgentVoiceSettings $effectiveVoiceSettings,
-        array $seedInputMessages = []
+        ?AgentVoiceSeedInputMessages $seedInputMessages = null
     ): array;
 
     /**

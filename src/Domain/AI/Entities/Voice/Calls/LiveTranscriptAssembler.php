@@ -62,8 +62,6 @@ class LiveTranscriptAssembler extends ValueObject
     /**
      * Append one fragment. Returns the sentences this fragment COMPLETED (zero or one — the other speaker's
      * open sentence when the speaker changed).
-     *
-     * @return LiveTranscriptSentence[]
      */
     public function appendFragment(
         string $role,
@@ -71,8 +69,8 @@ class LiveTranscriptAssembler extends ValueObject
         int $startMs,
         int $endMs,
         int $nowUnixMs
-    ): array {
-        $completedSentences = [];
+    ): LiveTranscriptSentences {
+        $completedSentences = new LiveTranscriptSentences();
         $otherRole = $role === AIConversationMessage::ROLE_USER
             ? AIConversationMessage::ROLE_ASSISTANT
             : AIConversationMessage::ROLE_USER;
@@ -97,16 +95,14 @@ class LiveTranscriptAssembler extends ValueObject
     /**
      * Close every open sentence whose speaker has been quiet for {@see IDLE_FLUSH_AFTER_MS}. The worker's periodic
      * tick calls this, because nothing else would ever close the LAST sentence before the other side speaks again.
-     *
-     * @return LiveTranscriptSentence[]
      */
-    public function closeIdleSentences(int $nowUnixMs): array
+    public function closeIdleSentences(int $nowUnixMs): LiveTranscriptSentences
     {
-        $completedSentences = [];
+        $completedSentences = new LiveTranscriptSentences();
         foreach (array_keys($this->openSentenceTextByRole) as $role) {
             $lastFragmentReceivedAtUnixMs = $this->lastFragmentReceivedAtUnixMsByRole[$role] ?? $nowUnixMs;
             if (($nowUnixMs - $lastFragmentReceivedAtUnixMs) >= static::IDLE_FLUSH_AFTER_MS) {
-                array_push($completedSentences, ...$this->closeOpenSentenceForRole($role));
+                $completedSentences->add(...$this->closeOpenSentenceForRole($role)->getElements());
             }
         }
 
@@ -115,14 +111,12 @@ class LiveTranscriptAssembler extends ValueObject
 
     /**
      * Close everything that is still open: the call ended, nothing more will be spoken.
-     *
-     * @return LiveTranscriptSentence[]
      */
-    public function closeAllSentences(): array
+    public function closeAllSentences(): LiveTranscriptSentences
     {
-        $completedSentences = [];
+        $completedSentences = new LiveTranscriptSentences();
         foreach (array_keys($this->openSentenceTextByRole) as $role) {
-            array_push($completedSentences, ...$this->closeOpenSentenceForRole($role));
+            $completedSentences->add(...$this->closeOpenSentenceForRole($role)->getElements());
         }
 
         return $completedSentences;
@@ -146,10 +140,9 @@ class LiveTranscriptAssembler extends ValueObject
     /**
      * Close the caller's open sentence NOW: the moment the model delegates, what the caller said so far is the
      * request and belongs in the transcript before the agent reads it, not 1.5 s later behind the agent's turn.
-     *
-     * @return LiveTranscriptSentence[]
+     * Returns the sentence it closed, or no sentence when the caller had none open.
      */
-    public function closeOpenCallerSentence(): array
+    public function closeOpenCallerSentence(): LiveTranscriptSentences
     {
         return $this->closeOpenSentenceForRole(AIConversationMessage::ROLE_USER);
     }
@@ -162,20 +155,19 @@ class LiveTranscriptAssembler extends ValueObject
         );
     }
 
-    /**
-     * @return LiveTranscriptSentence[]
-     */
-    protected function closeOpenSentenceForRole(string $role): array
+    /** Closes the open sentence of `$role` and returns it; no sentence when the speaker had none open or only blanks. */
+    protected function closeOpenSentenceForRole(string $role): LiveTranscriptSentences
     {
         $openSentenceText = trim($this->openSentenceTextByRole[$role] ?? '');
-        $completedSentences = [];
+        $completedSentences = new LiveTranscriptSentences();
         if ($openSentenceText !== '') {
-            $completedSentences[] = LiveTranscriptSentence::create(
+            $completedSentence = LiveTranscriptSentence::create(
                 $role,
                 $openSentenceText,
                 (int)($this->openSentenceStartMsByRole[$role] ?? 0),
                 (int)($this->openSentenceEndMsByRole[$role] ?? 0)
             );
+            $completedSentences->add($completedSentence);
         }
         unset(
             $this->openSentenceTextByRole[$role],

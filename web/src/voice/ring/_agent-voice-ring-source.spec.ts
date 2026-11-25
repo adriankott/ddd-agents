@@ -47,27 +47,6 @@ class FakeAccountRealtimePoll implements AccountRealtimePoll {
   }
 }
 
-/** The starter of the account realtime poll: counts starts and stops and keeps the arrival hook of the running poll. */
-class FakePollStarter {
-  starts = 0;
-  stops = 0;
-  deliver: ((message: AgentRealtimeMessageDelivery) => void) | undefined;
-  startedPoll: FakeAccountRealtimePoll | undefined;
-
-  start = (onMessage: (message: AgentRealtimeMessageDelivery) => void) => {
-    this.starts += 1;
-    this.deliver = onMessage;
-    const startedPoll = new FakeAccountRealtimePoll();
-    startedPoll.stop = () => {
-      startedPoll.stopCount += 1;
-      this.stops += 1;
-      this.deliver = undefined;
-    };
-    this.startedPoll = startedPoll;
-    return startedPoll;
-  };
-}
-
 interface RecordingSubscriber {
   rings: AgentVoiceRing[];
   clearedCallIds: number[];
@@ -84,124 +63,6 @@ const recordingSubscriber = (): RecordingSubscriber => {
   };
   return subscriber;
 };
-
-describe("AgentVoiceAccountRealtimeRingSource, given a function that starts the poll", () => {
-  beforeEach(() => {
-    vi.useFakeTimers({ toFake: ["Date"], now: NOW_MS });
-  });
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it("starts the poll with the first subscriber and stops it with the last", () => {
-    const pollStarter = new FakePollStarter();
-    const ringSource = createAgentVoiceRingSource(pollStarter.start);
-    expect(ringSource).toBeInstanceOf(AgentVoiceAccountRealtimeRingSource);
-    expect(pollStarter.starts).toBe(0);
-    const first = recordingSubscriber();
-    const second = recordingSubscriber();
-    const unsubscribeFirst = ringSource.subscribe(first.onRing, first.onRingCleared);
-    const unsubscribeSecond = ringSource.subscribe(second.onRing, second.onRingCleared);
-    expect(pollStarter.starts).toBe(1);
-    unsubscribeFirst();
-    expect(pollStarter.stops).toBe(0);
-    unsubscribeSecond();
-    expect(pollStarter.stops).toBe(1);
-  });
-
-  it("hands every ring message to every subscriber as a ring, and nothing else", () => {
-    const pollStarter = new FakePollStarter();
-    const ringSource = new AgentVoiceAccountRealtimeRingSource(pollStarter.start);
-    const first = recordingSubscriber();
-    const second = recordingSubscriber();
-    ringSource.subscribe(first.onRing, first.onRingCleared);
-    ringSource.subscribe(second.onRing, second.onRingCleared);
-    pollStarter.deliver?.(ringMessage(8815, NOW_MS + 30_000));
-    pollStarter.deliver?.({ messageType: "agent.client.tool", messageKey: "1", payloadJson: "{}", secondsLeft: 10 });
-    expect(first.rings.map(ring => ring.callId)).toStrictEqual([8815]);
-    expect(second.rings.map(ring => ring.callId)).toStrictEqual([8815]);
-    expect(first.rings[0].answerToken).toBe("token-8815");
-  });
-
-  it("answers whether a message was a ring", () => {
-    const ringSource = new AgentVoiceAccountRealtimeRingSource(new FakePollStarter().start);
-    expect(ringSource.acceptRealtimeMessage(ringMessage(8815, NOW_MS + 30_000))).toBe(true);
-    expect(ringSource.acceptRealtimeMessage({ messageType: "agent.client.tool", messageKey: "1", payloadJson: "{}", secondsLeft: 10 })).toBe(false);
-  });
-
-  it("gives a later subscriber the rings of the running poll that are still inside their deadline, the newest payload per call", () => {
-    const pollStarter = new FakePollStarter();
-    const ringSource = new AgentVoiceAccountRealtimeRingSource(pollStarter.start);
-    const first = recordingSubscriber();
-    ringSource.subscribe(first.onRing, first.onRingCleared);
-    pollStarter.deliver?.(ringMessage(8815, NOW_MS + 30_000, "first-token"));
-    pollStarter.deliver?.(ringMessage(8815, NOW_MS + 60_000, "replaced-token"));
-    pollStarter.deliver?.(ringMessage(8816, NOW_MS + 1_000));
-    vi.setSystemTime(NOW_MS + 1_000);
-    const later = recordingSubscriber();
-    ringSource.subscribe(later.onRing, later.onRingCleared);
-    expect(later.rings.map(ring => [ring.callId, ring.answerToken])).toStrictEqual([[8815, "replaced-token"]]);
-    expect(pollStarter.starts).toBe(1);
-  });
-
-  it("forgets the rings when the last subscriber leaves, and a new poll starts empty", () => {
-    const pollStarter = new FakePollStarter();
-    const ringSource = new AgentVoiceAccountRealtimeRingSource(pollStarter.start);
-    const first = recordingSubscriber();
-    const unsubscribe = ringSource.subscribe(first.onRing, first.onRingCleared);
-    pollStarter.deliver?.(ringMessage(8815, NOW_MS + 30_000));
-    unsubscribe();
-    const later = recordingSubscriber();
-    ringSource.subscribe(later.onRing, later.onRingCleared);
-    expect(later.rings).toStrictEqual([]);
-    expect(pollStarter.starts).toBe(2);
-  });
-
-  it("stops telling a subscriber that left", () => {
-    const pollStarter = new FakePollStarter();
-    const ringSource = new AgentVoiceAccountRealtimeRingSource(pollStarter.start);
-    const staying = recordingSubscriber();
-    const leaving = recordingSubscriber();
-    ringSource.subscribe(staying.onRing, staying.onRingCleared);
-    const unsubscribeLeaving = ringSource.subscribe(leaving.onRing, leaving.onRingCleared);
-    unsubscribeLeaving();
-    pollStarter.deliver?.(ringMessage(8815, NOW_MS + 30_000));
-    expect(staying.rings.length).toBe(1);
-    expect(leaving.rings.length).toBe(0);
-  });
-
-  it("tells no later subscriber the clear of a ring past its deadline when it came, also with a started poll", () => {
-    const pollStarter = new FakePollStarter();
-    const ringSource = new AgentVoiceAccountRealtimeRingSource(pollStarter.start);
-    const first = recordingSubscriber();
-    ringSource.subscribe(first.onRing, first.onRingCleared);
-    pollStarter.deliver?.(ringMessage(8815, NOW_MS + 5_000));
-    vi.setSystemTime(NOW_MS + 10_000);
-    const later = recordingSubscriber();
-    ringSource.subscribe(later.onRing, later.onRingCleared);
-    pollStarter.startedPoll?.clear(ringMessage(8815, NOW_MS + 5_000));
-
-    expect(first.clearedCallIds).toStrictEqual([8815]);
-    expect(later.rings).toStrictEqual([]);
-    expect(later.clearedCallIds).toStrictEqual([]);
-  });
-
-  it("hands a ring the started poll clears to every subscriber as cleared, through the started poll's subscribe", () => {
-    const pollStarter = new FakePollStarter();
-    const ringSource = new AgentVoiceAccountRealtimeRingSource(pollStarter.start);
-    const subscriber = recordingSubscriber();
-    const unsubscribe = ringSource.subscribe(subscriber.onRing, subscriber.onRingCleared);
-    expect(pollStarter.startedPoll?.subscribeCount).toBe(1);
-    pollStarter.deliver?.(ringMessage(8815, NOW_MS + 30_000));
-    pollStarter.startedPoll?.clear(ringMessage(8815, NOW_MS + 30_000));
-    expect(subscriber.clearedCallIds).toStrictEqual([8815]);
-
-    const startedPoll = pollStarter.startedPoll;
-    unsubscribe();
-    expect(startedPoll?.unsubscribeCount).toBe(1);
-    expect(startedPoll?.stopCount).toBe(1);
-  });
-});
 
 /** An account read that answers from the list, then with no message. */
 const accountReadOf = (...reads: AgentRealtimeMessageDelivery[][]) => async (): Promise<AccountRealtimeRead> => ({
@@ -238,6 +99,81 @@ describe("AgentVoiceAccountRealtimeRingSource, given the poll", () => {
 
     ringSource.subscribe(first.onRing, first.onRingCleared);
     expect(poll.subscribeCount).toBe(2);
+  });
+
+  it("hands every ring message to every subscriber as a ring, and nothing else", () => {
+    const poll = new FakeAccountRealtimePoll();
+    const ringSource = new AgentVoiceAccountRealtimeRingSource(poll);
+    const first = recordingSubscriber();
+    const second = recordingSubscriber();
+    ringSource.subscribe(first.onRing, first.onRingCleared);
+    ringSource.subscribe(second.onRing, second.onRingCleared);
+    poll.deliver(ringMessage(8815, NOW_MS + 30_000));
+    poll.deliver({ messageType: "agent.client.tool", messageKey: "1", payloadJson: "{}", secondsLeft: 10 });
+    expect(first.rings.map(ring => ring.callId)).toStrictEqual([8815]);
+    expect(second.rings.map(ring => ring.callId)).toStrictEqual([8815]);
+    expect(first.rings[0].answerToken).toBe("token-8815");
+  });
+
+  it("answers whether a message was a ring", () => {
+    const ringSource = new AgentVoiceAccountRealtimeRingSource(new FakeAccountRealtimePoll());
+    expect(ringSource.acceptRealtimeMessage(ringMessage(8815, NOW_MS + 30_000))).toBe(true);
+    expect(ringSource.acceptRealtimeMessage({ messageType: "agent.client.tool", messageKey: "1", payloadJson: "{}", secondsLeft: 10 })).toBe(false);
+  });
+
+  it("gives a later subscriber the rings it holds that are still inside their deadline, the newest payload per call", () => {
+    const poll = new FakeAccountRealtimePoll();
+    const ringSource = new AgentVoiceAccountRealtimeRingSource(poll);
+    const first = recordingSubscriber();
+    ringSource.subscribe(first.onRing, first.onRingCleared);
+    poll.deliver(ringMessage(8815, NOW_MS + 30_000, "first-token"));
+    poll.deliver(ringMessage(8815, NOW_MS + 60_000, "replaced-token"));
+    poll.deliver(ringMessage(8816, NOW_MS + 1_000));
+    vi.setSystemTime(NOW_MS + 1_000);
+    const later = recordingSubscriber();
+    ringSource.subscribe(later.onRing, later.onRingCleared);
+    expect(later.rings.map(ring => [ring.callId, ring.answerToken])).toStrictEqual([[8815, "replaced-token"]]);
+    expect(poll.subscribeCount).toBe(1);
+  });
+
+  it("forgets its rings when the last subscriber leaves: a new subscriber gets only what the poll hands over again", async () => {
+    const fakePoll = new FakeAccountRealtimePoll();
+    const ringSourceOverFake = new AgentVoiceAccountRealtimeRingSource(fakePoll);
+    const leaving = recordingSubscriber();
+    const unsubscribe = ringSourceOverFake.subscribe(leaving.onRing, leaving.onRingCleared);
+    fakePoll.deliver(ringMessage(8815, NOW_MS + 30_000));
+    unsubscribe();
+    const coming = recordingSubscriber();
+    ringSourceOverFake.subscribe(coming.onRing, coming.onRingCleared);
+    expect(coming.rings).toStrictEqual([]);
+
+    const poll = createAccountRealtimePoll({ readAccountRealtime: accountReadOf([ringMessage(8816, NOW_MS + 30_000)]), isTransportBound: () => true });
+    const ringSource = new AgentVoiceAccountRealtimeRingSource(poll);
+    const before = recordingSubscriber();
+    const unsubscribeBefore = ringSource.subscribe(before.onRing, before.onRingCleared);
+    await settle();
+    unsubscribeBefore();
+    const after = recordingSubscriber();
+    ringSource.subscribe(after.onRing, after.onRingCleared);
+    poll.stop();
+    expect(before.rings.map(ring => ring.callId)).toStrictEqual([8816]);
+    expect(after.rings.map(ring => ring.callId)).toStrictEqual([8816]);
+  });
+
+  it("stops telling a subscriber that left", () => {
+    const poll = new FakeAccountRealtimePoll();
+    const ringSource = new AgentVoiceAccountRealtimeRingSource(poll);
+    const staying = recordingSubscriber();
+    const leaving = recordingSubscriber();
+    ringSource.subscribe(staying.onRing, staying.onRingCleared);
+    const unsubscribeLeaving = ringSource.subscribe(leaving.onRing, leaving.onRingCleared);
+    unsubscribeLeaving();
+    poll.deliver(ringMessage(8815, NOW_MS + 30_000));
+    poll.clear(ringMessage(8815, NOW_MS + 30_000));
+    expect(staying.rings.length).toBe(1);
+    expect(staying.clearedCallIds).toStrictEqual([8815]);
+    expect(leaving.rings.length).toBe(0);
+    expect(leaving.clearedCallIds).toStrictEqual([]);
   });
 
   it("hands over a ring the poll had open before the subscriber came", async () => {

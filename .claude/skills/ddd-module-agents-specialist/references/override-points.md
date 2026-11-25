@@ -258,13 +258,17 @@ a package beside ddd-agents (or the application) answers them by implementing
 `ai.agent_voice_channel_provider`) as a service in a public `…\Services\` namespace — autoconfiguration registers it,
 no same-path subclass needed.
 
-- **Exactly one provider is asked:** the first in container order whose `isVoiceChannelAvailable()` answers true;
-  later providers are never asked (not even when the first answers null). More than one registered provider is a
-  WARNING of `app:agent:check-installation` (check `voiceChannel`) and is logged once per process: keep one.
+- **Exactly one provider is asked:** the first whose `isVoiceChannelAvailable()` answers true; later providers are
+  never asked (not even when the first answers null). An application's providers are asked first, in container
+  order, the package's own last (`findActiveVoiceChannelProvider()` is the one place that orders them).
 - **The package's own provider** is `AgentVoiceChannelProviderService`: registered in every installation, available
-  only while the voice channel can run (`AgentVoiceCallAdmissionService::canVoiceRunHere()`). An application that
-  registers a provider of its own therefore has two registered providers and reads the WARNING above; the one that
-  is available answers.
+  only while the voice channel can run (`AgentVoiceCallAdmissionService::canVoiceRunHere()`). It is the fallback:
+  an application that registers a provider of its own is answered by its own provider, without a warning. The
+  package's provider is recognised by its class (an object of exactly that class; a subclass is an application's
+  provider), never by a name or a tag.
+- **Two or more providers of an application** are a WARNING of `app:agent:check-installation` (check `voiceChannel`)
+  and are logged once per process: keep one. The package's provider is not counted
+  (`getRegisteredApplicationVoiceChannelProviderClassNames()` is the one place that counts them).
 - **No available provider:** today's answers (no live call, no variants changed, no calls).
 - **A provider that throws** is logged; that question gets the default answer and the turn goes on.
 - **A same-path subclass** of the service keeps working (it overrides the methods; the provider is then not asked

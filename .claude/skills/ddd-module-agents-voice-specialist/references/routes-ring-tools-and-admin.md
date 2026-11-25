@@ -147,10 +147,12 @@ options) and one call.
   `direction`, `endedAt`, `aiConversationId`, `voiceProvider`). Neither the duration nor the costs is a column: both
   are filtered and sorted through `bookedSeconds`.
 - **What the server derives:** the list answers `agentVoiceCallDerivedValues` beside `agentVoiceCalls` (one entry per
-  call, same order), the detail `callState` and `bookedCosts`. The state (`RINGING`, `IN_PROGRESS`, `ENDED`) is the
-  server's reading at answer time; a row a dead worker left open reads `ENDED`. `bookedCosts` is the call's booked
-  seconds at the catalog's present price per session second; no price, or nothing booked: the field is missing. An
-  application with a cost ledger answers its own value in `findBookedCostsOfVoiceCall()`.
+  call, same order), the detail `callState` and `bookedCosts`. Both fields of the list are object sets, so each is an
+  object with `elements` on the wire; an entry of `AdminAgentVoiceCallsDerivedValues` is held under its call's id
+  (`callId`). The state (`RINGING`, `IN_PROGRESS`, `ENDED`) is the server's reading at answer time; a row a dead
+  worker left open reads `ENDED`. `bookedCosts` is the call's booked seconds at the catalog's present price per
+  session second; no price, or nothing booked: the field is missing. An application with a cost ledger answers its
+  own value in `findBookedCostsOfVoiceCall()`.
 - **Transcript:** the detail carries the conversation id; a screen opens the conversation.
 - **Date-times** are serialized in the PHP default time zone of the process, without an offset. The admin screens
   read them as UTC: an application whose processes do not run in UTC shows shifted times there.
@@ -173,6 +175,6 @@ Two entries of the package's npm half; `web/public-api.json` lists every name th
 | Texts | keys of the manifest `i18n-keys.json`, translated by the application through the text function of the package's environment (`AgentsEnvironment`, its field "texts"). `AgentVoiceCallProvider` takes no translate prop; `useAgentVoiceTranslateText` is that function for a voice component of the application's own |
 | Styles | part of the package's one stylesheet (`@mgamadeus/ddd-agents/styles.css`); voice has none of its own. Every colour and size is a CSS custom property `--agents-voice-*` with a default; class names are module-scoped, so an application styles through the properties, never through a class selector |
 | Optional peers | `@mgamadeus/ddd-admin-ui`, `@mgamadeus/ddd-web` and `lucide-react`, loaded by the admin entry alone. `web/boundary.json` names per subpath the optional peers it may import (`optionalPeerImports`); check 10 of `web/scripts/check-package.mjs` fails when another entry loads one. An application without the admin screens installs none |
-| Ring source | `createAgentVoiceRingSource` takes the application's account realtime poll (`createAccountRealtimePoll` of `@mgamadeus/ddd-agents/ui`: it subscribes and never stops that poll) or a function that starts one (started with the first subscriber, stopped with the last). An application with a transport of its own passes its own source |
+| Ring source | `createAgentVoiceRingSource` takes the application's account realtime poll (`createAccountRealtimePoll` of `@mgamadeus/ddd-agents/ui`): it subscribes and never stops that poll, which the application creates and stops. An application with a transport of its own passes its own source |
 | A cleared ring | the poll tells its subscribers a message a read no longer holds (`AccountRealtimePollSubscriber`, `onMessageCleared`), so a ring answered or declined in another client, or withdrawn, stops with that read. A subscriber is told the clear only of a message it was handed |
 | The client id | the HTTP conversation client states a client id on every account read: the poll's `clientId` option, else the id of the bound UI client, else one it creates once (`createAgentUIClientId`). It is what lets the server count a client that only polls as listening |

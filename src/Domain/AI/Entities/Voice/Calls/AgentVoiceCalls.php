@@ -23,6 +23,7 @@ use DDD\Presentation\Base\Dtos\RequestDto;
  * @method AgentVoiceCall[] getElements()
  * @method AgentVoiceCall first()
  * @method static AgentVoiceCallsService getService()
+ * @phpstan-consistent-constructor
  */
 #[QueryOptions]
 #[LazyLoadRepo(LazyLoadRepo::DB, DBAgentVoiceCalls::class, forceDBEntityModelCreation: true)]
@@ -76,9 +77,8 @@ class AgentVoiceCalls extends EntitySet implements LlmMarkdownRenderable
      */
     public function buildLlmMarkdown(int $nowUnixTime, ?int $currentConversationId, bool $onlyOpenCalls): string
     {
-        $agentVoiceCalls = $this->getElements();
-        $markdownBlocks = [$this->buildLlmMarkdownSummaryLine($agentVoiceCalls, $onlyOpenCalls)];
-        foreach ($agentVoiceCalls as $agentVoiceCall) {
+        $markdownBlocks = [$this->buildLlmMarkdownSummaryLine($onlyOpenCalls)];
+        foreach ($this->getElements() as $agentVoiceCall) {
             $markdownBlocks[] = $agentVoiceCall->buildLlmMarkdownLine(
                 $nowUnixTime,
                 $currentConversationId !== null && $agentVoiceCall->aiConversationId === $currentConversationId
@@ -89,33 +89,28 @@ class AgentVoiceCalls extends EntitySet implements LlmMarkdownRenderable
     }
 
     /**
-     * The calls among this set's elements that ring or run at `$nowUnixTime` ({@see AgentVoiceCall::isOpenAt()}).
-     *
-     * @return AgentVoiceCall[]
+     * The calls among this set's elements that ring or run at `$nowUnixTime` ({@see AgentVoiceCall::isOpenAt()}), as
+     * a set of their own in the order of this one.
      */
-    public function getOpenCallsAt(int $nowUnixTime): array
+    public function getOpenCallsAt(int $nowUnixTime): static
     {
-        $openCalls = [];
+        $openCalls = new static();
         foreach ($this->getElements() as $agentVoiceCall) {
             if ($agentVoiceCall->isOpenAt($nowUnixTime)) {
-                $openCalls[] = $agentVoiceCall;
+                $openCalls->add($agentVoiceCall);
             }
         }
 
         return $openCalls;
     }
 
-    /**
-     * The calls among this set's elements that are still running.
-     *
-     * @return AgentVoiceCall[]
-     */
-    public function getRunningCalls(): array
+    /** The calls among this set's elements that are still running, as a set of their own in the order of this one. */
+    public function getRunningCalls(): static
     {
-        $runningCalls = [];
+        $runningCalls = new static();
         foreach ($this->getElements() as $agentVoiceCall) {
             if ($agentVoiceCall->isRunning()) {
-                $runningCalls[] = $agentVoiceCall;
+                $runningCalls->add($agentVoiceCall);
             }
         }
 
@@ -123,15 +118,13 @@ class AgentVoiceCalls extends EntitySet implements LlmMarkdownRenderable
     }
 
     /**
-     * The summary line of the call log: the total and the count per direction, newest first. A subclass with further
-     * media adds its count per medium.
-     *
-     * @param AgentVoiceCall[] $agentVoiceCalls
+     * The summary line of the call log of this set: the total and the count per direction, newest first. A subclass
+     * with further media adds its count per medium.
      */
-    protected function buildLlmMarkdownSummaryLine(array $agentVoiceCalls, bool $onlyOpenCalls): string
+    protected function buildLlmMarkdownSummaryLine(bool $onlyOpenCalls): string
     {
         $inboundCallCount = 0;
-        foreach ($agentVoiceCalls as $agentVoiceCall) {
+        foreach ($this->getElements() as $agentVoiceCall) {
             if ($agentVoiceCall->direction === AgentVoiceCall::DIRECTION_INBOUND) {
                 $inboundCallCount++;
             }
@@ -140,9 +133,9 @@ class AgentVoiceCalls extends EntitySet implements LlmMarkdownRenderable
         return sprintf(
             '%s — %d total (%d inbound, %d outbound), newest first:',
             $onlyOpenCalls ? 'Calls ringing or running right now' : 'Calls',
-            count($agentVoiceCalls),
+            $this->count(),
             $inboundCallCount,
-            count($agentVoiceCalls) - $inboundCallCount
+            $this->count() - $inboundCallCount
         );
     }
 }

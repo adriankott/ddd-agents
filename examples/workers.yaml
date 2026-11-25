@@ -22,3 +22,13 @@ consumers:
   - {transport: ai_tool_result_screening, replicas: 1, limit: 100, memoryLimit: 256M}
   # the narration of what the agent does while it works (short; stale lines are worthless)
   - {transport: ai_activity_lines, replicas: 1, limit: 200, memoryLimit: 256M}
+  # Only when voice is enabled (`AI.agentVoice.enabled`): the two transports of
+  # DDD\Domain\AI\MessageHandlers\Voice\AgentVoiceMessengerTransports. Uncomment both; an application without voice
+  # copies neither.
+  # one running call per message, for as long as the call lasts: replicas is the number of calls at the same time. No
+  # limit (a process takes the next call afterwards). busySilentSeconds and the process manager's stop grace lie above
+  # `AI.agentVoice` limits.maximumCallSeconds (3600 as shipped), so a restart waits for the call instead of cutting it.
+  # The handler raises its memory_limit to 512M; the process needs outbound WebSocket access to the provider.
+  # - {transport: voice_live_session, replicas: 4, memoryLimit: 512M, busySilentSeconds: 3660}
+  # one short look at a ring right after its deadline (a delayed message)
+  # - {transport: voice_ring_deadline, replicas: 1, limit: 200, memoryLimit: 256M}

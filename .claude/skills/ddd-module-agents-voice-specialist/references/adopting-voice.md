@@ -34,7 +34,10 @@ Nothing to do. The shipped `config/app/AI/agentVoice.php` sets `enabled` to fals
 6. **Messenger.** Copy the two transports of `AgentVoiceMessengerTransports::ALL` and the routing of
    `AgentVoiceMessengerTransports::ROUTING_BY_MESSAGE_CLASS` into the application's `messenger.yaml`; run a pool for
    `voice_live_session` and a consumer for `voice_ring_deadline`
-   ([call life and the session worker](call-life-and-session-worker.md)). The framework registers neither.
+   ([call life and the session worker](call-life-and-session-worker.md)). The framework registers neither. Both are
+   a commented block headed "only when voice is enabled" in the Messenger template of
+   `ddd-module-agents-specialist` and in `examples/workers.yaml`: uncomment the transports, their routing and the
+   two consumers.
 7. **The realtime binding** must carry an account audience: the ring goes to every open client of the account, not
    to a conversation, and the binding answers whether a client of the account listens. Without a bound transport the
    ring still arrives through the account-level read of the chat traits, within its poll interval; the same read
@@ -114,6 +117,6 @@ costs.
 | Finding | Meaning |
 |---|---|
 | `voiceChannel`, subject `AI.agentVoice.enabled` | switched on without the library (step 1) |
-| `voiceChannel`, several providers | the application registered a voice channel provider of its own beside the package's; only the first available one in container order is asked |
+| `voiceChannel`, several providers | the application registered two or more voice channel providers of its own; only the first available one in container order is asked. One provider of the application's own beside the package's is no finding: the application's is asked first, the package's is the fallback and is not counted |
 | `missingTables` | the call table is missing (step 4) |
 | `rightsHeldByNobody`, `useVoice` | voice is on and no role holds the right (step 8) |

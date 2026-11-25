@@ -7,6 +7,7 @@ namespace DDD\Tests\Agents\Voice\Domain\AI\Entities\Voice\Speech;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
 use DDD\Domain\AI\Entities\Voice\Calls\LiveTranscriptAssembler;
 use DDD\Domain\AI\Entities\Voice\Calls\LiveTranscriptSentence;
+use DDD\Domain\AI\Entities\Voice\Calls\LiveTranscriptSentences;
 use DDD\Tests\Agents\Voice\Support\AgentVoiceUnitTestCase;
 use DDD\Tests\Agents\Voice\Support\AgentVoiceValueObjectAssertionsTrait;
 
@@ -27,11 +28,11 @@ class LiveTranscriptAssemblerTest extends AgentVoiceUnitTestCase
     {
         $liveTranscriptAssembler = new LiveTranscriptAssembler();
 
-        static::assertSame([], $liveTranscriptAssembler->appendFragment(static::CALLER, 'Hello, ', 0, 400, 1000));
-        static::assertSame([], $liveTranscriptAssembler->appendFragment(static::CALLER, 'I need', 400, 900, 1400));
+        static::assertCount(0, $liveTranscriptAssembler->appendFragment(static::CALLER, 'Hello, ', 0, 400, 1000));
+        static::assertCount(0, $liveTranscriptAssembler->appendFragment(static::CALLER, 'I need', 400, 900, 1400));
         $completedSentences = $liveTranscriptAssembler->appendFragment(static::AGENT, 'Sure.', 900 + LiveTranscriptAssembler::TURN_CHANGE_GAP_MS, 2200, 2000);
 
-        static::assertSameValueObjects([LiveTranscriptSentence::create(static::CALLER, 'Hello, I need', 0, 900)], $completedSentences);
+        static::assertSameValueObjects(LiveTranscriptSentences::fromSentences(LiveTranscriptSentence::create(static::CALLER, 'Hello, I need', 0, 900)), $completedSentences);
         static::assertSame(2200, $liveTranscriptAssembler->getLastFragmentEndMs());
     }
 
@@ -40,7 +41,7 @@ class LiveTranscriptAssemblerTest extends AgentVoiceUnitTestCase
         $liveTranscriptAssembler = new LiveTranscriptAssembler();
         $liveTranscriptAssembler->appendFragment(static::CALLER, 'Hello', 0, 900, 1000);
 
-        static::assertSame([], $liveTranscriptAssembler->appendFragment(static::AGENT, 'Hi', 1699, 2000, 2000));
+        static::assertCount(0, $liveTranscriptAssembler->appendFragment(static::AGENT, 'Hi', 1699, 2000, 2000));
         static::assertCount(2, $liveTranscriptAssembler->closeAllSentences());
     }
 
@@ -50,8 +51,8 @@ class LiveTranscriptAssemblerTest extends AgentVoiceUnitTestCase
         $liveTranscriptAssembler->appendFragment(static::CALLER, 'Hello', 0, 900, 1000);
         static::assertCount(1, $liveTranscriptAssembler->appendFragment(static::AGENT, 'Hi', 1700, 2000, 2000));
 
-        static::assertSame([], $liveTranscriptAssembler->closeIdleSentences(3499));
-        static::assertSameValueObjects([LiveTranscriptSentence::create(static::AGENT, 'Hi', 1700, 2000)], $liveTranscriptAssembler->closeIdleSentences(3500));
+        static::assertCount(0, $liveTranscriptAssembler->closeIdleSentences(3499));
+        static::assertSameValueObjects(LiveTranscriptSentences::fromSentences(LiveTranscriptSentence::create(static::AGENT, 'Hi', 1700, 2000)), $liveTranscriptAssembler->closeIdleSentences(3500));
     }
 
     public function testAnIdleSpeakersSentenceIsClosedByTheTickOnce(): void
@@ -59,12 +60,12 @@ class LiveTranscriptAssemblerTest extends AgentVoiceUnitTestCase
         $liveTranscriptAssembler = new LiveTranscriptAssembler();
         $liveTranscriptAssembler->appendFragment(static::AGENT, 'One moment.', 0, 700, 1000);
 
-        static::assertSame([], $liveTranscriptAssembler->closeIdleSentences(1000 + LiveTranscriptAssembler::IDLE_FLUSH_AFTER_MS - 1));
+        static::assertCount(0, $liveTranscriptAssembler->closeIdleSentences(1000 + LiveTranscriptAssembler::IDLE_FLUSH_AFTER_MS - 1));
         static::assertSameValueObjects(
-            [LiveTranscriptSentence::create(static::AGENT, 'One moment.', 0, 700)],
+            LiveTranscriptSentences::fromSentences(LiveTranscriptSentence::create(static::AGENT, 'One moment.', 0, 700)),
             $liveTranscriptAssembler->closeIdleSentences(1000 + LiveTranscriptAssembler::IDLE_FLUSH_AFTER_MS)
         );
-        static::assertSame([], $liveTranscriptAssembler->closeIdleSentences(99999));
+        static::assertCount(0, $liveTranscriptAssembler->closeIdleSentences(99999));
     }
 
     public function testTheTickClosesOnlyTheSpeakerWhoIsQuiet(): void
@@ -75,7 +76,7 @@ class LiveTranscriptAssemblerTest extends AgentVoiceUnitTestCase
 
         $completedSentences = $liveTranscriptAssembler->closeIdleSentences(2600);
 
-        static::assertSameValueObjects([LiveTranscriptSentence::create(static::AGENT, 'Let me check', 0, 500)], $completedSentences);
+        static::assertSameValueObjects(LiveTranscriptSentences::fromSentences(LiveTranscriptSentence::create(static::AGENT, 'Let me check', 0, 500)), $completedSentences);
         static::assertSame('mm', $liveTranscriptAssembler->getOpenCallerSentenceText());
     }
 
@@ -83,14 +84,14 @@ class LiveTranscriptAssemblerTest extends AgentVoiceUnitTestCase
     {
         $liveTranscriptAssembler = new LiveTranscriptAssembler();
         $liveTranscriptAssembler->appendFragment(static::AGENT, 'Last time ', 0, 300, 1000);
-        static::assertSame([], $liveTranscriptAssembler->appendFragment(static::CALLER, 'Mhm', 400, 600, 1100));
-        static::assertSame([], $liveTranscriptAssembler->appendFragment(static::AGENT, 'we spoke', 650, 1100, 1300));
+        static::assertCount(0, $liveTranscriptAssembler->appendFragment(static::CALLER, 'Mhm', 400, 600, 1100));
+        static::assertCount(0, $liveTranscriptAssembler->appendFragment(static::AGENT, 'we spoke', 650, 1100, 1300));
 
         $completedOnTurnChange = $liveTranscriptAssembler->appendFragment(static::CALLER, ' right', 1100 + LiveTranscriptAssembler::TURN_CHANGE_GAP_MS, 2300, 2400);
 
-        static::assertSameValueObjects([LiveTranscriptSentence::create(static::AGENT, 'Last time we spoke', 0, 1100)], $completedOnTurnChange);
-        static::assertSameValueObjects([LiveTranscriptSentence::create(static::CALLER, 'Mhm right', 400, 2300)], $liveTranscriptAssembler->closeAllSentences());
-        static::assertSame([], $liveTranscriptAssembler->closeAllSentences());
+        static::assertSameValueObjects(LiveTranscriptSentences::fromSentences(LiveTranscriptSentence::create(static::AGENT, 'Last time we spoke', 0, 1100)), $completedOnTurnChange);
+        static::assertSameValueObjects(LiveTranscriptSentences::fromSentences(LiveTranscriptSentence::create(static::CALLER, 'Mhm right', 400, 2300)), $liveTranscriptAssembler->closeAllSentences());
+        static::assertCount(0, $liveTranscriptAssembler->closeAllSentences());
     }
 
     public function testTheOpenCallerSentenceIsReadableBeforeItCloses(): void
@@ -108,7 +109,7 @@ class LiveTranscriptAssemblerTest extends AgentVoiceUnitTestCase
         $liveTranscriptAssembler = new LiveTranscriptAssembler();
         $liveTranscriptAssembler->appendFragment(static::CALLER, '   ', 0, 100, 1000);
 
-        static::assertSame([], $liveTranscriptAssembler->appendFragment(static::AGENT, 'Hi', 900, 1000, 1100));
+        static::assertCount(0, $liveTranscriptAssembler->appendFragment(static::AGENT, 'Hi', 900, 1000, 1100));
     }
 
     public function testTheOpenCallerSentenceIsHandedOverOnlyOnce(): void
@@ -135,9 +136,9 @@ class LiveTranscriptAssemblerTest extends AgentVoiceUnitTestCase
         $liveTranscriptAssembler->appendFragment(static::CALLER, 'show me my figures', 0, 900, 1000);
         $liveTranscriptAssembler->appendFragment(static::AGENT, 'one moment', 800, 1200, 1300);
 
-        static::assertSameValueObjects([LiveTranscriptSentence::create(static::CALLER, 'show me my figures', 0, 900)], $liveTranscriptAssembler->closeOpenCallerSentence());
+        static::assertSameValueObjects(LiveTranscriptSentences::fromSentences(LiveTranscriptSentence::create(static::CALLER, 'show me my figures', 0, 900)), $liveTranscriptAssembler->closeOpenCallerSentence());
         static::assertSame('', $liveTranscriptAssembler->getOpenCallerSentenceText());
-        static::assertSameValueObjects([LiveTranscriptSentence::create(static::AGENT, 'one moment', 800, 1200)], $liveTranscriptAssembler->closeAllSentences());
+        static::assertSameValueObjects(LiveTranscriptSentences::fromSentences(LiveTranscriptSentence::create(static::AGENT, 'one moment', 800, 1200)), $liveTranscriptAssembler->closeAllSentences());
     }
 
     public function testTheTimelineMarkNeverMovesBackForALateFragment(): void

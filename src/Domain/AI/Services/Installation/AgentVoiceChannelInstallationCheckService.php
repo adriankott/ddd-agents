@@ -14,8 +14,11 @@ use DDD\Infrastructure\Services\Service;
 
 /**
  * `voiceChannel`, two findings:
- * - the voice channel asks exactly one provider ({@see AgentVoiceChannelProvider}). A WARNING when more than one is
- *   registered: only the first available one in container order answers, the others are never asked;
+ * - the voice channel asks exactly one provider ({@see AgentVoiceChannelProvider}). A WARNING when an application
+ *   registered two or more of its own: only the first available one in container order answers, the others are
+ *   never asked. The package's own provider is the fallback behind them and is not counted, so an application with
+ *   one provider of its own has no finding
+ *   ({@see AgentVoiceChannelService::getRegisteredApplicationVoiceChannelProviderClassNames()});
  * - voice is switched on (`AI.agentVoice.enabled`) but the WebSocket library of the session worker is not installed
  *   ({@see AgentVoiceCallAdmissionService::isVoiceSwitchedOnWithoutSessionWorkerLibrary()}). A WARNING: nothing
  *   fails, the channel reads as unavailable (no tool, no skill, every route answers `403 feature_not_available`),
@@ -39,14 +42,14 @@ class AgentVoiceChannelInstallationCheckService extends Service implements Agent
     public function findInstallationFindings(): AgentInstallationFindings
     {
         $agentInstallationFindings = AgentInstallationFindings::newInstance();
-        $registeredProviderClassNames = $this->getRegisteredVoiceChannelProviderClassNames();
-        if (count($registeredProviderClassNames) > 1) {
+        $applicationProviderClassNames = $this->getRegisteredApplicationVoiceChannelProviderClassNames();
+        if (count($applicationProviderClassNames) > 1) {
             $agentInstallationFindings->addFinding(
                 static::CHECK_NAME,
                 AgentInstallationFinding::SEVERITY_WARNING,
                 AgentVoiceChannelProvider::TAG,
-                'Several voice channel providers are registered (' . implode(', ', $registeredProviderClassNames) . '); only the first available one in container order is asked.',
-                'Keep one voice channel provider: exclude the others from the container (#[Exclude] or the services configuration).'
+                'Several voice channel providers of the application are registered (' . implode(', ', $applicationProviderClassNames) . '); only the first available one in container order is asked.',
+                'Keep one voice channel provider of the application: exclude the others from the container (#[Exclude] or the services configuration). The package\'s own provider stays registered; it is asked after the application\'s.'
             );
         }
         if ($this->isVoiceSwitchedOnWithoutSessionWorkerLibrary()) {
@@ -69,11 +72,11 @@ class AgentVoiceChannelInstallationCheckService extends Service implements Agent
         return $agentVoiceCallAdmissionService->isVoiceSwitchedOnWithoutSessionWorkerLibrary();
     }
 
-    /** @return string[] */
-    protected function getRegisteredVoiceChannelProviderClassNames(): array
+    /** @return string[] The registered providers of the application: every one but the package's own */
+    protected function getRegisteredApplicationVoiceChannelProviderClassNames(): array
     {
         /** @var AgentVoiceChannelService $agentVoiceChannelService */
         $agentVoiceChannelService = DDDService::instance()->getService(AgentVoiceChannelService::class);
-        return $agentVoiceChannelService->getRegisteredVoiceChannelProviderClassNames();
+        return $agentVoiceChannelService->getRegisteredApplicationVoiceChannelProviderClassNames();
     }
 }

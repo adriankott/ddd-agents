@@ -32,6 +32,15 @@ class AgentVoiceCallTraceBacklogPush extends ValueObject
         return $agentVoiceCallTraceBacklogPush;
     }
 
+    /**
+     * The key of a push in {@see AgentVoiceCallTraceBacklogPushes} is the object itself, never its content: two
+     * sentences pushed in the same millisecond with the same span are two pushes.
+     */
+    public function uniqueKey(): string
+    {
+        return static::uniqueKeyStatic(spl_object_id($this));
+    }
+
     /** How long the sentence was spoken, in milliseconds; null when its span is not known. */
     public function getSpokenLengthMs(): ?int
     {

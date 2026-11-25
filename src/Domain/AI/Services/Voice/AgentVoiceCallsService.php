@@ -467,11 +467,9 @@ class AgentVoiceCallsService extends EntitiesService
      * environment must not hang up a call another one is driving. A call without a conversation has no owner; the
      * production environment adopts it.
      *
-     * An application runs this from its stale-session sweep. Returns the calls it closed.
-     *
-     * @return AgentVoiceCall[]
+     * An application runs this from its stale-session sweep. Returns the calls it closed, in the order it closed them.
      */
-    public function closeStaleRunningCalls(): array
+    public function closeStaleRunningCalls(): AgentVoiceCalls
     {
         $staleRunningCalls = $this->findStaleRunningCalls()->getElements();
         $conversationIdsOfStaleCalls = [];
@@ -484,7 +482,7 @@ class AgentVoiceCallsService extends EntitiesService
             $this->getConversationsService()->keepConversationIdsOfCurrentEnvironment($conversationIdsOfStaleCalls)
         );
         $sweepRunsInProduction = $this->isProductionEnvironment();
-        $closedCalls = [];
+        $closedCalls = AgentVoiceCalls::newInstance();
         foreach ($staleRunningCalls as $staleRunningCall) {
             $callConversationId = $staleRunningCall->aiConversationId;
             if ($callConversationId === null ? !$sweepRunsInProduction : !isset($ownConversationIds[$callConversationId])) {
@@ -501,7 +499,7 @@ class AgentVoiceCallsService extends EntitiesService
                 }
             }
             $this->persistCallEnd($staleRunningCall, static::END_REASON_REAPED_STALE);
-            $closedCalls[] = $staleRunningCall;
+            $closedCalls->add($staleRunningCall);
         }
 
         return $closedCalls;

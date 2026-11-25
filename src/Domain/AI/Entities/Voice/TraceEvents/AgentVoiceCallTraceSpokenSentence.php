@@ -39,4 +39,13 @@ class AgentVoiceCallTraceSpokenSentence extends ValueObject
 
         return $agentVoiceCallTraceSpokenSentence;
     }
+
+    /**
+     * The key of a sentence in {@see AgentVoiceCallTraceSpokenSentences} is the object itself, never its content: two
+     * trace events with the same speaker and span are two sentences of the call.
+     */
+    public function uniqueKey(): string
+    {
+        return static::uniqueKeyStatic(spl_object_id($this));
+    }
 }

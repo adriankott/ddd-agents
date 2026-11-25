@@ -41,6 +41,20 @@ framework:
       ai_activity_lines:
         dsn: '{{MESSENGER_TRANSPORT_DSN}}/ai_activity_lines'
         retry_strategy: { max_retries: 0 }
+      # Only when voice is enabled (`AI.agentVoice.enabled`): the two transports of
+      # DDD\Domain\AI\MessageHandlers\Voice\AgentVoiceMessengerTransports (ALL). Uncomment them together with their
+      # routing below; an application without voice copies neither.
+      # - voice_live_session: one message is one running call, and its handler returns when the call is over. A failed
+      #   attach is tried once more (the worker attaches to the running session again); a session that is gone at the
+      #   provider is never retried.
+      # - voice_ring_deadline: one short message per ring, DELAYED by the ring length, so the transport must keep
+      #   delayed messages. Its handler never throws: no retry.
+      # voice_live_session:
+      #   dsn: '{{MESSENGER_TRANSPORT_DSN}}/voice_live_session'
+      #   retry_strategy: { max_retries: 1, delay: 2000 }
+      # voice_ring_deadline:
+      #   dsn: '{{MESSENGER_TRANSPORT_DSN}}/voice_ring_deadline'
+      #   retry_strategy: { max_retries: 0 }
     routing:
       'DDD\Domain\AI\MessageHandlers\AIConversationResumeMessage': ai_conversation_turn
       'DDD\Domain\AI\MessageHandlers\AIConversationCompactionMessage': ai_conversation_compaction
@@ -52,3 +66,7 @@ framework:
       'DDD\Domain\AI\MessageHandlers\AIConversationMessageEmbeddingMessage': ai_conversation_message_embedding
       'DDD\Domain\AI\MessageHandlers\AgentToolResultScreeningMessage': ai_tool_result_screening
       'DDD\Domain\AI\MessageHandlers\AgentActivityLinesNarrateMessage': ai_activity_lines
+      # Only when voice is enabled: the routing of AgentVoiceMessengerTransports (ROUTING_BY_MESSAGE_CLASS). Without it
+      # a call's attach message runs in the request that opened the call, for as long as the call lasts.
+      # 'DDD\Domain\AI\MessageHandlers\Voice\SessionWorker\VoiceLiveSessionAttachMessage': voice_live_session
+      # 'DDD\Domain\AI\MessageHandlers\Voice\AgentVoiceRingDeadlineMessage': voice_ring_deadline

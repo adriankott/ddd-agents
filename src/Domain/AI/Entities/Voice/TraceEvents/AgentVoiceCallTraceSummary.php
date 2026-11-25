@@ -6,9 +6,10 @@ namespace DDD\Domain\AI\Entities\Voice\TraceEvents;
 
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
 use DDD\Domain\AI\Entities\Conversations\TraceEvents\AIConversationTraceEvent;
+use DDD\Domain\AI\Entities\Conversations\TraceEvents\AIConversationTraceEvents;
 use DDD\Domain\AI\Entities\Conversations\TraceEvents\Summaries\AIConversationTraceAnomalies;
 use DDD\Domain\AI\Entities\Conversations\TraceEvents\Summaries\AIConversationTraceAnomaly;
-use DDD\Domain\AI\Entities\Conversations\TurnEvents\AIConversationTurnEvent;
+use DDD\Domain\AI\Entities\Conversations\TurnEvents\AIConversationTurnEvents;
 use DDD\Domain\AI\Entities\Voice\AgentVoiceConfiguration;
 use DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceCall;
 use DDD\Domain\Base\Entities\ValueObject;
@@ -125,11 +126,15 @@ class AgentVoiceCallTraceSummary extends ValueObject
      * Builds the header of one call from its trace events (time order) and the conversation's turn-end events.
      *
      * @param AgentVoiceCall $agentVoiceCall
-     * @param AIConversationTraceEvent[] $callTraceEvents
-     * @param AIConversationTurnEvent[] $turnEndEvents
+     * @param AIConversationTraceEvents $callTraceEvents the trace events of this call, in time order
+     * @param AIConversationTurnEvents|null $turnEndEvents the turn-end events of the call's conversation; null = none
+     *     were read, the flag of a slow pickup is then not computed
      */
-    public static function fromTraceEvents(AgentVoiceCall $agentVoiceCall, array $callTraceEvents, array $turnEndEvents = []): static
-    {
+    public static function fromTraceEvents(
+        AgentVoiceCall $agentVoiceCall,
+        AIConversationTraceEvents $callTraceEvents,
+        ?AIConversationTurnEvents $turnEndEvents = null
+    ): static {
         $callSummary = new static();
         $callSummary->agentVoiceCallId = $agentVoiceCall->id !== null ? (int)$agentVoiceCall->id : null;
         $callSummary->direction = $agentVoiceCall->direction ?? null;
@@ -139,42 +144,39 @@ class AgentVoiceCallTraceSummary extends ValueObject
         if (isset($agentVoiceCall->startedAt, $agentVoiceCall->endedAt)) {
             $callSummary->durationSeconds = max(0, $agentVoiceCall->endedAt->getTimestamp() - $agentVoiceCall->startedAt->getTimestamp());
         }
-        $callSummary->traceEventCount = count($callTraceEvents);
+        $callSummary->traceEventCount = $callTraceEvents->count();
         $callSummary->anomalies = new AIConversationTraceAnomalies();
 
-        $firstEventOfType = [];
-        foreach ($callTraceEvents as $traceEvent) {
-            $firstEventOfType[$traceEvent->eventType] ??= $traceEvent;
-        }
-        $openAnsweredAtUnixMs = static::findOccurredAtUnixMs($firstEventOfType, static::EVENT_TYPE_OPEN_ANSWERED);
-        $workerAttachedAtUnixMs = static::findOccurredAtUnixMs($firstEventOfType, static::EVENT_TYPE_WORKER_ATTACHED);
-        $deviceFirstAudioPlayedAtUnixMs = static::findOccurredAtUnixMs($firstEventOfType, static::EVENT_TYPE_DEVICE_FIRST_AUDIO_PLAYED);
+        $firstEvents = AgentVoiceCallTraceFirstEvents::fromTraceEvents($callTraceEvents);
+        $openAnsweredAtUnixMs = static::findOccurredAtUnixMs($firstEvents, static::EVENT_TYPE_OPEN_ANSWERED);
+        $workerAttachedAtUnixMs = static::findOccurredAtUnixMs($firstEvents, static::EVENT_TYPE_WORKER_ATTACHED);
+        $deviceFirstAudioPlayedAtUnixMs = static::findOccurredAtUnixMs($firstEvents, static::EVENT_TYPE_DEVICE_FIRST_AUDIO_PLAYED);
 
         $callSummary->ringToAnswerMs = static::getMillisecondsBetween(
-            static::findOccurredAtUnixMs($firstEventOfType, static::EVENT_TYPE_RING_STARTED),
-            static::findOccurredAtUnixMs($firstEventOfType, static::EVENT_TYPE_ANSWER_CLAIMED)
+            static::findOccurredAtUnixMs($firstEvents, static::EVENT_TYPE_RING_STARTED),
+            static::findOccurredAtUnixMs($firstEvents, static::EVENT_TYPE_ANSWER_CLAIMED)
         );
-        $callSummary->answerRequestMs = static::findDurationMs($firstEventOfType, static::EVENT_TYPE_ANSWER_CLAIMED);
-        $callSummary->openRequestMs = static::findDurationMs($firstEventOfType, static::EVENT_TYPE_OPEN_ANSWERED);
-        $callSummary->briefingMs = static::findDurationMs($firstEventOfType, static::EVENT_TYPE_BRIEFING_COMPOSED);
-        $callSummary->providerSessionMs = static::findDurationMs($firstEventOfType, static::EVENT_TYPE_PROVIDER_SESSION_CREATED);
+        $callSummary->answerRequestMs = static::findDurationMs($firstEvents, static::EVENT_TYPE_ANSWER_CLAIMED);
+        $callSummary->openRequestMs = static::findDurationMs($firstEvents, static::EVENT_TYPE_OPEN_ANSWERED);
+        $callSummary->briefingMs = static::findDurationMs($firstEvents, static::EVENT_TYPE_BRIEFING_COMPOSED);
+        $callSummary->providerSessionMs = static::findDurationMs($firstEvents, static::EVENT_TYPE_PROVIDER_SESSION_CREATED);
         $callSummary->workerAttachAfterOpenMs = static::getMillisecondsBetween($openAnsweredAtUnixMs, $workerAttachedAtUnixMs);
         $callSummary->firstAgentWordAfterOpenMs = static::getMillisecondsBetween(
             $openAnsweredAtUnixMs ?? $workerAttachedAtUnixMs,
-            static::findFirstAgentWordAtUnixMs($firstEventOfType)
+            static::findFirstAgentWordAtUnixMs($firstEvents)
         );
         $callSummary->deviceAnswerAppliedToFirstAudioMs = static::getMillisecondsBetween(
-            static::findOccurredAtUnixMs($firstEventOfType, static::EVENT_TYPE_DEVICE_ANSWER_APPLIED),
+            static::findOccurredAtUnixMs($firstEvents, static::EVENT_TYPE_DEVICE_ANSWER_APPLIED),
             $deviceFirstAudioPlayedAtUnixMs
         );
         $callSummary->deviceTapToFirstAudioMs = static::getMillisecondsBetween(
-            static::findOccurredAtUnixMs($firstEventOfType, static::EVENT_TYPE_DEVICE_CALL_TAPPED),
+            static::findOccurredAtUnixMs($firstEvents, static::EVENT_TYPE_DEVICE_CALL_TAPPED),
             $deviceFirstAudioPlayedAtUnixMs
         );
-        $callSummary->traceComplete = isset($firstEventOfType[AIConversationTraceEvent::EVENT_TYPE_TRACE_FLUSHED]);
+        $callSummary->traceComplete = $firstEvents->hasEventOfType(AIConversationTraceEvent::EVENT_TYPE_TRACE_FLUSHED);
 
-        $callSummary->summarizeSpeechAndDelegations($callTraceEvents, $turnEndEvents);
-        if (!$callSummary->traceComplete && isset($agentVoiceCall->endedAt) && isset($firstEventOfType[static::EVENT_TYPE_WORKER_ATTACHED])) {
+        $callSummary->summarizeSpeechAndDelegations($callTraceEvents, $turnEndEvents ?? AIConversationTurnEvents::newInstance());
+        if (!$callSummary->traceComplete && isset($agentVoiceCall->endedAt) && $firstEvents->hasEventOfType(static::EVENT_TYPE_WORKER_ATTACHED)) {
             $callSummary->addAnomaly(
                 AIConversationTraceAnomaly::CODE_TRACE_INCOMPLETE,
                 null,
@@ -187,23 +189,23 @@ class AgentVoiceCallTraceSummary extends ValueObject
 
     /**
      * When the first event of `$eventType` occurred, in Unix milliseconds; null when the call has no such event.
-     *
-     * @param array<string, AIConversationTraceEvent> $firstEventOfType
      */
-    protected static function findOccurredAtUnixMs(array $firstEventOfType, string $eventType): ?int
+    protected static function findOccurredAtUnixMs(AgentVoiceCallTraceFirstEvents $firstEvents, string $eventType): ?int
     {
-        return isset($firstEventOfType[$eventType]) ? (int)$firstEventOfType[$eventType]->occurredAtUnixMs : null;
+        $firstEvent = $firstEvents->findEventOfType($eventType);
+
+        return $firstEvent !== null ? (int)$firstEvent->occurredAtUnixMs : null;
     }
 
     /**
      * The duration the first event of `$eventType` carries, in milliseconds; null when the call has no such event or
      * it carries none.
-     *
-     * @param array<string, AIConversationTraceEvent> $firstEventOfType
      */
-    protected static function findDurationMs(array $firstEventOfType, string $eventType): ?int
+    protected static function findDurationMs(AgentVoiceCallTraceFirstEvents $firstEvents, string $eventType): ?int
     {
-        return isset($firstEventOfType[$eventType]) ? ($firstEventOfType[$eventType]->durationMs ?? null) : null;
+        $firstEvent = $firstEvents->findEventOfType($eventType);
+
+        return $firstEvent !== null ? ($firstEvent->durationMs ?? null) : null;
     }
 
     /** The milliseconds from `$fromUnixMs` until `$untilUnixMs`; null when either is missing or they are out of order. */
@@ -217,12 +219,10 @@ class AgentVoiceCallTraceSummary extends ValueObject
     /**
      * When the agent's first audio of the call began: the first words on the output transcript. A subclass with a
      * provider that reports the start of its audio in another event reads that event here too.
-     *
-     * @param array<string, AIConversationTraceEvent> $firstEventOfType
      */
-    protected static function findFirstAgentWordAtUnixMs(array $firstEventOfType): ?int
+    protected static function findFirstAgentWordAtUnixMs(AgentVoiceCallTraceFirstEvents $firstEvents): ?int
     {
-        return static::findOccurredAtUnixMs($firstEventOfType, static::EVENT_TYPE_FIRST_AGENT_TRANSCRIPT);
+        return static::findOccurredAtUnixMs($firstEvents, static::EVENT_TYPE_FIRST_AGENT_TRANSCRIPT);
     }
 
     /** Records one anomaly of this call. */
@@ -235,29 +235,27 @@ class AgentVoiceCallTraceSummary extends ValueObject
     /**
      * The speech rhythm (median turn gap), the delegation round trips and the anomaly flags, from the events of the
      * persisted sentences, of the backlog and of the tasks. Every payload is decoded once.
-     *
-     * @param AIConversationTraceEvent[] $callTraceEvents
-     * @param AIConversationTurnEvent[] $turnEndEvents
      */
-    protected function summarizeSpeechAndDelegations(array $callTraceEvents, array $turnEndEvents): void
+    protected function summarizeSpeechAndDelegations(AIConversationTraceEvents $callTraceEvents, AIConversationTurnEvents $turnEndEvents): void
     {
-        $spokenSentences = [];
+        $spokenSentences = new AgentVoiceCallTraceSpokenSentences();
         $taskStartedEvents = [];
-        $backlogPushes = [];
+        $backlogPushes = new AgentVoiceCallTraceBacklogPushes();
         $persistedRows = [];
         $matchedTaskStartKeys = [];
-        foreach ($callTraceEvents as $traceEvent) {
+        foreach ($callTraceEvents->getElements() as $traceEvent) {
             $tracePayload = $traceEvent->getPayloadArray();
             switch ($traceEvent->eventType) {
                 case AIConversationTraceEvent::EVENT_TYPE_TRANSCRIPT_SENTENCE_PERSISTED:
                     $persistedRows[] = ['event' => $traceEvent, 'payload' => $tracePayload];
                     if (isset($tracePayload['spokenFromMs'], $tracePayload['spokenUntilMs'])) {
-                        $spokenSentences[] = AgentVoiceCallTraceSpokenSentence::create(
+                        $spokenSentence = AgentVoiceCallTraceSpokenSentence::create(
                             (string)($tracePayload['role'] ?? ''),
                             (int)$tracePayload['spokenFromMs'],
                             (int)$tracePayload['spokenUntilMs'],
                             (int)$traceEvent->occurredAtUnixMs
                         );
+                        $spokenSentences->add($spokenSentence);
                     }
                     if (($tracePayload['role'] ?? null) === AIConversationMessage::ROLE_USER && (int)($tracePayload['chars'] ?? 99) < 3) {
                         $this->addAnomaly(
@@ -269,11 +267,12 @@ class AgentVoiceCallTraceSummary extends ValueObject
                     break;
                 case AIConversationTraceEvent::EVENT_TYPE_TRANSCRIPT_BACKLOG_PUSHED:
                     if (($tracePayload['role'] ?? null) === AIConversationMessage::ROLE_ASSISTANT) {
-                        $backlogPushes[] = AgentVoiceCallTraceBacklogPush::create(
+                        $backlogPush = AgentVoiceCallTraceBacklogPush::create(
                             (int)$traceEvent->occurredAtUnixMs,
                             isset($tracePayload['startMs']) ? (int)$tracePayload['startMs'] : null,
                             isset($tracePayload['endMs']) ? (int)$tracePayload['endMs'] : null
                         );
+                        $backlogPushes->add($backlogPush);
                     }
                     break;
                 case AIConversationTraceEvent::EVENT_TYPE_TASK_STARTED:
@@ -313,14 +312,12 @@ class AgentVoiceCallTraceSummary extends ValueObject
         }
 
         // The rhythm: the owner finishes → the agent starts, on the provider's session clock (one clock, no skew).
-        usort(
-            $spokenSentences,
-            static fn (AgentVoiceCallTraceSpokenSentence $left, AgentVoiceCallTraceSpokenSentence $right): int => $left->fromMs <=> $right->fromMs
-        );
+        $spokenSentences->sortBySpokenStart();
+        $spokenSentencesInSpokenOrder = $spokenSentences->getElements();
         $turnGapsMs = [];
-        for ($sentenceNumber = 1; $sentenceNumber < count($spokenSentences); $sentenceNumber++) {
-            $previousSentence = $spokenSentences[$sentenceNumber - 1];
-            $currentSentence = $spokenSentences[$sentenceNumber];
+        for ($sentenceNumber = 1; $sentenceNumber < count($spokenSentencesInSpokenOrder); $sentenceNumber++) {
+            $previousSentence = $spokenSentencesInSpokenOrder[$sentenceNumber - 1];
+            $currentSentence = $spokenSentencesInSpokenOrder[$sentenceNumber];
             if ($previousSentence->role === AIConversationMessage::ROLE_USER
                 && $currentSentence->role === AIConversationMessage::ROLE_ASSISTANT
             ) {
@@ -371,10 +368,9 @@ class AgentVoiceCallTraceSummary extends ValueObject
      * provider reports the spans. A subclass with a provider that does not reads the gaps from that provider's own
      * events here.
      *
-     * @param AIConversationTraceEvent[] $callTraceEvents
      * @return int[]
      */
-    protected function findTurnGapsWithoutSpokenSpans(array $callTraceEvents): array
+    protected function findTurnGapsWithoutSpokenSpans(AIConversationTraceEvents $callTraceEvents): array
     {
         return [];
     }
@@ -384,20 +380,20 @@ class AgentVoiceCallTraceSummary extends ValueObject
      * and the task start; was a read-back that STARTED before the task held in the backlog (its start on the wall
      * clock = when it was pushed minus its spoken length); did the turn worker pick the turn up late?
      *
-     * @param AgentVoiceCallTraceSpokenSentence[] $spokenSentences
-     * @param AgentVoiceCallTraceBacklogPush[] $backlogPushes the agent's sentences held back in the backlog
-     * @param AIConversationTurnEvent[] $turnEndEvents
+     * @param AgentVoiceCallTraceSpokenSentences $spokenSentences the persisted sentences of the call, in spoken order
+     * @param AgentVoiceCallTraceBacklogPushes $backlogPushes the agent's sentences held back in the backlog
+     * @param AIConversationTurnEvents $turnEndEvents the turn-end events of the call's conversation
      */
     protected function flagReadBackAndPickup(
         AIConversationTraceEvent $taskStartedEvent,
-        array $spokenSentences,
-        array $backlogPushes,
-        array $turnEndEvents
+        AgentVoiceCallTraceSpokenSentences $spokenSentences,
+        AgentVoiceCallTraceBacklogPushes $backlogPushes,
+        AIConversationTurnEvents $turnEndEvents
     ): void {
         $taskStartedAtUnixMs = (int)$taskStartedEvent->occurredAtUnixMs;
         $lastCallerSentenceAt = null;
         $agentSpokeAfterCaller = false;
-        foreach ($spokenSentences as $spokenSentence) {
+        foreach ($spokenSentences->getElements() as $spokenSentence) {
             if ($spokenSentence->occurredAtUnixMs > $taskStartedAtUnixMs) {
                 continue;
             }
@@ -409,7 +405,7 @@ class AgentVoiceCallTraceSummary extends ValueObject
             }
         }
         $readBackHeldInBacklog = false;
-        foreach ($backlogPushes as $backlogPush) {
+        foreach ($backlogPushes->getElements() as $backlogPush) {
             $pushedAtUnixMs = $backlogPush->pushedAtUnixMs;
             $spokenLengthMs = $backlogPush->getSpokenLengthMs();
             if ($spokenLengthMs !== null && $pushedAtUnixMs >= $taskStartedAtUnixMs
@@ -432,7 +428,7 @@ class AgentVoiceCallTraceSummary extends ValueObject
                 'the delegation started without ' . static::getAgentLabel() . ' reading the request back'
             );
         }
-        foreach ($turnEndEvents as $turnEndEvent) {
+        foreach ($turnEndEvents->getElements() as $turnEndEvent) {
             if (($turnEndEvent->initiatorMessageIndex ?? null) !== $taskStartedEvent->messageIndex) {
                 continue;
             }

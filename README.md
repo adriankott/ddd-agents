@@ -116,9 +116,10 @@ section 5.
 - **Voice channel provider** (`AgentVoiceChannelProvider`, tagged, autoconfigured): answers the voice channel seam of
   `AgentVoiceChannelService` without a same-path subclass. The package's own voice channel is one
   (`AgentVoiceChannelProviderService`, available only while voice can run, see "Voice"); an application with a
-  channel of its own registers another. Exactly one provider is asked — the first available in container order;
-  more than one registered is a `voiceChannel` warning of `app:agent:check-installation`. Without an available one:
-  no voice channel.
+  channel of its own registers another. Exactly one provider is asked: an application's providers first, in
+  container order, the package's own last, so an application's provider wins without a warning. Two or more
+  providers of an application are a `voiceChannel` warning of `app:agent:check-installation`; the package's own is
+  not counted. Without an available one: no voice channel.
 - **The space argument** (`config/app/AI/agentSpaceToolArgument.php`): its name and description on the wire.
 - **The task list widget** (`config/app/AI/agentTasks.php`): `taskListWidgetType`.
 - **`app:agent:check-installation`** (read-only, `--format=json`, exit 1 on a blocking finding): unbound package
@@ -153,7 +154,9 @@ to the override points below.
    the trait's builder methods; optionally one that mounts `AdminAgentVoiceCallsTrait` (the admin list of calls).
 5. The two transports and the routing of `AgentVoiceMessengerTransports` in the application's `messenger.yaml`: a
    pool for `voice_live_session` (one process per running call, a stop grace above `limits.maximumCallSeconds`,
-   outbound WebSocket access to the provider) and a consumer for `voice_ring_deadline` (delayed messages).
+   outbound WebSocket access to the provider) and a consumer for `voice_ring_deadline` (delayed messages). Both are
+   a commented block headed "only when voice is enabled" in the Messenger template of the installation skill and in
+   `examples/workers.yaml`.
 6. The realtime binding carries an account audience: the ring goes to every open client of the account, and the
    transport answers whether a client of the account listens (`askTransportWhetherClientIsListening()`). Without a
    bound transport the ring arrives through the account-level realtime read, within its poll interval; that read
@@ -211,10 +214,10 @@ with the read that finds it gone (`createAgentVoiceRingSource()` over the accoun
 | `AgentVoiceCallStoreService` | the store `entity`: the package's call table | map a store of its own by name (`getCallStoreClassNames()`, contract `AgentVoiceCallStore`) |
 | `AgentVoiceCallStartsService` | a call the agent starts rings the owner's open clients | route a call start to another medium, add a ring target |
 | `AgentVoiceRingService` | one ring message per call to the account's open clients; its caller context is empty | say who calls: `buildCallerContext()` answers the application's same-path subclass of the value object `AgentVoiceRingCallerContext`, which names its fields in `toPayloadArray()`; name the caller label key |
-| `AgentVoiceSessionContextsService` | the briefing of the voice model: instructions, the conversation so far, the delegation rules, the memories | add what it knows of the agent space |
-| the provider adapter | `OpenAILiveVoiceProviderAdapter` | register another adapter (a subclass of `RealtimeVoiceProviderAdapter`) under `provider.adapters`; one class answers to one name |
+| `AgentVoiceSessionContextsService` | the briefing of the voice model: instructions, the conversation so far, the delegation rules, the memories | add what it knows of the agent space; further seed rows are the set `AgentVoiceSeedInputMessages` that `buildApplicationSeedInputMessages()` of its subclass of `AgentVoiceSessionContext` returns |
+| the provider adapter | `OpenAILiveVoiceProviderAdapter` | register another adapter (a subclass of `RealtimeVoiceProviderAdapter`) under `provider.adapters`; one class answers to one name; `buildSessionCreationPayload()` takes the seed rows as the set `AgentVoiceSeedInputMessages` |
 | `AgentVoiceCallsMCPPackage` | three tools on the signed-in account's calls (`startVoiceCall`, `endVoiceCall`, `getVoiceCalls`) | add arguments of its own |
-| `AgentVoiceSessionsTrait`, `AdminAgentVoiceCallsTrait` | the routes; the admin list of the signed-in account's own calls | a stricter access rule for voice (`authorizeVoiceSessionAccess()`); whose calls an admin lists (`findAccountIdsOfListableVoiceCalls()`); the costs of a call (`findBookedCostsOfVoiceCall()`) |
+| `AgentVoiceSessionsTrait`, `AdminAgentVoiceCallsTrait` | the routes; the admin list of the signed-in account's own calls (it answers `agentVoiceCalls` and `agentVoiceCallDerivedValues`, both object sets: `elements` on the wire) | a stricter access rule for voice (`authorizeVoiceSessionAccess()`); whose calls an admin lists (`findAccountIdsOfListableVoiceCalls()`); the costs of a call (`findBookedCostsOfVoiceCall()`) |
 | `stampUIClientOfAccount()`, `getAgentClientPresenceService()` (hooks of the chat controller traits) | the account-level read states the presence of a client that sends `clientId`, voice switched on or not | state none (an empty `stampUIClientOfAccount()`); keep the presences in a service of its own |
 
 A refused call start or a refused running call carries a code (`feature_not_available`, `no_ai_budget`,

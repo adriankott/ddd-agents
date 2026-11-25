@@ -19,43 +19,46 @@ enum PhoneConversationSignalSource: string implements ConversationSignalSource
     use ConversationSignalSourceDefaultAnswers;
 
     /**
-     * A phone VOICEMAIL from a caller whose number is not enabled for authentication: the doorman took a
-     * message; the session worker posts its transcript as this signal into a fresh conversation of the called agent
-     * number's OWNER account and dispatches a resume, so the agent surfaces the message proactively. No class of the
-     * package writes this case: it is the case of an application's own medium.
+     * A signal source of the voice channel: a spoken message somebody left for the owner on a medium of the
+     * application, without a live call with the agent. For the conversation: the medium posts the transcript of the
+     * message as this signal into a fresh conversation of the OWNER's account and starts a turn, so the agent brings
+     * the message to the owner by itself. TURN-OWING. No class of the package writes this case: it is the case of an
+     * application's own medium.
      */
     case PHONE_VOICEMAIL = 'PHONE_VOICEMAIL';
 
     /**
-     * A phone call on THIS conversation was ANSWERED — the chat renders it as a call marker chip and the agent knows
-     * structurally that a call is running. NON-turn-owing: the turn derivation sees through phone lifecycle signals
+     * A signal source of the voice channel: a call on THIS conversation was ANSWERED. For the conversation: the chat
+     * renders it as a call marker chip and the agent knows structurally that a call is running. NON-turn-owing: the
+     * turn derivation sees through the lifecycle signals of a call
      * ({@see \DDD\Domain\AI\Entities\Conversations\AIConversation::hasUnansweredInboundMessage()}).
      */
     case PHONE_CALL_STARTED = 'PHONE_CALL_STARTED';
 
     /**
-     * A phone call on THIS conversation ENDED (the text carries duration and end reason — including `not_answered` when
-     * the callee declined or never picked up). Chat marker chip + structural context for the agent (an a2a task
-     * finishing after hang-up knows nobody is on the line). NON-turn-owing like {@see self::PHONE_CALL_STARTED}.
+     * A signal source of the voice channel: a call on THIS conversation ENDED (the text carries the duration and the
+     * end reason, including `not_answered` when the owner declined or never answered). For the conversation: a call
+     * marker chip in the chat and structural context for the agent (a delegated task that finishes after the call has
+     * ended knows that nobody is listening any more). NON-turn-owing like {@see self::PHONE_CALL_STARTED}.
      */
     case PHONE_CALL_ENDED = 'PHONE_CALL_ENDED';
 
     /**
-     * The voice model of a GPT-Live call DELEGATED to the backend: the caller's request is the transcript
-     * itself — the USER rows the call persisted right before this signal — so the signal carries no copy of it, only the
-     * instruction to act on it. TURN-OWING (deliberately not a lifecycle signal): the trailing signal is the owed work,
-     * exactly like a signal-only start.
+     * A signal source of the voice channel: the voice model of a running call DELEGATED a request to the agent. For
+     * the conversation: the request is the transcript itself (the USER rows the call persisted right before this
+     * signal), so the signal carries no copy of it, only the instruction to act on it. TURN-OWING (deliberately not a
+     * lifecycle signal): the trailing signal is the owed work, exactly like a signal-only start.
      */
     case PHONE_DELEGATION = 'PHONE_DELEGATION';
 
     /**
-     * A call the agent ITSELF started (`startVoiceCall`) ended unanswered — the app ring EXPIRED on every device, or
-     * the phone call was not answered or could not be connected: the platform starts ONE turn in the
-     * conversation the agent started the call from, so the agent tells the owner they did not pick up and ASKS
-     * whether to try another channel — never calls again by itself. Written once per call by
-     * the voice channel's follow-up service (`AgentVoiceCallFollowUpsService`) behind the call's unanswered-end claim;
-     * the text names the outcome and the channels that reach the owner now. TURN-OWING; a running turn takes it over
-     * at its next model call instead of a second reaction. A DECLINED ring never writes it.
+     * A signal source of the voice channel: a call the agent ITSELF started (`startVoiceCall`) ended unanswered: its
+     * ring EXPIRED on every client of the owner, or its medium did not reach the owner. For the conversation: the
+     * platform starts ONE turn in the conversation the agent started the call from, so the agent tells the owner that
+     * the call was not answered and ASKS whether to try another channel; it never calls again by itself. Written once
+     * per call by the voice channel's follow-up service (`AgentVoiceCallFollowUpsService`) behind the call's
+     * unanswered-end claim; the text names the outcome and the channels that reach the owner now. TURN-OWING; a
+     * running turn takes it over at its next model call instead of a second reaction. A DECLINED ring never writes it.
      */
     case PHONE_CALL_UNANSWERED_FOLLOW_UP = 'PHONE_CALL_UNANSWERED_FOLLOW_UP';
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DDD\Domain\AI\Entities\Voice\Calls;
 
 use DDD\Domain\AI\Entities\Conversations\Agent\Activity\AgentActivityLine;
+use DDD\Domain\AI\Entities\Conversations\Agent\Activity\AgentActivityLines;
 use DDD\Domain\AI\Entities\Conversations\Agent\Activity\AgentActivityTurnFeed;
 use DDD\Domain\AI\Entities\Voice\Prompts\AgentVoiceAIPromptNames;
 use DDD\Domain\AI\Entities\Voice\Prompts\AgentVoicePromptText;
@@ -110,11 +111,11 @@ class AgentVoiceTaskProgressSchedule extends ValueObject
         $silentContextLines = [];
         if ($newNarratedLines !== []) {
             if ($this->spokenProgressCount >= static::MAXIMUM_SPOKEN_PROGRESS_PER_TASK) {
-                $silentContextLines = $this->passLinesOn($newNarratedLines, $nowUnixMs);
+                $silentContextLines = $this->passLinesOn(static::buildActivityLines(...$newNarratedLines), $nowUnixMs);
             } elseif ($this->isSpokenProgressDueAt($nowUnixMs, $lastSpeechAtUnixMs)) {
                 $newestNarratedLine = array_pop($newNarratedLines);
-                $silentContextLines = $this->passLinesOn($newNarratedLines, $nowUnixMs);
-                $this->passLinesOn([$newestNarratedLine], $nowUnixMs);
+                $silentContextLines = $this->passLinesOn(static::buildActivityLines(...$newNarratedLines), $nowUnixMs);
+                $this->passLinesOn(static::buildActivityLines($newestNarratedLine), $nowUnixMs);
                 $spokenProgressLine = (string)$newestNarratedLine->line;
                 $this->spokenProgressCount++;
                 $this->lastSpokenProgressAtUnixMs = $nowUnixMs;
@@ -201,16 +202,26 @@ class AgentVoiceTaskProgressSchedule extends ValueObject
         return AgentVoiceAIPromptNames::APP_AI_VOICE_STEP_WITHOUT_LINE;
     }
 
+    /** The given lines of one turn's feed as a set, in their order. */
+    protected static function buildActivityLines(AgentActivityLine ...$activityLines): AgentActivityLines
+    {
+        $activityLinesSet = new AgentActivityLines();
+        foreach ($activityLines as $activityLine) {
+            $activityLinesSet->add($activityLine);
+        }
+
+        return $activityLinesSet;
+    }
+
     /**
      * Mark lines as handled and return their sentences.
      *
-     * @param AgentActivityLine[] $activityLines
      * @return string[]
      */
-    protected function passLinesOn(array $activityLines, int $nowUnixMs): array
+    protected function passLinesOn(AgentActivityLines $activityLines, int $nowUnixMs): array
     {
         $lineSentences = [];
-        foreach ($activityLines as $activityLine) {
+        foreach ($activityLines->getElements() as $activityLine) {
             $this->handledLineElementKeys[] = AgentActivityTurnFeed::buildElementKey($activityLine);
             $lineSentences[] = (string)$activityLine->line;
             $this->lastLinePassedOnAtUnixMs = $nowUnixMs;

@@ -7,6 +7,7 @@ namespace DDD\Domain\AI\Services\Voice\Live;
 use DDD\Domain\AI\Entities\Voice\AgentVoiceSettings;
 use DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceCall;
 use DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceSeedInputMessage;
+use DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceSeedInputMessages;
 use DDD\Domain\AI\Services\Voice\Providers\RealtimeVoiceProviderAdapter;
 use DDD\Infrastructure\Exceptions\BadGatewayException;
 use DDD\Infrastructure\Libs\Config;
@@ -126,14 +127,14 @@ class OpenAILiveVoiceProviderAdapter extends RealtimeVoiceProviderAdapter
      * call's settings, CLIENT delegation (the agent's own loop is the backend, never a model of the provider), the
      * seed history as `input`, and the client's offer as the WebRTC transport.
      *
-     * @param AgentVoiceSeedInputMessage[] $seedInputMessages the seed rows, the most important first
+     * @param AgentVoiceSeedInputMessages|null $seedInputMessages the seed rows, the most important first; null = none
      * @return array<string, mixed>
      */
     public function buildSessionCreationPayload(
         string $sdpOffer,
         string $liveInstructions,
         ?AgentVoiceSettings $effectiveVoiceSettings,
-        array $seedInputMessages = []
+        ?AgentVoiceSeedInputMessages $seedInputMessages = null
     ): array {
         $sessionCreationPayload = [
             'session' => [
@@ -158,7 +159,7 @@ class OpenAILiveVoiceProviderAdapter extends RealtimeVoiceProviderAdapter
 
         $seedInputRows = [];
         $remainingSeedChars = static::SEED_INPUT_TOTAL_MAX_CHARS;
-        foreach (array_slice($seedInputMessages, 0, static::SEED_INPUT_MAX_MESSAGES) as $seedInputMessage) {
+        foreach (array_slice($seedInputMessages?->getElements() ?? [], 0, static::SEED_INPUT_MAX_MESSAGES) as $seedInputMessage) {
             if ($remainingSeedChars <= 0) {
                 break;
             }

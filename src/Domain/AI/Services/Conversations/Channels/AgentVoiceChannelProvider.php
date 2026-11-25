@@ -16,11 +16,14 @@ use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
  * {@see AgentVoiceChannelService}, which hands each question to the provider. A package ships its provider as a service
  * in a public `…\Services\` namespace; autoconfiguration tags it. No same-path subclass of the service is needed.
  *
- * One voice channel per application: the service asks exactly ONE provider — the first in container order whose
- * {@see isVoiceChannelAvailable()} answers true. Further providers are never asked; more than one registered provider
- * is a WARNING of `app:agent:check-installation` (check `voiceChannel`) and is logged once per process. Without an
- * available provider the service gives its defaults ("no voice channel"). A provider that throws is logged and the
- * question gets the default answer; the turn goes on.
+ * One voice channel per application: the service asks exactly ONE provider, the first whose
+ * {@see isVoiceChannelAvailable()} answers true. An application's providers are asked first, in container order; the
+ * package's own provider (`AgentVoiceChannelProviderService`, the window voice channel) is the fallback and is asked
+ * last. So an application that registers a provider of its own replaces the package's without a warning. Further
+ * providers are never asked; two or more providers of an application (the package's is not counted) are a WARNING of
+ * `app:agent:check-installation` (check `voiceChannel`) and are logged once per process. Without an available
+ * provider the service gives its defaults ("no voice channel"). A provider that throws is logged and the question
+ * gets the default answer; the turn goes on.
  */
 #[AutoconfigureTag(AgentVoiceChannelProvider::TAG)]
 interface AgentVoiceChannelProvider

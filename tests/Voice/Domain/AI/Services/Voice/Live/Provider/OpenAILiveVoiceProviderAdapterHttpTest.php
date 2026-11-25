@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DDD\Tests\Agents\Voice\Domain\AI\Services\Voice\Live\Provider;
 
 use DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceSeedInputMessage;
+use DDD\Domain\AI\Entities\Voice\Calls\AgentVoiceSeedInputMessages;
 use DDD\Domain\AI\Services\Voice\Live\LiveSessionCreationResponse;
 use DDD\Infrastructure\Exceptions\BadGatewayException;
 use DDD\Tests\Agents\Voice\Support\AgentVoiceUnitTestCase;
@@ -66,7 +67,7 @@ class OpenAILiveVoiceProviderAdapterHttpTest extends AgentVoiceUnitTestCase
     {
         $recordingAdapter = new RecordingOpenAILiveVoiceProviderAdapter();
         $recordingAdapter->queuedAnswers = [new Response(201, [], '{"session":{"id":"live_abc"},"transport":{"sdp":"v=0 answer"}}')];
-        $sessionCreationPayload = $recordingAdapter->buildSessionCreationPayload('v=0 offer', 'Be brief.', null, [AgentVoiceSeedInputMessage::create('developer', 'Seed')]);
+        $sessionCreationPayload = $recordingAdapter->buildSessionCreationPayload('v=0 offer', 'Be brief.', null, AgentVoiceSeedInputMessages::fromMessages(AgentVoiceSeedInputMessage::create('developer', 'Seed')));
 
         $liveSessionCreationResponse = $recordingAdapter->createSessionFromSdpOffer($sessionCreationPayload);
 
