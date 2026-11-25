@@ -329,6 +329,32 @@ describe("createAgentsHttpConversationClient", () => {
     expect(withoutModels.getSelectableModels).toBeUndefined();
   });
 
+  test("reads the account-level realtime messages with the UI client's id, also through the polling default", async () => {
+    const uiClient = { clientId: "client-a", readUIState: () => null, acceptClientToolRequest: vi.fn() };
+    const { client, requests } = buildClient(
+      [
+        {
+          body: {
+            realtimeMessages: { elements: [{ messageType: "demo.voice.ring", messageKey: "call-1", payloadJson: "{}", secondsLeft: 20 }] },
+            realtimeListenerCredential: { transportName: "fake", credential: "token-of-3", listenPath: "accounts/3" },
+          },
+        },
+      ],
+      { uiClient, polling: {} },
+    );
+
+    const read = await client.getAccountRealtimeMessages?.();
+
+    expect(requests[0].method).toBe("GET");
+    expect(requests[0].url.pathname).toBe("/api/agents/conversations/realtimeMessages");
+    expect(requests[0].url.searchParams.get("clientId")).toBe("client-a");
+    expect(read).toEqual({
+      messages: [{ messageType: "demo.voice.ring", messageKey: "call-1", payloadJson: "{}", secondsLeft: 20 }],
+      listenerCredential: { transportName: "fake", credential: "token-of-3", listenPath: "accounts/3" },
+    });
+    expect(uiClient.acceptClientToolRequest).not.toHaveBeenCalled();
+  });
+
   test("every failure rejects with an AgentsClientError of the matching kind", async () => {
     const { client } = buildClient([
       { status: 404, body: { error: "AIConversation 7 not found." } },

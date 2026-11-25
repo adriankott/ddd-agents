@@ -409,8 +409,7 @@ trait AgentConversationControllerHooksTrait
             return new AgentRealtimeMessageDeliveries();
         }
         try {
-            /** @var AgentRealtimeChannelService $agentRealtimeChannelService */
-            $agentRealtimeChannelService = DDDService::instance()->getService(AgentRealtimeChannelService::class);
+            $agentRealtimeChannelService = $this->getAgentRealtimeChannelService();
             return $agentRealtimeChannelService->findDeliveriesForClient(
                 AgentRealtimeAudience::forConversation((int)$conversation->accountId, (int)($conversation->rootConversationId ?? $conversation->id)),
                 $clientId !== '' ? $clientId : null,
@@ -428,9 +427,43 @@ trait AgentConversationControllerHooksTrait
         if (!isset($conversation->accountId) || $conversation->accountId === null) {
             return null;
         }
+        $agentRealtimeChannelService = $this->getAgentRealtimeChannelService();
+        return $agentRealtimeChannelService->findListenerCredential((int)$conversation->accountId, (int)($conversation->rootConversationId ?? $conversation->id));
+    }
+
+    /** The realtime port the realtime reads of the traits ask (from the container) */
+    protected function getAgentRealtimeChannelService(): AgentRealtimeChannelService
+    {
         /** @var AgentRealtimeChannelService $agentRealtimeChannelService */
         $agentRealtimeChannelService = DDDService::instance()->getService(AgentRealtimeChannelService::class);
-        return $agentRealtimeChannelService->findListenerCredential((int)$conversation->accountId, (int)($conversation->rootConversationId ?? $conversation->id));
+        return $agentRealtimeChannelService;
+    }
+
+    /**
+     * The open realtime messages addressed to account `$accountId` (the account audience, not a conversation's) for the
+     * reading client: the account's mailbox, expired messages left out, a message for one client only to that client;
+     * the client tool requests (always of a conversation) are left out. Empty on any error.
+     */
+    protected function findRealtimeMessageDeliveriesOfAccountClient(int $accountId, ?string $clientId): AgentRealtimeMessageDeliveries
+    {
+        try {
+            $agentRealtimeChannelService = $this->getAgentRealtimeChannelService();
+            return $agentRealtimeChannelService->findDeliveriesForClient(
+                AgentRealtimeAudience::forAccount($accountId),
+                $clientId !== '' ? $clientId : null,
+                [AgentUIRealtimeMessageTypeProviderService::MESSAGE_TYPE_CLIENT_TOOL_REQUEST]
+            );
+        } catch (Throwable $throwable) {
+            DDDService::instance()->getLogger()->warning('[AgentRealtime] account mailbox delivery skipped', ['accountId' => $accountId, 'reason' => $throwable->getMessage()]);
+            return new AgentRealtimeMessageDeliveries();
+        }
+    }
+
+    /** The listener credential of the host's realtime transport for account `$accountId` without a conversation (null without a transport) */
+    protected function findRealtimeListenerCredentialOfAccount(int $accountId): ?AgentRealtimeListenerCredential
+    {
+        $agentRealtimeChannelService = $this->getAgentRealtimeChannelService();
+        return $agentRealtimeChannelService->findListenerCredential($accountId, null);
     }
 
     /** {@see stampUIClientOfConversation()} for a send that names its conversation by id, read under the caller's rights */

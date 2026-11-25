@@ -178,6 +178,14 @@ export interface WireConversationRunStateResponse {
   realtimeListenerCredential?: { transportName: string; credential: string; listenPath?: string | null; expiresAt?: string | null } | null;
 }
 
+/** `AgentAccountRealtimeMessagesGetResponseDto`. */
+export interface WireAccountRealtimeMessagesResponse {
+  /** The open messages of the realtime port addressed to the account (`AgentRealtimeMessageDeliveries`) */
+  realtimeMessages?: WireSet<{ messageType: string; messageKey: string; payloadJson: string; secondsLeft: number }> | null;
+  /** What the client needs to listen on the host's transport without a conversation (`AgentRealtimeListenerCredential`) */
+  realtimeListenerCredential?: { transportName: string; credential: string; listenPath?: string | null; expiresAt?: string | null } | null;
+}
+
 /** `AIConversationActivityGetResponseDto`. */
 export interface WireConversationActivityResponse {
   turnMessageId?: number | null;

@@ -118,7 +118,12 @@ const uiClient = useAgentUIClient({
 - A host push transport hands each message to `acceptArrivedRealtimeMessage(conversationId, message, uiClient, sendAnswer)`;
   without one the run-state read delivers. A transport that only pings calls
   `readRunStateAfterClientToolRequestPing(conversationId, client.getConversationRunState, uiClient)`: a read that
-  finds no request is repeated once after `CLIENT_TOOL_REQUEST_PING_REREAD_DELAY_MS` (400 ms). `runClientToolRequestForDevelopment(uiClient, 'LIST_TARGETS')` tries the
+  finds no request is repeated once after `CLIENT_TOOL_REQUEST_PING_REREAD_DELAY_MS` (400 ms).
+- A client that shows no conversation reads the messages addressed to its account (e.g. a call's ring) with
+  `createAccountRealtimePoll({ readAccountRealtime: client.getAccountRealtimeMessages, onMessage, onListenerCredential,
+  isTransportBound })`: a read at once, then every 5 s while no transport is bound; `onMessage` gets each message once.
+  A transport hands what it carries to `poll.acceptArrivedMessage(message)`; one that only pings calls
+  `poll.readAfterPing()` (one re-read after 400 ms when nothing new arrived). `runClientToolRequestForDevelopment(uiClient, 'LIST_TARGETS')` tries the
   adapters without a model.
 
 ## Texts and translations

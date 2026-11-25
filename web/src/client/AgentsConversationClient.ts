@@ -1,3 +1,4 @@
+import type { AccountRealtimeRead } from "../ui/account-realtime";
 import type { ClientToolAnswer } from "../ui/client-tools";
 import type {
   AgentsConversation,
@@ -48,6 +49,13 @@ export interface AgentsConversationClient {
    * a binding without it runs no UI tools.
    */
   answerClientToolRequest?: (conversationId: number, requestId: number, answer: ClientToolAnswer) => Promise<void>;
+
+  /**
+   * The account-level realtime read of the signed-in account: the open realtime messages addressed to the account
+   * (not to a conversation; for every client of the account or this one) and the listener credential without a
+   * conversation. Optional: `createAccountRealtimePoll` (`/ui`) polls it for a client that shows no conversation.
+   */
+  getAccountRealtimeMessages?: () => Promise<AccountRealtimeRead>;
 
   /** The newest page, each message with its delegated children's `{ id, runState }`. */
   getNewestMessagesPage: (conversationId: number, pageSize: number) => Promise<ConversationMessagesPage>;

@@ -555,6 +555,7 @@
       "PollingConversationChangeSubscriptionOptions",
       "PollingDocumentVisibility",
       "PollingTimers",
+      "WireAccountRealtimeMessagesResponse",
       "WireActivityLine",
       "WireChangeHistory",
       "WireClientContext",
@@ -921,6 +922,8 @@
   },
   "./ui": {
     "values": [
+      "ACCOUNT_REALTIME_PING_REREAD_DELAY_MS",
+      "ACCOUNT_REALTIME_POLL_INTERVAL_MS",
       "AGENT_ANCHOR_ATTRIBUTE",
       "AGENT_ANCHOR_GROUP_ATTRIBUTE",
       "AGENT_ATTRIBUTES",
@@ -964,6 +967,7 @@
       "computePictureDimensions",
       "computeRetryScale",
       "convertPixelsToGrey",
+      "createAccountRealtimePoll",
       "createAgentUIClientId",
       "createAgentWindowAdapter",
       "createDomScreenPathGuide",
@@ -992,6 +996,9 @@
       "useAgentUIClient"
     ],
     "types": [
+      "AccountRealtimePoll",
+      "AccountRealtimePollOptions",
+      "AccountRealtimeRead",
       "AgentRealtimeListenerCredential",
       "AgentRealtimeMessageDelivery",
       "AgentUIClientBinding",

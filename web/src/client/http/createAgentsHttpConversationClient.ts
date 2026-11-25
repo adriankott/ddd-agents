@@ -46,7 +46,9 @@ import {
   mapWireSelectableModel,
   readWireSetElements,
 } from "./agents-http-mappers";
+import type { AccountRealtimeRead } from "../../ui/account-realtime";
 import type {
+  WireAccountRealtimeMessagesResponse,
   WireConversationActivityResponse,
   WireConversationMessageSearchResponse,
   WireConversationMessagesResponse,
@@ -177,6 +179,24 @@ class AgentsHttpConversationClient implements AgentsConversationClient {
     }
     this.options.onRealtimeListenerCredential?.(conversationId, response.realtimeListenerCredential ?? null);
     return mapWireConversationRunState(response);
+  };
+
+  /**
+   * The account-level realtime read (`GET /realtimeMessages`): the messages addressed to the signed-in account for this
+   * client (the `uiClient`'s id when bound) and the listener credential without a conversation. Arrival is the
+   * caller's (`createAccountRealtimePoll` of `/ui`).
+   */
+  getAccountRealtimeMessages = async (): Promise<AccountRealtimeRead> => {
+    const response = await this.request<WireAccountRealtimeMessagesResponse>({
+      operation: "getAccountRealtimeMessages",
+      method: "GET",
+      path: "/realtimeMessages",
+      query: this.options.uiClient ? { clientId: this.options.uiClient.clientId } : undefined,
+    });
+    return {
+      messages: readWireSetElements(response.realtimeMessages),
+      listenerCredential: response.realtimeListenerCredential ?? null,
+    };
   };
 
   /** Posts the answer of the UI client to a client tool request (`Agent.UI`); a refused answer is the server's word. */

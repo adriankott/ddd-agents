@@ -29,7 +29,7 @@ The live-call look-up runs at most once per `AIConversation::LIVE_CALL_PROBE_TTL
 object (`AIConversationLiveCallProbe`), so the steps of a turn share it. The segment changes only at a call's start and
 end. The presence also decides whether the composed-view kit is taught
 (`AgentModelInput::OWNER_PRESENCES_TAUGHT_THE_COMPOSED_VIEW_KIT`) and whether a scheduled run writes the e-mail variant.
-Voice channels are the host's (`AgentVoiceChannelService`, entry skill).
+Voice channels are the host's or a package's (`AgentVoiceChannelService` and its provider `AgentVoiceChannelProvider`, entry skill).
 
 ## 2. The device of a message
 

@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.5.7
+
+**Two generic enablers for packages beside ddd-agents: a voice channel provider port and the account-level realtime
+read.** npm `@mgamadeus/ddd-agents` 0.5.7 in lockstep.
+
+- `AgentVoiceChannelProvider` (`DDD\Domain\AI\Services\Conversations\Channels`, `#[AutoconfigureTag]`, tag
+  `ai.agent_voice_channel_provider`): `isVoiceChannelAvailable()`, `findLiveAnsweredCallChannelType()`,
+  `putCallReachVariantsInto()`, `findCallTaskTextsOfConversation()`. `AgentVoiceChannelService` keeps its methods and
+  asks exactly one provider — the first available in container order; without one it gives today's answers ("no voice
+  channel"); a provider that throws is logged and the question gets the default. A same-path subclass of the service
+  keeps working.
+- `app:agent:check-installation`: new check `voiceChannel` — a WARNING when more than one voice channel provider is
+  registered (only the first available one is asked).
+- Chat controller traits: `GET …/realtimeMessages` (`getAccountRealtimeMessages()`, body
+  `buildAccountRealtimeMessagesResponse()`; `AgentAccountRealtimeMessagesGetRequestDto` with `clientId`,
+  `AgentAccountRealtimeMessagesGetResponseDto` with `realtimeMessages` and `realtimeListenerCredential`): the open
+  messages addressed to the signed-in account (`AgentRealtimeAudience::forAccount()`), optionally to one client,
+  expired ones left out, and the listener credential without a conversation. Same gate and delivery rules as the
+  run-state read; 403 without a signed-in account. Hooks `findRealtimeMessageDeliveriesOfAccountClient()`,
+  `findRealtimeListenerCredentialOfAccount()`, `getAgentRealtimeChannelService()`. A host that lists its routes gets
+  one more GET route.
+- Web: `AgentsConversationClient.getAccountRealtimeMessages?()` (HTTP binding and polling wrapper);
+  `@mgamadeus/ddd-agents/ui`: `createAccountRealtimePoll()` (a read at once, a poll every
+  `ACCOUNT_REALTIME_POLL_INTERVAL_MS` while no transport is bound, the arrival hook `onMessage` once per message,
+  `acceptArrivedMessage()` for a transport that carries the message, `readAfterPing()` with one re-read after
+  `ACCOUNT_REALTIME_PING_REREAD_DELAY_MS`), `AccountRealtimeRead`; wire type `WireAccountRealtimeMessagesResponse`.
+- Tests: provider absent, registered, unavailable, failing, several (one asked, installation warning); the account read
+  (the account's messages only, not a conversation's or another account's, expiry, target client, credential without
+  a conversation, 403 without an account); web: the account poll, the arrival hook, the ping re-read, the HTTP read.
+
 ## 0.5.6
 
 **Recurring vs one-time in `getTaskSchedules`.** Requires `mgamadeus/ddd` ^3.46.3; npm `@mgamadeus/ddd-agents` 0.5.6

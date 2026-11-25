@@ -94,7 +94,7 @@ Each is a public service with a working default. The owning topic skill explains
 | `DDD\Domain\AI\Services\Conversations\Rights\AgentAccountRightsService` | a row is readable by its own account; a reader of every row (`isAccountReaderOfAllAgentRows()`: the framework's admin with access to all resources) reads all; no account reads nothing | add account hierarchies in `applyNonAdminAccountCondition()`; take "reads all" away from scoped admins in `isAccountReaderOfAllAgentRows()`, or per table (`isAccountReaderOfAllAgentSpaces()`, `isAccountReaderOfAllAgentMandates()`, `isAccountReaderOfAllMessageEmbeddings()`, `isAccountReaderOfAllEvaluationRows()`, `isAccountReaderOfAllTurnEventSnapshots()`) | this file, [agent-space.md](agent-space.md) |
 | `DDD\Domain\AI\Services\Conversations\AgentOwnerFacingTextTranslationService` | the framework's translations of translation keys (`__()`), or the host's global `___()` when it defines one; English when a key has none | translate the report, stop reasons and schedule texts with the host's own layer (`translateKeyWithApplicationTranslations()`) | `ddd-module-agents-autonomy-specialist` |
 | `DDD\Domain\AI\Services\Conversations\Environments\AgentEnvironmentNamesService` | one environment (`ENVIRONMENT_PRODUCTION`) | stamp each environment's conversations, so processes of several environments on one database drive only their own rows | this file |
-| `DDD\Domain\AI\Services\Conversations\Channels\AgentVoiceChannelService` | no voice channel | connect live calls | not documented yet (a later skill) |
+| `DDD\Domain\AI\Services\Conversations\Channels\AgentVoiceChannelService` | no voice channel | connect live calls — preferably through the tagged provider `AgentVoiceChannelProvider` (no subclass) | this file, "The voice channel provider" |
 | `DDD\Domain\AI\Services\Conversations\Discovery\AgentSourceRootsService` | the application's `src/`, then every module's source path | replace the source roots in a test | [first-capability-end-to-end.md](first-capability-end-to-end.md) |
 | `DDD\Domain\AI\Services\Conversations\Eligibility\AgentAutomationEligibilityService` | every space and account eligible | refuse automated work for an ended, suspended or erased scope | `ddd-module-agents-autonomy-specialist` |
 | `DDD\Domain\AI\Services\Conversations\Schedules\ScheduleBudgetPotsService` | no budget: a zero pot that never caps | cap the spend of scheduled runs | `ddd-module-agents-autonomy-specialist` |
@@ -247,3 +247,22 @@ the meta tools leave out is `config/app/AI/agentModelInputOptions.php` (both: `d
 - A database entity and its set are built with `X::newInstance()`, never `new X()`; a repository is reached through
   the service or `X::getRepoClassInstance()`, so the host's repository with its read rights runs.
 - No closures in regular methods; no `private`, no `final` (the package's contract tests enforce both on its own code).
+
+## The voice channel provider
+
+The agent core asks `AgentVoiceChannelService` three questions: `findLiveAnsweredCallChannelType()` (the channel of
+the live answered call of a root conversation), `putCallReachVariantsInto()` (which call channel reaches the owner now,
+as variant dimensions) and `findCallTaskTextsOfConversation()` (the calls' task texts for the trace view). Since 0.5.7
+a package beside ddd-agents (or the application) answers them by implementing
+`DDD\Domain\AI\Services\Conversations\Channels\AgentVoiceChannelProvider` (`#[AutoconfigureTag]`, tag
+`ai.agent_voice_channel_provider`) as a service in a public `…\Services\` namespace — autoconfiguration registers it,
+no same-path subclass needed.
+
+- **Exactly one provider is asked:** the first in container order whose `isVoiceChannelAvailable()` answers true;
+  later providers are never asked (not even when the first answers null). More than one registered provider is a
+  WARNING of `app:agent:check-installation` (check `voiceChannel`) and is logged once per process: keep one.
+- **No available provider:** today's answers (no live call, no variants changed, no calls).
+- **A provider that throws** is logged; that question gets the default answer and the turn goes on.
+- **A same-path subclass** of the service keeps working (it overrides the methods; the provider is then not asked
+  unless the subclass calls the parent).
+

@@ -58,6 +58,27 @@ of `@mgamadeus/ddd-agents/ui`: an empty read is followed by one re-read after `C
 A process-local cache (APCu) cannot carry the mailbox across workers: the installation check `realtimeChannel` warns
 while Agent.UI is bound without a shared cache.
 
+### The account-level read (a client that shows no conversation)
+
+A message to `AgentRealtimeAudience::forAccount()` (e.g. a call's ring) must reach a client that shows no
+conversation. Since 0.5.7 the chat controller traits route `GET …/realtimeMessages` (`getAccountRealtimeMessages()`,
+`AgentConversationReadsTrait`; body `buildAccountRealtimeMessagesResponse()`, request
+`AgentAccountRealtimeMessagesGetRequestDto` with the optional `clientId`): the open messages of the signed-in account's
+mailbox for the reading client (`realtimeMessages`) and the listener credential without a conversation
+(`realtimeListenerCredential`, `findListenerCredential($accountId, null)`). Same gate as every trait route
+(`authorizeConversationAccess()`), no signed-in account = 403; the same delivery as the run-state read: expired
+messages left out, a message for one client only to that client, client tool requests (always of a conversation) left
+out, a conversation's mailbox and another account's never read. Hooks: `findRealtimeMessageDeliveriesOfAccountClient()`,
+`findRealtimeListenerCredentialOfAccount()`, `getAgentRealtimeChannelService()`.
+
+Web: the HTTP binding's `getAccountRealtimeMessages()` (optional on `AgentsConversationClient`) reads it;
+`createAccountRealtimePoll({ readAccountRealtime, onMessage, onListenerCredential, isTransportBound, intervalMs })` of
+`@mgamadeus/ddd-agents/ui` reads at once, then every `ACCOUNT_REALTIME_POLL_INTERVAL_MS` (5 s) while no transport is
+bound, and hands each message once to `onMessage` (the arrival hook; a replaced payload and a message sent again after
+a read saw it gone arrive again). A transport that carries the message hands it to `poll.acceptArrivedMessage()`; one
+that only pings calls `poll.readAfterPing()` (one re-read after `ACCOUNT_REALTIME_PING_REREAD_DELAY_MS` when the first
+read brought nothing new).
+
 `AIConversationRealtimeSignalService::publishClientToolRequestSignal()` is deprecated since 0.5.0: the package still
 rings it after every client tool request, so a host override keeps working; move it to `publishMessageToTransport()`.
 

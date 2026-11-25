@@ -83,6 +83,14 @@ section 5.
   through the realtime port (`AgentRealtimeChannelService`: a mailbox in the shared cache read with the run state, a
   host transport optional); `openScreen` at most once per user turn by default (`maxOpenScreenPerUserTurn`), the window
   tool `setAgentWindowMode` off by default (`windowModeRequests`).
+- **Account-level realtime read** (`GET …/realtimeMessages` of the chat controller traits): the open realtime messages
+  addressed to the signed-in account (`AgentRealtimeAudience::forAccount()`, e.g. a call's ring) and the listener
+  credential without a conversation — for a client that shows no conversation; same gate, expiry and target-client
+  rules as the run-state read. Web: `createAccountRealtimePoll()` of `@mgamadeus/ddd-agents/ui`.
+- **Voice channel provider** (`AgentVoiceChannelProvider`, tagged, autoconfigured): a package beside ddd-agents answers
+  the voice channel seam of `AgentVoiceChannelService` without a same-path subclass. Exactly one provider is asked —
+  the first available in container order; more than one registered is a `voiceChannel` warning of
+  `app:agent:check-installation`. Without one: no voice channel.
 - **The space argument** (`config/app/AI/agentSpaceToolArgument.php`): its name and description on the wire.
 - **The task list widget** (`config/app/AI/agentTasks.php`): `taskListWidgetType`.
 - **`app:agent:check-installation`** (read-only, `--format=json`, exit 1 on a blocking finding): unbound package

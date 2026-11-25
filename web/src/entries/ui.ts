@@ -4,7 +4,7 @@
  * `ScreenHighlighter`, optionally `ScreenPictureCapturer`, `AgentWindowAdapter`, `ScreenPathGuide` and handlers of
  * further request types), the Markdown writer and reference registry, DOM defaults (reader, highlighter, target
  * source from `data-agent-anchor` marks, picture capturer, path guide), the agent-window adapter, the realtime arrival
- * adapter and dev helper, the UI state the client reports, and the hook.
+ * adapter and dev helper, the account-level realtime poll (a client that shows no conversation), the UI state the client reports, and the hook.
  */
 export * from "../ui/client-tools";
 export * from "../ui/agent-ui-state";
@@ -19,3 +19,4 @@ export * from "../ui/DomScreenPathGuide";
 export * from "../ui/screen-picture";
 export * from "../ui/agent-window";
 export * from "../ui/realtime-arrival";
+export * from "../ui/account-realtime";

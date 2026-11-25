@@ -140,6 +140,7 @@ config/app/AI/agentRealtimeChannel.php	widgets
 src/Domain/AI/Services/Conversations/AIConversationTaskPushNotificationConfigsService.php	widgets
 src/Domain/AI/Services/Conversations/ComposedViewBindingResolutionService.php	widgets
 src/Presentation/Api/Agents/Conversations/Dtos/AIConversationActivity*	widgets
+src/Presentation/Api/Agents/Conversations/Dtos/AgentAccountRealtimeMessages*	widgets
 src/Presentation/Api/Agents/Conversations/Dtos/AIConversationInjectSignalPostRequestDto.php	widgets
 # skills-and-purposes (ddd-module-agents-skills-and-purposes-specialist): agent skills, catalog, loading, purposes, done criteria, variants, progress
 src/Domain/AI/**/Skills/**	skills-and-purposes

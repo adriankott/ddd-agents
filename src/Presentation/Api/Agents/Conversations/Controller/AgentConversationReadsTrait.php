@@ -19,6 +19,8 @@ use DDD\Domain\Common\Entities\Accounts\Account;
 use DDD\Infrastructure\Exceptions\ForbiddenException;
 use DDD\Infrastructure\Exceptions\NotFoundException;
 use DDD\Infrastructure\Services\AuthService;
+use DDD\Presentation\Api\Agents\Conversations\Dtos\AgentAccountRealtimeMessagesGetRequestDto;
+use DDD\Presentation\Api\Agents\Conversations\Dtos\AgentAccountRealtimeMessagesGetResponseDto;
 use DDD\Presentation\Api\Agents\Conversations\Dtos\AIConversationActivityGetRequestDto;
 use DDD\Presentation\Api\Agents\Conversations\Dtos\AIConversationActivityGetResponseDto;
 use DDD\Presentation\Api\Agents\Conversations\Dtos\AIConversationGetRequestDto;
@@ -41,8 +43,8 @@ use DDD\Presentation\Base\Router\Routes\Get;
 /**
  * The read routes of the agent chat for an application's conversations controller (routes relative to the
  * controller's `#[Route]`): the conversation, its run state (the polling read), its messages page, the activity lines
- * of a turn, the in-conversation search, the context around one message, the search across conversations and the list
- * of the caller's conversations. Every body is a protected `build…Response()` an application calls from its own
+ * of a turn, the in-conversation search, the context around one message, the search across conversations, the list
+ * of the caller's conversations and the account-level realtime read (a client that shows no conversation). Every body is a protected `build…Response()` an application calls from its own
  * redeclared route. Error outcomes: an unknown, foreign or hidden id is NotFoundException (HTTP 404, the web client's
  * `notFound`); a refusal of the application's gate ({@see self::authorizeConversationAccess()}) is ForbiddenException
  * (HTTP 403, `forbidden`).
@@ -493,6 +495,42 @@ trait AgentConversationReadsTrait
         $responseDto->clientToolRequest = $this->findClientToolRequestDeliveryOfClient($aiConversation, $requestDto->clientId ?? null);
         $responseDto->realtimeMessages = $this->findRealtimeMessageDeliveriesOfClient($aiConversation, $requestDto->clientId ?? null);
         $responseDto->realtimeListenerCredential = $this->findRealtimeListenerCredentialOfConversation($aiConversation);
+        return $responseDto;
+    }
+
+    /**
+     * The account-level realtime read of the signed-in account — the read a client that shows no conversation repeats
+     * while no transport is bound: the open messages of the realtime port addressed to the account
+     * ({@see \DDD\Domain\AI\Entities\Conversations\Realtime\AgentRealtimeAudience::forAccount()}; for every client of
+     * the account or the reading `clientId`; expired ones left out) and the listener credential without a conversation.
+     * The same gate and delivery as the run-state read; a message of another account is never read.
+     *
+     * @param AgentAccountRealtimeMessagesGetRequestDto $requestDto
+     * @return AgentAccountRealtimeMessagesGetResponseDto
+     * @throws \DDD\Infrastructure\Exceptions\ForbiddenException when no account is authenticated
+     */
+    #[Get('/realtimeMessages')]
+    #[Summary('AgentRealtime Account Messages')]
+    public function getAccountRealtimeMessages(AgentAccountRealtimeMessagesGetRequestDto $requestDto): AgentAccountRealtimeMessagesGetResponseDto
+    {
+        $this->authorizeConversationAccess();
+        $requestDto = $this->resolveRequestDtoOfRoutedMethod(__FUNCTION__, $requestDto);
+        return $this->buildAccountRealtimeMessagesResponse($requestDto);
+    }
+
+    /**
+     * @throws \DDD\Infrastructure\Exceptions\ForbiddenException when no account is authenticated
+     */
+    protected function buildAccountRealtimeMessagesResponse(AgentAccountRealtimeMessagesGetRequestDto $requestDto): AgentAccountRealtimeMessagesGetResponseDto
+    {
+        $authAccount = AuthService::instance()->getAccount();
+        if (!$authAccount instanceof Account || !isset($authAccount->id)) {
+            throw new ForbiddenException('No authenticated account');
+        }
+        $accountId = (int)$authAccount->id;
+        $responseDto = new AgentAccountRealtimeMessagesGetResponseDto();
+        $responseDto->realtimeMessages = $this->findRealtimeMessageDeliveriesOfAccountClient($accountId, $requestDto->clientId ?? null);
+        $responseDto->realtimeListenerCredential = $this->findRealtimeListenerCredentialOfAccount($accountId);
         return $responseDto;
     }
 }

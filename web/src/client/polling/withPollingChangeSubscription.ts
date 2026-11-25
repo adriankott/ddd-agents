@@ -1,4 +1,5 @@
 import type { AgentsConversationClient } from "../AgentsConversationClient";
+import type { AccountRealtimeRead } from "../../ui/account-realtime";
 import type {
   AgentsConversation,
   ChangedConversationMessages,
@@ -40,6 +41,7 @@ class PollingAgentsConversationClient implements AgentsConversationClientWithCha
   readonly composeSentMessageText?: (text: string, attachments: ConversationAttachmentReference[] | undefined) => string;
   readonly getMessageSentPayload?: (conversationId: number, messageId: number) => Promise<ConversationMessageSentPayload>;
   readonly getConversationRunState?: (conversationId: number) => Promise<ConversationRunStateRead>;
+  readonly getAccountRealtimeMessages?: () => Promise<AccountRealtimeRead>;
 
   constructor(
     protected readonly binding: AgentsConversationClient,
@@ -50,6 +52,7 @@ class PollingAgentsConversationClient implements AgentsConversationClientWithCha
     this.composeSentMessageText = binding.composeSentMessageText?.bind(binding);
     this.getMessageSentPayload = binding.getMessageSentPayload?.bind(binding);
     this.getConversationRunState = binding.getConversationRunState?.bind(binding);
+    this.getAccountRealtimeMessages = binding.getAccountRealtimeMessages?.bind(binding);
   }
 
   getConversationMetadata = (conversationId: number): Promise<AgentsConversation> =>
