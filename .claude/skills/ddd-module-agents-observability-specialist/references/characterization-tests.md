@@ -107,7 +107,23 @@ is `skillOrder`:
 - `skills → <name>` — the skill's public fields, `toolNames`, `packages`;
 - `packages → <short class name>` — `packageId`, the package's fields, per tool its fields, `parameters → <name>`
   (the documented schema an MCP client reads), `inputSchemaWithoutParameters` and `wire` (the schema the loop sends:
-  `description`, `requiredParameters`, one token per parameter, `rest`). The key is the short class name, so a
+  `description`, `requiredParameters`, one token per parameter, `rest`), and per tool two parts beside its
+  documentation:
+  - `declarations` — every attribute of the tool method but `#[MCPTool]` itself, short class name => its declared
+    arguments as written (`ReflectionAttribute::getArguments()`, nothing instantiated: a named argument keeps its
+    name, a positional one its position; `true` for an attribute without arguments; a long text a hash token; a
+    second attribute of one class `<name> #2`). These are what the loop and its readers ask by tool name
+    (`MCPToolAttributeCatalog`: effect, time limit, parallel admission, owner-facing subject, gates, …), and also
+    `MCPRequiresAccountRights`, `MCPRequiresFeatureFlags`, `MCPHiddenQueryOptions`. A package release that changes a
+    declaration of its tool moves the shipped surface and the application's side together; an application's
+    same-path subclass that redeclares a tool shows as an accepted difference;
+  - `overlay` — what the application's `AI.toolOverlays` entry for the tool sets: `sets` (the keys the overlay reads a
+    value from: `accountRights`, `description`, `examples`, `ownerFacingSubject`, `parameters`, `summary`) and
+    `ownerFacingSubject` (the one value that shows nowhere else in the entry). The texts, rights and parameters an
+    overlay replaces are already the tool's fields and schema; `sets` says a changed value came from the overlay.
+    The package's own surface holds no overlay (the package configures none).
+  The derived answers (`AgentRunReport::ownerFacingTitleForWriteTool()`, `MCPToolEffectCatalog`, …) keep their own
+  package tests; the document pins their input. The key is the short class name, so a
   same-path subclass keeps the key of the class it replaces; two classes with one short name are keyed by full name;
 - `purposes → <name>` — `class` (short name) and the public fields;
 - `bundles → <class>` — the bundle's fields and one token per tool of its `tools/list` documentation.
@@ -124,6 +140,9 @@ as one token); the package's own surface is about 70 KB. Keep the defaults; a ho
 the constants in a builder subclass (`createSurfaceDocumentBuilder()`) — the hashes change with them, so regenerate
 both files in the same commit.
 
+`declarations` and `overlay` (since 0.5.9) add about 17 % to a host with about 230 tools; the package's own surface
+went from about 68 KB to about 85 KB.
+
 ## For the package maintainer
 
 `tests/Testing/Surface/AgentPackageSurfaceTest.php` pins the package's surface (package kernel, default config,
@@ -139,6 +158,14 @@ The file holds package entries only (no host value): every application diffs aga
 `DDD\Testing\Agents\` extend PHPUnit; the module excludes them from the container (`AgentsModule::getExcludePatterns()`,
 pattern `Testing`), so a production install without PHPUnit never loads them.
 
+## Beside it: the installation check as a test
+
+`DDD\Testing\Agents\Installation\AgentInstallationCheckTestCase` runs `app:agent:check-installation` in the
+application's suite (hooks `createConsoleApplication()`, `getFailingSeverities()` — default BLOCKING —,
+`getCheckNamesNotFailingTheTest()`). The surface snapshot pins WHAT is offered; the installation check tests that the
+installation is sound (bindings, rights, command names, tables). Details: `ddd-module-agents-specialist`,
+references/installation-check.md.
+
 ## Full class names
 
 | Class | Role |
@@ -148,3 +175,4 @@ pattern `Testing`), so a production install without PHPUnit never loads them.
 | `DDD\Testing\Agents\Surface\AgentSurfaceDocument` | the five parts |
 | `DDD\Testing\Agents\Surface\AgentSurfaceDocumentComparer` | compares two document trees value by value; entry-wise helpers; no container |
 | `DDD\Testing\Agents\Surface\AgentSurfaceDifference`, `DDD\Testing\Agents\Surface\AgentSurfaceDifferences` | one difference (kind, path, both values) and their set with its failure text |
+| `DDD\Testing\Agents\Installation\AgentInstallationCheckTestCase` | the abstract test case that runs the installation check (entry skill) |

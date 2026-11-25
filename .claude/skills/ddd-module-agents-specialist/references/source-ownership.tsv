@@ -33,6 +33,7 @@ src/Domain/AI/Traits/**	observability
 src/Presentation/Mcp/Agents/**	observability
 src/Symfony/Commands/Agents/AgentCheckInstallationCommand.php	entry
 src/Symfony/Commands/Agents/**	observability
+src/Testing/Agents/Installation/**	entry
 src/Testing/Agents/Surface/**	observability
 src/Presentation/Api/Agents/Conversations/Dtos/AIConversationMessageSentPayload*	observability
 config/app/AI/evalOutboundRecipients.php	observability

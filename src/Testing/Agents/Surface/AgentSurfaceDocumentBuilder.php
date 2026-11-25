@@ -6,12 +6,18 @@ namespace DDD\Testing\Agents\Surface;
 
 use DDD\Domain\AI\Entities\MCPPackages\MCPBundleDocumentation;
 use DDD\Domain\AI\Entities\MCPPackages\MCPPackageDocumentation;
+use DDD\Domain\AI\Entities\MCPPackages\MCPTool;
+use DDD\Domain\AI\Entities\MCPPackages\MCPToolOverlay;
+use DDD\Domain\AI\Entities\MCPPackages\MCPToolOverlays;
 use DDD\Domain\AI\Entities\MCPPackages\ToolDefinitions;
 use DDD\Domain\AI\Entities\Skills\AISkill;
 use DDD\Domain\AI\Services\Conversations\Purposes\AIConversationPurposesService;
 use DDD\Domain\AI\Services\Skills\AISkillsService;
 use DDD\Infrastructure\Services\DDDService;
 use JsonException;
+use ReflectionClass;
+use ReflectionMethod;
+use Throwable;
 
 /**
  * Builds the surface document ({@see AgentSurfaceDocument}) of an application: what its agent is offered, as the
@@ -21,7 +27,9 @@ use JsonException;
  * - `skillOrder`: the catalog's skill names in the order the agent is offered them (a list: one value, the
  *   application's own, never compared with another document's);
  * - `skills`: every catalog skill by name: its public fields, its tool names, the packages it includes;
- * - `packages`: every package a skill includes, by short class name ({@see buildPackageKeysByClass()}): its id, and
+ * - `packages`: every package a skill includes, by short class name ({@see buildPackageKeysByClass()}): its id, per
+ *   tool what its method declares for the loop and what the application's overlay sets
+ *   ({@see buildDeclarationEntriesByToolName()}), and
  *   per tool its fields, one value per parameter of the documented schema (what an MCP client reads), and the schema
  *   the loop puts on the wire (`wire`: its description, one hash token per parameter, the rest);
  * - `purposes`: the purposes the caller names: class and public fields;
@@ -158,10 +166,14 @@ class AgentSurfaceDocumentBuilder
     {
         $packageDocumentation = $this->convertToPlainArray(MCPPackageDocumentation::createFromClassName($packageClass));
         $wireEntriesByToolName = $this->buildWireEntriesByToolName($packageClass);
+        $declarationEntriesByToolName = $this->buildDeclarationEntriesByToolName($packageClass);
         $toolEntries = [];
         foreach ($packageDocumentation['functions'] ?? [] as $toolDocumentation) {
             $toolName = (string)($toolDocumentation['name'] ?? '');
             $toolEntries[$toolName] = $this->buildToolEntry($toolDocumentation);
+            foreach ($declarationEntriesByToolName[$toolName] ?? [] as $declarationPartName => $declarationPart) {
+                $toolEntries[$toolName][$declarationPartName] = $declarationPart;
+            }
             if (isset($wireEntriesByToolName[$toolName])) {
                 $toolEntries[$toolName]['wire'] = $wireEntriesByToolName[$toolName];
             }
@@ -174,6 +186,116 @@ class AgentSurfaceDocumentBuilder
         }
         $packageEntry['tools'] = $toolEntries;
         return $packageEntry;
+    }
+
+    /**
+     * What the tools of a package declare for the loop beside their documentation, by tool name:
+     * - `declarations`: the attributes of the tool's `#[MCPTool]` method, short class name => the declared arguments
+     *   (`true` for an attribute without arguments). These are the declarations the loop and its readers ask by tool
+     *   name ({@see \DDD\Domain\AI\Entities\MCPPackages\MCPToolAttributeCatalog}): the subject a run report names,
+     *   whether the newest result is never stubbed, whether a scheduled run may call the tool, …;
+     * - `overlay`: what the application's overlay sets for the tool (`AI.toolOverlays`,
+     *   {@see buildOverlayEntry()}).
+     * A part that holds nothing is left out.
+     *
+     * @return array<string, array<string, mixed>>
+     * @throws JsonException
+     */
+    public function buildDeclarationEntriesByToolName(string $packageClass): array
+    {
+        $applicationOverlays = MCPToolOverlays::getApplicationOverlays();
+        $declarationEntriesByToolName = [];
+        foreach ((new ReflectionClass($packageClass))->getMethods(ReflectionMethod::IS_PUBLIC) as $reflectionMethod) {
+            if ($reflectionMethod->getAttributes(MCPTool::class) === []) {
+                continue;
+            }
+            $toolName = $reflectionMethod->getName();
+            $declarationEntry = [];
+            $declarations = $this->buildDeclarationsOfToolMethod($reflectionMethod);
+            if ($declarations !== []) {
+                $declarationEntry['declarations'] = $declarations;
+            }
+            $toolOverlay = $applicationOverlays->findOverlayOfTool($toolName);
+            $overlayEntry = $toolOverlay !== null ? $this->buildOverlayEntry($toolOverlay) : [];
+            if ($overlayEntry !== []) {
+                $declarationEntry['overlay'] = $overlayEntry;
+            }
+            if ($declarationEntry !== []) {
+                $declarationEntriesByToolName[$toolName] = $declarationEntry;
+            }
+        }
+        return $declarationEntriesByToolName;
+    }
+
+    /**
+     * What the application's overlay sets for one tool: `sets`, the keys of its entry in `AI.toolOverlays` that the
+     * overlay reads a value from (one value), and `ownerFacingSubject`, the one key whose value shows nowhere else in
+     * the tool's entry. The texts, rights and parameters an overlay replaces are the tool's own fields and its schema:
+     * a changed overlay text is one changed value there, and `sets` says that it came from the overlay.
+     *
+     * @return array<string, mixed>
+     */
+    public function buildOverlayEntry(MCPToolOverlay $toolOverlay): array
+    {
+        $setKeys = [];
+        if ($toolOverlay->replacesAccountRights()) {
+            $setKeys[] = MCPToolOverlay::KEY_ACCOUNT_RIGHTS;
+        }
+        if ($toolOverlay->description !== null) {
+            $setKeys[] = MCPToolOverlay::KEY_DESCRIPTION;
+        }
+        if ($toolOverlay->examples !== null) {
+            $setKeys[] = MCPToolOverlay::KEY_EXAMPLES;
+        }
+        if ($toolOverlay->ownerFacingSubject !== null) {
+            $setKeys[] = MCPToolOverlay::KEY_OWNER_FACING_SUBJECT;
+        }
+        if ($toolOverlay->parameterDescriptions !== [] || $toolOverlay->hiddenParameterNames !== []) {
+            $setKeys[] = MCPToolOverlay::KEY_PARAMETERS;
+        }
+        if ($toolOverlay->summary !== null) {
+            $setKeys[] = MCPToolOverlay::KEY_SUMMARY;
+        }
+        if ($setKeys === []) {
+            return [];
+        }
+        $overlayEntry = ['sets' => $setKeys];
+        if ($toolOverlay->ownerFacingSubject !== null) {
+            $overlayEntry['ownerFacingSubject'] = $toolOverlay->ownerFacingSubject;
+        }
+        return $overlayEntry;
+    }
+
+    /**
+     * The attributes of one tool method but `#[MCPTool]` itself (its values are the tool's documented fields): short
+     * class name => the declared arguments, condensed; `true` for an attribute without arguments. A second attribute
+     * of a class is keyed `<name> #2`.
+     *
+     * @return array<string, mixed>
+     * @throws JsonException
+     */
+    public function buildDeclarationsOfToolMethod(ReflectionMethod $reflectionMethod): array
+    {
+        $declarations = [];
+        foreach ($reflectionMethod->getAttributes() as $reflectionAttribute) {
+            if ($reflectionAttribute->getName() === MCPTool::class) {
+                continue;
+            }
+            $attributeShortName = $this->buildShortClassName($reflectionAttribute->getName());
+            $declarationKey = $attributeShortName;
+            for ($occurrence = 2; isset($declarations[$declarationKey]); $occurrence++) {
+                $declarationKey = $attributeShortName . ' #' . $occurrence;
+            }
+            try {
+                $declaredArguments = $reflectionAttribute->getArguments();
+            } catch (Throwable) {
+                $declarations[$declarationKey] = '(arguments not readable)';
+                continue;
+            }
+            $declarations[$declarationKey] = $declaredArguments === [] ? true : $this->condenseValue($this->convertToPlainArray($declaredArguments));
+        }
+        ksort($declarations);
+        return $declarations;
     }
 
     /**

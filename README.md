@@ -14,7 +14,7 @@ supervisor, run claims, the decision layer, the message handlers of the loop and
 | `src/Domain/AI/…` | the agent core, in the namespace `DDD\Domain\AI\…` shared with `ddd-ai` (no class name collides) |
 | `src/Presentation/…` | the agent console printer, the JSON-RPC base controller `MCPController`, `MCPToolExecutorService` |
 | `config/app/AI/` | the module's defaults: application names and wording, egress, persona, the tool-call child process, context retention (an application overrides a file under its own `config/app/AI/`) |
-| `src/Testing/Agents/` | test hooks an application's suite extends (`AgentSurfaceSnapshotTestCase`); they need PHPUnit and are never services |
+| `src/Testing/Agents/` | test hooks an application's suite extends (`AgentSurfaceSnapshotTestCase`, `AgentInstallationCheckTestCase`); they need PHPUnit and are never services |
 | `tests/` | the package's own suite: unit, contract, integration (a local MariaDB) and the reference-kernel smoke test |
 | `examples/` | `reference-kernel/` (a minimal host without an application) and `workers.yaml` (one consumer per transport) |
 | `.claude/skills/` | the developer skills: the entry skill `ddd-module-agents-specialist` and eight topic skills |
@@ -48,8 +48,14 @@ HTTP MCP bundles — with one subclass of `DDD\Testing\Agents\Surface\AgentSurfa
 failure names each changed value by its path. The package ships its own surface
 (`src/Testing/Agents/Surface/agent-package-surface.json`); with an accepted-differences file the application keeps
 only where it differs from the package, so a package release rewrites neither file unless the application's own change
-meets it. `REGENERATE_AGENT_SURFACE_SNAPSHOT=1` writes both files. Details: the observability skill, reference
-"characterization-tests".
+meets it. Per tool the document also holds its `declarations` (every attribute of the tool method but `#[MCPTool]`)
+and what the application's overlay sets (`overlay`). `REGENERATE_AGENT_SURFACE_SNAPSHOT=1` writes both files. Details:
+the observability skill, reference "characterization-tests".
+
+The installation check runs as a test of the application's suite with one subclass of
+`DDD\Testing\Agents\Installation\AgentInstallationCheckTestCase` (`createConsoleApplication()` for the command-name
+check; fails on BLOCKING findings by default, `getFailingSeverities()` and `getCheckNamesNotFailingTheTest()` adapt
+it).
 
 ## Application overrides
 
@@ -107,7 +113,8 @@ section 5.
 - **The task list widget** (`config/app/AI/agentTasks.php`): `taskListWidgetType`.
 - **`app:agent:check-installation`** (read-only, `--format=json`, exit 1 on a blocking finding): unbound package
   skills, bindings to missing classes, package rights held by nobody, missing tables, features without their store or
-  binaries, leftover config keys, unresolved command names, the naming lint, pending renames.
+  binaries, leftover config keys, unresolved command names, names that cannot be built or run another class, skill
+  rights no tool requires, rights attributes outside packages, the naming lint, pending renames.
 - **Renames** ship as data: `renames.json` at the package root. After an update run `vendor/bin/ddd-renames` (dry run),
   then `vendor/bin/ddd-renames --apply` (needs `mgamadeus/ddd` 3.45.0 or newer for the bin).
 

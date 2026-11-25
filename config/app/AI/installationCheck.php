@@ -12,6 +12,8 @@ declare(strict_types=1);
  * - acceptedUnboundSkills: package skills the host does not offer (`Agent.UI` without a client that executes UI tools);
  * - acceptedUnmappedRights: package rights the mapping leaves out because the application's rights object answers them;
  * - acceptedSkillRightGaps: skill names or MCP package classes whose skill does not name the package's class-level right;
+ * - acceptedSkillOnlyRights: skill names whose `requiredAccountRights` name a right no tool of their packages requires
+ *   (the right is meant to hide the offer only);
  * - acceptedMissingTables: tables of package entities the host does not create (a feature it never switches on; a
  *   feature a package declares as switched off or unbound is not required anyway).
  *
@@ -23,6 +25,7 @@ return [
     'acceptedUnboundSkills' => [],
     'acceptedUnmappedRights' => [],
     'acceptedSkillRightGaps' => [],
+    'acceptedSkillOnlyRights' => [],
     'acceptedMissingTables' => [],
     'renamesStateFile' => null,
 ];

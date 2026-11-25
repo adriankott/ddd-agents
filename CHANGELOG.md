@@ -1,5 +1,44 @@
 # Changelog
 
+## 0.5.9
+
+**Host guards: the installation check sees which class runs under a command's names, two rights checks, a test case
+that makes the check a CI gate, and the tools' declarations in the surface document.** Contributed by an application
+team. npm `@mgamadeus/ddd-agents` 0.5.9 in lockstep (no web change).
+
+- `app:agent:check-installation`, check `consoleCommands` (only with a console application): it now builds every
+  name and alias of a package command once and reports, beside a name the console does not resolve (WARNING, as
+  before):
+  - a name the console lists and cannot build — **BLOCKING** (every run of it throws; the finding carries the first
+    line of the reason);
+  - a name that runs a class which is no subclass of the package command — WARNING (the framework lets a command
+    replace another by name, so it may be meant);
+  - an application subclass without `#[AsCommand]` (it takes the package command's names) while a name runs another
+    class — WARNING (its overrides never run; usually it is not registered);
+  - two such application subclasses of one package command — WARNING;
+  - the names of one package command running different classes — WARNING.
+- New check `skillOnlyRights` (WARNING): a skill names a right in `requiredAccountRights` that no tool of its bound
+  packages requires (tool attribute, class attribute or the tool's overlay) — the right hides the offer while the
+  tools still execute over the HTTP MCP route and the console; a misspelled right name shows here too. Accepted per
+  skill in the new key `acceptedSkillOnlyRights` of `config/app/AI/installationCheck.php`.
+- New check `rightsDeclaredOutsidePackages` (WARNING): `#[MCPRequiresAccountRights]` on a class below
+  `Presentation/Mcp` that is no MCP package (a bundle, a controller), where it gates nothing.
+- `DDD\Testing\Agents\Installation\AgentInstallationCheckTestCase` (abstract, extends PHPUnit's `TestCase`): runs the
+  installation check in the application's suite. Hooks `createConsoleApplication()` (null skips `consoleCommands`),
+  `getFailingSeverities()` (default BLOCKING), `getCheckNamesNotFailingTheTest()`. Accepted findings are read from
+  the same config as the command. Below `DDD\Testing\Agents\`, excluded from the container like the surface hooks.
+- Surface document (`AgentSurfaceDocumentBuilder`): per tool two new parts — `declarations` (every attribute of the
+  tool method but `#[MCPTool]`, short class name => its declared arguments, nothing instantiated) and `overlay`
+  (`sets`: the keys of the tool's `AI.toolOverlays` entry the overlay reads, plus `ownerFacingSubject`). The shipped
+  `agent-package-surface.json` is regenerated (about 68 KB → 85 KB).
+- **Host surface snapshots:** after the update, `testThePackagesSurfaceDiffersOnlyWhereTheApplicationAcceptedIt()`
+  shows new differences wherever the application adds an overlay to a package tool or redeclares a package tool's
+  attributes in a same-path subclass, and `testTheOfferedSurfaceIsThePinnedOne()` shows the new parts of the
+  application's own tools. Regenerate both files (`REGENERATE_AGENT_SURFACE_SNAPSHOT=1`), review, commit.
+- Tests: command-name owners, the unbuildable-name BLOCKING finding, skill-only rights (11); declarations and overlay
+  of the surface (5). Entry skill reference "installation-check", observability reference "characterization-tests",
+  README, source ownership.
+
 ## 0.5.8
 
 **A characterization test hook for applications: the agent surface snapshot.** Contributed by an application team.

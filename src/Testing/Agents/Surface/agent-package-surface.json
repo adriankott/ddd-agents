@@ -211,6 +211,15 @@
                         }
                     },
                     "inputSchemaWithoutParameters": "#2fe32d840ed8 (261 characters)",
+                    "declarations": {
+                        "MCPToolEffect": [
+                            "READ"
+                        ],
+                        "MCPToolParallelSafe": [
+                            "one read of the picture store"
+                        ],
+                        "MCPToolSummary": "#d7580c4964e2 (152 characters)"
+                    },
                     "wire": {
                         "description": "#183e27e11368 (287 characters)",
                         "parameters": {
@@ -260,6 +269,21 @@
                         "accountWide": "#cea70e0fb3be (241 characters)"
                     },
                     "inputSchemaWithoutParameters": "#519662cd63dd (432 characters)",
+                    "declarations": {
+                        "MCPToolEffect": {
+                            "0": "WRITE",
+                            "identicalRepeatDoesNewWork": true,
+                            "isOutwardAction": true
+                        },
+                        "MCPToolExecutionTimeout": [
+                            100,
+                            "The consent check is a model call of up to 45 s and runs a second time when it gave no verdict."
+                        ],
+                        "MCPToolRequiresOwnerWordsAsEvidence": [
+                            "the grant is verified against the owner's own statement in the conversation"
+                        ],
+                        "MCPToolSummary": "#0d344bbd0b24 (194 characters)"
+                    },
                     "wire": {
                         "description": "#875c5ffe0034 (730 characters)",
                         "parameters": {
@@ -290,6 +314,15 @@
                         "agentSpaceId": "#66d380700b52 (348 characters)"
                     },
                     "inputSchemaWithoutParameters": "#4ee92156f7f9 (256 characters)",
+                    "declarations": {
+                        "MCPToolEffect": [
+                            "READ"
+                        ],
+                        "MCPToolParallelSafe": [
+                            "lists the account's mandates"
+                        ],
+                        "MCPToolSummary": "#48ede624d162 (138 characters)"
+                    },
                     "wire": {
                         "description": "#2764fa82a37f (216 characters)",
                         "parameters": {
@@ -318,6 +351,14 @@
                         }
                     },
                     "inputSchemaWithoutParameters": "#f20acaaf228e (251 characters)",
+                    "declarations": {
+                        "MCPToolEffect": [
+                            "DELETE"
+                        ],
+                        "MCPToolSummary": [
+                            "Revoke a mandate immediately — any customer utterance suffices; when in doubt, revoke. Id from listMandates."
+                        ]
+                    },
                     "wire": {
                         "description": "#a914224d795d (264 characters)",
                         "parameters": {
@@ -353,6 +394,18 @@
                         }
                     },
                     "inputSchemaWithoutParameters": "#4e51cdf520a3 (258 characters)",
+                    "declarations": {
+                        "MCPHiddenQueryOptions": [
+                            "noCache"
+                        ],
+                        "MCPToolEffect": [
+                            "READ"
+                        ],
+                        "MCPToolParallelSafe": [
+                            "reads stored reports of finished runs"
+                        ],
+                        "MCPToolSummary": "#06bf2b2b594b (251 characters)"
+                    },
                     "wire": {
                         "description": "#90c4cb33896a (436 characters)",
                         "parameters": {
@@ -397,6 +450,19 @@
                         }
                     },
                     "inputSchemaWithoutParameters": "#a19a41ec5454 (556 characters)",
+                    "declarations": {
+                        "MCPHiddenQueryOptions": [
+                            "noCache"
+                        ],
+                        "MCPRequiresAccountRights": [
+                            "scheduleAgentTasks"
+                        ],
+                        "MCPToolEffect": {
+                            "0": "WRITE",
+                            "identicalRepeatDoesNewWork": true
+                        },
+                        "MCPToolSummary": "#e4bc4623a509 (183 characters)"
+                    },
                     "wire": {
                         "description": "#3a1730c244e1 (553 characters)",
                         "parameters": {
@@ -439,6 +505,19 @@
                         }
                     },
                     "inputSchemaWithoutParameters": "#b5a41e9cb40a (514 characters)",
+                    "declarations": {
+                        "MCPHiddenQueryOptions": [
+                            "noCache"
+                        ],
+                        "MCPRequiresAccountRights": [
+                            "scheduleAgentTasks"
+                        ],
+                        "MCPToolEffect": {
+                            "0": "WRITE",
+                            "identicalRepeatDoesNewWork": true
+                        },
+                        "MCPToolSummary": "#d7ff2b28543e (264 characters)"
+                    },
                     "wire": {
                         "description": "#b09401582575 (950 characters)",
                         "parameters": {
@@ -486,6 +565,18 @@
                         }
                     },
                     "inputSchemaWithoutParameters": "#d8a1b4d61671 (515 characters)",
+                    "declarations": {
+                        "MCPHiddenQueryOptions": [
+                            "noCache"
+                        ],
+                        "MCPRequiresAccountRights": [
+                            "scheduleAgentTasks"
+                        ],
+                        "MCPToolEffect": [
+                            "WRITE"
+                        ],
+                        "MCPToolSummary": "#e39bc3147567 (274 characters)"
+                    },
                     "wire": {
                         "description": "#8093c74f0121 (1101 characters)",
                         "parameters": {
@@ -538,6 +629,33 @@
                         "filters": "#ac15514927c8 (666 characters)"
                     },
                     "inputSchemaWithoutParameters": "#043431512fa6 (498 characters)",
+                    "declarations": {
+                        "MCPExposedFilterProperties": [
+                            "status",
+                            "oneTimeAt",
+                            "nextRunAt",
+                            "lastFiredAt",
+                            "created",
+                            "reportChannel",
+                            "failureStreak"
+                        ],
+                        "MCPHiddenQueryOptions": [
+                            "expand",
+                            "select",
+                            "skiptoken",
+                            "noCache"
+                        ],
+                        "MCPToolEffect": [
+                            "READ"
+                        ],
+                        "MCPToolParallelSafe": [
+                            "reads schedules, newest run lines and budget notes"
+                        ],
+                        "MCPToolRefreshesState": [
+                            "schedules fire and close in the background — identical arguments legitimately return a changed list"
+                        ],
+                        "MCPToolSummary": "#b2f175863010 (295 characters)"
+                    },
                     "wire": {
                         "description": "#0bfcfe4b0a67 (899 characters)",
                         "parameters": {
@@ -583,6 +701,29 @@
                         "filters": "#ecc1d8544d6c (410 characters)"
                     },
                     "inputSchemaWithoutParameters": "#ab41a01680d2 (419 characters)",
+                    "declarations": {
+                        "MCPExposedFilterProperties": [
+                            "created",
+                            "scheduleId",
+                            "runState"
+                        ],
+                        "MCPHiddenQueryOptions": [
+                            "expand",
+                            "select",
+                            "skiptoken",
+                            "noCache"
+                        ],
+                        "MCPToolEffect": [
+                            "READ"
+                        ],
+                        "MCPToolParallelSafe": [
+                            "reads the run conversations of the schedules in scope"
+                        ],
+                        "MCPToolRefreshesState": [
+                            "runs start and finish in the background — identical arguments legitimately return new runs and new states"
+                        ],
+                        "MCPToolSummary": "#2fbc08996695 (270 characters)"
+                    },
                     "wire": {
                         "description": "#b070bb5fdf97 (972 characters)",
                         "parameters": {
@@ -617,6 +758,21 @@
                         }
                     },
                     "inputSchemaWithoutParameters": "#cf6db3a6a472 (260 characters)",
+                    "declarations": {
+                        "MCPHiddenQueryOptions": [
+                            "noCache"
+                        ],
+                        "MCPToolEffect": [
+                            "READ"
+                        ],
+                        "MCPToolParallelSafe": [
+                            "reads a finished run's stored report"
+                        ],
+                        "MCPToolRefreshesState": [
+                            "a run in progress finishes in the background — the same id legitimately returns a report later"
+                        ],
+                        "MCPToolSummary": "#e4e322ab51a7 (134 characters)"
+                    },
                     "wire": {
                         "description": "#e8396d6664d0 (510 characters)",
                         "parameters": {
@@ -646,6 +802,19 @@
                         }
                     },
                     "inputSchemaWithoutParameters": "#a80ae41b0a12 (252 characters)",
+                    "declarations": {
+                        "MCPHiddenQueryOptions": [
+                            "noCache"
+                        ],
+                        "MCPRequiresAccountRights": [
+                            "scheduleAgentTasks"
+                        ],
+                        "MCPToolEffect": {
+                            "0": "WRITE",
+                            "identicalRepeatDoesNewWork": true
+                        },
+                        "MCPToolSummary": "#f9a618d4c62a (144 characters)"
+                    },
                     "wire": {
                         "description": "#f01f9bbf7d47 (386 characters)",
                         "parameters": {
@@ -675,6 +844,19 @@
                         }
                     },
                     "inputSchemaWithoutParameters": "#a80ae41b0a12 (252 characters)",
+                    "declarations": {
+                        "MCPHiddenQueryOptions": [
+                            "noCache"
+                        ],
+                        "MCPRequiresAccountRights": [
+                            "scheduleAgentTasks"
+                        ],
+                        "MCPToolEffect": {
+                            "0": "WRITE",
+                            "identicalRepeatDoesNewWork": true
+                        },
+                        "MCPToolSummary": "#7271f832b045 (135 characters)"
+                    },
                     "wire": {
                         "description": "#ede4913d57a3 (496 characters)",
                         "parameters": {
@@ -706,6 +888,18 @@
                         }
                     },
                     "inputSchemaWithoutParameters": "#a80ae41b0a12 (252 characters)",
+                    "declarations": {
+                        "MCPHiddenQueryOptions": [
+                            "noCache"
+                        ],
+                        "MCPRequiresAccountRights": [
+                            "scheduleAgentTasks"
+                        ],
+                        "MCPToolEffect": [
+                            "DELETE"
+                        ],
+                        "MCPToolSummary": "#a706f2909fff (220 characters)"
+                    },
                     "wire": {
                         "description": "#ca8f65680a8c (425 characters)",
                         "parameters": {
@@ -752,6 +946,18 @@
                         "timezoneIdentifier": "#cac55bb2be3f (272 characters)"
                     },
                     "inputSchemaWithoutParameters": "#b2a22207bbd8 (404 characters)",
+                    "declarations": {
+                        "MCPHiddenQueryOptions": [
+                            "noCache"
+                        ],
+                        "MCPRequiresAccountRights": [
+                            "scheduleAgentTasks"
+                        ],
+                        "MCPToolEffect": [
+                            "WRITE"
+                        ],
+                        "MCPToolSummary": "#6354de94d59b (290 characters)"
+                    },
                     "wire": {
                         "description": "#40b9a59a984b (847 characters)",
                         "parameters": {
@@ -806,6 +1012,15 @@
                         "renderMode": "#1a4e09a2b000 (248 characters)"
                     },
                     "inputSchemaWithoutParameters": "#9bb692dc1209 (329 characters)",
+                    "declarations": {
+                        "MCPToolEffect": [
+                            "READ"
+                        ],
+                        "MCPToolReturnsUntrustedContent": [
+                            "a screen shows texts other people wrote"
+                        ],
+                        "MCPToolSummary": "#f87af634f00c (134 characters)"
+                    },
                     "wire": {
                         "description": "#e3e3349cb012 (476 characters)",
                         "parameters": {
@@ -840,6 +1055,17 @@
                         }
                     },
                     "inputSchemaWithoutParameters": "#c246e92d23ec (257 characters)",
+                    "declarations": {
+                        "MCPToolEffect": [
+                            "READ"
+                        ],
+                        "MCPToolReturnsTrustedContent": [
+                            "the application's own screen catalogue"
+                        ],
+                        "MCPToolSummary": [
+                            "Lists the screens this user can open (keys, tabs, filters) for openScreen; searchText narrows."
+                        ]
+                    },
                     "wire": {
                         "description": "The screens this user can open: menu entries and record screens with their tabs and filters. Pass a key to\nopenScreen.",
                         "parameters": {
@@ -889,6 +1115,17 @@
                         }
                     },
                     "inputSchemaWithoutParameters": "#eef7bca43ff0 (331 characters)",
+                    "declarations": {
+                        "MCPToolEffect": [
+                            "READ"
+                        ],
+                        "MCPToolReturnsUntrustedContent": [
+                            "the opened screen's title and content are texts other people wrote"
+                        ],
+                        "MCPToolSummary": [
+                            "Opens a screen (a key from listScreens, record id, tab, filters) in the user's client."
+                        ]
+                    },
                     "wire": {
                         "description": "#ecdf4321253d (197 characters)",
                         "parameters": {
@@ -927,6 +1164,17 @@
                         }
                     },
                     "inputSchemaWithoutParameters": "#1fe0fefdc675 (297 characters)",
+                    "declarations": {
+                        "MCPToolEffect": [
+                            "READ"
+                        ],
+                        "MCPToolReturnsUntrustedContent": [
+                            "the marked elements are named by their labels on the screen"
+                        ],
+                        "MCPToolSummary": [
+                            "Marks fields, buttons, rows or sections on the user's screen by their references, with a short note."
+                        ]
+                    },
                     "wire": {
                         "description": "#65b620d70435 (191 characters)",
                         "parameters": {
@@ -980,6 +1228,17 @@
                         }
                     },
                     "inputSchemaWithoutParameters": "#50e92602136c (282 characters)",
+                    "declarations": {
+                        "MCPToolEffect": [
+                            "READ"
+                        ],
+                        "MCPToolReturnsTrustedContent": [
+                            "cron names written by staff, schedules and states"
+                        ],
+                        "MCPToolSummary": [
+                            "The cron jobs with state (failing, overdue, running, ok, paused), schedule, last and next run."
+                        ]
+                    },
                     "wire": {
                         "description": "#526c6b396d74 (423 characters)",
                         "parameters": {
@@ -1017,6 +1276,17 @@
                         "cronExecutionId": "#cddc1f0648e9 (242 characters)"
                     },
                     "inputSchemaWithoutParameters": "#af1acf6224f7 (274 characters)",
+                    "declarations": {
+                        "MCPToolEffect": [
+                            "READ"
+                        ],
+                        "MCPToolReturnsUntrustedContent": [
+                            "the output of a cron command is text a command wrote"
+                        ],
+                        "MCPToolSummary": [
+                            "One cron with schedule, command, statistics and newest runs; or one run with the end of its output."
+                        ]
+                    },
                     "wire": {
                         "description": "#3cc8cfcf830e (318 characters)",
                         "parameters": {
@@ -1066,6 +1336,17 @@
                         }
                     },
                     "inputSchemaWithoutParameters": "#10d086a6463e (277 characters)",
+                    "declarations": {
+                        "MCPToolEffect": [
+                            "READ"
+                        ],
+                        "MCPToolReturnsUntrustedContent": [
+                            "the output of a cron command is text a command wrote"
+                        ],
+                        "MCPToolSummary": [
+                            "Runs of the crons, newest first, optionally of one cron or only failed ones, with duration and first output line."
+                        ]
+                    },
                     "wire": {
                         "description": "#d341db6a1398 (320 characters)",
                         "parameters": {
@@ -1102,6 +1383,17 @@
                         "sections": "#209a3d150234 (335 characters)"
                     },
                     "inputSchemaWithoutParameters": "#c20ded184fb9 (262 characters)",
+                    "declarations": {
+                        "MCPToolEffect": [
+                            "READ"
+                        ],
+                        "MCPToolReturnsTrustedContent": [
+                            "states and counts the platform computes; names of transports, crons and error groups"
+                        ],
+                        "MCPToolSummary": [
+                            "Platform health: workers, crons, error groups and the application's sections, each ok or ATTENTION with findings."
+                        ]
+                    },
                     "wire": {
                         "description": "#ace76dafb698 (333 characters)",
                         "parameters": {
@@ -1167,6 +1459,17 @@
                         }
                     },
                     "inputSchemaWithoutParameters": "#42f7acac0e3f (348 characters)",
+                    "declarations": {
+                        "MCPToolEffect": [
+                            "READ"
+                        ],
+                        "MCPToolReturnsUntrustedContent": [
+                            "error messages can quote what a client sent"
+                        ],
+                        "MCPToolSummary": [
+                            "Error groups of the issues registry by environment, status, section and search text, last seen first."
+                        ]
+                    },
                     "wire": {
                         "description": "#5ef683cdceba (407 characters)",
                         "parameters": {
@@ -1216,6 +1519,17 @@
                         }
                     },
                     "inputSchemaWithoutParameters": "#57c123579298 (306 characters)",
+                    "declarations": {
+                        "MCPToolEffect": [
+                            "READ"
+                        ],
+                        "MCPToolReturnsUntrustedContent": [
+                            "error messages and stack frames can quote what a client sent"
+                        ],
+                        "MCPToolSummary": [
+                            "One error group: message, origin, releases, entry points and newest events with stack frames."
+                        ]
+                    },
                     "wire": {
                         "description": "#05bc033512db (342 characters)",
                         "parameters": {
@@ -1260,6 +1574,17 @@
                         }
                     },
                     "inputSchemaWithoutParameters": "#ebb7127f6ee4 (313 characters)",
+                    "declarations": {
+                        "MCPToolEffect": [
+                            "READ"
+                        ],
+                        "MCPToolReturnsTrustedContent": [
+                            "event counts the platform computes"
+                        ],
+                        "MCPToolSummary": [
+                            "Error events over time for an environment or one error group: total, peak and buckets."
+                        ]
+                    },
                     "wire": {
                         "description": "#1395a5e294a8 (313 characters)",
                         "parameters": {
@@ -1304,6 +1629,15 @@
                         "status": "#67f826486fb4 (350 characters)"
                     },
                     "inputSchemaWithoutParameters": "#3ebd056f6617 (345 characters)",
+                    "declarations": {
+                        "MCPToolEffect": [
+                            "WRITE"
+                        ],
+                        "MCPToolRequiresOwnerConfirmation": true,
+                        "MCPToolSummary": [
+                            "Set the status of one error group: RESOLVED, IGNORED or OPEN; asks the owner first."
+                        ]
+                    },
                     "wire": {
                         "description": "#6d976d04b0b5 (820 characters)",
                         "parameters": {
@@ -1338,6 +1672,17 @@
                     "title": "getWorkersOverview",
                     "parameters": [],
                     "inputSchemaWithoutParameters": "#ffb7e0efa6fa (237 characters)",
+                    "declarations": {
+                        "MCPToolEffect": [
+                            "READ"
+                        ],
+                        "MCPToolReturnsTrustedContent": [
+                            "worker states and counts the platform computes"
+                        ],
+                        "MCPToolSummary": [
+                            "Workers overview: totals, each transport with state, waiting messages, processes, handled and failed."
+                        ]
+                    },
                     "wire": {
                         "description": "#3a478314f02d (407 characters)",
                         "parameters": [],
@@ -1374,6 +1719,17 @@
                         }
                     },
                     "inputSchemaWithoutParameters": "#3c90e1b3b064 (323 characters)",
+                    "declarations": {
+                        "MCPToolEffect": [
+                            "READ"
+                        ],
+                        "MCPToolReturnsUntrustedContent": [
+                            "error messages of worker runs can quote what a client sent"
+                        ],
+                        "MCPToolSummary": [
+                            "One worker transport: state, waiting messages, message classes with failures and durations, live processes."
+                        ]
+                    },
                     "wire": {
                         "description": "#87fcb9d9955a (342 characters)",
                         "parameters": {

@@ -12,7 +12,9 @@ use DDD\Domain\AI\Entities\Installation\AgentInstallationFindings;
 use DDD\Domain\AI\Entities\Installation\AgentPackageRename;
 use DDD\Domain\AI\Entities\Installation\AgentPackageRenames;
 use DDD\Domain\AI\Entities\MCPPackages\MCPPackage;
+use DDD\Domain\AI\Entities\MCPPackages\MCPRequiresAccountRights;
 use DDD\Domain\AI\Entities\MCPPackages\MCPTool;
+use DDD\Domain\AI\Entities\MCPPackages\MCPToolEntitlement;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolOverlay;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolOverlays;
 use DDD\Domain\AI\Entities\Skills\AISkill;
@@ -36,6 +38,7 @@ use ReflectionClass;
 use ReflectionMethod;
 use Symfony\Component\Console\Application;
 use Symfony\Component\Console\Attribute\AsCommand;
+use Symfony\Component\Console\Command\LazyCommand;
 use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 use Symfony\Contracts\Service\Attribute\Required;
 use Throwable;
@@ -55,12 +58,19 @@ use Throwable;
  *   package's default mapping grants nothing then);
  * - `skillRights` (WARNING): a bound package requires a right on the class whose skill does not name it in
  *   `requiredAccountRights` — the skill is offered to accounts that may call none of its tools;
+ * - `skillOnlyRights` (WARNING): a skill names a right in `requiredAccountRights` that no tool of its bound packages
+ *   requires — the offer is hidden from an account without the right, the tools still execute for it;
+ * - `rightsDeclaredOutsidePackages` (WARNING): `#[MCPRequiresAccountRights]` on a class below `Presentation/Mcp` that
+ *   is no MCP package (a bundle, a controller) — never read there;
  * - `toolOverlays` (WARNING): an entry of `AI.toolOverlays` with a key the overlay does not read, or for a tool name no
  *   bound package has;
  * - `missingTables` (BLOCKING): a table of a package entity the schema lacks (DB unreachable: one WARNING);
  * - `renamedConfigKeys` (WARNING): a config key a package renamed (`renames.json`, kind `configKey`) or removed
  *   ({@see REMOVED_CONFIG_KEYS_BY_VERSION}) still set;
- * - `consoleCommands` (WARNING): a package command name the console does not resolve (only with a console application);
+ * - `consoleCommands` (WARNING; BLOCKING for a name the console lists and cannot build): a package command name the
+ *   console does not resolve, a name that runs a class which is no subclass of the package command, an application
+ *   subclass that takes the names and runs under none or only some of them, two such subclasses, or the names of one
+ *   package command running different classes (only with a console application);
  * - `skillLint` (WARNING; BLOCKING for a skill file of the application that does not parse): the skill-file lint and the
  *   naming lint ({@see AISkillFilesLintService});
  * - `pendingRenames` (WARNING): renames of the installed packages (`renames.json`) newer than the application's record
@@ -87,6 +97,12 @@ class AgentInstallationCheckService extends Service
 
     public const string CHECK_SKILL_RIGHTS = 'skillRights';
 
+    /** @var string The check of a skill right that no tool of the skill's packages requires */
+    public const string CHECK_SKILL_ONLY_RIGHTS = 'skillOnlyRights';
+
+    /** @var string The check of the rights attribute on a class that is no MCP package */
+    public const string CHECK_RIGHTS_DECLARED_OUTSIDE_PACKAGES = 'rightsDeclaredOutsidePackages';
+
     public const string CHECK_MISSING_TABLES = 'missingTables';
 
     public const string CHECK_RENAMED_CONFIG_KEYS = 'renamedConfigKeys';
@@ -106,6 +122,8 @@ class AgentInstallationCheckService extends Service
         self::CHECK_RIGHTS_HELD_BY_NOBODY => 'addRightsHeldByNobodyFindings',
         self::CHECK_ACCOUNT_RIGHTS_MAPPING => 'addAccountRightsMappingFindings',
         self::CHECK_SKILL_RIGHTS => 'addSkillRightsFindings',
+        self::CHECK_SKILL_ONLY_RIGHTS => 'addSkillOnlyRightFindings',
+        self::CHECK_RIGHTS_DECLARED_OUTSIDE_PACKAGES => 'addRightsDeclaredOutsidePackagesFindings',
         self::CHECK_TOOL_OVERLAYS => 'addToolOverlayFindings',
         self::CHECK_MISSING_TABLES => 'addMissingTableFindings',
         self::CHECK_RENAMED_CONFIG_KEYS => 'addRenamedConfigKeyFindings',
@@ -131,6 +149,9 @@ class AgentInstallationCheckService extends Service
 
     /** @var string The folder of a source root that holds its console commands */
     public const string CONSOLE_COMMANDS_FOLDER = 'Symfony/Commands';
+
+    /** @var string The folder of a source root that holds its MCP packages, bundles and controllers */
+    public const string MCP_FOLDER = 'Presentation/Mcp';
 
     /** @var iterable<AgentInstallationCheckInterface> The added checks (by tag) */
     protected iterable $agentInstallationChecks = [];
@@ -234,7 +255,7 @@ class AgentInstallationCheckService extends Service
             $checkName,
             AgentInstallationFinding::SEVERITY_WARNING,
             $checkName,
-            "The check could not run: " . ($firstLineOfReason !== false && $firstLineOfReason !== '' ? $firstLineOfReason : $checkFailure::class),
+            "The check could not run: " . ($firstLineOfReason !== false ? $firstLineOfReason : $checkFailure::class),
             'Fix the cause and run the command again; the other checks ran.'
         );
     }
@@ -455,6 +476,146 @@ class AgentInstallationCheckService extends Service
                 );
             }
         }
+    }
+
+    /**
+     * `skillOnlyRights`: a skill names a right in `requiredAccountRights` that no tool of its bound packages requires
+     * (WARNING; accepted: skill names in `acceptedSkillOnlyRights`). The skill level filters the offer only: the
+     * executor receives package classes and no skill, so the right hides the skill from an account without it while
+     * the same account still executes the skill's tools over the HTTP MCP route and the console. A right name
+     * misspelled in a skill file shows here too: no tool requires it.
+     */
+    protected function addSkillOnlyRightFindings(AgentInstallationFindings $agentInstallationFindings): void
+    {
+        $configuredBinding = Config::get(AISkillsService::CONFIG_SKILL_PACKAGES);
+        if (!is_array($configuredBinding)) {
+            return;
+        }
+        try {
+            $packageClassesBySkillName = AISkill::resolvePackageIdsOfBinding($configuredBinding);
+        } catch (Throwable) {
+            return; // reported by skillBindings
+        }
+        /** @var AISkillsService $aISkillsService */
+        $aISkillsService = DDDService::instance()->getService(AISkillsService::class);
+        $acceptedSkillNames = $this->readConfiguredNames('acceptedSkillOnlyRights');
+        foreach ($packageClassesBySkillName as $skillName => $packageClasses) {
+            $skillName = (string)$skillName;
+            $aISkill = $aISkillsService->getAISkillByName($skillName);
+            if ($aISkill === null || $aISkill->requiredAccountRights === [] || in_array($skillName, $acceptedSkillNames, true)) {
+                continue;
+            }
+            $rightNamesRequiredByTools = [];
+            foreach ($packageClasses as $packageClass) {
+                if (!is_subclass_of($packageClass, MCPPackage::class)) {
+                    continue;
+                }
+                $rightNamesRequiredByTools = array_merge($rightNamesRequiredByTools, $this->findAccountRightNamesRequiredByToolsOfPackage($packageClass));
+            }
+            $rightNamesNoToolRequires = $this->findRightNamesNoToolRequires($aISkill->requiredAccountRights, $rightNamesRequiredByTools);
+            if ($rightNamesNoToolRequires === []) {
+                continue;
+            }
+            $agentInstallationFindings->addFinding(
+                static::CHECK_SKILL_ONLY_RIGHTS,
+                AgentInstallationFinding::SEVERITY_WARNING,
+                $skillName,
+                "The skill '$skillName' requires " . implode(', ', $rightNamesNoToolRequires)
+                . ', which no tool of its packages requires: the skill is hidden from an account without the right, its tools still execute for that account over the HTTP MCP route and the console.',
+                "Require the right on the package class or on its tools (#[MCPRequiresAccountRights], or accountRights of the tool in config/app/AI/toolOverlays.php), or list the skill in acceptedSkillOnlyRights of config/app/AI/installationCheck.php when hiding the offer is all the right is meant to do."
+            );
+        }
+    }
+
+    /**
+     * The rights of a skill that none of its tools requires, in the skill's order.
+     *
+     * @param string[] $skillRightNames
+     * @param string[] $rightNamesRequiredByTools
+     * @return string[]
+     */
+    public function findRightNamesNoToolRequires(array $skillRightNames, array $rightNamesRequiredByTools): array
+    {
+        return array_values(array_unique(array_diff($skillRightNames, $rightNamesRequiredByTools)));
+    }
+
+    /**
+     * The rights the tools of one package require, as the offer filter and the executor read them
+     * ({@see MCPToolEntitlement::createFromReflectionMethod()}): the attribute of the tool method and of its package
+     * class, replaced by the rights the application's overlay names for the tool.
+     *
+     * @return string[]
+     */
+    protected function findAccountRightNamesRequiredByToolsOfPackage(string $packageClass): array
+    {
+        $rightNames = [];
+        $packageReflectionClass = new ReflectionClass($packageClass);
+        foreach ($packageReflectionClass->getMethods(ReflectionMethod::IS_PUBLIC) as $reflectionMethod) {
+            if ($reflectionMethod->getAttributes(MCPTool::class) === []) {
+                continue;
+            }
+            foreach (MCPToolEntitlement::createFromReflectionMethod($packageReflectionClass, $reflectionMethod)->requiredAccountRightNames as $rightName) {
+                $rightNames[$rightName] = $rightName;
+            }
+        }
+        return array_values($rightNames);
+    }
+
+    /**
+     * `rightsDeclaredOutsidePackages`: a class below a source root's `Presentation/Mcp` that carries
+     * `#[MCPRequiresAccountRights]` and is no MCP package (WARNING). The attribute is read on a tool method and on its
+     * package class only; on a bundle or a controller it gates nothing.
+     */
+    protected function addRightsDeclaredOutsidePackagesFindings(AgentInstallationFindings $agentInstallationFindings): void
+    {
+        /** @var AgentSourceRootsService $agentSourceRootsService */
+        $agentSourceRootsService = DDDService::instance()->getService(AgentSourceRootsService::class);
+        $attributeShortName = substr((string)strrchr(MCPRequiresAccountRights::class, '\\'), 1);
+        foreach ($agentSourceRootsService->getSourceRoots()->getElements() as $agentSourceRoot) {
+            $mcpDirectory = $agentSourceRoot->directory . '/' . static::MCP_FOLDER;
+            if (!is_dir($mcpDirectory)) {
+                continue;
+            }
+            $fileIterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($mcpDirectory, FilesystemIterator::SKIP_DOTS));
+            foreach ($fileIterator as $file) {
+                if (!$file->isFile() || $file->getExtension() !== 'php' || !str_contains((string)file_get_contents($file->getPathname()), $attributeShortName)) {
+                    continue;
+                }
+                $className = $agentSourceRoot->findClassNameForFilePath($file->getPathname());
+                if ($className === null || !$this->isClassCarryingRightsAttributeWithoutBeingAPackage($className)) {
+                    continue;
+                }
+                $agentInstallationFindings->addFinding(
+                    static::CHECK_RIGHTS_DECLARED_OUTSIDE_PACKAGES,
+                    AgentInstallationFinding::SEVERITY_WARNING,
+                    $className,
+                    "$className carries #[MCPRequiresAccountRights] and is no MCP package: the attribute is read on a tool method and on its package class only, here it gates nothing.",
+                    'Move the attribute onto the package classes (or their tools) the right is meant to gate.'
+                );
+            }
+        }
+    }
+
+    /** Whether a class carries the rights attribute (on itself or on a method) and is no MCP package */
+    protected function isClassCarryingRightsAttributeWithoutBeingAPackage(string $className): bool
+    {
+        try {
+            if (!class_exists($className) || is_subclass_of($className, MCPPackage::class)) {
+                return false;
+            }
+            $reflectionClass = new ReflectionClass($className);
+            if ($reflectionClass->getAttributes(MCPRequiresAccountRights::class) !== []) {
+                return true;
+            }
+            foreach ($reflectionClass->getMethods() as $reflectionMethod) {
+                if ($reflectionMethod->getAttributes(MCPRequiresAccountRights::class) !== []) {
+                    return true;
+                }
+            }
+        } catch (Throwable) {
+            return false;
+        }
+        return false;
     }
 
     /**
@@ -707,28 +868,215 @@ class AgentInstallationCheckService extends Service
     }
 
     /**
-     * `consoleCommands`: a name (or alias) of a package command that the console of this run does not resolve (WARNING:
-     * the cron line or the host script that runs it fails). Skipped without a console application.
+     * `consoleCommands` (skipped without a console application), per package command:
+     * - a name (or alias) the console of this run does not resolve (WARNING): the cron line or the host script that
+     *   runs it fails;
+     * - a name the console lists and cannot build (BLOCKING): every run of it throws, whoever starts it;
+     * - a name that runs a class which is neither the package command nor a subclass of it (WARNING: the framework
+     *   lets a command replace another by name, so it may be meant; where the package starts its command by that name
+     *   — child processes, the reproduce lines it prints — it gets the other one);
+     * - an application command that extends the package command without a name of its own (it takes the package
+     *   command's names) while a name runs another class (WARNING): the application's overrides never run; two such
+     *   application commands of one package command (WARNING): only one runs;
+     * - the names running different classes (WARNING): an application subclass that took only some of the names, so a cron line
+     *   or a child process under another name runs without the application's overrides.
      */
     protected function addConsoleCommandFindings(AgentInstallationFindings $agentInstallationFindings): void
     {
         if ($this->consoleApplication === null) {
             return;
         }
-        foreach ($this->findPackageCommandNamesByCommandClass() as $commandClassName => $commandNames) {
+        $commandNamesByCommandClass = $this->findPackageCommandNamesByCommandClass();
+        $applicationCommandClassNamesByPackageCommandClass = $this->findApplicationCommandClassesTakingPackageCommandNames(array_keys($commandNamesByCommandClass));
+        foreach ($commandNamesByCommandClass as $commandClassName => $commandNames) {
+            $registeredClassNamesByCommandName = [];
             foreach ($commandNames as $commandName) {
-                if ($this->consoleApplication->has($commandName)) {
+                if (!$this->consoleApplication->has($commandName)) {
+                    $agentInstallationFindings->addFinding(
+                        static::CHECK_CONSOLE_COMMANDS,
+                        AgentInstallationFinding::SEVERITY_WARNING,
+                        $commandName,
+                        "The package command '$commandName' ($commandClassName) is not registered in this console: a cron line or script that runs it fails.",
+                        'Clear the cache (cache:clear with the same APP_ENV), check that the module is registered (extra.ddd-module) and that no exclude of services.yaml removes the command.'
+                    );
                     continue;
                 }
+                try {
+                    $registeredClassNamesByCommandName[$commandName] = $this->findClassNameOfRegisteredCommand($commandName);
+                } catch (Throwable $commandFailure) {
+                    $firstLineOfReason = strtok(trim($commandFailure->getMessage()), "\n");
+                    $agentInstallationFindings->addFinding(
+                        static::CHECK_CONSOLE_COMMANDS,
+                        AgentInstallationFinding::SEVERITY_BLOCKING,
+                        $commandName,
+                        "The package command '$commandName' ($commandClassName) is listed in this console and cannot be built: "
+                        . ($firstLineOfReason !== false ? $firstLineOfReason : $commandFailure::class),
+                        'Run the command with --help to see the full error; a command class without a name and a missing constructor argument are the usual causes.'
+                    );
+                }
+            }
+            $this->addCommandNameOwnerFindings(
+                $agentInstallationFindings,
+                $commandClassName,
+                $registeredClassNamesByCommandName,
+                $applicationCommandClassNamesByPackageCommandClass[$commandClassName] ?? []
+            );
+        }
+    }
+
+    /**
+     * The findings about WHICH class runs under the names of one package command.
+     *
+     * @param array<string, string> $registeredClassNamesByCommandName command name => the class the console runs under it
+     * @param string[] $applicationCommandClassNames the application's commands that extend the package command
+     *        without a name of their own ({@see findApplicationCommandClassesTakingPackageCommandNames()})
+     */
+    protected function addCommandNameOwnerFindings(
+        AgentInstallationFindings $agentInstallationFindings,
+        string $commandClassName,
+        array $registeredClassNamesByCommandName,
+        array $applicationCommandClassNames = []
+    ): void {
+        foreach ($registeredClassNamesByCommandName as $commandName => $registeredClassName) {
+            if ($registeredClassName === $commandClassName || is_subclass_of($registeredClassName, $commandClassName)) {
+                continue;
+            }
+            $agentInstallationFindings->addFinding(
+                static::CHECK_CONSOLE_COMMANDS,
+                AgentInstallationFinding::SEVERITY_WARNING,
+                (string)$commandName,
+                "The name '$commandName' of the package command $commandClassName runs $registeredClassName, which is no subclass of it: the package starts its command by that name and gets another one.",
+                'Rename the other command, or make it a subclass of the package command.'
+            );
+        }
+        if (count($applicationCommandClassNames) > 1) {
+            $agentInstallationFindings->addFinding(
+                static::CHECK_CONSOLE_COMMANDS,
+                AgentInstallationFinding::SEVERITY_WARNING,
+                $commandClassName,
+                'The application commands ' . implode(', ', $applicationCommandClassNames) . " extend the package command $commandClassName without a name of their own: only one command can run under its names.",
+                'Keep one of them without #[AsCommand] and give every other one its own name.'
+            );
+            return;
+        }
+        if (count($applicationCommandClassNames) === 1) {
+            $applicationCommandClassName = $applicationCommandClassNames[0];
+            $namesRunningAnotherClass = [];
+            foreach ($registeredClassNamesByCommandName as $commandName => $registeredClassName) {
+                if ($registeredClassName !== $applicationCommandClassName && !is_subclass_of($registeredClassName, $applicationCommandClassName)) {
+                    $namesRunningAnotherClass[] = "$commandName → $registeredClassName";
+                }
+            }
+            if ($namesRunningAnotherClass !== []) {
                 $agentInstallationFindings->addFinding(
                     static::CHECK_CONSOLE_COMMANDS,
                     AgentInstallationFinding::SEVERITY_WARNING,
-                    $commandName,
-                    "The package command '$commandName' ($commandClassName) is not registered in this console: a cron line or script that runs it fails.",
-                    'Clear the cache (cache:clear with the same APP_ENV), check that the module is registered (extra.ddd-module) and that no exclude of services.yaml removes the command.'
+                    $applicationCommandClassName,
+                    "The application command $applicationCommandClassName extends the package command $commandClassName without a name of its own, so it takes that command's names, but "
+                    . implode(', ', $namesRunningAnotherClass) . ": the application's overrides do not run under these names.",
+                    'Check that the class is registered as a service (no exclude of services.yaml removes it, autoconfiguration is on for its folder) and clear the cache.'
                 );
             }
+            return;
         }
+        $distinctRegisteredClassNames = array_values(array_unique($registeredClassNamesByCommandName));
+        if (count($distinctRegisteredClassNames) < 2) {
+            return;
+        }
+        $nameAndClassPairs = [];
+        foreach ($registeredClassNamesByCommandName as $commandName => $registeredClassName) {
+            $nameAndClassPairs[] = "$commandName → $registeredClassName";
+        }
+        $agentInstallationFindings->addFinding(
+            static::CHECK_CONSOLE_COMMANDS,
+            AgentInstallationFinding::SEVERITY_WARNING,
+            $commandClassName,
+            "The names of the package command $commandClassName run different classes (" . implode(', ', $nameAndClassPairs)
+            . '): a cron line or a child process under one of the names runs without the overrides of the other class.',
+            "Let the application's subclass declare no #[AsCommand] of its own (the framework registers it under every name and alias of the package command), or repeat every name and alias on it."
+        );
+    }
+
+    /**
+     * The class of the command the console runs under a name (a lazily registered command is resolved). Throws what
+     * the console throws when it cannot build the command.
+     */
+    protected function findClassNameOfRegisteredCommand(string $commandName): string
+    {
+        $registeredCommand = $this->consoleApplication->get($commandName);
+        if ($registeredCommand instanceof LazyCommand) {
+            $registeredCommand = $registeredCommand->getCommand();
+        }
+        return $registeredCommand::class;
+    }
+
+    /**
+     * The application's concrete command classes that extend a package command and declare no `#[AsCommand]` of their
+     * own, by the nearest package command they extend: the framework registers such a class under every name and
+     * alias of the package command, in its place.
+     *
+     * @param string[] $packageCommandClassNames
+     * @return array<string, string[]> package command class => application command classes
+     */
+    protected function findApplicationCommandClassesTakingPackageCommandNames(array $packageCommandClassNames): array
+    {
+        /** @var AgentSourceRootsService $agentSourceRootsService */
+        $agentSourceRootsService = DDDService::instance()->getService(AgentSourceRootsService::class);
+        $applicationCommandClassNamesByPackageCommandClass = [];
+        foreach ($agentSourceRootsService->getSourceRoots()->getElements() as $agentSourceRoot) {
+            $commandsDirectory = $agentSourceRoot->directory . '/' . static::CONSOLE_COMMANDS_FOLDER;
+            if (!$agentSourceRoot->isApplication || !is_dir($commandsDirectory)) {
+                continue;
+            }
+            $fileIterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($commandsDirectory, FilesystemIterator::SKIP_DOTS));
+            foreach ($fileIterator as $file) {
+                if (!$file->isFile() || $file->getExtension() !== 'php') {
+                    continue;
+                }
+                $applicationCommandClassName = $agentSourceRoot->findClassNameForFilePath($file->getPathname());
+                $packageCommandClassName = $applicationCommandClassName !== null
+                    ? $this->findPackageCommandWhoseNamesAClassTakes($applicationCommandClassName, $packageCommandClassNames)
+                    : null;
+                if ($packageCommandClassName !== null) {
+                    $applicationCommandClassNamesByPackageCommandClass[$packageCommandClassName][] = $applicationCommandClassName;
+                }
+            }
+        }
+        foreach ($applicationCommandClassNamesByPackageCommandClass as $packageCommandClassName => $applicationCommandClassNames) {
+            sort($applicationCommandClassNames);
+            $applicationCommandClassNamesByPackageCommandClass[$packageCommandClassName] = $applicationCommandClassNames;
+        }
+        return $applicationCommandClassNamesByPackageCommandClass;
+    }
+
+    /**
+     * The nearest package command a concrete class without `#[AsCommand]` extends; null for an abstract class, a class
+     * with a name of its own and a class that extends no package command.
+     *
+     * @param string[] $packageCommandClassNames
+     */
+    public function findPackageCommandWhoseNamesAClassTakes(string $className, array $packageCommandClassNames): ?string
+    {
+        try {
+            if (!class_exists($className)) {
+                return null;
+            }
+            $reflectionClass = new ReflectionClass($className);
+            if ($reflectionClass->isAbstract() || $reflectionClass->getAttributes(AsCommand::class) !== []) {
+                return null;
+            }
+            for ($parentClass = $reflectionClass->getParentClass(); $parentClass !== false; $parentClass = $parentClass->getParentClass()) {
+                if (in_array($parentClass->getName(), $packageCommandClassNames, true)) {
+                    return $parentClass->getName();
+                }
+                if ($parentClass->getAttributes(AsCommand::class) !== []) {
+                    return null; // a command with a name of its own stands between: its names are taken, not the package's
+                }
+            }
+        } catch (Throwable) {
+            return null;
+        }
+        return null;
     }
 
     /**
@@ -980,7 +1328,7 @@ class AgentInstallationCheckService extends Service
 
     /**
      * A list of names of {@see CONFIG_PATH} (`skippedChecks`, `acceptedUnboundSkills`, `acceptedUnmappedRights`,
-     * `acceptedSkillRightGaps`, `acceptedMissingTables`); [] when unset.
+     * `acceptedSkillRightGaps`, `acceptedSkillOnlyRights`, `acceptedMissingTables`); [] when unset.
      *
      * @return string[]
      */
