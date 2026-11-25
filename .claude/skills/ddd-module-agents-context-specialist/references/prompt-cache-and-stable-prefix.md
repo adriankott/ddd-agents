@@ -174,8 +174,10 @@ compaction summarizer never see them.
 `AgentWireConfiguration::$previousReasoningCarryOver` (resolved from `RunSettings`): `all`, `currentTurn`, `capped`,
 `off`. Order: the conversation's row, else the model's catalog value (`agenticUseCase.previousReasoning.carryOver`,
 the value object `AIModelPreviousReasoningCarryOver` on `AIModelAgenticUseCaseConfig::$previousReasoning` in
-mgamadeus/ddd-ai, read with `AIModel::getAgenticPreviousReasoningCarryOver()`, host-overridable in
-`config/app/AI/models.php`; applied on the Responses API, on Messages and on Chat Completions over the direct OpenRouter
+mgamadeus/ddd-ai, read with `AIModel::getAgenticPreviousReasoningCarryOver($wireApi)` for the wire the run resolved —
+the run settings' row, else the catalog's wire after any fallback — so a value under
+`agenticUseCase.previousReasoningByWireApi.<wire API>` replaces the model-wide one on that wire, for the mode and the
+numbers of the cut; host-overridable in `config/app/AI/models.php`; applied on the Responses API, on Messages and on Chat Completions over the direct OpenRouter
 egress only, where `reasoning_details` reach the provider), else the per-API default: `capped` on Responses and on
 Messages, `off` on Chat Completions; always `off` on the server-state arm. Catalog values: Kimi K3.1 Pro `currentTurn`
 (it keeps its verdicts — what it saw on pictures — in its reasoning, so without its own items it re-read the same

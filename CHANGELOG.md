@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.5
+
+**The model's reasoning carry-over per wire API.** Requires `mgamadeus/ddd-ai` ^3.8.0; npm `@mgamadeus/ddd-agents`
+0.5.5 in lockstep, no web change.
+
+- `AgentWireConfiguration::resolveFor()` reads the catalog's carry-over (`AIModel::getAgenticPreviousReasoningCarryOver()`)
+  for the wire the run resolved — the run settings' row, else the catalog's wire after any fallback — so a value under
+  `agenticUseCase.previousReasoningByWireApi.<wire API>` applies to the mode and to the numbers of the cut on that wire,
+  and a run that falls back to another wire gets that wire's value (before: always the model-wide value).
+
 ## 0.5.4
 
 **Fix: a client tool request no longer times out behind a transport that only pings.** npm `@mgamadeus/ddd-agents`

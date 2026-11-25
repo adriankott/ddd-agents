@@ -137,16 +137,18 @@ class AgentWireConfiguration
         // the server-state arm never carries reasoning items: OpenAI keeps them in the stored conversation state
         // the model's catalog value applies where `reasoning_details` reach the provider: the Responses API, or Chat
         // Completions over the direct OpenRouter egress (a proxy may drop the field)
+        // the catalog's value for the wire the run actually speaks (after the run settings' row and any fallback): a
+        // value may be measured on one wire only (`agenticUseCase.previousReasoningByWireApi`)
+        $modelPreviousReasoning = $aiModel?->getAgenticPreviousReasoningCarryOver($agentWireConfiguration->wireApi);
         $agentWireConfiguration->previousReasoningCarryOver = self::resolvePreviousReasoningCarryOver(
             $runSettings->previousReasoningCarryOver ?? null,
             $agentWireConfiguration->wireApi,
             $directOpenRouterEgress || $agentWireConfiguration->wireApi !== AIModel::AGENT_WIRE_API_CHAT_COMPLETIONS
-                ? $aiModel?->getAgenticPreviousReasoningCarryOver()?->getCarryOver()
+                ? $modelPreviousReasoning?->getCarryOver()
                 : null
         );
-        // the numbers of the cut, each on its own: the conversation's row, else the model's catalog value, else the
-        // committed default of the wire API, else the global one
-        $modelPreviousReasoning = $aiModel?->getAgenticPreviousReasoningCarryOver();
+        // the numbers of the cut, each on its own: the conversation's row, else the model's catalog value for the
+        // resolved wire, else the committed default of the wire API, else the global one
         $agentWireConfiguration->previousReasoningCapTokens = self::firstCountOfAtLeast(1, [$runSettings->previousReasoningCapTokens ?? null, $modelPreviousReasoning?->capTokens])
             ?? static::resolveDefaultPreviousReasoningCapTokens($agentWireConfiguration->wireApi);
         $agentWireConfiguration->previousReasoningKeptTokensAtCut = self::firstCountOfAtLeast(0, [$runSettings->previousReasoningKeptTokensAtCut ?? null, $modelPreviousReasoning?->keptTokensAtCut])
@@ -305,7 +307,7 @@ class AgentWireConfiguration
     /**
      * The carry-over mode a call on `$wireApi` runs with, from the conversation's row (null = inherit): the row's value
      * (the legacy `on` reads as `all`), else the model's catalog value (`$modelCarryOver`,
-     * {@see \DDD\Domain\AI\Entities\Models\AIModel::getAgenticPreviousReasoningCarryOver()}, catalog key
+     * {@see \DDD\Domain\AI\Entities\Models\AIModel::getAgenticPreviousReasoningCarryOver()} for the wire of the call, catalog key
      * `agenticUseCase.previousReasoning.carryOver` — e.g. `currentTurn` for a
      * reasoning model that keeps its verdicts only in its reasoning), else the per-API default — `capped` on the
      * Responses and the Messages API (cap {@see resolveDefaultPreviousReasoningCapTokens()}), `off` on Chat
