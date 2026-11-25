@@ -1,6 +1,6 @@
 ---
 name: ddd-module-agents-specialist
-description: "Installs, wires and runs the agent of mgamadeus/ddd-agents in a DDD host and routes to the eight agent topic skills. Covers the installation checklist, chat controller traits, the agent space (agentSpaceId, account level, its host entity), same-path overrides, entitlements, listeners, the 19 config files, host wording, persona and egress, the six Messenger transports, the usage envelope middleware, workers and stop grace, the package's console commands (schedules, purges, diagnosis, chat replay, evaluation), host duties, the cron list, table names, persisted class names, the package suite, source ownership. Use when adding the agent to an application, wiring agent transports or workers, schedules never fire, a crashed turn never answers, agent event tables grow, overriding an agent service, naming agent tables, or asking which agent skill explains a file."
+description: "Installs, wires and runs the agent of mgamadeus/ddd-agents in a DDD host and routes to the eight agent topic skills. Covers the installation checklist, chat controller traits, the agent space (agentSpaceId, account level, its host entity), same-path overrides, entitlements, listeners, the config files, host wording, persona and egress, the six Messenger transports, the usage envelope middleware, workers and stop grace, the package's console commands (schedules, purges, diagnosis, chat replay, evaluation), the installation check app:agent:check-installation, host duties, the cron list, table names, persisted class names, the package suite, source ownership. Use when adding the agent to an application, checking an installation after an update, wiring agent transports or workers, schedules never fire, a crashed turn never answers, agent event tables grow, overriding an agent service, naming agent tables, or asking which agent skill explains a file."
 metadata:
   author: mgamadeus
   version: "0.2.0"
@@ -156,6 +156,7 @@ the recovery commands).
 | Task or symptom | Reference |
 |---|---|
 | Add the agent to an application; the first request | [installation.md](references/installation.md) |
+| Check an installation after an update; a finding of `app:agent:check-installation`; add a check from another package | [installation-check.md](references/installation-check.md) |
 | Replace an agent service, gate by flags or rights, add a listener, join a host table into a statement | [override-points.md](references/override-points.md) |
 | Which config file does what, which skill explains it; the host's words, persona, egress; environment variables | [config-map.md](references/config-map.md) |
 | Configure transports, routing, middlewares, worker pools, stop grace, retries | [transports-and-workers.md](references/transports-and-workers.md) |
@@ -209,6 +210,7 @@ with the same name.
 | `app:agent:backfill-conversation-environment` | stamps conversations without an environment with one (`--environment`) | no (once) | yes (`--dryRun` counts) |
 | `app:agent:execute-tool-call` | hidden: executes one persisted tool call in a child process and writes its outcome into the call row | no; the turn worker starts it when the host declares `consoleScript` | yes |
 | `app:agent:diagnose` | reconstructs the resume decision of one conversation; `--drive` drives one turn in the console, `--retry` retries a FAILED run | no | no (`--drive`, `--retry` write) |
+| `app:agent:check-installation` | checks the installation: bindings, unbound package skills, rights held by nobody, skill rights, tool overlays, missing tables, renamed config keys, package command names, the skill lint, pending renames, added checks; `--format=json`; exit 1 on a BLOCKING finding ([references/installation-check.md](references/installation-check.md)) | no; after every update and in CI | no |
 | `app:agent:validate-conversation` | checks the integrity of stored conversations; exit 1 on a violation | no | no |
 | `app:agent:cache-diff` | per model call: where the request first differs from the previous one, the cache credit, the cause | no | no |
 | `app:agent:activity-lines` | replays the tool calls of a conversation through the activity narrator and prints the lines per model | no | no (makes model calls) |

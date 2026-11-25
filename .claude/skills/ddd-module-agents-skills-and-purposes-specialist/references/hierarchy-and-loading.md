@@ -9,7 +9,11 @@ the discovery modes · what belongs to other skills
 ## The hierarchy
 
 A skill is a root (the default) or a sub-skill (`isSubSkill: true`). A root lists its direct sub-skills in
-`subSkillNames`; a sub-skill may be listed by several roots. The rule is the same at every depth: a loaded skill
+`subSkillNames`; a sub-skill may be listed by several roots. A sub-skill may instead name its root in its own file
+(`subSkillOf: 'Agent.Web.Search'`, one name or a list): it is then a sub-skill, and `AISkillsService` adds it to the
+`subSkillNames` of every named root while both are registered in `AI.skillPackages`
+(`AISkillsService::getSubSkillNamesByRootName()`, memoized per binding). A host or a package adds a sub-skill to a
+package root this way without copying the root's file. The rule is the same at every depth: a loaded skill
 lists its own sub-skills. A root may list a general skill too; that skill stays in the catalog and gets no line in
 the block.
 

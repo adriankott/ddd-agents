@@ -16,7 +16,7 @@ use DDD\Infrastructure\Modules\DDDModule;
  * `ModuleNamespacesTestCase` and the package's contract test):
  * - `DDD\Domain\AI\Entities\AgentSpaces\`, `…\Entities\ClientTools\`, `…\Entities\Conversations\`, `…\Entities\Discovery\`, `…\Entities\Documents\`,
  *   `…\Entities\Drives\`, `…\Entities\Environment\`,
- *   `…\Entities\Evals\`, `…\Entities\MCPPackages\`, `…\Entities\Mandates\`, `…\Entities\Models\CustomerSelection\`,
+ *   `…\Entities\Evals\`, `…\Entities\Installation\`, `…\Entities\MCPPackages\`, `…\Entities\Mandates\`, `…\Entities\Models\CustomerSelection\`,
  *   `…\Entities\RecordedRuns\`, `…\Entities\Skills\`, `…\Entities\SystemHealth\`, `…\Entities\Texts\Embeddings\`, `…\Entities\WebSearch\`;
  * - `DDD\Domain\AI\Exceptions\Conversations\`, `…\Exceptions\Evals\`, `…\Exceptions\Texts\Embeddings\`;
  * - `DDD\Domain\AI\Interfaces\`, `DDD\Domain\AI\MessageHandlers\`;
@@ -25,7 +25,7 @@ use DDD\Infrastructure\Modules\DDDModule;
  * - `DDD\Domain\AI\Repo\Argus\Conversations\`, `…\Repo\Argus\Guard\`, `…\Repo\Argus\Mandates\`, `…\Repo\Argus\WebSearch\`,
  *   `…\Repo\DB\AgentSpaces\`, `…\Repo\DB\ClientTools\`, `…\Repo\DB\Conversations\`, `…\Repo\DB\Evals\`, `…\Repo\DB\Mandates\`;
  * - `DDD\Domain\AI\Services\AgentSpaces\`, `…\Services\ClientTools\`, `…\Services\Conversations\`, `…\Services\Decisions\`, `…\Services\Documents\`,
- *   `…\Services\Drives\`, `…\Services\Eval\`, `…\Services\Mandates\`,
+ *   `…\Services\Drives\`, `…\Services\Eval\`, `…\Services\Installation\`, `…\Services\Mandates\`,
  *   `…\Services\Skills\`, `…\Services\SystemHealth\`, `…\Services\SystemPrompts\`, `…\Services\Texts\Embeddings\`, `…\Services\WebSearch\`;
  * - `DDD\Modules\Agents\`, `DDD\Presentation\Api\Agents\`, `DDD\Presentation\Mcp\` (the MCP / JSON-RPC wire DTOs,
  *   the tool executor, the console printer and the JSON-RPC base controller);
@@ -54,6 +54,7 @@ class AgentsModule extends DDDModule
         'DDD\\Domain\\AI\\Entities\\Drives\\',
         'DDD\\Domain\\AI\\Entities\\Environment\\',
         'DDD\\Domain\\AI\\Entities\\Evals\\',
+        'DDD\\Domain\\AI\\Entities\\Installation\\',
         'DDD\\Domain\\AI\\Entities\\MCPPackages\\',
         'DDD\\Domain\\AI\\Entities\\Mandates\\',
         'DDD\\Domain\\AI\\Entities\\Models\\CustomerSelection\\',
@@ -86,6 +87,7 @@ class AgentsModule extends DDDModule
         'DDD\\Domain\\AI\\Services\\Documents\\',
         'DDD\\Domain\\AI\\Services\\Drives\\',
         'DDD\\Domain\\AI\\Services\\Eval\\',
+        'DDD\\Domain\\AI\\Services\\Installation\\',
         'DDD\\Domain\\AI\\Services\\Mandates\\',
         'DDD\\Domain\\AI\\Services\\Skills\\',
         'DDD\\Domain\\AI\\Services\\SystemPrompts\\',
@@ -138,6 +140,8 @@ class AgentsModule extends DDDModule
             'DDD\\Domain\\AI\\Services\\ClientTools\\',
             // the health report of System.Health and its sections port
             'DDD\\Domain\\AI\\Services\\SystemHealth\\',
+            // the installation check (app:agent:check-installation) and its checks port
+            'DDD\\Domain\\AI\\Services\\Installation\\',
             'DDD\\Presentation\\Mcp\\Services\\',
         ];
     }

@@ -34,7 +34,7 @@ A suite folder keeps only the files that decode to an object with a `cases` list
 
 | Key | Type | Default | Read by |
 |---|---|---|---|
-| `skill` | string | the file name without `.json` | the skill filter `--skill` of eval-tools and eval-suite; the skill line of the report |
+| `skill` | string | the file name without `.json` | the skill filter `--skill` of eval-tools and eval-suite; the skill line of the report. A `skill` the application does not register in `AI.skillPackages` skips every case of the fixture (`SKIP <case> skill not registered`, no failure); a fixture named by its file only is always planned |
 | `purposeName` | string | none | the purpose of every case that names none |
 | `cases` | list of objects | — | every object with a non-empty `id` is a case (eval-tools, eval-suite); eval-selection also takes entries without `id` (named `<file>.<position>`); eval-recall and eval-tiers take entries with `id` (tiers: and a `prompt` and a scope) |
 

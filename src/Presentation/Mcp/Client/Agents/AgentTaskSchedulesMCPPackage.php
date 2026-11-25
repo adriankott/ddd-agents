@@ -25,6 +25,8 @@ use DDD\Domain\AI\Entities\MCPPackages\MCPToolEffect;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolParallelSafe;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolRefreshesState;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolSummary;
+use DDD\Domain\AI\Entities\Conversations\Widgets\Syntax\WidgetBlockFieldNames;
+use DDD\Infrastructure\Libs\Config;
 use DDD\Domain\AI\Services\AgentSpaces\AgentSpacesService;
 use DDD\Domain\AI\Services\Conversations\Agent\AIConversationOwnerReportDeliveryService;
 use DDD\Domain\AI\Services\Conversations\AIConversationSchedulesService;
@@ -68,18 +70,32 @@ use DDD\Domain\AI\Entities\MCPPackages\MCPToolReturnsTrustedContent;
  * never ran → gone; recurring with runs → archived; one-time with a run → stays history). Every run delivers its final
  * report over the schedule's `reportChannel`; the delivery is the platform's, never a tool call of the run.
  *
- * Scope: the space the call names (`agentSpaceId`, filled from the conversation when omitted), else the account as a
- * whole (schedules without a space). A schedule is stored for the signed-in account
+ * Scope: the space the call names (`agentSpaceId`, or the application's name of it, filled from the conversation when
+ * omitted; the whole tool arguments go to {@see AgentSpacesService::findAgentSpaceOfToolCall()}), else the account as
+ * a whole (schedules without a space). A schedule is stored for the signed-in account
  * ({@see AIConversationSchedulesService::createSchedule()}). A scheduled run never administers schedules: every tool
  * but `startBackgroundTask` and the reads refuses inside one.
  *
+ * Rights: the tools that create or change a schedule — `startBackgroundTask` (it spends budget at once),
+ * `scheduleOneTimeTask`, `createRecurringTaskSchedule`, `updateTaskSchedule`, `pauseTaskSchedule`,
+ * `resumeTaskSchedule`, `deleteTaskSchedule` — require {@see AgentAccountRights::SCHEDULE_AGENT_TASKS}; the reads
+ * (`getTaskSchedules`, `getTaskRuns`, `getTaskRunReport`) require none. An application changes a tool's right by name in
+ * `config/app/AI/toolOverlays.php` (`accountRights`, `[]` = none), never by redeclaring the method. An account that may
+ * use a space reads that space's schedules and runs, also those that run as another account
+ * ({@see isScopeReadWithoutEntityRights()}).
+ *
  * Override points for an application (same-path subclass): the budget note ({@see composeScheduleBudgetPotNote()}),
- * the monthly cost note ({@see composeMonthlyCostNote()}), the widget of the task list
- * ({@see TASK_LIST_WIDGET_TYPE}, {@see composeTaskListWidgetNote()}), and the account rights: the package gates no
- * tool by a right; an application that has one declares `MCPRequiresAccountRights` on its subclass.
+ * the monthly cost note ({@see composeMonthlyCostNote()}), the widget of the task list (`AI.agentTasks.taskListWidgetType`,
+ * {@see findTaskListWidgetType()}, {@see composeTaskListWidgetNote()}), the phone note of the list
+ * ({@see composeTaskListPhoneNote()}), the reads of a scope ({@see findRunConversationsOfScope()},
+ * {@see findSchedulesOfScope()}), a schedule a retried call already produced ({@see findScheduleAlreadyProducedByCall()}).
+ * The payer of scheduled runs (whose budget pot a schedule spends) is decided in a same-path subclass of
+ * {@see \DDD\Domain\AI\Services\Conversations\Schedules\ScheduleBudgetPotsService}
+ * (`findScheduleBudgetPotStatusForAccount()`, read here through
+ * {@see AIConversationSchedulesService::buildScheduleBudgetPotStatusForAccount()}), never in
+ * {@see requireActingAccount()}: that one only scopes the lists and the targets of a call.
  */
 #[MCPToolReturnsTrustedContent('the account\'s task schedules as the platform stores them')]
-#[MCPRequiresAccountRights(AgentAccountRights::SCHEDULE_AGENT_TASKS)]
 class AgentTaskSchedulesMCPPackage extends MCPPackage
 {
     public static ?string $name = 'agent.tasks';
@@ -96,10 +112,17 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
     public const int MAX_ROWS_PER_PAGE = 100;
 
     /**
-     * @var string|null The widget type that shows the task list on screen, with `agentSpaceId` as its only field; null =
-     * the application has none, and `getTaskSchedules` names no widget.
+     * @var string|null The widget type that shows the task list on screen, with the space's self-hydration key as its
+     * only field; null = the application has none, and `getTaskSchedules` names no widget. The config
+     * `AI.agentTasks.taskListWidgetType` wins over it ({@see findTaskListWidgetType()}).
      */
     public const ?string TASK_LIST_WIDGET_TYPE = null;
+
+    /** @var string The config path of the task list's widget type */
+    public const string CONFIG_TASK_LIST_WIDGET_TYPE = 'AI.agentTasks.taskListWidgetType';
+
+    /** @var int How many tasks the agent reads aloud on a phone line before it offers the rest */
+    public const int PHONE_LINE_TASKS_READ_ALOUD = 3;
 
     /**
      * Starts a ONE-OFF background task RIGHT NOW: the task runs unattended in a fresh background conversation and its
@@ -115,6 +138,7 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
     #[MCPToolEffect(MCPToolEffect::WRITE, identicalRepeatDoesNewWork: true)]
     #[MCPHiddenQueryOptions('noCache')]
     #[MCPToolSummary('Start a one-off background task NOW — worked unattended, final report to the owner by email (default). Later moment → scheduleOneTimeTask; repeating → createRecurringTaskSchedule.')]
+    #[MCPRequiresAccountRights(AgentAccountRights::SCHEDULE_AGENT_TASKS)]
     public function startBackgroundTask(
         BackgroundTaskStartRequestDto $requestDto,
         AIConversationSchedulesService $aIConversationSchedulesService,
@@ -193,6 +217,7 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
     #[MCPToolEffect(MCPToolEffect::WRITE, identicalRepeatDoesNewWork: true)]
     #[MCPHiddenQueryOptions('noCache')]
     #[MCPToolSummary('Schedule a ONE-TIME task at a moment — relative (runInMinutes) or local absolute (runAtLocalTime "YYYY-MM-DD HH:MM"). Fires once, then closes. NOW → startBackgroundTask; repeating → createRecurringTaskSchedule; changing an EXISTING task → updateTaskSchedule.')]
+    #[MCPRequiresAccountRights(AgentAccountRights::SCHEDULE_AGENT_TASKS)]
     public function scheduleOneTimeTask(
         OneTimeTaskScheduleCreateRequestDto $requestDto,
         AIConversationSchedulesService $aIConversationSchedulesService,
@@ -201,6 +226,17 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
         $this->refuseScheduleAdministrationFromScheduledRun($callProvenance, 'scheduleOneTimeTask');
         $agentSpace = $this->findAgentSpaceOfCall($requestDto->agentSpaceId, $callProvenance);
         $actingAccount = $this->requireActingAccount($callProvenance);
+        // a retried call (a resumed turn, a replayed step) that already produced its schedule answers with it
+        $alreadyProducedSchedule = $this->findScheduleAlreadyProducedByCall($requestDto, $callProvenance, $aIConversationSchedulesService);
+        if ($alreadyProducedSchedule !== null) {
+            $alreadyProducedResponseDto = new TaskScheduleCreateMcpResponseDto();
+            $alreadyProducedResponseDto->scheduleId = isset($alreadyProducedSchedule->id) ? (int)$alreadyProducedSchedule->id : null;
+            $alreadyProducedResponseDto->nextRunAt = $alreadyProducedSchedule->nextRunAt ?? null;
+            $alreadyProducedResponseDto->note = 'This call already produced schedule #' . (int)($alreadyProducedSchedule->id ?? 0)
+                . ' — it was NOT created again. ' . static::composeNextFiringNote($alreadyProducedSchedule)
+                . 'Confirm it to the user in ONE short sentence; do not schedule it again.';
+            return $alreadyProducedResponseDto;
+        }
         // the zone is decided before anything is parsed: an explicit override, else the zone this call thinks in, else
         // the zone of the space; the run spawned at fire time inherits exactly this zone
         $validatedOverride = $this->findValidatedTimezoneIdentifier($requestDto->timezoneIdentifier);
@@ -262,6 +298,7 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
     #[MCPToolEffect(MCPToolEffect::WRITE)]
     #[MCPHiddenQueryOptions('noCache')]
     #[MCPToolSummary('Set up a RECURRING background task on a cron (max 4 firings/day — hourly crons are refused) — each run reports to the owner by email (default). One-off now → startBackgroundTask; one-time at a moment → scheduleOneTimeTask; changing an EXISTING task → updateTaskSchedule.')]
+    #[MCPRequiresAccountRights(AgentAccountRights::SCHEDULE_AGENT_TASKS)]
     public function createRecurringTaskSchedule(
         RecurringTaskScheduleCreateRequestDto $requestDto,
         AIConversationSchedulesService $aIConversationSchedulesService,
@@ -394,8 +431,8 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
                 $scheduleQueryOptions->setOrderBy($newestFirstOrderBy);
             }
             // a fresh load: inside one turn this read follows status writes (pause → list)
-            $schedules = $aIConversationSchedulesService->findAll(useEntityRegistrCache: false);
-            $responseDto->totalMatchingCount = $aIConversationSchedulesService->countAll();
+            $schedules = $this->findSchedulesOfScope($aIConversationSchedulesService, $agentSpace, $actingAccount);
+            $responseDto->totalMatchingCount = $this->countSchedulesOfScope($aIConversationSchedulesService, $agentSpace, $actingAccount);
         } finally {
             AIConversationSchedules::restoreDefaultQueryOptionsSnapshot();
         }
@@ -425,8 +462,10 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
             }
         }
         $responseDto->recurringBudgetNote = $budgetNotes !== [] ? implode(' ', $budgetNotes) : null;
-        $taskListWidgetNote = $this->composeTaskListWidgetNote($agentSpace, $callProvenance);
-        $responseDto->taskListWidgetNote = $taskListWidgetNote !== '' ? $taskListWidgetNote : null;
+        $taskListNote = $callProvenance->isOwnerOnThePhoneLine()
+            ? $this->composeTaskListPhoneNote($callProvenance)
+            : $this->composeTaskListWidgetNote($agentSpace, $callProvenance);
+        $responseDto->taskListWidgetNote = $taskListNote !== '' ? $taskListNote : null;
         return $responseDto;
     }
 
@@ -481,15 +520,13 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
                 $newestFirstOrderBy = OrderByOptions::fromString('id desc');
                 $runQueryOptions->setOrderBy($newestFirstOrderBy);
             }
-            $runConversations = $aIConversationsService->findAll(useEntityRegistrCache: false);
-            $responseDto->totalMatchingCount = $aIConversationsService->countAll();
+            $runConversations = $this->findRunConversationsOfScope($aIConversationsService, $agentSpace, $actingAccount);
+            $responseDto->totalMatchingCount = $this->countRunConversationsOfScope($aIConversationsService, $agentSpace, $actingAccount);
         } finally {
             AIConversations::restoreDefaultQueryOptionsSnapshot();
         }
         // the schedule titles in ONE load — archived schedules included, their runs stay readable
-        $schedulesInScope = $agentSpace !== null
-            ? $aIConversationSchedulesService->findSchedulesOfAgentSpace($agentSpace, includeArchived: true)
-            : $aIConversationSchedulesService->findSchedulesOfAccountWithoutAgentSpace($actingAccount, includeArchived: true);
+        $schedulesInScope = $this->findAllSchedulesOfScopeForLabels($aIConversationSchedulesService, $agentSpace, $actingAccount);
         $scheduleLabelPerScheduleId = [];
         foreach ($schedulesInScope->getElements() as $schedule) {
             $scheduleLabelPerScheduleId[(int)$schedule->id] = $schedule->getOwnerFacingLabel();
@@ -525,8 +562,9 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
         AIConversationOwnerReportDeliveryService $aIConversationOwnerReportDeliveryService,
         AgentToolCallProvenance $callProvenance
     ): TaskRunReportMcpResponseDto {
-        // a rights-scoped load: the owner reads their own conversations only
-        $runConversation = $aIConversationsService->find((int)$requestDto->conversationId);
+        // the run is read like the lists: its schedule must be one the acting account may work with (the target check
+        // below); the run conversation itself may belong to the account the schedule runs as
+        $runConversation = $this->findRunConversationById((int)$requestDto->conversationId, $aIConversationsService);
         $scheduleId = $runConversation instanceof AIConversation ? ($runConversation->scheduleId ?? null) : null;
         if (!$runConversation instanceof AIConversation || $scheduleId === null || $scheduleId <= 0) {
             throw new NotFoundException('No such task run — the id must be a run conversation from getTaskSchedules / getTaskRuns.');
@@ -550,7 +588,13 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
             $responseDto->note = TaskRunReportMcpResponseDto::NOTE_RUN_IN_PROGRESS;
             return $responseDto;
         }
-        $responseDto->ownerReport = $aIConversationOwnerReportDeliveryService->composeOwnerReportOfRun($runConversation);
+        // the report rows belong to the run's account: read under the rule of the scope (the schedule was checked above)
+        DDDService::instance()->deactivateEntityRightsRestrictions();
+        try {
+            $responseDto->ownerReport = $aIConversationOwnerReportDeliveryService->composeOwnerReportOfRun($runConversation);
+        } finally {
+            DDDService::instance()->restoreEntityRightsRestrictionsStateSnapshot();
+        }
         return $responseDto;
     }
 
@@ -566,6 +610,7 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
     #[MCPToolEffect(MCPToolEffect::WRITE, identicalRepeatDoesNewWork: true)]
     #[MCPHiddenQueryOptions('noCache')]
     #[MCPToolSummary('PAUSE an ACTIVE task schedule (stops firing, keeps id/cron/history; resumeTaskSchedule restarts it). Stopping for good → deleteTaskSchedule.')]
+    #[MCPRequiresAccountRights(AgentAccountRights::SCHEDULE_AGENT_TASKS)]
     public function pauseTaskSchedule(
         TaskScheduleIdRequestDto $requestDto,
         AIConversationSchedulesService $aIConversationSchedulesService,
@@ -601,6 +646,7 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
     #[MCPToolEffect(MCPToolEffect::WRITE, identicalRepeatDoesNewWork: true)]
     #[MCPHiddenQueryOptions('noCache')]
     #[MCPToolSummary('RESUME a PAUSED task schedule (next firing computed from now). A schedule the platform paused is refused with the reason; relay it.')]
+    #[MCPRequiresAccountRights(AgentAccountRights::SCHEDULE_AGENT_TASKS)]
     public function resumeTaskSchedule(
         TaskScheduleIdRequestDto $requestDto,
         AIConversationSchedulesService $aIConversationSchedulesService,
@@ -630,6 +676,7 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
     #[MCPToolEffect(MCPToolEffect::DELETE)]
     #[MCPHiddenQueryOptions('noCache')]
     #[MCPToolSummary('Delete / stop / CANCEL a task schedule (archive policy: never ran → gone; recurring with runs → archived; one-time with a run → history stays). CHANGING an existing task → updateTaskSchedule, never delete + recreate.')]
+    #[MCPRequiresAccountRights(AgentAccountRights::SCHEDULE_AGENT_TASKS)]
     public function deleteTaskSchedule(
         TaskScheduleIdRequestDto $requestDto,
         AIConversationSchedulesService $aIConversationSchedulesService,
@@ -647,7 +694,8 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
      * RECURRING schedules — at most 4 firings per day, as at creation. Only an ACTIVE or PAUSED schedule changes; a
      * finished one (DONE, CANCELLED, EXPIRED, ARCHIVED) is refused. Find the id via `getTaskSchedules` first; taking a
      * task back entirely is `deleteTaskSchedule`. Only for a change the owner asks for to THAT task: an order for another
-     * report or another rhythm is a NEW schedule beside the existing ones. Confirm in ONE short sentence what changed.
+     * report or another rhythm is a NEW schedule beside the existing ones, and a task the owner did not mention is never
+     * rewritten. Confirm in ONE short sentence what changed.
      *
      * @example {"scheduleId": 42, "cronSchedule": "0 8 * * 5"}
      * @example {"scheduleId": 17, "runAtLocalTime": "2026-08-12 16:00"}
@@ -657,6 +705,7 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
     #[MCPToolEffect(MCPToolEffect::WRITE)]
     #[MCPHiddenQueryOptions('noCache')]
     #[MCPToolSummary('Change an EXISTING task schedule in place (task text, title, timing, cron, report channel, done criteria) — NEVER delete + recreate for a change. An order for another report or rhythm is a NEW schedule. Moment: one-time tasks that have not run; cron: recurring only (max 4 firings/day).')]
+    #[MCPRequiresAccountRights(AgentAccountRights::SCHEDULE_AGENT_TASKS)]
     public function updateTaskSchedule(
         TaskScheduleUpdateRequestDto $requestDto,
         AIConversationSchedulesService $aIConversationSchedulesService,
@@ -710,6 +759,10 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
             $schedule->timezoneUnverified = false;
             $editedColumnNames[] = 'timezone';
             $editedColumnNames[] = 'timezoneUnverified';
+        } elseif (trim((string)($schedule->timezone ?? '')) === '') {
+            // a schedule stored without a zone (an older row) gets the zone a new schedule of its scope would get; it
+            // stays on UTC only when none is known
+            $editedColumnNames = [...$editedColumnNames, ...$this->applyTimezoneForNewScheduleToScheduleWithoutZone($schedule)];
         }
 
         $editedCronExpression = trim((string)($requestDto->cronSchedule ?? ''));
@@ -755,7 +808,8 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
         $responseDto->nextRunAt = $schedule->nextRunAt ?? null;
         $responseDto->note = 'Schedule updated IN PLACE (same id, run history preserved). ' . static::composeNextFiringNote($schedule);
         if (in_array('oneTimeAt', $editedColumnNames, true)) {
-            $responseDto->note .= static::composeOneTimeMomentNote($schedule->oneTimeAt, $schedule->getCronTimezoneIdentifier(), $now);
+            $responseDto->note .= static::composeOneTimeMomentNote($schedule->oneTimeAt, $schedule->getCronTimezoneIdentifier(), $now)
+                . 'VERIFY this matches what the user asked (wrong day → fix it with updateTaskSchedule). ';
         }
         $responseDto->note .= 'Confirm to the user in ONE short sentence what changed.';
         return $responseDto;
@@ -817,7 +871,10 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
     }
 
     /**
-     * The space the call works for: the one `agentSpaceId` names (checked for the account), else the conversation's.
+     * The space the call works for: the one the call's arguments name (checked for the account), else the
+     * conversation's. The resolver receives the WHOLE arguments of the call ({@see AgentToolCallProvenance::$toolArguments}),
+     * so an argument the application names (`AI.agentSpaceToolArgument`) reaches it; the DTO's `agentSpaceId` fills
+     * the default name when the arguments are not at hand.
      *
      * @param int|null $agentSpaceId
      * @param AgentToolCallProvenance $callProvenance
@@ -832,7 +889,11 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
     {
         /** @var AgentSpacesService $agentSpacesService */
         $agentSpacesService = DDDService::instance()->getService(AgentSpacesService::class);
-        return $agentSpacesService->findAgentSpaceOfToolCall([AgentSpacesService::TOOL_ARGUMENT_AGENT_SPACE_ID => $agentSpaceId], $callProvenance);
+        $toolArguments = $callProvenance->toolArguments ?? [];
+        if ($agentSpaceId !== null && !isset($toolArguments[AgentSpacesService::TOOL_ARGUMENT_AGENT_SPACE_ID])) {
+            $toolArguments[AgentSpacesService::TOOL_ARGUMENT_AGENT_SPACE_ID] = $agentSpaceId;
+        }
+        return $agentSpacesService->findAgentSpaceOfToolCall($toolArguments, $callProvenance);
     }
 
     /**
@@ -1105,14 +1166,233 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
      */
     protected function composeTaskListWidgetNote(?AgentSpace $agentSpace, AgentToolCallProvenance $callProvenance): string
     {
-        if (static::TASK_LIST_WIDGET_TYPE === null || $callProvenance->isOwnerOnThePhoneLine() || $callProvenance->isInDelegationChild()) {
+        $taskListWidgetType = $this->findTaskListWidgetType();
+        if ($taskListWidgetType === null || $callProvenance->isOwnerOnThePhoneLine() || $callProvenance->isInDelegationChild()) {
             return '';
         }
-        $widgetFields = ['type' => static::TASK_LIST_WIDGET_TYPE];
-        if ($agentSpace !== null) {
-            $widgetFields['agentSpaceId'] = (int)$agentSpace->id;
+        $widgetFields = ['type' => $taskListWidgetType];
+        $widgetSelfHydrationKey = $agentSpace?->getWidgetSelfHydrationKey();
+        if ($widgetSelfHydrationKey !== null) {
+            $widgetFields[WidgetBlockFieldNames::getWidgetSelfHydrationKeyFieldName()] = $widgetSelfHydrationKey;
         }
         return 'When the user wants to SEE the tasks: write a SHORT one-line intro, THEN this widget on its own line'
             . " (it renders the live list itself):\n```widget\n" . json_encode($widgetFields, JSON_UNESCAPED_SLASHES) . "\n```";
+    }
+
+    /**
+     * The widget type of the task list: the config `AI.agentTasks.taskListWidgetType`, else {@see TASK_LIST_WIDGET_TYPE};
+     * null = none.
+     *
+     * @return string|null
+     */
+    protected function findTaskListWidgetType(): ?string
+    {
+        $configuredWidgetType = Config::get(static::CONFIG_TASK_LIST_WIDGET_TYPE);
+        if (is_string($configuredWidgetType) && trim($configuredWidgetType) !== '') {
+            return trim($configuredWidgetType);
+        }
+        return static::TASK_LIST_WIDGET_TYPE;
+    }
+
+    /**
+     * How to read the task list on a phone line, where nothing is shown: a few tasks in words, the rest offered; ''
+     * in a delegation child (it does not talk to the owner).
+     *
+     * @param AgentToolCallProvenance $callProvenance
+     * @return string
+     */
+    protected function composeTaskListPhoneNote(AgentToolCallProvenance $callProvenance): string
+    {
+        if ($callProvenance->isInDelegationChild()) {
+            return '';
+        }
+        return 'The owner is on the phone: read at most ' . static::PHONE_LINE_TASKS_READ_ALOUD . ' tasks aloud, each as its'
+            . ' title and its next time in plain words (weekday, time of day), the most relevant first; say how many more'
+            . ' there are and offer to go on. Never read ids, cron expressions, statuses in capitals or filter syntax.';
+    }
+
+    /**
+     * Whether the reads of the scope run without the entity read rights. The package rule: an account that may use a
+     * space reads that space's schedules and runs, also those that run as another account (the read rights follow the
+     * authenticated account and would hide them). The mandatory scope filter (the space, or the account's own rows
+     * without a space) bounds the read; a space the acting account may not use keeps the entity rights.
+     *
+     * @param AgentSpace|null $agentSpace
+     * @param Account $actingAccount
+     * @return bool
+     */
+    protected function isScopeReadWithoutEntityRights(?AgentSpace $agentSpace, Account $actingAccount): bool
+    {
+        if ($agentSpace === null) {
+            return true;
+        }
+        /** @var AgentSpacesService $agentSpacesService */
+        $agentSpacesService = DDDService::instance()->getService(AgentSpacesService::class);
+        try {
+            $agentSpacesService->requireAgentSpaceUsableByAccount($agentSpace, $actingAccount);
+            return true;
+        } catch (ForbiddenException) {
+            return false;
+        }
+    }
+
+    /**
+     * The run conversations of the scope under the query options the caller set (the scope filter among them), read
+     * under {@see isScopeReadWithoutEntityRights()}.
+     *
+     * @throws BadRequestException
+     * @throws InternalErrorException
+     * @throws InvalidArgumentException
+     * @throws ReflectionException
+     */
+    protected function findRunConversationsOfScope(AIConversationsService $aIConversationsService, ?AgentSpace $agentSpace, Account $actingAccount): AIConversations
+    {
+        $readsWithoutEntityRights = $this->isScopeReadWithoutEntityRights($agentSpace, $actingAccount);
+        if ($readsWithoutEntityRights) {
+            DDDService::instance()->deactivateEntityRightsRestrictions();
+        }
+        try {
+            return $aIConversationsService->findAll(useEntityRegistrCache: false);
+        } finally {
+            if ($readsWithoutEntityRights) {
+                DDDService::instance()->restoreEntityRightsRestrictionsStateSnapshot();
+            }
+        }
+    }
+
+    /**
+     * How many run conversations of the scope match the caller's query options, under the same rule as
+     * {@see findRunConversationsOfScope()}.
+     */
+    protected function countRunConversationsOfScope(AIConversationsService $aIConversationsService, ?AgentSpace $agentSpace, Account $actingAccount): int
+    {
+        $readsWithoutEntityRights = $this->isScopeReadWithoutEntityRights($agentSpace, $actingAccount);
+        if ($readsWithoutEntityRights) {
+            DDDService::instance()->deactivateEntityRightsRestrictions();
+        }
+        try {
+            return (int)$aIConversationsService->countAll();
+        } finally {
+            if ($readsWithoutEntityRights) {
+                DDDService::instance()->restoreEntityRightsRestrictionsStateSnapshot();
+            }
+        }
+    }
+
+    /**
+     * The schedules of the scope under the query options the caller set, read under
+     * {@see isScopeReadWithoutEntityRights()}.
+     *
+     * @throws BadRequestException
+     * @throws InternalErrorException
+     * @throws InvalidArgumentException
+     * @throws ReflectionException
+     */
+    protected function findSchedulesOfScope(AIConversationSchedulesService $aIConversationSchedulesService, ?AgentSpace $agentSpace, Account $actingAccount): AIConversationSchedules
+    {
+        $readsWithoutEntityRights = $this->isScopeReadWithoutEntityRights($agentSpace, $actingAccount);
+        if ($readsWithoutEntityRights) {
+            DDDService::instance()->deactivateEntityRightsRestrictions();
+        }
+        try {
+            return $aIConversationSchedulesService->findAll(useEntityRegistrCache: false);
+        } finally {
+            if ($readsWithoutEntityRights) {
+                DDDService::instance()->restoreEntityRightsRestrictionsStateSnapshot();
+            }
+        }
+    }
+
+    /** How many schedules of the scope match the caller's query options, under the rule of {@see findSchedulesOfScope()} */
+    protected function countSchedulesOfScope(AIConversationSchedulesService $aIConversationSchedulesService, ?AgentSpace $agentSpace, Account $actingAccount): int
+    {
+        $readsWithoutEntityRights = $this->isScopeReadWithoutEntityRights($agentSpace, $actingAccount);
+        if ($readsWithoutEntityRights) {
+            DDDService::instance()->deactivateEntityRightsRestrictions();
+        }
+        try {
+            return (int)$aIConversationSchedulesService->countAll();
+        } finally {
+            if ($readsWithoutEntityRights) {
+                DDDService::instance()->restoreEntityRightsRestrictionsStateSnapshot();
+            }
+        }
+    }
+
+    /** Every schedule of the scope, archived included (the labels of the run list), under the rule of the scope */
+    protected function findAllSchedulesOfScopeForLabels(AIConversationSchedulesService $aIConversationSchedulesService, ?AgentSpace $agentSpace, Account $actingAccount): AIConversationSchedules
+    {
+        $readsWithoutEntityRights = $this->isScopeReadWithoutEntityRights($agentSpace, $actingAccount);
+        if ($readsWithoutEntityRights) {
+            DDDService::instance()->deactivateEntityRightsRestrictions();
+        }
+        try {
+            return $agentSpace !== null
+                ? $aIConversationSchedulesService->findSchedulesOfAgentSpace($agentSpace, includeArchived: true)
+                : $aIConversationSchedulesService->findSchedulesOfAccountWithoutAgentSpace($actingAccount, includeArchived: true);
+        } finally {
+            if ($readsWithoutEntityRights) {
+                DDDService::instance()->restoreEntityRightsRestrictionsStateSnapshot();
+            }
+        }
+    }
+
+    /**
+     * A conversation by id without the entity read rights — for `getTaskRunReport`, which checks the run's SCHEDULE
+     * against the acting account before it answers anything ({@see findScheduleOfActingAccount()}); null when none.
+     */
+    protected function findRunConversationById(int $conversationId, AIConversationsService $aIConversationsService): ?AIConversation
+    {
+        DDDService::instance()->deactivateEntityRightsRestrictions();
+        try {
+            $runConversation = $aIConversationsService->find($conversationId);
+        } finally {
+            DDDService::instance()->restoreEntityRightsRestrictionsStateSnapshot();
+        }
+        return $runConversation instanceof AIConversation ? $runConversation : null;
+    }
+
+    /**
+     * Override point: the schedule THIS call already produced, when the call is retried (a resumed turn, a replayed
+     * step): `scheduleOneTimeTask` answers with it and creates nothing. The default: null (every call creates). An
+     * application that can tell a repeated call (a call id it stored on the schedule, the creating conversation and
+     * the same task text) returns the stored schedule.
+     *
+     * @param OneTimeTaskScheduleCreateRequestDto $requestDto
+     * @param AgentToolCallProvenance $callProvenance
+     * @param AIConversationSchedulesService $aIConversationSchedulesService
+     * @return AIConversationSchedule|null
+     */
+    protected function findScheduleAlreadyProducedByCall(
+        OneTimeTaskScheduleCreateRequestDto $requestDto,
+        AgentToolCallProvenance $callProvenance,
+        AIConversationSchedulesService $aIConversationSchedulesService
+    ): ?AIConversationSchedule {
+        return null;
+    }
+
+    /**
+     * Gives a schedule stored without a zone the zone a new schedule of its scope gets
+     * ({@see AgentSpacesService::findTimezoneForNewSchedule()}); no answer leaves it on UTC. Returns the edited column
+     * names.
+     *
+     * @param AIConversationSchedule $schedule
+     * @return string[]
+     */
+    protected function applyTimezoneForNewScheduleToScheduleWithoutZone(AIConversationSchedule $schedule): array
+    {
+        /** @var AgentSpacesService $agentSpacesService */
+        $agentSpacesService = DDDService::instance()->getService(AgentSpacesService::class);
+        try {
+            $agentSpaceTimezone = $agentSpacesService->findTimezoneForNewSchedule($schedule);
+        } catch (BadRequestException|InternalErrorException|InvalidArgumentException|ReflectionException) {
+            return [];
+        }
+        if ($agentSpaceTimezone === null) {
+            return [];
+        }
+        $schedule->timezone = $agentSpaceTimezone->identifier;
+        $schedule->timezoneUnverified = $agentSpaceTimezone->unverified;
+        return ['timezone', 'timezoneUnverified'];
     }
 }

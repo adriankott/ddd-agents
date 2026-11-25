@@ -16,7 +16,9 @@ use DDD\Infrastructure\Exceptions\InternalErrorException;
 use DDD\Infrastructure\Services\AuthService;
 use DDD\Infrastructure\Services\DDDService;
 use Psr\Cache\InvalidArgumentException;
+use ReflectionClass;
 use ReflectionException;
+use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Exception\InvalidOptionException;
 use Symfony\Component\Console\Input\InputInterface;
@@ -42,8 +44,9 @@ use Symfony\Component\Console\Output\OutputInterface;
  *
  * A subclass declares its options in `configure()` (calling the `configure…Option(s)()` methods it needs), states what
  * the run needs by overriding the switch methods, and does its work in {@see executeConsoleWork()}. An application
- * replaces a command of the module by a subclass outside `DDD\Symfony\Commands\` that repeats `#[AsCommand]` with the
- * same name: the framework then removes the module's service of that name.
+ * replaces a command of the module by a subclass outside `DDD\Symfony\Commands\`: the framework then removes the
+ * module's service. Without an `#[AsCommand]` of its own the subclass keeps every name of the module's command (in the
+ * container through Core's yield pass, on a hand-built object through {@see __construct()}).
  */
 abstract class AgentConsoleCommand extends Command
 {
@@ -58,6 +61,54 @@ abstract class AgentConsoleCommand extends Command
 
     /** @var string[] The names of the space options the agent-spaces service declared on this command */
     protected array $agentSpaceScopeOptionNames = [];
+
+    /**
+     * A command built without a name takes the names of its `#[AsCommand]`. A subclass that declares no `#[AsCommand]`
+     * of its own (an application's replacement of a package command) takes name, aliases, the hidden mark, description
+     * and help from the nearest parent class that declares one — so `new HostCommand()` is named like the registered
+     * command (the console names come from Core's yield pass, this covers an object built by hand: the lock name of
+     * `LockableTrait`, the command line of an evaluation child process). A description or help the subclass sets in
+     * `configure()` wins.
+     *
+     * @param string|null $name the command name (with `|`-separated aliases); null = from the attribute
+     */
+    public function __construct(?string $name = null)
+    {
+        $inheritedCommandAttribute = $name === null ? static::findAsCommandAttributeOfNearestParentClass() : null;
+        parent::__construct($name ?? $inheritedCommandAttribute?->name);
+        if ($inheritedCommandAttribute === null) {
+            return;
+        }
+        if ($this->getDescription() === '' && ($inheritedCommandAttribute->description ?? '') !== '') {
+            $this->setDescription((string)$inheritedCommandAttribute->description);
+        }
+        if ($this->getHelp() === '' && ($inheritedCommandAttribute->help ?? '') !== '') {
+            $this->setHelp((string)$inheritedCommandAttribute->help);
+        }
+    }
+
+    /**
+     * The `#[AsCommand]` of the nearest parent class when this class declares none itself; null when this class
+     * declares one (Symfony reads it) or no parent class does.
+     *
+     * @return AsCommand|null
+     */
+    public static function findAsCommandAttributeOfNearestParentClass(): ?AsCommand
+    {
+        $commandReflectionClass = new ReflectionClass(static::class);
+        if ($commandReflectionClass->getAttributes(AsCommand::class) !== []) {
+            return null;
+        }
+        $parentReflectionClass = $commandReflectionClass->getParentClass();
+        while ($parentReflectionClass !== false) {
+            $asCommandAttributes = $parentReflectionClass->getAttributes(AsCommand::class);
+            if ($asCommandAttributes !== []) {
+                return $asCommandAttributes[0]->newInstance();
+            }
+            $parentReflectionClass = $parentReflectionClass->getParentClass();
+        }
+        return null;
+    }
 
     /**
      * Runs {@see executeConsoleWork()} inside what the command asked for: the progress reporter, the budget grant, the

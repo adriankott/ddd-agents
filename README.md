@@ -27,7 +27,7 @@ supervisor, run claims, the decision layer, the message handlers of the loop and
 | PHP | `DDD\Domain\AI\…` (feature folders), `DDD\Presentation\Api\Agents\`, `DDD\Presentation\Mcp\Client\Agents\`, `DDD\Presentation\Mcp\Admin\System\`, `DDD\Symfony\Commands\Agents\` |
 | Config | `config/app/AI/…` (`AI.skillPackages`, `AI.accountRights`, …), skills in `config/app/AI/Skills/Agent/` and `…/System/` |
 | Skills ↔ package ids | `Agent.Mandates` ↔ `agent.mandates`, `Agent.Tasks` ↔ `agent.tasks`, `Agent.TaskRunReports` ↔ `agent.taskRunReports`, `Agent.Memory` ↔ `agent.memory`, `Agent.Web.Search` ↔ `agent.web.search`, `Agent.UI` ↔ `agent.ui`, `System.Health` / `.Issues` / `.Workers` / `.Crons` ↔ `ddd.system.*` |
-| Rights | `AgentAccountRights`: `operatePlatform`, `scheduleAgentTasks`, `useAgentMemory`, `useWeb`, `useUI` |
+| Rights | `AgentAccountRights`: `operatePlatform`, `scheduleAgentTasks`, `useAgentMemory`, `useWeb`, `useUI` (composed with the host's own rights object, see below) |
 | Console | `app:agent:…` (the former `app:ai-agent:`, `app:ai-conversation:`, `app:ai-schedule:`, `app:ai:` names stay as aliases), `app:mcp:…` |
 | npm entries | `.`, `./renderer`, `./kit`, `./widgets`, `./contract`, `./client`, `./client/testing`, `./chat`, `./preview`, `./image-render`, `./provider`, `./ui` |
 
@@ -66,6 +66,46 @@ tool schemas before their skill is loaded. Every switch defaults to the package'
 byte-identical until a host sets one. The default character (`config/app/AI/Prompts/AI/Agent/Character.md`) is an
 example; a host replaces it with its own file at the same path. Details: the context skill, "What the model sees",
 section 5.
+
+## Rights, tool texts and names a host sets by config
+
+- **Rights.** The package asks the host's own rights object (`AIConversationEntitlementsService`) composed with the
+  mapping `AI.accountRights` (`AgentComposedAccountRights`): a package right the host object does not hold is still held
+  through the mapping (roles, `'*'`, or `['right' => '<host right>']`). A host object that implements
+  `AgentAccountRightsAnsweringInterface` decides the names it answers alone. `AgentDeclaredAccountRightsService`
+  lists every right the installed packages declare.
+- **Per tool, by name** (`config/app/AI/toolOverlays.php`): `accountRights` (replaces the attributes, `[]` = none),
+  `description`, `summary`, `parameters`, `ownerFacingSubject`.
+- **The space argument** (`config/app/AI/agentSpaceToolArgument.php`): its name and description on the wire.
+- **The task list widget** (`config/app/AI/agentTasks.php`): `taskListWidgetType`.
+- **`app:agent:check-installation`** (read-only, `--format=json`, exit 1 on a blocking finding): unbound package
+  skills, bindings to missing classes, package rights held by nobody, missing tables, features without their store or
+  binaries, leftover config keys, unresolved command names, the naming lint, pending renames.
+- **Renames** ship as data: `renames.json` at the package root. After an update run `vendor/bin/ddd-renames` (dry run),
+  then `vendor/bin/ddd-renames --apply` (needs `mgamadeus/ddd` 3.45.0 or newer for the bin).
+
+## Memory: the store is the host port
+
+`AI.agentMemory.enabled` (`config/app/AI/agentMemory.php`, off by default) switches the agent's memory on. Every read
+and write of a memory goes through `AgentMemoryStoreService` (`DDD\Domain\AI\Services\Conversations\Memories`): the
+core's directives and search, the memory tools, the curation, the embedding repair and the evaluation purge. The
+default store keeps its rows in the package's table. A host with memories in rows of its own puts a same-path subclass
+of the store under its root namespace, fills `AgentMemory` as the carrier (`id` = its row's id, scope = `accountId` and
+an optional `agentSpaceId`) and switches memory on; it needs no package table. The methods a host store answers:
+
+| Method | Answers |
+|---|---|
+| `findCurrentMemoriesForScope(int $accountId, ?int $agentSpaceId, ?string $memoryType, ?int $limit)` | the current memories of a scope, newest first |
+| `findCurrentDirectivesForScope(int $accountId, ?int $agentSpaceId)` | the current directives of a scope |
+| `findSimilarMemories(string $searchText, int $accountId, ?int $agentSpaceId, int $limit, ?string $memoryType)` | the nearest current memories |
+| `findCurrentDuplicateOfContent(int $accountId, ?int $agentSpaceId, string $content)` | the current memory with the same content, or null |
+| `persistMemory(AgentMemory)`, `embedMemory(AgentMemory)` | the write of a memory |
+| `closeValidityWindow(int $targetId, int $successorId, DateTime $validTo, ?DateTime $invalidatedAt)`, `invalidateMemory(int $memoryId)` | close a row for its successor; forget a memory |
+| `find(int $memoryId)` | one memory by id, under the caller's rights |
+| `getEmbeddingRepairTargets()` | the tables the embedding repair covers |
+| `getColumnsNotPurgedByEvalPurge()` | `table.column` => reason for the evaluation purge |
+
+Details: the context skill, reference "Memories and standing directives", section 8.
 
 ## Environment of the package test kernel (`tests/Support/kernel`)
 

@@ -12,6 +12,7 @@ use DDD\Domain\AI\Entities\Evals\AgentEvalSuiteSchedule;
 use DDD\Domain\AI\Entities\Evals\AgentEvalSuiteTask;
 use DDD\Domain\AI\Entities\Evals\AgentEvalSuiteTasks;
 use DDD\Domain\AI\Services\Eval\AgentEvalSuitePlanService;
+use DDD\Domain\AI\Entities\Skills\AISkill;
 use DDD\Infrastructure\Libs\Config;
 use DDD\Infrastructure\Services\DDDService;
 use DDD\Tests\Agents\Support\IntegrationTestCase;
@@ -26,6 +27,9 @@ class AgentEvalSuitePlanServiceCommandSupportTest extends IntegrationTestCase
 {
     /** @var array<string, mixed>|null The config values before the test */
     protected ?array $configTreeBefore = null;
+
+    /** @var mixed The skill binding before the test */
+    protected mixed $packageClassesBySkillNameBefore = null;
 
     /** @var string A temporary folder of fixtures */
     protected string $fixtureDirectory = '';
@@ -42,10 +46,15 @@ class AgentEvalSuitePlanServiceCommandSupportTest extends IntegrationTestCase
             ['id' => 'catalog.other', 'prompt' => 'other', 'expect' => ['tool' => 'listItems']],
         ]]));
         file_put_contents($this->fixtureDirectory . '/selection.json', (string)json_encode(['cases' => []]));
+        // the skills the fixtures name are registered, as in a host that binds them
+        $bindingMemo = new ReflectionProperty(AISkill::class, 'packageClassesBySkillName');
+        $this->packageClassesBySkillNameBefore = $bindingMemo->getValue();
+        $bindingMemo->setValue(null, ['Catalog' => [], 'Catalog.Search' => [], 'Catalog.Items' => []]);
     }
 
     protected function onTearDown(): void
     {
+        (new ReflectionProperty(AISkill::class, 'packageClassesBySkillName'))->setValue(null, $this->packageClassesBySkillNameBefore);
         (new ReflectionProperty(Config::class, 'configTree'))->setValue(null, $this->configTreeBefore ?? []);
         foreach ([$this->fixtureDirectory . '/Catalog/Catalog.Items.json', $this->fixtureDirectory . '/selection.json'] as $fixtureFile) {
             @unlink($fixtureFile);

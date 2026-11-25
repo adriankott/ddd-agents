@@ -56,6 +56,7 @@ real list of strings (`AISkillFilesLintService::SKILL_FRONTMATTER_LIST_KEYS`).
 | `requiresVisionCapabilities` | bool | `load_skills` refuses it on a model without `AIModel::$hasVisionCapabilities` | load, preload |
 | `isSubSkill` | bool | Not in the general catalog; offered only while a root that lists it is loaded | offer, load |
 | `subSkillNames` | list | The root's edges: the sub-skills its loaded block lists. The lint checks that each name resolves to a file | offer, loaded block |
+| `subSkillOf` | string or list | The sub-skill names its root itself (`subSkillOf: 'Agent.Web.Search'`): it is a sub-skill (no `isSubSkill` needed), and each named root lists it beside its own `subSkillNames` when both are registered in `AI.skillPackages` — no copy of the root's file. The lint reports a name of the skill itself, a root without a file and `isSubSkill: false` beside it | offer, loaded block |
 | `onlyUnderPurposeNames` | list | Offered, loadable and preloaded only inside a conversation of one of these purposes | offer, load, preload |
 | `notUnderPurposeNames` | list | Never offered, loaded or preloaded under these purposes, also not in a delegation child whose tree root has one | offer, load, preload |
 | `onlyOnInitiatorTypes` | list | Offered only in a conversation of this initiator type, e.g. `PHONE_CALL`, and preloaded there from the first turn | offer, load, preload |

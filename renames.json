@@ -1,0 +1,474 @@
+{
+    "$schema": "https://raw.githubusercontent.com/ddd-framework/ddd/main/tools/Renames/renames.schema.json",
+    "format": 1,
+    "package": "mgamadeus/ddd-agents",
+    "renames": [
+        {
+            "version": "0.3.0",
+            "kind": "skillName",
+            "old": "Assistant.Mandates",
+            "new": "Agent.Mandates"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "skillName",
+            "old": "Assistant.Tasks",
+            "new": "Agent.Tasks"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "skillName",
+            "old": "Assistant.TaskRunReports",
+            "new": "Agent.TaskRunReports"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "skillName",
+            "old": "Assistant.Settings",
+            "new": "Agent.Settings"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "skillName",
+            "old": "Assistant.Budget",
+            "new": "Agent.Budget"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "skillName",
+            "old": "Memory.Management",
+            "new": "Agent.Memory"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "skillName",
+            "old": "Web.Search",
+            "new": "Agent.Web.Search"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "skillName",
+            "old": "Web.Images",
+            "new": "Agent.Web.Images"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "skillName",
+            "old": "Communication.Messages",
+            "new": "Agent.Communication.Messages"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "skillName",
+            "old": "Communication.VoiceCalls",
+            "new": "Agent.Communication.VoiceCalls"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "skillName",
+            "old": "Web.PageView",
+            "new": "Agent.Web.Pages",
+            "note": "the page tools moved to mgamadeus/ddd-agent-browser; install it and bind its skill"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "constant",
+            "old": "DDD\\Domain\\AI\\Entities\\Skills\\AISkill::ASSISTANT_MANDATES",
+            "new": "DDD\\Domain\\AI\\Entities\\Skills\\AISkill::AGENT_MANDATES"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "constant",
+            "old": "DDD\\Domain\\AI\\Entities\\Skills\\AISkill::ASSISTANT_TASKS",
+            "new": "DDD\\Domain\\AI\\Entities\\Skills\\AISkill::AGENT_TASKS"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "constant",
+            "old": "DDD\\Domain\\AI\\Entities\\Skills\\AISkill::ASSISTANT_TASK_RUN_REPORTS",
+            "new": "DDD\\Domain\\AI\\Entities\\Skills\\AISkill::AGENT_TASK_RUN_REPORTS"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "constant",
+            "old": "DDD\\Domain\\AI\\Entities\\Skills\\AISkill::ASSISTANT_SETTINGS",
+            "new": "DDD\\Domain\\AI\\Entities\\Skills\\AISkill::AGENT_SETTINGS"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "constant",
+            "old": "DDD\\Domain\\AI\\Entities\\Skills\\AISkill::ASSISTANT_BUDGET",
+            "new": "DDD\\Domain\\AI\\Entities\\Skills\\AISkill::AGENT_BUDGET"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "constant",
+            "old": "DDD\\Domain\\AI\\Entities\\Skills\\AISkill::MEMORY_MANAGEMENT",
+            "new": "DDD\\Domain\\AI\\Entities\\Skills\\AISkill::AGENT_MEMORY"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "constant",
+            "old": "DDD\\Domain\\AI\\Entities\\Skills\\AISkill::WEB_SEARCH",
+            "new": "DDD\\Domain\\AI\\Entities\\Skills\\AISkill::AGENT_WEB_SEARCH"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "constant",
+            "old": "DDD\\Domain\\AI\\Entities\\Skills\\AISkill::WEB_IMAGES",
+            "new": "DDD\\Domain\\AI\\Entities\\Skills\\AISkill::AGENT_WEB_IMAGES"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "constant",
+            "old": "DDD\\Domain\\AI\\Entities\\Skills\\AISkill::COMMUNICATION_MESSAGES",
+            "new": "DDD\\Domain\\AI\\Entities\\Skills\\AISkill::AGENT_COMMUNICATION_MESSAGES"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "constant",
+            "old": "DDD\\Domain\\AI\\Entities\\Skills\\AISkill::COMMUNICATION_VOICE_CALLS",
+            "new": "DDD\\Domain\\AI\\Entities\\Skills\\AISkill::AGENT_COMMUNICATION_VOICE_CALLS"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "namespace",
+            "old": "DDD\\Presentation\\Mcp\\Client\\AI",
+            "new": "DDD\\Presentation\\Mcp\\Client\\Agents",
+            "note": "class names unchanged; same-path overrides move with them"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "namespace",
+            "old": "DDD\\Presentation\\Mcp\\Agent",
+            "new": "DDD\\Presentation\\Mcp\\Agents",
+            "note": "class names unchanged; same-path overrides move with them"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "packageId",
+            "old": "agent.taskSchedules",
+            "new": "agent.tasks"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "packageId",
+            "old": "agent.memories",
+            "new": "agent.memory"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "packageId",
+            "old": "agent.webSearch",
+            "new": "agent.web.search"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-agent:activity-lines",
+            "new": "app:agent:activity-lines",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-agent:cache-diff",
+            "new": "app:agent:cache-diff",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-agent:chat-tui",
+            "new": "app:agent:chat-tui",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-agent:client-tools:purge",
+            "new": "app:agent:purge-client-tool-requests",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-agent:compact",
+            "new": "app:agent:compact",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-agent:context-eviction-sim",
+            "new": "app:agent:context-eviction-sim",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-agent:decision-fixtures",
+            "new": "app:agent:decision-fixtures",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-agent:decision-stats",
+            "new": "app:agent:decision-stats",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-agent:diagnose",
+            "new": "app:agent:diagnose",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-agent:eval-analyze",
+            "new": "app:agent:eval-analyze",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-agent:eval-compaction-tree",
+            "new": "app:agent:eval-compaction-tree",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-agent:eval-conversations-purge",
+            "new": "app:agent:eval-conversations-purge",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-agent:eval-eviction",
+            "new": "app:agent:eval-eviction",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-agent:eval-guard",
+            "new": "app:agent:eval-guard",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-agent:eval-recall",
+            "new": "app:agent:eval-recall",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-agent:eval-schedule-runs",
+            "new": "app:agent:eval-schedule-runs",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-agent:eval-selection",
+            "new": "app:agent:eval-selection",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-agent:eval-suite",
+            "new": "app:agent:eval-suite",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-agent:eval-tiers",
+            "new": "app:agent:eval-tiers",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-agent:eval-tools",
+            "new": "app:agent:eval-tools",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-agent:execute-tool-call",
+            "new": "app:agent:execute-tool-call",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-agent:inspect",
+            "new": "app:agent:inspect",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-agent:jev-probe",
+            "new": "app:agent:jev-probe",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-agent:loaded-capabilities-compact",
+            "new": "app:agent:loaded-capabilities-compact",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-agent:probe-reasoning-replay",
+            "new": "app:agent:probe-reasoning-replay",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-agent:reap",
+            "new": "app:agent:reap",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-agent:request-snapshot-debug-payloads-strip",
+            "new": "app:agent:request-snapshot-debug-payloads-strip",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-agent:run-report",
+            "new": "app:agent:run-report",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-agent:skill-token-map",
+            "new": "app:agent:skill-token-map",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-agent:tool-response-stats",
+            "new": "app:agent:tool-response-stats",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-agent:trace-events-purge",
+            "new": "app:agent:trace-events-purge",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-agent:turn-events-purge",
+            "new": "app:agent:turn-events-purge",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-agent:validate-conversation",
+            "new": "app:agent:validate-conversation",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-conversation:backfill-environment",
+            "new": "app:agent:backfill-conversation-environment",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-conversation:backfill-message-embeddings",
+            "new": "app:agent:backfill-message-embeddings",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-conversation:compact-finalized",
+            "new": "app:agent:compact-finalized-conversations",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-conversation:deliver-owed-reports-and-resume-owed-turns",
+            "new": "app:agent:deliver-owed-reports-and-resume-owed-turns",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-conversation:fire-due-schedules",
+            "new": "app:agent:fire-due-schedules",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-conversation:mark-finalized",
+            "new": "app:agent:mark-finalized-conversations",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-conversation:repair-zero-embeddings",
+            "new": "app:agent:repair-zero-embeddings",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-conversation:scorecards",
+            "new": "app:agent:conversation-scorecards",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-conversation:search-inspect",
+            "new": "app:agent:conversation-search-inspect",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai-schedule:close-for-inactive-agent-spaces",
+            "new": "app:agent:close-schedules-for-inactive-agent-spaces",
+            "note": "the old name stays an alias"
+        },
+        {
+            "version": "0.3.0",
+            "kind": "consoleCommand",
+            "old": "app:ai:composed-view:export-node-schema",
+            "new": "app:agent:export-composed-view-node-schema",
+            "note": "the old name stays an alias"
+        }
+    ]
+}

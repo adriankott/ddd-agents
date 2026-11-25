@@ -14,6 +14,7 @@ use DDD\Domain\AI\Entities\Evals\AgentEvalSuiteDefinitions;
 use DDD\Domain\AI\Entities\Evals\AgentEvalSuitePlanOptions;
 use DDD\Domain\AI\Entities\Evals\AgentEvalSuiteTask;
 use DDD\Domain\AI\Entities\Evals\AgentEvalSuiteTasks;
+use DDD\Domain\AI\Entities\Skills\AISkill;
 use DDD\Infrastructure\Libs\Config;
 use DDD\Infrastructure\Services\DDDService;
 use DDD\Infrastructure\Services\Service;
@@ -237,7 +238,8 @@ class AgentEvalSuitePlanService extends Service
 
     /**
      * The tasks of tools-style fixtures for every model × flavor × fixture × case, in that order. A fixture is skipped
-     * when the skill filter names neither its skill nor its file name; a case when the case filter does not name it,
+     * when the skill filter names neither its skill nor its file name, or when the skill it names is not registered
+     * ({@see isSkillOfFixtureRegistered()}); a case when the case filter does not name it,
      * when its flow exists only on the job queue (unless such cases are planned), when it requires vision on a model
      * that cannot see, or when it has no scope.
      */
@@ -247,7 +249,8 @@ class AgentEvalSuitePlanService extends Service
         foreach ($agentEvalSuitePlanOptions->modelNames as $modelName) {
             foreach ($agentEvalSuitePlanOptions->flavors as $flavor) {
                 foreach ($agentEvalFixtures->getElements() as $agentEvalFixture) {
-                    if (!$agentEvalFixture->hasCases() || !$agentEvalSuitePlanOptions->matchesSkillFilter($agentEvalFixture)) {
+                    if (!$agentEvalFixture->hasCases() || !$agentEvalSuitePlanOptions->matchesSkillFilter($agentEvalFixture)
+                        || !$this->isSkillOfFixtureRegistered($agentEvalFixture)) {
                         continue;
                     }
                     foreach ($agentEvalFixture->getCases()->getElements() as $agentEvalCase) {
@@ -260,6 +263,23 @@ class AgentEvalSuitePlanService extends Service
             }
         }
         return $agentEvalSuiteTasks;
+    }
+
+    /**
+     * Whether the skill a fixture names in its `skill` field is registered in the application's binding
+     * (`AI.skillPackages`). A fixture named by its file only, and a host without a readable binding, count as
+     * registered: only a named skill the host does not bind skips the fixture's cases (`SKIP … skill not registered`).
+     */
+    public function isSkillOfFixtureRegistered(AgentEvalFixture $agentEvalFixture): bool
+    {
+        if (!$agentEvalFixture->declaresSkillName()) {
+            return true;
+        }
+        try {
+            return in_array($agentEvalFixture->getSkillName(), AISkill::getAllSkillNames(), true);
+        } catch (\LogicException) {
+            return true;
+        }
     }
 
     /** The task of one tools-style case on one model in one flavor; null when the case is not planned there. */

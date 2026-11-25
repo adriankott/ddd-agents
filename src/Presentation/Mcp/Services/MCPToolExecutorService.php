@@ -11,6 +11,7 @@ use DDD\Domain\Base\Repo\Argus\Utils\ArgusApiOperations;
 use DDD\Domain\AI\Entities\AgentSpaces\AgentSpace;
 use DDD\Domain\AI\Entities\MCPPackages\MCPEmptyStringIsValue;
 use DDD\Domain\AI\Entities\MCPPackages\MCPRequiresAdminWithAccessToAllResources;
+use DDD\Domain\AI\Entities\AgentSpaces\AgentSpaceToolArgument;
 use DDD\Domain\AI\Entities\Conversations\Agent\AgentToolCallProvenance;
 use DDD\Domain\AI\Services\AgentSpaces\AgentSpacesService;
 use DDD\Domain\Common\Entities\Accounts\Account;
@@ -20,6 +21,7 @@ use DDD\Domain\AI\Services\Conversations\Agent\OwnerConsentsService;
 use DDD\Domain\AI\Services\Conversations\Agent\AgentToolCallImageStoreService;
 use DDD\Domain\AI\Entities\MCPPackages\MCPServerProvidedInput;
 use DDD\Domain\AI\Entities\MCPPackages\MCPTool;
+use DDD\Domain\AI\Entities\MCPPackages\MCPToolOverlays;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolSummary;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolEntitlement;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolRequiresMandate;
@@ -856,6 +858,7 @@ class MCPToolExecutorService extends Service
                 } catch (ForbiddenException) {
                     return MCPToolResponse::finalRefusal($this->buildAgentSpaceNotUsableRefusalText($toolName));
                 }
+                $arguments = $this->applyResolvedAgentSpaceToRenamedSpaceArgument($arguments, $targetAgentSpace);
 
                 // THE HARD ENTITLEMENT GATE. The offer side filters a gated tool out of the turn
                 // payload, but only the agent loop sees that filtered offer — the HTTP MCP server and
@@ -1427,7 +1430,8 @@ class MCPToolExecutorService extends Service
         $actionClassDescription = AgentMandate::getActionClassDescription($actionClass);
         // the platform's check of a ONE_INSTRUCTION judges THIS call: the tool's summary says what it does
         $toolSummaryAttributes = $reflectionMethod->getAttributes(MCPToolSummary::class);
-        $toolSummary = $toolSummaryAttributes !== [] ? $toolSummaryAttributes[0]->newInstance()->summary : null;
+        $toolSummary = MCPToolOverlays::getApplicationOverlays()->findOverlayOfTool($toolName)?->summary
+            ?? ($toolSummaryAttributes !== [] ? $toolSummaryAttributes[0]->newInstance()->summary : null);
         $authAccountId = AuthService::instance()->getAccount()?->id;
         if ($authAccountId === null) {
             return MCPToolResponse::finalRefusal(
@@ -1955,6 +1959,30 @@ class MCPToolExecutorService extends Service
     }
 
     /**
+     * Under an application's name of the space argument (`AI.agentSpaceToolArgument`, {@see AgentSpaceToolArgument}):
+     * a call that passed that argument gets the DTO property `agentSpaceId` set to the space it resolved to (or left
+     * out without one), so every request DTO reads the same target as the gates. Without a renamed argument, or when
+     * the call did not pass it, the arguments stay as they are.
+     *
+     * @param array<array-key, mixed> $arguments
+     * @param AgentSpace|null $targetAgentSpace
+     * @return array<array-key, mixed>
+     */
+    protected function applyResolvedAgentSpaceToRenamedSpaceArgument(array $arguments, ?AgentSpace $targetAgentSpace): array
+    {
+        $agentSpaceToolArgument = AgentSpaceToolArgument::current();
+        if (!$agentSpaceToolArgument->isRenamed() || !array_key_exists($agentSpaceToolArgument->name, $arguments)) {
+            return $arguments;
+        }
+        if ($targetAgentSpace !== null && isset($targetAgentSpace->id)) {
+            $arguments[AgentSpaceToolArgument::DTO_PROPERTY_NAME] = (int)$targetAgentSpace->id;
+        } else {
+            unset($arguments[AgentSpaceToolArgument::DTO_PROPERTY_NAME]);
+        }
+        return $arguments;
+    }
+
+    /**
      * The refusal for a tool the caller is not entitled to run, or null when the call may proceed.
      *
      * A refusal, never an exception: the agent reads it as a deterministic corrective and stops, the HTTP and CLI
@@ -2283,7 +2311,7 @@ class MCPToolExecutorService extends Service
         // the authenticated account's rights (the host: plain `->` on the lazy `settings` — the load is wanted here)
         /** @var AIConversationEntitlementsService $aIConversationEntitlementsService */
         $aIConversationEntitlementsService = DDDService::instance()->getService(AIConversationEntitlementsService::class);
-        $accountRightsSetting = $aIConversationEntitlementsService->findAccountRightsOfCurrentAccount();
+        $accountRightsSetting = $aIConversationEntitlementsService->findComposedAccountRightsOfCurrentAccount();
         if ($accountRightsSetting === null) {
             return MCPToolResponse::finalRefusal(
                 "Tool '{$toolName}' requires the account rights {$requiredAccountRightNames}, and no account rights "
@@ -2391,7 +2419,12 @@ class MCPToolExecutorService extends Service
             // branches (the carrier is a ValueObject that may match those). Inject the passed instance when it matches
             // the declared type; otherwise an empty instance (the HTTP-MCP path provides nothing → null fields).
             if (is_a($className, MCPServerProvidedInput::class, true)) {
-                $params[] = ($serverProvidedInput instanceof $className) ? $serverProvidedInput : new $className();
+                $providedInput = ($serverProvidedInput instanceof $className) ? $serverProvidedInput : new $className();
+                if ($providedInput instanceof AgentToolCallProvenance) {
+                    // the call's arguments for the tool's own resolvers (an argument no DTO declares included)
+                    $providedInput->toolArguments = $data;
+                }
+                $params[] = $providedInput;
                 continue;
             }
 

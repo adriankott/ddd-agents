@@ -29,7 +29,18 @@ rights (`scheduleAgentTasks`, `useAgentMemory`, `useWeb`, `useUI`, `useDrive`) t
 rights as constants (`AgentAccountRights` here, the drive's rights class in ddd-clouddrive), carries them on its package class
 (`#[MCPRequiresAccountRights]`) and names them in its skill's `requiredAccountRights`; a host maps them to its roles
 (its own `config/app/AI/accountRights.php`, replaced whole) or answers them with its own `AgentAccountRightsInterface`
-(`findAccountRightsOfConversation()`, `findAccountRightsOfCurrentAccount()`). Null on an axis means that axis does not restrict. A host gates by putting a
+(`findAccountRightsOfConversation()`, `findAccountRightsOfCurrentAccount()`). Null on an axis means that axis does not restrict.
+
+**Composed rights.** The package checks a host's own rights object composed with the mapping
+(`AgentComposedAccountRights`, built by `AIConversationEntitlementsService::findComposedAccountRightsOfConversation()` /
+`findComposedAccountRightsOfCurrentAccount()`): per right name, a host object that implements
+`AgentAccountRightsAnsweringInterface` and answers the name decides alone (held or not); otherwise the right is held
+when the host object holds it OR the mapping holds it. So a host object that knows only its own right names leaves the
+package rights to `AI.accountRights`. A mapping entry is a role list (`'*'` = every account) or a delegation
+`['right' => '<host right>']`, which asks the host object for that right. A right the host withholds is left out of
+its own mapping or answered through the interface. `AgentDeclaredAccountRightsService::getDeclaredAccountRightNames()`
+lists every right the installed packages declare (their `*AccountRights::RIGHTS` lists and the rights on their
+packages and tools) — what a host's guard test and `app:agent:check-installation` hold the mapping against. A host gates by putting a
 same-path subclass of the service under its root namespace; how is the entry skill's (`ddd-module-agents-specialist`,
 override points). Consequences: without that subclass every flag gate is inert, a right gate follows the role mapping
 (a host right the mapping does not name is not held), and `requiresAccountBillingAccess` drops a skill only when the host answers false, not when it answers null.
@@ -43,7 +54,10 @@ override points). Consequences: without that subclass every flag gate is inert, 
   `MCPToolEntitlement`). The skill stays loaded, the tool leaves the wire and the tools line, and the executor refuses
   it on every path. The attributes belong to `ddd-module-agents-tools-specialist`.
 - Rule of thumb: the skill carries the one gate every tool of it needs; a tool carries only a gate of its own (a
-  write, a metered action).
+  write, a metered action). `Agent.Tasks` names no right: its reads are for every account, its writing tools require
+  `scheduleAgentTasks` each.
+- A host changes a tool's right by tool NAME in `config/app/AI/toolOverlays.php` (`'accountRights' => [...]`, `[]` =
+  no right); the overlay replaces what the method and class attributes say (tools skill, tool overlays).
 
 ## The overlays
 

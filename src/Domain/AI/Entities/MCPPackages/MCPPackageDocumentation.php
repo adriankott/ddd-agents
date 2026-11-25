@@ -84,7 +84,7 @@ class MCPPackageDocumentation extends ValueObject
         if (!is_a($className, MCPPackage::class, true)) {
             throw new BadRequestException('Class name for MCP Package documentation has to inherit MCPPackage');
         }
-        $memoKey = $className . '|' . (int)$includeOutputSchema . '|' . (int)$addObjectsToDef;
+        $memoKey = $className . '|' . (int)$includeOutputSchema . '|' . (int)$addObjectsToDef . '|' . MCPToolOverlays::getSchemaConfigurationFingerprint();
         if (isset(self::$documentationByClass[$memoKey])) {
             return self::$documentationByClass[$memoKey];
         }

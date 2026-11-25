@@ -43,6 +43,10 @@ use Symfony\Component\Validator\Constraints\NotNull;
  * At most one CURRENT row per scope and content: the unique index on the generated column
  * {@see $currentDedupKey} (the scope and the content hash while the row is current, NULL afterwards).
  *
+ * The carrier of the memory port ({@see AgentMemoryStoreService}): a host whose memories live in rows of its own fills
+ * it from those rows — `id` = the host row's id, `accountId` / `agentSpaceId` the scope, `memoryType`, `content`,
+ * `validFrom` / `validTo` the validity — and is never written through the package's table.
+ *
  * @property AgentMemories $parent
  * @method AgentMemories getParent()
  * @method static AgentMemoryStoreService getService()

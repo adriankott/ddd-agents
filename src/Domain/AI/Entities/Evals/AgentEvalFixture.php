@@ -52,6 +52,12 @@ class AgentEvalFixture extends ValueObject
         return basename($this->fixturePath, '.json');
     }
 
+    /** Whether the fixture names its skill in a `skill` field (not only by its file name). */
+    public function declaresSkillName(): bool
+    {
+        return trim((string)($this->fixtureFields['skill'] ?? '')) !== '';
+    }
+
     /** `skill`: the skill the fixture's cases are about; the file name when the fixture names none. */
     public function getSkillName(): string
     {

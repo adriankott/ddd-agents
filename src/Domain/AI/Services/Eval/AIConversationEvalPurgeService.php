@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace DDD\Domain\AI\Services\Eval;
 
 use DDD\Domain\AI\Entities\Evals\ConversationPurge\AIConversationEvalPurgeKeys;
-use DDD\Domain\AI\Repo\DB\Conversations\Memories\DBAgentMemoryModel;
 use DDD\Domain\AI\Entities\Evals\ConversationPurge\AIConversationEvalPurgeReport;
 use DDD\Domain\AI\Entities\Evals\ConversationPurge\AIConversationEvalPurgeSettings;
 use DDD\Domain\AI\Entities\Evals\ConversationPurge\AIConversationEvalPurgeStep;
@@ -29,6 +28,7 @@ use DDD\Domain\AI\Repo\DB\Evals\SuiteRuns\AgentEvalSuiteCases\DBAgentEvalSuiteCa
 use DDD\Domain\AI\Repo\DB\Mandates\DBAgentMandateModel;
 use DDD\Domain\AI\Services\Conversations\Agent\AgentEvalAccountsService;
 use DDD\Domain\AI\Services\Conversations\AIConversationMessagesService;
+use DDD\Domain\AI\Services\Conversations\Memories\AgentMemoryStoreService;
 use DDD\Domain\Base\Repo\DB\Dialect\Json\JsonPath;
 use DDD\Domain\Base\Repo\DB\Dialect\SqlDialect;
 use DDD\Domain\Base\Repo\DB\Doctrine\EntityManagerFactory;
@@ -191,7 +191,8 @@ class AIConversationEvalPurgeService extends Service
 
     /**
      * Columns pointing at a conversation or its rows that are deliberately NOT a purge step, with the reason. An
-     * application adds the columns of its own tables (`array_merge` with the parent's).
+     * application adds the columns of its own tables (`array_merge` with the parent's). The memory columns come from the
+     * memory store ({@see AgentMemoryStoreService::getColumnsNotPurgedByEvalPurge()}): a host store names its own.
      *
      * @return string[] `table.column` → why it is not a step
      */
@@ -201,6 +202,7 @@ class AIConversationEvalPurgeService extends Service
         $messageTableName = (string)DBAIConversationMessageModel::getTableName();
         $toolCallBatchTableName = (string)DBAIConversationToolCallBatchModel::getTableName();
         return [
+            ...$this->getAgentMemoryStoreService()->getColumnsNotPurgedByEvalPurge(),
             "{$conversationTableName}.rootConversationId" => 'inside the tree: the tree expansion follows it',
             "{$conversationTableName}.supervisedConversationId" => 'inside the tree: the tree expansion follows it',
             "{$conversationTableName}.delegatedFromMessageId" => 'inside the tree: the child conversation goes with it',
@@ -212,7 +214,6 @@ class AIConversationEvalPurgeService extends Service
             "{$toolCallBatchTableName}.sourceUserMessageId" => 'the batch goes with its conversation',
             DBAIConversationDelegationBatchModel::getTableName() . '.spawnedByMessageId' => 'the batch goes with its parent conversation',
             DBAIConversationTraceEventModel::getTableName() . '.agentVoiceCallId' => 'the trace event goes with its conversation',
-            DBAgentMemoryModel::getTableName() . '.sourceMessageId' => 'a plain number recording where a memory was said; an evaluation run is never curated into memories, and a memory outlives its message',
             DBAgentEvalSuiteCaseModel::getTableName() . '.aiConversationId' => 'the stored case of a suite run keeps the id of the conversation it ran as a plain number; the record outlives the conversation',
         ];
     }
@@ -1101,5 +1102,13 @@ class AIConversationEvalPurgeService extends Service
     protected function buildStringLiteral(string $text): string
     {
         return "'" . str_replace("'", "''", $text) . "'";
+    }
+
+    /** The memory store, the host port that names the memory columns ({@see getColumnsNotPurged()}). */
+    protected function getAgentMemoryStoreService(): AgentMemoryStoreService
+    {
+        /** @var AgentMemoryStoreService $agentMemoryStoreService */
+        $agentMemoryStoreService = DDDService::instance()->getService(AgentMemoryStoreService::class);
+        return $agentMemoryStoreService;
     }
 }

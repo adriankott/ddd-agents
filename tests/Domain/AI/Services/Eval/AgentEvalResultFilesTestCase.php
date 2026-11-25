@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DDD\Tests\Agents\Domain\AI\Services\Eval;
 
 use DDD\Domain\AI\Services\Eval\AgentEvalResultFilesService;
+use DDD\Domain\AI\Entities\Skills\AISkill;
 use DDD\Infrastructure\Libs\Config;
 use DDD\Infrastructure\Services\DDDService;
 use DDD\Tests\Agents\Support\IntegrationTestCase;
@@ -29,6 +30,9 @@ abstract class AgentEvalResultFilesTestCase extends IntegrationTestCase
     /** @var array<string, mixed>|null the config values read so far, restored after every test */
     protected ?array $configTreeBefore = null;
 
+    /** @var mixed The skill binding before the test */
+    protected mixed $packageClassesBySkillNameBefore = null;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -39,10 +43,15 @@ abstract class AgentEvalResultFilesTestCase extends IntegrationTestCase
         $configTree = new ReflectionProperty(Config::class, 'configTree');
         $this->configTreeBefore = $configTree->isInitialized() ? (array)$configTree->getValue() : null;
         $this->setResultsDirectoryConfigValue($this->resultsDirectory);
+        // the skills the fixtures name are registered, as in a host that binds them
+        $bindingMemo = new ReflectionProperty(AISkill::class, 'packageClassesBySkillName');
+        $this->packageClassesBySkillNameBefore = $bindingMemo->getValue();
+        $bindingMemo->setValue(null, ['Catalog' => [], 'Catalog.Search' => [], 'Catalog.Items' => []]);
     }
 
     protected function onTearDown(): void
     {
+        (new ReflectionProperty(AISkill::class, 'packageClassesBySkillName'))->setValue(null, $this->packageClassesBySkillNameBefore);
         (new ReflectionProperty(Config::class, 'configTree'))->setValue(null, $this->configTreeBefore ?? []);
         if ($this->temporaryDirectory !== '' && is_dir($this->temporaryDirectory)) {
             $this->removeTemporaryEntry($this->temporaryDirectory);

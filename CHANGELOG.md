@@ -1,5 +1,100 @@
 # Changelog
 
+## 0.4.0
+
+Host adaptability: a host adapts the package through config and small overrides, never by copying package code or
+changing tables. Requires `mgamadeus/ddd` ^3.44.3.
+
+**Changed defaults (read before updating):**
+
+- **Rights are composed.** A host that answers rights with its own `AgentAccountRightsInterface` object no longer
+  loses every package right it does not know: per right, the host object's "held" counts, else the mapping
+  `AI.accountRights` decides (roles, `'*'`, or the new delegation `['right' => '<host right>']`). Before, every right
+  the host object did not hold was missing. A host object that implements the new
+  `AgentAccountRightsAnsweringInterface` decides the names it answers alone (also "not held").
+- **Task tools gated per tool.** `AgentTaskSchedulesMCPPackage` carries no class-wide right any more. The tools that
+  create or change a schedule — `startBackgroundTask` (spends budget at once), `scheduleOneTimeTask`,
+  `createRecurringTaskSchedule`, `updateTaskSchedule`, `pauseTaskSchedule`, `resumeTaskSchedule`,
+  `deleteTaskSchedule` — require `scheduleAgentTasks`; `getTaskSchedules`, `getTaskRuns`, `getTaskRunReport` require
+  none. The skill file `Agent/Tasks.md` names no right: an account without `scheduleAgentTasks` now gets the skill and
+  its reads.
+- **Task reads of a space.** An account that may use a space reads that space's schedules and runs, also those that
+  run as another account (the reads run without entity read rights, bounded by the scope filter).
+- **Memory.** `AI.agentMemory.enabled` means memory on; every memory read and write goes through
+  `AgentMemoryStoreService`.
+
+**New:**
+
+- **Composed rights** (`AgentComposedAccountRights`, `AIConversationEntitlementsService::findComposedAccountRightsOfConversation()`,
+  `findComposedAccountRightsOfCurrentAccount()`) at every check (tool offer and executor refusal, conversation rights,
+  client tool rows). **Declared rights:** `AgentDeclaredAccountRightsService::getDeclaredAccountRightNames()` lists
+  every right the installed packages declare (their `*AccountRights::RIGHTS` lists and the rights on their packages
+  and tools) — for a host guard test "every package right is answered or mapped".
+- **Tool overlays by name** (`config/app/AI/toolOverlays.php`, `AI.toolOverlays`; `MCPToolOverlays`): per tool name
+  `accountRights` (replaces the attributes, `[]` = none), `description`, `summary`, `parameters` (parameter
+  descriptions), `ownerFacingSubject`. Read where the schema, the entitlement, the mandate summary and the run report
+  are built; the documentation caches follow the overlay's fingerprint. Unknown keys and unknown tool names are reported
+  by `app:agent:check-installation`.
+- **The space argument by the host's name** (`config/app/AI/agentSpaceToolArgument.php`, `AgentSpaceToolArgument`):
+  `name` and `description` of `agentSpaceId` on the wire. Schemas carry the name, the resolver reads it first,
+  `findAgentSpaceOfToolCall()` receives the whole tool arguments (`AgentToolCallProvenance::$toolArguments`).
+- **Task tools:** the task list widget from config (`config/app/AI/agentTasks.php`, `taskListWidgetType`; else
+  `TASK_LIST_WIDGET_TYPE`), its field the host's self-hydration key field (`WidgetBlockFieldNames::getWidgetSelfHydrationKeyFieldName()`,
+  `AgentSpace::getWidgetSelfHydrationKey()`) instead of a fixed `agentSpaceId`; on a phone line a note to read at most
+  three tasks aloud (`composeTaskListPhoneNote()`); `updateTaskSchedule` of a schedule stored without a zone stores the
+  zone `AgentSpacesService::findTimezoneForNewSchedule()` answers (UTC only when null); `findScheduleAlreadyProducedByCall()`
+  (protected, default null) lets a host answer a retried `scheduleOneTimeTask` with the schedule it already produced;
+  protected reads of a scope (`isScopeReadWithoutEntityRights()`, `findSchedulesOfScope()`, `findRunConversationsOfScope()`,
+  their counts). The payer of scheduled runs is decided only in `ScheduleBudgetPotsService` (documented; the class
+  docblock said otherwise). Texts: `updateTaskSchedule` never rewrites a task the owner did not mention; a moved
+  moment asks the model again to verify it against the request.
+- **Memory is a host port:** `AgentMemoryStoreService` answers every memory read and write, plus
+  `getEmbeddingRepairTargets()` and `getColumnsNotPurgedByEvalPurge()` (new); the evaluation purge and the embedding
+  repair ask it. A host with memories in its own rows needs no package table (README, "Memory: the store is the host port").
+- **Console commands inherit their names.** `AgentConsoleCommand` gives a subclass without its own `#[AsCommand]` the
+  name, aliases and description of its nearest attributed ancestor (with Core 3.44.3 a host subclass replaces the
+  package command under all its names).
+- **`subSkillOf`** in skill frontmatter: a skill names the root skill(s) it is a sub-skill of; the root lists it
+  without editing the root file. Linted (`AISkillFilesLintService::findSubSkillOfProblems()`).
+- **Evaluation:** a case whose skill the host does not register is skipped (`SKIP <case> skill not registered (<skill>)`)
+  instead of failing.
+- **`app:agent:check-installation`** — see below.
+- **Renames as data:** `renames.json` at the package root lists the renames of 0.3.0 (skill names, `AISkill`
+  constants, the two MCP namespaces, package ids, the `app:ai-*` console names; the recorded chat harness name stays)
+  for Core's `vendor/bin/ddd-renames`. 0.4.0 renames nothing.
+
+**`app:agent:check-installation`** (read-only; `--format=json` prints `{ok, blocking, warnings, findings: [{checkName,
+severity, subject, message, hint}]}`; exit 1 on a BLOCKING finding, 2 on an unknown format, else 0). Checks:
+`skillBindings` (a binding names a missing class: BLOCKING), `unboundPackageSkills`, `rightsHeldByNobody` (a declared
+package right the mapping gives no account), `skillRights` (a bound package's class-wide right its effective skill file
+does not name), `toolOverlays` (unknown keys and tool names), `missingTables` (BLOCKING; the memory table only while
+the package store is on; one WARNING when the database does not answer), `renamedConfigKeys` (old keys of
+`renames.json` still set), `consoleCommands` (package command names the host does not resolve), `skillLint` (the
+naming and file lint; BLOCKING for an application skill file that fails it), `pendingRenames` (renames newer than
+`.ddd-renames.json`; points at `vendor/bin/ddd-renames`), and the feature checks `toolImageStore` (picture store
+without its object store) and `documentTools` (document tools without their binaries on PATH). A package adds a check
+by implementing `AgentInstallationCheckInterface` (service tag `ai.agent_installation_check`). Accepted findings and
+skipped checks: `config/app/AI/installationCheck.php`. A finding of an unreachable database carries the driver's
+message (it may name the database user and host).
+
+**What a host does:**
+
+1. Composer: `mgamadeus/ddd-agents` ^0.4.0 (`mgamadeus/ddd` ^3.44.3; ^3.45.0 for `vendor/bin/ddd-renames`).
+2. Run `vendor/bin/ddd-renames` (dry run), then `--apply`, and commit `.ddd-renames.json` — a host still on 0.2.x names
+   gets the 0.3.0 renames applied.
+3. Run `php bin/console app:agent:check-installation` and fix every blocking finding.
+4. Rights: delete wrappers that re-answered package rights in your own rights object — the mapping answers them now.
+   To withhold a package right, leave it out of your `config/app/AI/accountRights.php`, map it to a role, delegate it
+   (`['right' => '<your right>']`) or implement `AgentAccountRightsAnsweringInterface`.
+5. Task tools: an account without `scheduleAgentTasks` now reads tasks. To gate the reads too, set
+   `'getTaskSchedules' => ['accountRights' => ['scheduleAgentTasks']]` (and the two other reads) in
+   `config/app/AI/toolOverlays.php`. A host subclass that redeclared `MCPRequiresAccountRights` on the class may drop
+   it; one that chooses the task widget by subclass constant may move it to `agentTasks.php`.
+6. A host that renamed or redescribed package tools by subclass may move that to `toolOverlays.php`; a host whose space
+   is called otherwise on the wire sets `agentSpaceToolArgument.php`.
+7. Memory: hosts on the package table need nothing; a host with its own memory rows replaces the store
+   (`AgentMemoryStoreService`, same path) and switches `AI.agentMemory.enabled` on.
+
 ## 0.3.14
 
 Drive files open in the canvas. Web package only; no PHP change.

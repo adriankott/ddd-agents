@@ -79,7 +79,7 @@ same-path lookup: under `App\` at the mirrored path with no configuration, under
 
 | Symptom | Cause |
 |---|---|
-| A skill is never offered | not in the binding; a gate fails (`OfferedSkillCatalog::getRejectionStep()` names the step); `isSubSkill` without a loaded root listing it; `onlyUnderPurposeNames` / `onlyOnInitiatorTypes` |
+| A skill is never offered | not in the binding; a gate fails (`OfferedSkillCatalog::getRejectionStep()` names the step); `isSubSkill` without a loaded root listing it; `subSkillOf` naming a root that is not registered; `onlyUnderPurposeNames` / `onlyOnInitiatorTypes` |
 | "NOT loaded (…)" in a `load_skills` result | a load gate refused it; the sentence names which (`AISkillLoadRefusals`) |
 | `LogicException` about the skill binding at the first turn | the binding is missing, empty, or names an id no package declares |
 | A package id does not resolve in the host | an id resolves only for a package the source-root scan finds; a host under another root namespace binds by class (the scan and its override: `ddd-module-agents-specialist`) |

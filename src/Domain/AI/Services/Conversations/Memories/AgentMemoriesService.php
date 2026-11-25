@@ -6,13 +6,11 @@ namespace DDD\Domain\AI\Services\Conversations\Memories;
 
 use DDD\Domain\AI\Entities\AgentSpaces\AgentSpace;
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
-use DDD\Domain\AI\Entities\Conversations\Memories\AgentEmbeddingRepairTarget;
 use DDD\Domain\AI\Entities\Conversations\Memories\AgentEmbeddingRepairTargets;
 use DDD\Domain\AI\Entities\Conversations\Memories\AgentMemory;
 use DDD\Domain\AI\Entities\Conversations\Memories\AgentMemoryHit;
 use DDD\Domain\AI\Entities\Conversations\Memories\AgentMemoryHits;
 use DDD\Domain\AI\Entities\Conversations\Memories\AgentStandingDirectives;
-use DDD\Domain\AI\Repo\DB\Conversations\Memories\DBAgentMemoryModel;
 use DDD\Infrastructure\Exceptions\BadRequestException;
 use DDD\Infrastructure\Exceptions\InternalErrorException;
 use DDD\Infrastructure\Libs\Config;
@@ -23,15 +21,17 @@ use ReflectionException;
 
 /**
  * What the agent core asks of the durable memory (the owner's standing directives, curated facts and solutions): the
- * directives of a scope, the curation after a turn, a similarity search, and the memory table the embedding repair
+ * directives of a scope, the curation after a turn, a similarity search, and the memory tables the embedding repair
  * covers. The core resolves this service only through `DDDService::instance()->getService(AgentMemoriesService::class)`.
  *
- * Two ways to answer:
- * - the package's memory store ({@see AgentMemoryStoreService}, table `AgentMemories`): switched on by
- *   `AI.agentMemory.enabled` (`config/app/AI/agentMemory.php`, default off). While it is off every method answers "no
- *   memory" and nothing reads or writes the table, so an application without the table is unaffected;
- * - an application's own memory component: a same-path subclass under the application's root namespace that overrides
- *   the methods (and leaves the switch off).
+ * `AI.agentMemory.enabled` (`config/app/AI/agentMemory.php`, default off) means "memory on": while it is off every
+ * method answers "no memory" and nothing reads or writes a memory row; while it is on every answer comes from the
+ * memory store {@see AgentMemoryStoreService}, the host port. Where the rows live is the store's business:
+ * - the package's own table (the default store);
+ * - the host's own rows: a same-path subclass of {@see AgentMemoryStoreService} under the host's root namespace, with
+ *   memory switched on — the memory tools, the curation, the repair and the purge reach it the same way.
+ * A host that replaces this service wholesale (a same-path subclass overriding its methods, switch left off) keeps
+ * working as before.
  */
 class AgentMemoriesService extends Service
 {
@@ -121,18 +121,17 @@ class AgentMemoriesService extends Service
     }
 
     /**
-     * The memory tables whose zero vectors the embedding repair re-embeds. With the memory store: its table.
+     * The memory tables whose zero vectors the embedding repair re-embeds: those the memory store names
+     * ({@see AgentMemoryStoreService::getEmbeddingRepairTargets()}); none while memory is off.
      *
      * @return AgentEmbeddingRepairTargets
      */
     public function getEmbeddingRepairTargets(): AgentEmbeddingRepairTargets
     {
-        $agentEmbeddingRepairTargets = new AgentEmbeddingRepairTargets();
-        if (static::isMemoryStoreEnabled()) {
-            $memoryRepairTarget = AgentEmbeddingRepairTarget::forModel(DBAgentMemoryModel::class, 'content', 'embedding');
-            $agentEmbeddingRepairTargets->add($memoryRepairTarget);
+        if (!static::isMemoryStoreEnabled()) {
+            return new AgentEmbeddingRepairTargets();
         }
-        return $agentEmbeddingRepairTargets;
+        return $this->getAgentMemoryStoreService()->getEmbeddingRepairTargets();
     }
 
     /**

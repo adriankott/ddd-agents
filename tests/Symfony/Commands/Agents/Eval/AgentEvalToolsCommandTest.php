@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace DDD\Tests\Agents\Symfony\Commands\Agents\Eval;
 
+use DDD\Symfony\Commands\Agents\AgentEvalToolsCommand;
+use DDD\Domain\AI\Entities\Skills\AISkill;
 use DDD\Domain\AI\Services\AIModelsService;
 use ReflectionMethod;
 use DDD\Symfony\Commands\Agents\Eval\AgentEvalSuiteRunningCase;
@@ -173,6 +175,27 @@ class AgentEvalToolsCommandTest extends AgentEvalResultFilesTestCase
         self::assertSame([40], $runnerServiceDouble->fallbackAccountIdsOfChecks);
         $resultDocument = json_decode((string)file_get_contents($resultFile), true);
         self::assertSame([1, 1], [$resultDocument['total'], $resultDocument['passed']]);
+    }
+
+    public function testTheCasesOfAFixtureWhoseSkillIsNotRegisteredAreSkippedNotFailed(): void
+    {
+        (new ReflectionProperty(AISkill::class, 'packageClassesBySkillName'))->setValue(null, ['Catalog' => []]);
+        $probeCommand = new AgentEvalToolsProbeCommand();
+        $probeCommand->runnerServiceDouble = new AgentEvalRunnerServiceWithScriptedApplicabilityDouble();
+        $probeCommand->ownShapeRowFields = ['passed' => false];
+        $fixturePath = $this->writeFixture([
+            ['id' => 'unbound.case', 'prompt' => 'search', 'agentSpaceId' => 7, 'expect' => ['tool' => 'searchCatalog']],
+        ]);
+        $resultFile = $this->temporaryDirectory . '/unbound/result.json';
+
+        $commandTester = $this->runProbeCommand($probeCommand, ['--fixture' => $fixturePath, '--parallel' => '1', '--no-save' => true, '--result-file' => $resultFile]);
+
+        self::assertStringContainsString(
+            sprintf('  SKIP %-32s %s (%s)', 'unbound.case', AgentEvalToolsCommand::SKILL_NOT_REGISTERED_SKIP_REASON, 'Catalog.Search'),
+            $commandTester->getDisplay()
+        );
+        $resultDocument = json_decode((string)file_get_contents($resultFile), true);
+        self::assertSame(0, $resultDocument['total'], 'a skipped case is no row and no failure');
     }
 
     public function testTheRunInThisProcessReportsTheCasesThatDoNotApplyAndPrintsTheReport(): void

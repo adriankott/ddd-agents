@@ -249,6 +249,14 @@ class AISkill extends Entity
     public array $subSkillNames = [];
 
     /**
+     * @var string[] The roots a SUB-SKILL names itself (frontmatter `subSkillOf: 'Agent.Web.Search'`, a name or a
+     * list): it is a sub-skill ({@see $isSubSkill}), and each named root that is registered in the binding lists it in
+     * its {@see $subSkillNames} — the edge lives in the sub-skill's own file, no file of the root (or a host's copy of
+     * it) has to name it. Empty = the skill names no root.
+     */
+    public array $subSkillOf = [];
+
+    /**
      * @var string[] PURPOSE-BOUND marker (frontmatter `onlyUnderPurposeNames`, default empty = general): when set, the
      * skill is offered and loadable ONLY inside a conversation whose {@see \DDD\Domain\AI\Entities\Conversations\AIConversation::$purposeName}
      * is one of these names. The working skill of a purposed run (e.g. the skill that carries out a `Nightly.Digest`
@@ -842,6 +850,23 @@ class AISkill extends Entity
             }
         }
         return $skillNames;
+    }
+
+    /**
+     * The root names of a skill's frontmatter value `subSkillOf`: a name or a list of names, trimmed, empty ones and
+     * repeats left out; anything else is no root.
+     *
+     * @return string[]
+     */
+    public static function readSubSkillOfFrontmatter(mixed $frontmatterValue): array
+    {
+        $rootSkillNames = [];
+        foreach (is_array($frontmatterValue) ? $frontmatterValue : [$frontmatterValue] as $rootSkillName) {
+            if (is_string($rootSkillName) && trim($rootSkillName) !== '') {
+                $rootSkillNames[] = trim($rootSkillName);
+            }
+        }
+        return array_values(array_unique($rootSkillNames));
     }
 
     /** The step floor of a skill's frontmatter value: a positive whole number (also as a digit string), else null. */

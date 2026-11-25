@@ -291,6 +291,9 @@ class AISkillFilesLintService extends Service
                 ) {
                     $problems[] = "$skillFile: 'turnMinimumSteps' is not a positive whole number (the loader ignores it)";
                 }
+                if (array_key_exists('subSkillOf', $frontmatter)) {
+                    array_push($problems, ...$this->findSubSkillOfProblems($skillFile, $skillName, $frontmatter, $aISkillsService));
+                }
                 foreach ((array)($frontmatter['subSkillNames'] ?? []) as $subSkillName) {
                     if (is_string($subSkillName) && $aISkillsService->getAISkillByName($subSkillName) === null) {
                         $problems[] = "$skillFile: sub-skill '$subSkillName' resolves to no skill file";
@@ -300,6 +303,37 @@ class AISkillFilesLintService extends Service
         }
         foreach ($aISkillSourcesService->findCollidingNames($skillNamesByRoot) as $lowercaseSkillName => $holders) {
             $problems[] = "skill name '$lowercaseSkillName' collides (case-insensitive): " . implode(', ', $holders);
+        }
+        return $problems;
+    }
+
+    /**
+     * The problems of a skill file's `subSkillOf`: not a name or a list of names, naming the skill itself, naming a
+     * skill without a file, or set beside `isSubSkill: false` (the key makes it a sub-skill).
+     *
+     * @param array<string, mixed> $frontmatter
+     * @return string[]
+     */
+    public function findSubSkillOfProblems(string $skillFile, string $skillName, array $frontmatter, AISkillsService $aISkillsService): array
+    {
+        $problems = [];
+        $subSkillOfValue = $frontmatter['subSkillOf'];
+        if (!is_string($subSkillOfValue) && !$this->isListOfStrings($subSkillOfValue)) {
+            $problems[] = "$skillFile: 'subSkillOf' is neither a skill name nor a list of skill names";
+        }
+        $rootSkillNames = AISkill::readSubSkillOfFrontmatter($subSkillOfValue);
+        if ($rootSkillNames === []) {
+            $problems[] = "$skillFile: 'subSkillOf' names no root skill";
+        }
+        foreach ($rootSkillNames as $rootSkillName) {
+            if ($rootSkillName === $skillName) {
+                $problems[] = "$skillFile: 'subSkillOf' names the skill itself";
+            } elseif ($aISkillsService->getAISkillByName($rootSkillName) === null) {
+                $problems[] = "$skillFile: 'subSkillOf' root '$rootSkillName' resolves to no skill file";
+            }
+        }
+        if (array_key_exists('isSubSkill', $frontmatter) && $frontmatter['isSubSkill'] === false) {
+            $problems[] = "$skillFile: 'subSkillOf' beside 'isSubSkill: false' (subSkillOf makes it a sub-skill; drop isSubSkill)";
         }
         return $problems;
     }

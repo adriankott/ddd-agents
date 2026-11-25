@@ -84,9 +84,14 @@ class MCPPackage extends ValueObject
         Cache::instance(Cache::CACHE_GROUP_REDIS)->delete(static::buildDocumentationCacheKey());
     }
 
-    /** The cache key of this package's documentation: the class name only. */
+    /**
+     * The cache key of this package's documentation: the class name, and the fingerprint of the application's tool
+     * overlays and space argument ({@see MCPToolOverlays::getSchemaConfigurationFingerprint()}) when it has any.
+     */
     protected static function buildDocumentationCacheKey(): string
     {
-        return 'mcp.doc.package.' . str_replace('\\', '.', static::class);
+        $schemaConfigurationFingerprint = MCPToolOverlays::getSchemaConfigurationFingerprint();
+        return 'mcp.doc.package.' . str_replace('\\', '.', static::class)
+            . ($schemaConfigurationFingerprint !== '' ? '.' . $schemaConfigurationFingerprint : '');
     }
 }

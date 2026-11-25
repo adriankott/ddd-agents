@@ -87,10 +87,11 @@ scripts are the application's.
 10. **The package's evaluation commands run nothing without the application's fixtures.** `AI.evalSuite.fixturePaths`
     names the default fixture of each single command and `AI.evalSuite.suites` the suites `eval-suite` plans; both are
     empty in the package. `app:mcp:compare-tool-calls` likewise reads the application's scripts.
-11. **A package command is replaced, not edited.** A subclass outside `DDD\Symfony\Commands\` that repeats
-    `#[AsCommand]` with the same name wins (`FrameworkCommandsYieldPass` of `mgamadeus/ddd` removes the package's
-    service of that name); override its documented protected methods. A child process runs the subclass because it
-    runs the parent's own name.
+11. **A package command is replaced, not edited.** A subclass outside `DDD\Symfony\Commands\` wins
+    (`FrameworkCommandsYieldPass` of `mgamadeus/ddd` removes the package's service); without an `#[AsCommand]` of its
+    own it keeps every name, alias and the description of the package command — in the container (Core 3.44.3) and on
+    an object built with `new` (`AgentConsoleCommand::__construct()`). Override its documented protected methods. A
+    child process runs the subclass because it runs the parent's own name.
 12. **No closures in the application's commands** (the package's own rule): pass a value object or call a named
     method; a short callback for `array_map` / `usort` is fine.
 

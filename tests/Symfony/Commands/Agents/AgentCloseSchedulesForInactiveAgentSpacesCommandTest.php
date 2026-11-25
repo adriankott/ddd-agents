@@ -148,14 +148,19 @@ class AgentCloseSchedulesForInactiveAgentSpacesCommandTest extends UnitTestCase
         self::assertSame(ApplicationCloseSchedulesUnderBothNamesCommandDouble::class, $commandMap[ApplicationCloseSchedulesUnderBothNamesCommandDouble::OLD_COMMAND_NAME]);
     }
 
-    public function testAnApplicationCommandUnderItsOldNameAloneLeavesTheModulesCommandBesideIt(): void
+    public function testAnApplicationSubclassUnderItsOldNameAloneReplacesTheModulesCommandAndKeepsItsName(): void
     {
         $container = $this->buildContainerWithCommands([AgentCloseSchedulesForInactiveAgentSpacesCommand::class, ApplicationCloseSchedulesUnderOldNameOnlyCommandDouble::class]);
 
         (new FrameworkCommandsYieldPass())->process($container);
 
-        self::assertTrue($container->hasDefinition(AgentCloseSchedulesForInactiveAgentSpacesCommand::class));
+        // a subclass replaces the module's command by class (Core 3.44.3) and is registered under its names as well
+        self::assertFalse($container->hasDefinition(AgentCloseSchedulesForInactiveAgentSpacesCommand::class));
         self::assertTrue($container->hasDefinition(ApplicationCloseSchedulesUnderOldNameOnlyCommandDouble::class));
+        (new AddConsoleCommandPass())->process($container);
+        $commandMap = $container->getDefinition('console.command_loader')->getArgument(1);
+        self::assertSame(ApplicationCloseSchedulesUnderOldNameOnlyCommandDouble::class, $commandMap[self::MODULE_COMMAND_NAME]);
+        self::assertSame(ApplicationCloseSchedulesUnderOldNameOnlyCommandDouble::class, $commandMap[ApplicationCloseSchedulesUnderBothNamesCommandDouble::OLD_COMMAND_NAME]);
     }
 
     public function testTheOldNameRunsTheApplicationsCommandInAConsole(): void

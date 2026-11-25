@@ -92,6 +92,9 @@ class AgentEvalSuiteCommand extends AgentEvalConsoleCommand
     /** @var string The child command of a case of a tools-style fixture */
     public const string CHILD_COMMAND_TOOLS_CASE = 'app:agent:eval-tools';
 
+    /** @var string[] The SKIP lines of the cases the planning leaves out because their fixture's skill is not registered */
+    protected array $skillNotRegisteredSkipLines = [];
+
     /** @var string The child command of a skill-selection case */
     public const string CHILD_COMMAND_SELECTION_CASE = 'app:agent:eval-selection';
 
@@ -236,7 +239,13 @@ class AgentEvalSuiteCommand extends AgentEvalConsoleCommand
         $flavors = $this->parseList((string)$input->getOption('flavors'), [AgentEvalSuiteTask::FLAVOR_CALL, AgentEvalSuiteTask::FLAVOR_JUDGE], 'flavors');
         $evalArms = $this->resolveEvalArmOptions($input);
         $visionCapabilityByModelName = $this->buildVisionCapabilityByModelName($modelNames);
+        $this->skillNotRegisteredSkipLines = [];
         $agentEvalSuiteTasks = $this->planTasks($input, $agentEvalSuiteDefinitions, $suites, $modelNames, $flavors, $visionCapabilityByModelName);
+        if (!$asJson) {
+            foreach ($this->skillNotRegisteredSkipLines as $skipLine) {
+                $output->writeln($skipLine);
+            }
+        }
         if ($agentEvalSuiteTasks->count() === 0) {
             $output->writeln('<error>No case matched — nothing to run.</error>');
             return Command::INVALID;
@@ -348,10 +357,43 @@ class AgentEvalSuiteCommand extends AgentEvalConsoleCommand
             }
             $agentEvalFixtures = $this->buildFixturesOfSuite($agentEvalSuiteDefinition, $input);
             $agentEvalSuitePlanOptions = $this->buildPlanOptions($input, $modelNames, $plannedFlavors, $visionCapabilityByModelName);
+            if ($agentEvalSuiteDefinition->taskKind === AgentEvalSuiteTask::KIND_TOOLS_CASE) {
+                array_push($this->skillNotRegisteredSkipLines, ...$this->buildSkillNotRegisteredSkipLinesOfSuite($agentEvalSuiteDefinition->suiteName, $agentEvalFixtures, $agentEvalSuitePlanOptions));
+            }
             $tasksOfSuite = $agentEvalSuitePlanService->buildTasksOfKind($agentEvalSuiteDefinition->taskKind, $agentEvalSuiteDefinition->suiteName, $agentEvalFixtures, $agentEvalSuitePlanOptions);
             $agentEvalSuiteTasks->addTasksOf($tasksOfSuite);
         }
         return $agentEvalSuiteTasks;
+    }
+
+    /**
+     * The SKIP lines of the cases of a tools suite whose fixture names a skill the application does not register
+     * (`SKIP <suite> <case> skill not registered`): the planning leaves them out
+     * ({@see AgentEvalSuitePlanService::isSkillOfFixtureRegistered()}); they are no failures.
+     *
+     * @return string[]
+     */
+    protected function buildSkillNotRegisteredSkipLinesOfSuite(string $suite, AgentEvalFixtures $agentEvalFixtures, AgentEvalSuitePlanOptions $agentEvalSuitePlanOptions): array
+    {
+        $skipLines = [];
+        foreach ($agentEvalFixtures->getElements() as $agentEvalFixture) {
+            if (!$agentEvalFixture->hasCases() || !$agentEvalSuitePlanOptions->matchesSkillFilter($agentEvalFixture)
+                || $this->getPlanService()->isSkillOfFixtureRegistered($agentEvalFixture)) {
+                continue;
+            }
+            foreach ($agentEvalFixture->getCases()->getElements() as $agentEvalCase) {
+                if ($agentEvalSuitePlanOptions->matchesCaseFilter($agentEvalCase->getId())) {
+                    $skipLines[] = sprintf(
+                        '  <comment>SKIP</comment> %-10s %-44s %s (%s)',
+                        $suite,
+                        mb_substr($agentEvalCase->getId(), 0, 44),
+                        AgentEvalToolsCommand::SKILL_NOT_REGISTERED_SKIP_REASON,
+                        $agentEvalFixture->getSkillName()
+                    );
+                }
+            }
+        }
+        return $skipLines;
     }
 
     /**

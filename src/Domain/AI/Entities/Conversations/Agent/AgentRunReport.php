@@ -6,6 +6,7 @@ namespace DDD\Domain\AI\Entities\Conversations\Agent;
 
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolAttributeCatalog;
+use DDD\Domain\AI\Entities\MCPPackages\MCPToolOverlays;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolOwnerFacingSubject;
 use DDD\Domain\AI\Services\Conversations\AgentOwnerFacingTextTranslationService;
 use DDD\Domain\Base\Entities\Translatable\Translatable;
@@ -312,12 +313,16 @@ class AgentRunReport extends ValueObject
     }
 
     /**
-     * The owner-facing title of a write tool's subject, untranslated source string: the subject the tool declares
-     * ({@see MCPToolOwnerFacingSubject}); a write tool without one is named by its verb-less camel-case words — readable,
+     * The owner-facing title of a write tool's subject, untranslated source string: the subject of the application's
+     * tool overlay ({@see MCPToolOverlays}), else the subject the tool declares ({@see MCPToolOwnerFacingSubject}); a write tool without one is named by its verb-less camel-case words — readable,
      * never a raw tool name.
      */
     public static function ownerFacingTitleForWriteTool(string $toolName): string
     {
+        $overlaidOwnerFacingSubject = MCPToolOverlays::getApplicationOverlays()->findOverlayOfTool($toolName)?->ownerFacingSubject;
+        if ($overlaidOwnerFacingSubject !== null) {
+            return $overlaidOwnerFacingSubject;
+        }
         $ownerFacingSubject = MCPToolAttributeCatalog::getAttributeOfToolName($toolName, MCPToolOwnerFacingSubject::class);
         if ($ownerFacingSubject !== null) {
             return $ownerFacingSubject->subject;

@@ -4,15 +4,20 @@
 
 Contents: 1. What belongs in a memory · 2. What the core asks of the host · 3. Standing directives in the model
 input · 4. Episodic history · 5. Moments in memories · 6. Host checklist (own memory component) · 7. The package's
-memory store
+memory store · 8. The memory store as the host port (a store over the host's own rows)
 
-The core asks its memory questions through `AgentMemoriesService` (the port). Two ways to answer them:
+The core asks its memory questions through `AgentMemoriesService`; every answer comes from the memory store
+`AgentMemoryStoreService`, the host port. `AI.agentMemory.enabled` (`config/app/AI/agentMemory.php`, default off) means
+"memory is on", not "the package's table is used". Off: every method of `AgentMemoriesService` answers "no memory",
+nothing reads or writes a memory row, the memory tools are not offered. On: three ways to back it:
 
-- **The package's memory store** (section 7): switch it on with `AI.agentMemory.enabled` in
-  `config/app/AI/agentMemory.php` once its table exists. It stores, curates and recalls memories and brings the memory
-  tools. Off by default: then every method of the port answers "no memory" and nothing touches the table.
+- **The package's memory store** (section 7): the default store over the package's table. Switch memory on once the
+  table exists. It stores, curates and recalls memories and brings the memory tools.
+- **A store over the host's own rows** (section 8): a same-path subclass of `AgentMemoryStoreService` that answers the
+  port from the host's entity, with memory switched on and no package table. Tools, curation, repair and purge reach it
+  unchanged.
 - **The host's own memory component**: a same-path subclass of `AgentMemoriesService` under the host's root namespace
-  that overrides the methods (the switch stays off).
+  that overrides the methods (the switch stays off) — still supported.
 
 This reference says what the core asks, where the answers land in the model input, and how the package's store works.
 
@@ -86,7 +91,7 @@ A memory that records when something was said keeps the instant and the zone it 
    long flat tool list weakens a cheap model's tool choice, while memory operations are rare. Only tools declaring
    `MCPToolWritesAgentMemoryOnly` refresh the directives within a run.
 3. An embedding provider (`AITextEmbeddingsService` subclass) if `findSimilarMemories()` is vector-based, and the
-   memory table in `getEmbeddingRepairTargets()`.
+   memory table in `getEmbeddingRepairTargets()` (with a store subclass: `AgentMemoryStoreService::getEmbeddingRepairTargets()`).
 4. Curation off the critical path: `curateConversationAfterTurn()` is called with `$async = true`; dispatch a message,
    never run model calls inline.
 
@@ -144,3 +149,31 @@ whose `skillPackages.php` replaces the package's file lists `AISkill::AGENT_MEMO
 **Adopting the store with an existing memory table.** A host that already keeps memories in its own table maps the
 store onto it through `tableNames` (its database config, `Base.Repo.database.tableNames`) only when the columns match the table above;
 otherwise it keeps its own component.
+
+## 8. The memory store as the host port
+
+`AgentMemoryStoreService` is the one place that names the memory table: the core's questions, the memory tools, the
+curation, the embedding repair (`getEmbeddingRepairTargets()`) and the evaluation purge (`getColumnsNotPurgedByEvalPurge()`,
+merged into `AIConversationEvalPurgeService::getColumnsNotPurged()`) all ask it. A contract test keeps every other
+class of the package off the memory model.
+
+A host whose memories live in rows of its own puts a same-path subclass of the store under its root namespace and
+switches memory on. It answers the port from its rows and fills `AgentMemory` as the carrier: `id` = the host row's
+id, `accountId` / `agentSpaceId` the scope, `memoryType`, `content`, `validFrom` / `validTo`. The scope arguments stay
+`(int $accountId, ?int $agentSpaceId)`; an empty space means account level, and a read for a space returns the
+account-level rows plus that space's.
+
+| Port method | Answers |
+|---|---|
+| `findCurrentMemoriesForScope()`, `findCurrentDirectivesForScope()` | the current memories / directives of a scope, newest first |
+| `findSimilarMemories()` | the nearest (or text-matching) current memories of a scope |
+| `findCurrentDuplicateOfContent()` | the current memory of exactly this scope with the same content, or null |
+| `persistMemory()`, `embedMemory()` | the write of a memory (the curation and the `remember` / `updateMemory` tools) |
+| `closeValidityWindow()`, `invalidateMemory()` | close a row for its successor; forget a memory (`forget`) |
+| `find()` | one memory by the host row's id, under the caller's rights |
+| `getEmbeddingRepairTargets()` | the tables the embedding repair covers; [] for none |
+| `getColumnsNotPurgedByEvalPurge()` | the host table's columns that point at a conversation row and are no purge step; [] for none |
+
+`curateConversationAfterTurn()` and `isConversationCuratable()` stay as they are unless the host curates differently.
+The test fixture `tests/Domain/AI/Services/Conversations/Memories/HostBackedAgentMemoryStoreService.php` shows a store
+over another entity's rows.

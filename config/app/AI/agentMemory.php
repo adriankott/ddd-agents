@@ -3,15 +3,18 @@
 declare(strict_types=1);
 
 /**
- * The package's durable memory store, read as `Config::get('AI.agentMemory')` by
+ * The agent's durable memory, read as `Config::get('AI.agentMemory')` by
  * {@see \DDD\Domain\AI\Services\Conversations\Memories\AgentMemoriesService::isMemoryStoreEnabled()}:
  *
- *     'enabled' => bool   // the package's memory store answers the core's memory questions and its tools are offered
+ *     'enabled' => bool   // memory is on: the core asks the memory store and the memory tools are offered
  *
- * Off by default: the store needs its table (`AgentMemories`), so an application switches it on after the table
- * exists. While it is off, the core's memory questions are answered "no memory", nothing reads or writes the table and
- * the memory tools are not offered. An application ships its own file at this path, which REPLACES this one whole.
- * An application with a memory component of its own (a same-path subclass of the port) leaves it off.
+ * "On" says that the agent has a memory, not which table holds it: every answer comes from the memory store
+ * ({@see \DDD\Domain\AI\Services\Conversations\Memories\AgentMemoryStoreService}, the host port). The default
+ * store keeps its rows in the package's table (`AgentMemories`): switch memory on after that table exists. A host
+ * whose memories live in rows of its own puts a same-path subclass of the store under its root namespace and switches
+ * memory on without the package's table. Off by default: the core's memory questions are answered "no memory",
+ * nothing reads or writes a memory row and the memory tools are not offered. An application ships its own file at
+ * this path, which REPLACES this one whole.
  */
 return [
     'enabled' => false,

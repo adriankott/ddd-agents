@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace DDD\Domain\AI\Services\Conversations\Memories;
 
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
+use DDD\Domain\AI\Entities\Conversations\Memories\AgentEmbeddingRepairTarget;
+use DDD\Domain\AI\Entities\Conversations\Memories\AgentEmbeddingRepairTargets;
 use DDD\Domain\AI\Entities\Conversations\Memories\AgentMemories;
 use DDD\Domain\AI\Entities\Conversations\Memories\AgentMemory;
 use DDD\Domain\AI\Entities\Texts\Embeddings\TextEmbedding;
@@ -25,10 +27,25 @@ use Psr\Cache\InvalidArgumentException;
 use ReflectionException;
 
 /**
- * The package's memory store: reads by scope (an account plus an optional space), the similarity search, the write
- * (cut, hash, embed, store) and the bitemporal closing of a row. What a memory is and how it is keyed lives on
- * {@see AgentMemory}; the curation after a turn is {@see AgentMemoryCurationService}. The core reaches this store
- * through the port {@see AgentMemoriesService} while the store is switched on.
+ * THE memory port of the agent: every read and write of the durable memory (the owner's standing directives, curated
+ * facts and solutions) goes through this store — the core's questions ({@see AgentMemoriesService}, while
+ * `AI.agentMemory.enabled` is on), the memory tools ({@see \DDD\Presentation\Mcp\Client\Agents\AgentMemoriesMCPPackage}),
+ * the curation after a turn ({@see AgentMemoryCurationService}), the embedding repair and the evaluation purge. Nothing
+ * outside the store, its repositories and its entities names the package's memory table or one of its columns.
+ *
+ * The default answers from the package's table (`AgentMemories`): reads by scope (an account plus an optional space),
+ * the similarity search, the write (cut, hash, embed, store) and the bitemporal closing of a row.
+ *
+ * A host that keeps memories in rows of its own puts a same-path subclass of this service under its root namespace
+ * and answers the port's methods from its rows; {@see AgentMemory} is the carrier it fills (its `id` is the host row's
+ * id, `accountId` / `agentSpaceId` the scope, `memoryType`, `content`, `validFrom` / `validTo` the validity), and the
+ * scope arguments stay `(int $accountId, ?int $agentSpaceId)`, an empty space meaning account level. The port:
+ * {@see findCurrentMemoriesForScope()}, {@see findCurrentDirectivesForScope()}, {@see findSimilarMemories()},
+ * {@see findCurrentDuplicateOfContent()}, {@see persistMemory()}, {@see embedMemory()}, {@see closeValidityWindow()},
+ * {@see invalidateMemory()}, `find()`, {@see getEmbeddingRepairTargets()} and {@see getColumnsNotPurgedByEvalPurge()};
+ * {@see curateConversationAfterTurn()} and {@see isConversationCuratable()} decide the curation and stay as they are
+ * unless the host curates differently. The host switches memory on (`AI.agentMemory.enabled`) without creating the
+ * package's table.
  *
  * @method AgentMemory|null find(int|string|null $entityId, bool $useEntityRegistrCache = true)
  * @method AgentMemories findAll(?int $offset = null, $limit = null, bool $useEntityRegistrCache = true)
@@ -236,6 +253,35 @@ class AgentMemoryStoreService extends EntitiesService
             ['closedAt' => $now, 'id' => (int)$agentMemory->id]
         );
         return $this->find($memoryId, useEntityRegistrCache: false);
+    }
+
+    /**
+     * The memory tables whose zero vectors the embedding repair re-embeds (`app:agent:repair-zero-embeddings`). The
+     * default: the package's table (content `content`, vector `embedding`). A host store names its own table, or none.
+     *
+     * @return AgentEmbeddingRepairTargets
+     */
+    public function getEmbeddingRepairTargets(): AgentEmbeddingRepairTargets
+    {
+        $agentEmbeddingRepairTargets = new AgentEmbeddingRepairTargets();
+        $memoryEmbeddingRepairTarget = AgentEmbeddingRepairTarget::forModel(DBAgentMemoryModel::class, 'content', 'embedding');
+        $agentEmbeddingRepairTargets->add($memoryEmbeddingRepairTarget);
+        return $agentEmbeddingRepairTargets;
+    }
+
+    /**
+     * The memory columns that point at a conversation or its rows and are deliberately NOT a step of the evaluation
+     * purge, `table.column` => why ({@see \DDD\Domain\AI\Services\Eval\AIConversationEvalPurgeService::getColumnsNotPurged()}).
+     * The default: the package's table, whatever the switch says (its model exists in every installation). A host
+     * store backed by its own rows names its columns, or returns [].
+     *
+     * @return string[] `table.column` => reason
+     */
+    public function getColumnsNotPurgedByEvalPurge(): array
+    {
+        return [
+            DBAgentMemoryModel::getTableName() . '.sourceMessageId' => 'a plain number recording where a memory was said; an evaluation run is never curated into memories, and a memory outlives its message',
+        ];
     }
 
     /**

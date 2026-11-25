@@ -75,6 +75,11 @@ host's entity is the entry skill's (`ddd-module-agents-specialist`).
 A tool reads the space from its request DTO, never from `$agentSpaceId` of the provenance: the argument may name
 another space, and the executor checked that one.
 
+An application that calls the space otherwise on the wire (say shopId) sets `AI.agentSpaceToolArgument`
+(`config/app/AI/agentSpaceToolArgument.php`): the schemas carry its name, the resolver reads it first, the DTOs keep
+`agentSpaceId` ([tool overlays and the space argument](tool-overlays-and-the-space-argument.md)).
+`AgentToolCallProvenance::$toolArguments` holds the call's whole arguments for a resolver override.
+
 ## The space a call targets
 
 `MCPToolExecutorService::dispatchTool()` asks `AgentSpacesService::findAgentSpaceOfToolCall()` once per call: the

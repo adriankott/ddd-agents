@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DDD\Domain\AI\Entities\MCPPackages;
 
+use DDD\Domain\AI\Entities\AgentSpaces\AgentSpaceToolArgument;
 use DDD\Domain\Base\Entities\ValueObject;
 use DDD\Infrastructure\Reflection\ReflectionClass;
 use DDD\Infrastructure\Reflection\ReflectionDocComment;
@@ -207,6 +208,7 @@ class MCPSchema extends ValueObject
                     );
                 }
             }
+            $mcpSchema->applyApplicationSchemaConfiguration((string)($function->name ?? ''));
         } elseif ($functionType === self::FUNCTION_TYPE_OUTPUT) {
             // Process output type
             $outputType = $reflectionMethod->getReturnType();
@@ -248,6 +250,42 @@ class MCPSchema extends ValueObject
             }
         }
         return $mcpSchema;
+    }
+
+    /**
+     * What the application configures into an INPUT schema: the space argument under its own name and description
+     * ({@see AgentSpaceToolArgument}; the property keeps its place) and the parameter descriptions of the tool's overlay
+     * ({@see MCPToolOverlays}; by the name on the wire, or by the DTO property name of the space argument).
+     */
+    public function applyApplicationSchemaConfiguration(string $toolName): void
+    {
+        $agentSpaceToolArgument = AgentSpaceToolArgument::current();
+        $spaceProperty = $this->properties[AgentSpaceToolArgument::DTO_PROPERTY_NAME] ?? null;
+        if ($spaceProperty !== null && $agentSpaceToolArgument->changesSchema()) {
+            if ($agentSpaceToolArgument->description !== null) {
+                $spaceProperty->description = $agentSpaceToolArgument->description;
+            }
+            if ($agentSpaceToolArgument->isRenamed() && !isset($this->properties[$agentSpaceToolArgument->name])) {
+                $renamedProperties = [];
+                foreach ($this->properties as $propertyName => $objectProperty) {
+                    $renamedProperties[$propertyName === AgentSpaceToolArgument::DTO_PROPERTY_NAME ? $agentSpaceToolArgument->name : $propertyName] = $objectProperty;
+                }
+                $this->properties = $renamedProperties;
+            }
+        }
+        $mcpToolOverlay = $toolName !== '' ? MCPToolOverlays::getApplicationOverlays()->findOverlayOfTool($toolName) : null;
+        if ($mcpToolOverlay === null) {
+            return;
+        }
+        foreach ($this->properties as $propertyName => $objectProperty) {
+            $overlaidDescription = $mcpToolOverlay->findParameterDescription((string)$propertyName);
+            if ($overlaidDescription === null && $propertyName === $agentSpaceToolArgument->name) {
+                $overlaidDescription = $mcpToolOverlay->findParameterDescription(AgentSpaceToolArgument::DTO_PROPERTY_NAME);
+            }
+            if ($overlaidDescription !== null) {
+                $objectProperty->description = $overlaidDescription;
+            }
+        }
     }
 
     public function hasObjectDefinitionForIndex(string $index): bool

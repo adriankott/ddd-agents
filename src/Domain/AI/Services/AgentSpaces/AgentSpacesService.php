@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DDD\Domain\AI\Services\AgentSpaces;
 
 use DDD\Domain\AI\Entities\AgentSpaces\AgentOwnerAddressingArguments;
+use DDD\Domain\AI\Entities\AgentSpaces\AgentSpaceToolArgument;
 use DDD\Domain\AI\Entities\AgentSpaces\AgentSpace;
 use DDD\Domain\AI\Entities\AgentSpaces\AgentSpaceConsoleScopeOptions;
 use DDD\Domain\AI\Entities\AgentSpaces\AgentSpaces;
@@ -614,7 +615,7 @@ class AgentSpacesService extends EntitiesService
     public function findAgentSpaceOfToolCall(array $toolArguments, ?AgentToolCallProvenance $agentToolCallProvenance): ?AgentSpace
     {
         $agentSpaceOfConversation = $agentToolCallProvenance !== null ? $agentToolCallProvenance->agentSpace : null;
-        $requestedAgentSpaceId = (int)($toolArguments[static::TOOL_ARGUMENT_AGENT_SPACE_ID] ?? 0);
+        $requestedAgentSpaceId = $this->findRequestedAgentSpaceIdOfToolArguments($toolArguments);
         if ($requestedAgentSpaceId <= 0) {
             return $agentSpaceOfConversation;
         }
@@ -632,6 +633,27 @@ class AgentSpacesService extends EntitiesService
     }
 
     /**
+     * The space id the arguments of a call name: the argument under the application's name
+     * ({@see AgentSpaceToolArgument}, `AI.agentSpaceToolArgument`) when it holds a positive id, else
+     * {@see TOOL_ARGUMENT_AGENT_SPACE_ID}; 0 = none named. An application whose argument holds an id of its own entity
+     * overrides {@see findAgentSpaceOfToolCall()} and reads the argument there.
+     *
+     * @param array<array-key, mixed> $toolArguments
+     */
+    public function findRequestedAgentSpaceIdOfToolArguments(array $toolArguments): int
+    {
+        $agentSpaceToolArgument = AgentSpaceToolArgument::current();
+        if ($agentSpaceToolArgument->isRenamed()) {
+            $requestedAgentSpaceId = $toolArguments[$agentSpaceToolArgument->name] ?? null;
+            if (is_numeric($requestedAgentSpaceId) && (int)$requestedAgentSpaceId > 0) {
+                return (int)$requestedAgentSpaceId;
+            }
+        }
+        $requestedAgentSpaceId = $toolArguments[static::TOOL_ARGUMENT_AGENT_SPACE_ID] ?? null;
+        return is_numeric($requestedAgentSpaceId) ? max(0, (int)$requestedAgentSpaceId) : 0;
+    }
+
+    /**
      * `$toolArguments` with the arguments the conversation's space fills when the model left them out. Called in the
      * agent loop before the entitlement check and before the request DTOs of the tool are filled; never on the
      * HTTP-MCP path (no conversation, the client names its target itself). An argument the model passed always wins.
@@ -646,7 +668,7 @@ class AgentSpacesService extends EntitiesService
      */
     public function applyAgentSpaceDefaultsToToolArguments(array $toolArguments, array $parameterClassNames, AgentSpace $agentSpace): array
     {
-        if ((int)($toolArguments[static::TOOL_ARGUMENT_AGENT_SPACE_ID] ?? 0) > 0 || !isset($agentSpace->id)) {
+        if ($this->findRequestedAgentSpaceIdOfToolArguments($toolArguments) > 0 || !isset($agentSpace->id)) {
             return $toolArguments;
         }
         foreach ($parameterClassNames as $parameterClassName) {
@@ -686,6 +708,10 @@ class AgentSpacesService extends EntitiesService
         $filledToolArguments = $this->applyAgentSpaceDefaultsToToolArguments($toolArguments, $parameterClassNames, $agentSpace);
         foreach ($argumentNamesNotNarrowed as $argumentNameNotNarrowed) {
             unset($filledToolArguments[$argumentNameNotNarrowed]);
+            // the application's name of the space argument stands for the DTO property: "none" leaves both unfilled
+            if ($argumentNameNotNarrowed === AgentSpaceToolArgument::current()->name) {
+                unset($filledToolArguments[static::TOOL_ARGUMENT_AGENT_SPACE_ID]);
+            }
         }
         return $filledToolArguments;
     }
@@ -709,7 +735,8 @@ class AgentSpacesService extends EntitiesService
      */
     public function getDescriptionPrefixesOfToolArgumentsFilledFromAgentSpace(): array
     {
-        return [static::TOOL_ARGUMENT_AGENT_SPACE_ID => static::DESCRIPTION_PREFIX_OF_TOOL_ARGUMENT_FILLED_FROM_AGENT_SPACE];
+        // keyed by the name on the wire: the application's name of the space argument ({@see AgentSpaceToolArgument})
+        return [AgentSpaceToolArgument::current()->name => static::DESCRIPTION_PREFIX_OF_TOOL_ARGUMENT_FILLED_FROM_AGENT_SPACE];
     }
 
     /**

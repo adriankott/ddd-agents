@@ -6,7 +6,7 @@ Contents: how to read this reference · run and drive a conversation · inspect 
 evaluation · evaluation housekeeping · decisions · scheduled maintenance and repair · the shared bases · how an
 application adds its own command or replaces one · full class names
 
-Every command below is registered by the package kernel under the name shown (46 names, 45 of them listed and the
+Every command below is registered by the package kernel under the name shown (49 names, 48 of them listed and the
 hidden tool-call child; the list the package tests is the command map of
 `tests/Kernel/PackageAgentCommandsRegistrationTest.php`). All classes live in
 `src/Symfony/Commands/Agents/` and extend `AgentConsoleCommand`; the evaluation commands extend `AgentEvalConsoleCommand`
@@ -233,6 +233,22 @@ tool calls, unique tool-call ids, contiguous indexes); read-only, rights lifted.
 - **Writes:** nothing. **Envelope:** no model call.
 - **Exit codes:** `0`; `1` when a conversation is missing or has a violation.
 - **Budget:** no option. **Override points:** none beyond the base.
+
+### `app:agent:check-installation` — `AgentCheckInstallationCommand`
+
+Checks how the application installed the agent packages (`AgentInstallationCheckService`): skill bindings, unbound
+package skills, rights held by nobody, skills that do not name their packages' rights, tool overlays, missing tables,
+renamed config keys, package command names, the skill lint, pending renames, and the checks other packages add. Every
+check, its severity and the config that accepts a finding: the entry skill, reference "The installation check".
+
+| Option | Default | Meaning |
+|---|---|---|
+| `--format` | `text` | `text` (a table and a summary line) or `json` (`ok`, `blocking`, `warnings`, `findings` with `checkName`, `severity`, `subject`, `message`, `hint`) |
+
+- **Writes:** nothing. **Envelope:** no model call. Works as the default account for console work.
+- **Exit codes:** `0` without a BLOCKING finding; `1` with one; `2` for an unknown `--format`.
+- **Budget:** no option. **Override points:** the service (`AgentInstallationCheckService`, same-path subclass) and
+  `AgentInstallationCheckInterface` for added checks.
 
 ### `app:agent:activity-lines` — `AgentActivityLinesCommand`
 
@@ -505,6 +521,11 @@ and a judge model). Reports per case and overall, writes the run into the result
 - **Budget:** `--ignore-budget`, handed to every child.
 - **Child processes:** when `--repeat` > 1, or `--parallel` > 1 without `--case`; each child is this command with
   `--case`, `--json`, `--no-save`, `--fixture`; ceiling = the case's `timeoutSeconds` (default 600, at least 60).
+- **Skipped cases:** SKIP lines for a case whose flow exists only on the job queue, that needs vision the model
+  lacks, that has no scope, or whose fixture names a `skill` the application does not register
+  (`SKIP <case> skill not registered (<skill>)`, `SKILL_NOT_REGISTERED_SKIP_REASON`; a package fixture of a skill the
+  host does not bind). A skipped case is no row of the report and no failure; eval-suite prints the same line per case
+  of a tools suite and plans none of them (`AgentEvalSuitePlanService::isSkillOfFixtureRegistered()`).
 - **Override points:** `runCaseOfOwnShape()` (a case of the application's own shape), `buildPlanOptionsOfRun()` (the
   plan options), the `*_LABEL` and `*_SKIP_REASON` constants (the words of the output).
 
@@ -1131,9 +1152,12 @@ A child that runs past its ceiling is ended and its case counts as failed.
 `#[AsCommand]` with a name of its own, declares its options in `configure()` with the `configure…` methods it needs,
 states its needs through the switch methods, and works in `executeConsoleWork()`.
 
-**Replace:** a subclass of the package's command, outside the namespace `DDD\Symfony\Commands\`, that repeats
-`#[AsCommand]` with the SAME name (an attribute is not inherited by the console's discovery) and overrides the override
-points listed above. What then happens is the compiler pass `FrameworkCommandsYieldPass` of `mgamadeus/ddd`
+**Replace:** a subclass of the package's command, outside the namespace `DDD\Symfony\Commands\`, that overrides the
+override points listed above. Leave `#[AsCommand]` out: the subclass then keeps every name and alias of the package
+command and its description — Core's `FrameworkCommandsYieldPass` (3.44.3) passes them on in the container, and
+`AgentConsoleCommand::__construct()` takes them from the nearest parent class that declares the attribute for an object
+built with `new` (its `getName()`, the lock name of `LockableTrait`, the command line of an evaluation child). Repeat
+the attribute only to add a name of its own. What then happens is the compiler pass `FrameworkCommandsYieldPass` of `mgamadeus/ddd`
 (`src/Symfony/CompilerPasses/`): it collects every service tagged `console.command` by its names (the tag's `command`
 attribute, else the `#[AsCommand]` name, both split at `|` for aliases); for a name registered by more than one service,
 it removes every service whose class lies below `DDD\Symfony\Commands\` — but only when at least one of the services lies

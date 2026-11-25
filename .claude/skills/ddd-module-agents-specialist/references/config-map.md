@@ -1,4 +1,4 @@
-# Config map: the nineteen config files and who explains them
+# Config map: the config files and who explains them
 
 **Reader:** host developer
 
@@ -14,7 +14,7 @@ Readers that fall back per key to their class default: `AgentApplicationWording:
 file does not list is off, except `AgentDecisionModelSettings::DEFAULT_ON_SITES`). The other readers take the file as
 it is.
 
-Besides the nineteen PHP files the package ships prompts (`config/app/AI/Prompts/`), purposes
+Besides the PHP files the package ships prompts (`config/app/AI/Prompts/`), purposes
 (`config/app/AI/Purposes/`) and its agent skill files (`config/app/AI/Skills/`); a host's file at the same path
 replaces each of them the same way. Prompts: `ddd-module-agents-context-specialist` and
 `ddd-module-agents-decisions-and-guards-specialist`; purposes and skills: `ddd-module-agents-skills-and-purposes-specialist`
@@ -36,6 +36,10 @@ and `ddd-module-agents-autonomy-specialist`.
 | `documents.php` | `AI.documents` | `AgentDocumentTextExtractionService::getSettings()`, `AgentDocumentSettings` (the drive read tools `readDriveDocument`, `viewDriveDocumentPages`) | document reading on or off, the largest document, the pages whose text is kept, the characters of one read, OCR, the cache group and lifetime of the extracted text, page images (on, per call, DPI) | on; 25 MB; 500 pages; 40000 characters; OCR on; Core's default group (set `redis`) 86400 s; page images on, 4 per call, 110 DPI | `ddd-module-agents-tools-specialist` (section Drive mounts) |
 | `evalOutboundRecipients.php` | `AI.evalOutboundRecipients` | `EvalOutboundRecipientsService` | the test sinks an eval run may send to | none | `ddd-module-agents-observability-specialist` |
 | `evalSuite.php` | `AI.evalSuite` | `AgentEvalResultFilesService::getResultsDirectory()`; the suite planning (`AgentEvalSuitePlanService`: `getSuiteDefinitions()`, `findFixturePath()`); the evaluation commands | the results folder of the evaluation runs; the resource group per fixture and the fixtures whose write cases run alone on their agent space; the suites a suite run plans (`suites`), the default fixture of each evaluation command (`fixturePaths`), the default judge and driver models of a judged case (`judgeModelName`, `driverModelName`) | `var/agent-evals`, no groups, no exclusive fixtures, no suites, no fixture paths, the package's judge and driver | `ddd-module-agents-observability-specialist` |
+| `toolOverlays.php` | `AI.toolOverlays` | `MCPToolOverlays` (entitlement, schema, mandate summary, run report) | per tool name: `accountRights` (replaces the attributes, `[]` = none), `description`, `summary`, `parameters`, `ownerFacingSubject` | none | `ddd-module-agents-tools-specialist` |
+| `agentSpaceToolArgument.php` | `AI.agentSpaceToolArgument` | `AgentSpaceToolArgument` (`MCPSchema`, `AgentSpacesService`) | the space argument's name and description on the wire | `agentSpaceId`, the DTO's description | `ddd-module-agents-tools-specialist` |
+| `agentTasks.php` | `AI.agentTasks` | `AgentTaskSchedulesMCPPackage::findTaskListWidgetType()` | the widget type of the task list (`taskListWidgetType`) | none | `ddd-module-agents-autonomy-specialist` |
+| `installationCheck.php` | `AI.installationCheck` | `AgentInstallationCheckService` (`app:agent:check-installation`) | checks skipped, findings accepted (unbound skills, unmapped rights, skill right gaps, missing tables) | every check runs, nothing accepted | this skill, references/installation-check.md |
 | `purposeRequirements.php` | `AI.purposeRequirements` | `AIConversationPurposesService::getPurposeByName()` | feature flags a purpose requires | none | `ddd-module-agents-skills-and-purposes-specialist` |
 | `skillNamespaceGroups.php` | `AI.skillNamespaceGroups` | `AISkillCatalogDocService` | the groups of the admin skill screen | the package's groups | `ddd-module-agents-skills-and-purposes-specialist` |
 | `skillPackages.php` | `AI.skillPackages` | `AISkillsService`, `AISkill::getPackageClassesBySkillName()` | which MCP packages each skill brings | the package's own skills | `ddd-module-agents-skills-and-purposes-specialist` |

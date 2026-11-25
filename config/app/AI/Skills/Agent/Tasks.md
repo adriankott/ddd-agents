@@ -1,5 +1,4 @@
 ---
-requiredAccountRights: ['scheduleAgentTasks']
 decisionCriteria: "Work outside this turn: a deep job in the background now, something at a set time, or recurring checks."
 shortDescription: "runs tasks for you: background work now, one-time at a set moment, recurring"
 description: >-

@@ -83,6 +83,16 @@ class AgentToolCallProvenance extends ValueObject implements MCPServerProvidedIn
     public ?string $toolName = null;
 
     /**
+     * @var array<array-key, mixed>|null The arguments of this call as the tool's request DTOs are filled from them (the
+     *      space defaults applied) — set by the executor on every path. A package tool hands them to
+     *      {@see \DDD\Domain\AI\Services\AgentSpaces\AgentSpacesService::findAgentSpaceOfToolCall()}, so an argument the
+     *      application names (`AI.agentSpaceToolArgument`) reaches its resolver although no DTO declares it. Null
+     *      before the executor filled it.
+     */
+    #[HideProperty]
+    public ?array $toolArguments = null;
+
+    /**
      * The LIVE conversation this call runs in (the delegation CHILD when delegated) — what a tool's row is appended to
      * ({@see getConversationToWriteInto()}). Held directly because the tool-call row's parent link is not guaranteed to be wired in memory
      * (a plain `$message->toolCall = $toolCall` assignment sets no parent). Server-only, never serialised. Null on the

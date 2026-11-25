@@ -195,15 +195,19 @@ skill file `config/app/AI/Skills/Agent/Tasks.md`) is the agent's surface over th
 
 | Point | What the package does |
 |---|---|
-| Scope | the space `agentSpaceId` names (filled from the conversation), else the schedules the account holds without a space; the reads filter on it, AND-connected on top of the model's filter |
+| Scope | the space `agentSpaceId` names (or the name the application gives it in `AI.agentSpaceToolArgument`; the resolver gets the whole tool arguments), filled from the conversation, else the schedules the account holds without a space; the reads filter on it, AND-connected on top of the model's filter |
+| Reads of a scope | an account that may use the space reads that space's schedules and runs, also those that run as another account: the reads run without entity read rights, bounded by the scope filter (`isScopeReadWithoutEntityRights()`, `findSchedulesOfScope()`, `findRunConversationsOfScope()`, protected); `getTaskRunReport` checks the run's schedule against the acting account first |
 | A schedule by id | found with read rights; its space must be usable by the acting account, a schedule without a space must be the account's own — else "not found" |
 | Owner | the conversation's account, else the signed-in one; `createSchedule()` stores the signed-in account |
-| Zone | an explicit `timezoneIdentifier`, else the call's zone, else the space's; none known = UTC |
+| Zone | an explicit `timezoneIdentifier`, else the call's zone, else the space's; none known = UTC. An `updateTaskSchedule` of a schedule stored without a zone (an older row) stores the zone `AgentSpacesService::findTimezoneForNewSchedule()` answers for it; UTC only when that is null |
 | Limits | every limit of `AIConversationScheduleCreationLimits`, the self-replication guard, the frequency floor on create and on a cron edit |
 | Report channel | EMAIL when the call names none — a host without the report mail lets the model pass CHAT (owner reports reference) |
 | Budget | the schedule budget pot line (`composeScheduleBudgetPotNote()`) and the monthly cost projection (`composeMonthlyCostNote()`), both protected; an application without a pot gets no line |
-| Widget of the task list | `TASK_LIST_WIDGET_TYPE` (default null: none); a same-path subclass that sets it gets a widget fence with `agentSpaceId` in the `getTaskSchedules` result, never on a phone line or in a sub-agent |
-| Account rights | none; an application that gates scheduling by a right declares `MCPRequiresAccountRights` on its same-path subclass |
+| Payer | who pays a scheduled run is decided ONLY in a same-path `ScheduleBudgetPotsService` (`findScheduleBudgetPotStatusForAccount()`, read by the tools through `AIConversationSchedulesService::buildScheduleBudgetPotStatusForAccount()`); `requireActingAccount()` scopes the lists and the targets of a call and is no payer point |
+| Widget of the task list | the config `AI.agentTasks.taskListWidgetType` (`config/app/AI/agentTasks.php`), else `TASK_LIST_WIDGET_TYPE` (default null: none): the `getTaskSchedules` result carries a widget fence whose only field is the space's self-hydration key under the name the application gives it (`WidgetBlockFieldNames::getWidgetSelfHydrationKeyFieldName()`, `AgentSpace::getWidgetSelfHydrationKey()`); never in a sub-agent |
+| Phone line | instead of the widget a note to read at most `PHONE_LINE_TASKS_READ_ALOUD` tasks aloud in plain words and offer the rest (`composeTaskListPhoneNote()`) |
+| A retried call | `scheduleOneTimeTask` asks `findScheduleAlreadyProducedByCall()` (protected, default null) before it creates; a schedule it returns is answered with "not created again" |
+| Account rights | the tools that create or change a schedule (`startBackgroundTask`, which spends budget at once, `scheduleOneTimeTask`, `createRecurringTaskSchedule`, `updateTaskSchedule`, `pauseTaskSchedule`, `resumeTaskSchedule`, `deleteTaskSchedule`) require `scheduleAgentTasks`; the three reads require none, and the skill file names no right. Another right for a tool, or none: `config/app/AI/toolOverlays.php` (`accountRights` by tool name; tools reference) |
 
 A host with different rules derives the class at the same path (same id) and overrides the protected methods; a
 tool that needs another request class gets a method of its own (tools reference, package-bundle-and-controller).

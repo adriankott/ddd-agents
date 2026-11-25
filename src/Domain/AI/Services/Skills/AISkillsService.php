@@ -63,8 +63,14 @@ class AISkillsService extends Service
         'description', 'shortDescription', 'decisionCriteria', 'salesTriggers', 'nonEvictable', 'requiredFeatureFlags',
         'anyOfRequiredFeatureFlags', 'requiresVisionCapabilities', 'requiredAccountRights', 'requiresAccountBillingAccess',
         'isSubSkill', 'subSkillNames', 'onlyUnderPurposeNames', 'notUnderPurposeNames', 'preloadOnWidgetTypes',
-        'providesWidgetTypes', 'onlyOnInitiatorTypes', 'turnMinimumSteps',
+        'providesWidgetTypes', 'onlyOnInitiatorTypes', 'turnMinimumSteps', 'subSkillOf',
     ];
+
+    /**
+     * @var array<string, array<string, string[]>> per binding (a hash over the registered skill names): root skill
+     *      name => the registered skills that name it in `subSkillOf`; built once per binding and process
+     */
+    protected static array $subSkillNamesOfRootByBindingSignature = [];
 
     /** @var array<string, array<string, mixed>>|null the skill requirement overlay, read once per process */
     protected static ?array $skillRequirementsBySkillName = null;
@@ -182,7 +188,7 @@ class AISkillsService extends Service
      */
     public function getAISkillByName(string $skillName): ?AISkill
     {
-        $raw = Config::get(self::CONFIG_SKILLS_PREFIX . $skillName);
+        $raw = $this->findRawSkillFile($skillName);
         if (!is_string($raw) || $raw === '') {
             if ($this->throwErrors) {
                 throw new NotFoundException("AISkill not found: $skillName");
@@ -226,8 +232,14 @@ class AISkillsService extends Service
         $skill->requiresAccountBillingAccess = (bool)($frontmatter['requiresAccountBillingAccess'] ?? false);
         // Sub-skill mechanics: `isSubSkill: true` = not in the general catalog,
         // offered only while a ROOT listing it in `subSkillNames` is loaded. Definition lives at AISkill fields.
-        $skill->isSubSkill = (bool)($frontmatter['isSubSkill'] ?? false);
-        $skill->subSkillNames = array_values(array_map('strval', (array)($frontmatter['subSkillNames'] ?? [])));
+        // `subSkillOf: 'Agent.Web.Search'` = the skill names its root itself: a sub-skill, attached to every named root
+        // that is registered — the root's own `subSkillNames` and the sub-skills naming it are united.
+        $skill->subSkillOf = AISkill::readSubSkillOfFrontmatter($frontmatter['subSkillOf'] ?? null);
+        $skill->isSubSkill = $skill->subSkillOf !== [] || (bool)($frontmatter['isSubSkill'] ?? false);
+        $skill->subSkillNames = array_values(array_unique([
+            ...array_map('strval', (array)($frontmatter['subSkillNames'] ?? [])),
+            ...$this->findSubSkillNamesNamingRoot($skillName),
+        ]));
         // Purpose binding: `onlyUnderPurposeNames: ['Schedule.Run']` = offered/loadable only inside that purposed run.
         $skill->onlyUnderPurposeNames = array_values(array_map('strval', (array)($frontmatter['onlyUnderPurposeNames'] ?? [])));
         // Purpose exclusion: `notUnderPurposeNames: ['Schedule.Run']` = never offered/loadable/preloaded inside that purposed run.
@@ -273,6 +285,72 @@ class AISkillsService extends Service
             }
         }
         return $catalog;
+    }
+
+    /**
+     * The raw text of a skill file by its dotted name (frontmatter and body, before any substitution); null or '' =
+     * no such file.
+     */
+    public function findRawSkillFile(string $skillName): mixed
+    {
+        return Config::get(self::CONFIG_SKILLS_PREFIX . $skillName);
+    }
+
+    /**
+     * The registered skills whose file names `$rootSkillName` in `subSkillOf` — attached only when the root is
+     * registered too; [] for an unregistered root or without a binding.
+     *
+     * @return string[]
+     */
+    public function findSubSkillNamesNamingRoot(string $rootSkillName): array
+    {
+        return $this->getSubSkillNamesByRootName()[$rootSkillName] ?? [];
+    }
+
+    /**
+     * Root skill name => the registered skills that name it in `subSkillOf`, both registered in the binding. Read from
+     * the raw frontmatter of the registered skill files (with the requirement overlay), never through
+     * {@see getAISkillByName()} (which asks this map); memoized per binding.
+     *
+     * @return array<string, string[]>
+     */
+    public function getSubSkillNamesByRootName(): array
+    {
+        try {
+            $registeredSkillNames = AISkill::getAllSkillNames();
+        } catch (\LogicException) {
+            return [];
+        }
+        $bindingSignature = md5(implode('|', $registeredSkillNames));
+        if (isset(self::$subSkillNamesOfRootByBindingSignature[$bindingSignature])) {
+            return self::$subSkillNamesOfRootByBindingSignature[$bindingSignature];
+        }
+        $subSkillNamesByRootName = [];
+        foreach ($registeredSkillNames as $registeredSkillName) {
+            foreach ($this->findSubSkillOfRootNamesOfSkillFile($registeredSkillName) as $rootSkillName) {
+                if ($rootSkillName !== $registeredSkillName && in_array($rootSkillName, $registeredSkillNames, true)) {
+                    $subSkillNamesByRootName[$rootSkillName][] = $registeredSkillName;
+                }
+            }
+        }
+        self::$subSkillNamesOfRootByBindingSignature[$bindingSignature] = $subSkillNamesByRootName;
+        return $subSkillNamesByRootName;
+    }
+
+    /**
+     * The roots a skill file names in `subSkillOf` (after the requirement overlay); [] without a file.
+     *
+     * @return string[]
+     */
+    public function findSubSkillOfRootNamesOfSkillFile(string $skillName): array
+    {
+        $raw = $this->findRawSkillFile($skillName);
+        if (!is_string($raw) || $raw === '') {
+            return [];
+        }
+        $frontmatter = self::splitFrontmatter($this->substitutePersonaPlaceholders($raw))->frontmatter;
+        $frontmatter = $this->applySkillRequirementOverlay($skillName, $frontmatter);
+        return AISkill::readSubSkillOfFrontmatter($frontmatter['subSkillOf'] ?? null);
     }
 
     /** @var string[]|null Memoized union of every gate-referenced flag name (deploy-static). */

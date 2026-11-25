@@ -9,6 +9,7 @@ use DDD\Domain\AI\Entities\AgentSpaces\AgentSpace;
 use DDD\Domain\AI\Entities\Conversations\Agent\Context\AgentProductAwareness;
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Entities\Conversations\Entitlements\AgentAccountRightsInterface;
+use DDD\Domain\AI\Entities\Conversations\Entitlements\AgentComposedAccountRights;
 use DDD\Domain\AI\Entities\Conversations\Entitlements\AgentRoleMappedAccountRights;
 use DDD\Domain\AI\Entities\Conversations\Entitlements\AgentFeatureFlagsInterface;
 use DDD\Infrastructure\Exceptions\BadRequestException;
@@ -79,9 +80,12 @@ class AIConversationEntitlementsService extends Service
     }
 
     /**
-     * The rights of the account the conversation acts for. The default: the rights the config `AI.accountRights` maps
-     * to the account's roles ({@see AgentRoleMappedAccountRights}); null (ungated) for a conversation without an
-     * account.
+     * The rights of the account the conversation acts for — the application's override point. The default: the rights
+     * the config `AI.accountRights` maps to the account's roles ({@see AgentRoleMappedAccountRights}); null (ungated)
+     * for a conversation without an account. An application returns its own {@see AgentAccountRightsInterface}; the
+     * package never reads this method directly but composes its answer with the mapping
+     * ({@see findComposedAccountRightsOfConversation()}), so package rights the application does not know stay
+     * mapped.
      *
      * @param AIConversation $conversation
      * @return AgentAccountRightsInterface|null
@@ -92,11 +96,83 @@ class AIConversationEntitlementsService extends Service
      */
     public function findAccountRightsOfConversation(AIConversation $conversation): ?AgentAccountRightsInterface
     {
+        $account = $this->findAccountOfConversation($conversation);
+        return $account instanceof Account ? AgentRoleMappedAccountRights::forAccount($account) : null;
+    }
+
+    /**
+     * The rights the package CHECKS for the conversation: {@see findAccountRightsOfConversation()} — the application's
+     * override point — composed with the mapping `AI.accountRights` ({@see composeAccountRights()}), so the package
+     * rights an application object does not answer still follow the mapping. Every gate of the package reads this one.
+     *
+     * @param AIConversation $conversation
+     * @return AgentAccountRightsInterface|null null = ungated (the application answered null)
+     * @throws BadRequestException
+     * @throws InternalErrorException
+     * @throws InvalidArgumentException
+     * @throws ReflectionException
+     */
+    public function findComposedAccountRightsOfConversation(AIConversation $conversation): ?AgentAccountRightsInterface
+    {
+        $accountRights = $this->findAccountRightsOfConversation($conversation);
+        if ($accountRights === null) {
+            return null;
+        }
+        return $this->composeAccountRights($accountRights, $this->findAccountOfConversation($conversation));
+    }
+
+    /**
+     * The rights the package CHECKS for the authenticated account: {@see findAccountRightsOfCurrentAccount()} composed
+     * with the mapping ({@see composeAccountRights()}).
+     *
+     * @return AgentAccountRightsInterface|null null = ungated
+     * @throws BadRequestException
+     * @throws InternalErrorException
+     * @throws InvalidArgumentException
+     * @throws ReflectionException
+     */
+    public function findComposedAccountRightsOfCurrentAccount(): ?AgentAccountRightsInterface
+    {
+        $accountRights = $this->findAccountRightsOfCurrentAccount();
+        if ($accountRights === null) {
+            return null;
+        }
+        return $this->composeAccountRights($accountRights, AuthService::instance()->getAccount());
+    }
+
+    /**
+     * `$accountRights` as the package checks them: the package's own objects ({@see AgentRoleMappedAccountRights},
+     * {@see AgentComposedAccountRights}) as they are; an application's object composed with the mapping of `$account`
+     * (its roles; without an account only `'*'` and delegations hold) — {@see AgentComposedAccountRights}.
+     *
+     * @param AgentAccountRightsInterface $accountRights
+     * @param Account|null $account
+     * @return AgentAccountRightsInterface
+     */
+    public function composeAccountRights(AgentAccountRightsInterface $accountRights, ?Account $account): AgentAccountRightsInterface
+    {
+        if ($accountRights instanceof AgentRoleMappedAccountRights || $accountRights instanceof AgentComposedAccountRights) {
+            return $accountRights;
+        }
+        $agentRoleMappedAccountRights = $account instanceof Account
+            ? AgentRoleMappedAccountRights::forAccount($account)
+            : AgentRoleMappedAccountRights::forRoleNamesUnderConfiguredMapping([]);
+        return AgentComposedAccountRights::compose($accountRights, $agentRoleMappedAccountRights);
+    }
+
+    /**
+     * The account the conversation acts for: its account as loaded, else the signed-in account when it is the same
+     * one, else its account read now; null for a conversation without an account.
+     *
+     * @param AIConversation $conversation
+     * @return Account|null
+     */
+    protected function findAccountOfConversation(AIConversation $conversation): ?Account
+    {
         $conversationAccountId = $conversation->accountId ?? null;
         if ($conversationAccountId === null) {
             return null;
         }
-        // the conversation's account as loaded, else the signed-in account when it is the same one; read last
         $account = isset($conversation->account) ? $conversation->account : null;
         $currentAccount = AuthService::instance()->getAccount();
         if ($account === null && $currentAccount !== null && (int)$currentAccount->id === (int)$conversationAccountId) {
@@ -105,7 +181,7 @@ class AIConversationEntitlementsService extends Service
         if ($account === null) {
             $account = $conversation->account ?? null;
         }
-        return $account instanceof Account ? AgentRoleMappedAccountRights::forAccount($account) : null;
+        return $account instanceof Account ? $account : null;
     }
 
     /**

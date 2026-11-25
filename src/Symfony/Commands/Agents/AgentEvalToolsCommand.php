@@ -110,6 +110,9 @@ class AgentEvalToolsCommand extends AgentEvalConsoleCommand
     /** @var string Why a case without a scope is skipped */
     public const string MISSING_SCOPE_SKIP_REASON = 'no agent space (case or --agentSpaceId)';
 
+    /** @var string Why a case of a fixture whose named skill the application does not register is skipped */
+    public const string SKILL_NOT_REGISTERED_SKIP_REASON = 'skill not registered';
+
     /** @var int Microseconds between two looks at the running child processes */
     public const int CHILD_POLL_MICROSECONDS = 100_000;
 
@@ -356,6 +359,19 @@ class AgentEvalToolsCommand extends AgentEvalConsoleCommand
     }
 
     /**
+     * The SKIP line of a case whose fixture names a skill (`skill`) the application does not register
+     * ({@see SKILL_NOT_REGISTERED_SKIP_REASON}): a package fixture of a skill the host does not bind is no failure of the
+     * agent. Null for every other case.
+     */
+    protected function buildSkillNotRegisteredSkipLineOfCase(AgentEvalFixture $agentEvalFixture, AgentEvalCase $agentEvalCase): ?string
+    {
+        if ($this->getSuitePlanService()->isSkillOfFixtureRegistered($agentEvalFixture)) {
+            return null;
+        }
+        return sprintf('  <comment>SKIP</comment> %-32s %s (%s)', $agentEvalCase->getId(), static::SKILL_NOT_REGISTERED_SKIP_REASON, $agentEvalFixture->getSkillName());
+    }
+
+    /**
      * The SKIP line of a case the run leaves out — its flow exists only on the job queue, it requires vision the model
      * lacks, or it has no scope — or null for a case that runs.
      */
@@ -446,8 +462,12 @@ class AgentEvalToolsCommand extends AgentEvalConsoleCommand
         AgentEvalSuitePlanOptions $agentEvalSuitePlanOptions,
         OutputInterface $output
     ): ?AgentEvalToolsCaseRun {
-        $scopeId = $this->findScopeIdOfCase($agentEvalCase, $agentEvalSuitePlanOptions);
-        $skipLine = $this->buildSkipLineOfCase($runSettings, $agentEvalCase, $scopeId);
+        $scopeId = null;
+        $skipLine = $this->buildSkillNotRegisteredSkipLineOfCase($agentEvalFixture, $agentEvalCase);
+        if ($skipLine === null) {
+            $scopeId = $this->findScopeIdOfCase($agentEvalCase, $agentEvalSuitePlanOptions);
+            $skipLine = $this->buildSkipLineOfCase($runSettings, $agentEvalCase, $scopeId);
+        }
         if ($skipLine !== null) {
             if (!$runSettings->jsonOutput) {
                 $output->writeln($skipLine);
@@ -988,7 +1008,8 @@ class AgentEvalToolsCommand extends AgentEvalConsoleCommand
                 if (!$agentEvalSuitePlanOptions->matchesCaseFilter($agentEvalCase->getId())) {
                     continue;
                 }
-                $skipLine = $this->buildSkipLineOfCase($runSettings, $agentEvalCase, $this->findScopeIdOfCase($agentEvalCase, $agentEvalSuitePlanOptions));
+                $skipLine = $this->buildSkillNotRegisteredSkipLineOfCase($agentEvalFixture, $agentEvalCase)
+                    ?? $this->buildSkipLineOfCase($runSettings, $agentEvalCase, $this->findScopeIdOfCase($agentEvalCase, $agentEvalSuitePlanOptions));
                 if ($skipLine !== null && !$runSettings->jsonOutput) {
                     $output->writeln($skipLine);
                 }

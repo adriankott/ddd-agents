@@ -157,6 +157,13 @@ class MCPTool extends ValueObject
             // we exclude examples from description as the examples will be included in the MCPSchema of the input
             $mcpFunction->description = $docComment->getDescription(includeExamples: false);
         }
+        // the application's overlay by tool NAME replaces the texts ({@see MCPToolOverlays}); the parameter texts are
+        // replaced where the input schema is built
+        $mcpToolOverlay = MCPToolOverlays::getApplicationOverlays()->findOverlayOfTool($mcpFunction->name);
+        if ($mcpToolOverlay !== null) {
+            $mcpFunction->description = $mcpToolOverlay->description ?? ($mcpFunction->description ?? null);
+            $mcpFunction->summary = $mcpToolOverlay->summary ?? $mcpFunction->summary;
+        }
         $mcpFunction->inputSchema = MCPSchema::createFromReflectionMethod(
             $bundleOrPackageDocumentation,
             $mcpFunction,

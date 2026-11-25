@@ -20,6 +20,9 @@ use ReflectionMethod;
  * because three callers reach it — the agent loop, the HTTP MCP server and an application's console command — and only
  * the first sees the filtered offer at all. Two copies of an authorization rule drift; this is the one copy.
  *
+ * The account rights of an application's tool overlay (`AI.toolOverlays`, {@see MCPToolOverlays}) replace those of the
+ * attributes for that tool name — on both sides, because both build their entitlement here.
+ *
  * Package ∪ method is deliberately the ONLY level represented here. The exposing SKILL is not: the executor receives
  * package classes and no skill, and a tool is multi-anchored across skills
  * ({@see \DDD\Domain\AI\Entities\Conversations\Messages\LoadedCapabilities}), so "the skill that exposed this call"
@@ -76,6 +79,11 @@ class MCPToolEntitlement extends ValueObject
             $mcpPackageReflectionClass,
             $reflectionMethod
         );
+        // the application's overlay by tool NAME replaces the attributes' rights ([] = no right for this tool)
+        $mcpToolOverlay = MCPToolOverlays::getApplicationOverlays()->findOverlayOfTool($reflectionMethod->getName());
+        if ($mcpToolOverlay !== null && $mcpToolOverlay->replacesAccountRights()) {
+            $mcpToolEntitlement->requiredAccountRightNames = $mcpToolOverlay->accountRightNames ?? [];
+        }
         return $mcpToolEntitlement;
     }
 

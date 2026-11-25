@@ -32,6 +32,7 @@ src/Domain/AI/Interfaces/AIConversationProgressReporterInterface.php	observabili
 src/Domain/AI/Traits/**	observability
 src/Presentation/Mcp/Agents/**	observability
 src/Symfony/Commands/Agents/AgentClientToolsPurgeCommand.php	tools
+src/Symfony/Commands/Agents/AgentCheckInstallationCommand.php	entry
 src/Symfony/Commands/Agents/**	observability
 src/Presentation/Api/Agents/Conversations/Dtos/AIConversationMessageSentPayload*	observability
 config/app/AI/evalOutboundRecipients.php	observability
@@ -70,6 +71,7 @@ src/Domain/AI/**/SystemHealth/**	tools
 src/Presentation/Mcp/Admin/**	tools
 config/app/AI/Skills/System/**	tools
 src/Domain/AI/Entities/MCPPackages/LlmRendering/**	tools
+config/app/AI/toolOverlays.php	tools
 config/app/AI/accountRights.php	entry
 # web research (ddd-module-agents-tools-specialist): pierces the autonomy folders config/app/AI/Skills/** and src/Presentation/Mcp/Client/Agents/**
 src/Domain/AI/**/WebSearch/**	tools
@@ -120,6 +122,7 @@ src/Domain/AI/MessageHandlers/AIConversationReportEmailSend*	autonomy
 config/app/AI/supervisor.php	autonomy
 config/app/AI/Prompts/AI/Agent/SubAgentDirective.md	autonomy
 config/app/AI/Purposes/**	autonomy
+config/app/AI/agentTasks.php	autonomy
 config/app/AI/Skills/**	autonomy
 src/Presentation/Mcp/Client/Agents/**	autonomy
 # widgets (ddd-module-agents-widgets-specialist): widgets, composed views, signal sources, activity lines, realtime signal, external agents
@@ -226,6 +229,8 @@ config/app/AI/agentToolCallChildProcess.php	tools
 src/Modules/**	entry
 src/Domain/AI/**/AgentSpaces/**	entry
 src/Domain/AI/**/Discovery/**	entry
+src/Domain/AI/**/Installation/**	entry
+config/app/AI/installationCheck.php	entry
 src/Domain/AI/**/Entitlements/**	entry
 src/Domain/AI/**/Channels/**	entry
 src/Domain/AI/Entities/Environment/**	entry

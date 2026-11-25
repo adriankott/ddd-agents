@@ -2123,7 +2123,7 @@ class AIConversation extends Entity
     {
         /** @var AIConversationEntitlementsService $aIConversationEntitlementsService */
         $aIConversationEntitlementsService = DDDService::instance()->getService(AIConversationEntitlementsService::class);
-        return $aIConversationEntitlementsService->findAccountRightsOfConversation($this);
+        return $aIConversationEntitlementsService->findComposedAccountRightsOfConversation($this);
     }
 
     /**

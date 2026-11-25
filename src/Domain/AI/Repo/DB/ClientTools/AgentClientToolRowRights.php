@@ -63,7 +63,7 @@ trait AgentClientToolRowRights
     {
         /** @var AIConversationEntitlementsService $aiConversationEntitlementsService */
         $aiConversationEntitlementsService = DDDService::instance()->getService(AIConversationEntitlementsService::class);
-        $accountRights = $aiConversationEntitlementsService->findAccountRightsOfCurrentAccount();
+        $accountRights = $aiConversationEntitlementsService->findComposedAccountRightsOfCurrentAccount();
         return $accountRights === null || $accountRights->getMissingRightNames([AgentAccountRights::USE_UI]) === [];
     }
 }

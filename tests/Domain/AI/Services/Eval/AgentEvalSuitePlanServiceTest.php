@@ -6,6 +6,7 @@ namespace DDD\Tests\Agents\Domain\AI\Services\Eval;
 
 use DDD\Domain\AI\Entities\Evals\AgentEvalCase;
 use DDD\Domain\AI\Entities\Evals\AgentEvalFixture;
+use DDD\Domain\AI\Entities\Skills\AISkill;
 use DDD\Domain\AI\Entities\Evals\AgentEvalFixtures;
 use DDD\Domain\AI\Entities\Evals\AgentEvalSuitePlanOptions;
 use DDD\Domain\AI\Entities\Evals\AgentEvalSuiteSchedule;
@@ -27,6 +28,9 @@ class AgentEvalSuitePlanServiceTest extends IntegrationTestCase
     /** @var mixed The memo of the effect catalog before the test */
     protected mixed $effectsByToolNameBeforeTest = null;
 
+    /** @var mixed The skill binding before the test */
+    protected mixed $packageClassesBySkillNameBeforeTest = null;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -41,11 +45,36 @@ class AgentEvalSuitePlanServiceTest extends IntegrationTestCase
             'createRecurringTaskSchedule' => new MCPToolEffect(MCPToolEffect::WRITE),
             'grantMandate' => new MCPToolEffect(MCPToolEffect::WRITE),
         ]);
+        // the skills the fixtures name are registered, as in a host that binds them
+        $bindingMemo = new ReflectionProperty(AISkill::class, 'packageClassesBySkillName');
+        $this->packageClassesBySkillNameBeforeTest = $bindingMemo->getValue();
+        $bindingMemo->setValue(null, ['Notes.Profile' => [], 'Notes.Listings' => [], 'Notes.Keywords' => []]);
     }
 
     protected function onTearDown(): void
     {
         (new ReflectionProperty(MCPToolEffectCatalog::class, 'effectsByToolName'))->setValue(null, $this->effectsByToolNameBeforeTest);
+        (new ReflectionProperty(AISkill::class, 'packageClassesBySkillName'))->setValue(null, $this->packageClassesBySkillNameBeforeTest);
+    }
+
+    public function testTheCasesOfAFixtureWhoseNamedSkillIsNotRegisteredAreNotPlanned(): void
+    {
+        $planService = $this->planService();
+        $fixtures = $this->fixtures([
+            '/fixtures/Unbound.json' => ['skill' => 'Notes.Unbound', 'cases' => [['id' => 'u1', 'agentSpaceId' => 1]]],
+            '/fixtures/Notes.FileOnly.json' => ['cases' => [['id' => 'f1', 'agentSpaceId' => 1]]],
+            '/fixtures/Bound.json' => ['skill' => 'Notes.Profile', 'cases' => [['id' => 'b1', 'agentSpaceId' => 1]]],
+        ]);
+        $fixturesByName = [];
+        foreach ($fixtures->getElements() as $agentEvalFixture) {
+            $fixturesByName[$agentEvalFixture->getName()] = $agentEvalFixture;
+        }
+
+        self::assertFalse($planService->isSkillOfFixtureRegistered($fixturesByName['Unbound']));
+        self::assertTrue($planService->isSkillOfFixtureRegistered($fixturesByName['Notes.FileOnly']), 'a fixture named by its file keeps today\'s planning');
+        self::assertTrue($planService->isSkillOfFixtureRegistered($fixturesByName['Bound']));
+        $tasks = $planService->buildToolsTasks('tools', $fixtures, AgentEvalSuitePlanOptions::forModelsAndFlavors(['MODEL'], ['call']));
+        self::assertSame(['MODEL|call|tools|f1', 'MODEL|call|tools|b1'], $tasks->getTaskIds());
     }
 
     protected function planService(): AgentEvalSuitePlanService

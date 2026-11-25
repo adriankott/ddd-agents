@@ -66,8 +66,9 @@ the tools and their results to the tools skill.
    the package file.
 9. **Host hooks are same-path subclasses** of `AgentMemoriesService`, `AgentSituationalContextService`,
    `AITextEmbeddingsService`, `AgentSpacesService` and `AgentModelInput`, resolved through the container; the defaults
-   answer "nothing". The one exception: `AgentMemoriesService` answers from the package's memory store while
-   `AI.agentMemory.enabled` is on.
+   answer "nothing". The one exception: `AgentMemoriesService` answers from the memory store (`AgentMemoryStoreService`,
+   the host port: the package's table, or a host's same-path store over its own rows) while `AI.agentMemory.enabled`
+   is on.
 
 ## Traps
 

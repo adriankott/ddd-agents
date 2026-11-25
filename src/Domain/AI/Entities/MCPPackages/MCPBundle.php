@@ -91,7 +91,8 @@ class MCPBundle extends ValueObject
     {
         $includedPackages = static::INCLUDED_PACKAGES;
         sort($includedPackages);
-        $packagesSignature = substr(md5(implode('|', $includedPackages)), 0, 12);
+        // the application's tool overlays and space argument change the documented texts and names
+        $packagesSignature = substr(md5(implode('|', $includedPackages) . '|' . MCPToolOverlays::getSchemaConfigurationFingerprint()), 0, 12);
 
         return 'mcp.doc.bundle.' . str_replace('\\', '.', static::class)
             . '.' . $packagesSignature
