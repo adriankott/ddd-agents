@@ -12,8 +12,8 @@ use DDD\Infrastructure\Services\Service;
 
 /**
  * The client tool request types of `Agent.UI` itself: read the screen (text or picture), list and open screens, mark
- * elements, and the agent window's view mode — off unless the host switches it on
- * (`AI.agentUI.windowModeRequests`).
+ * elements, the agent window's view mode — off unless the host switches it on (`AI.agentUI.windowModeRequests`) — and
+ * the typed actions on the open screen, off unless the host switches them on (`AI.agentUI.screenActionRequests`).
  */
 class AgentUIClientToolRequestTypeProviderService extends Service implements AgentClientToolRequestTypeProvider
 {
@@ -37,10 +37,23 @@ class AgentUIClientToolRequestTypeProviderService extends Service implements Age
                 static::REGISTERED_BY,
                 $this->isWindowModeRequestsEnabled()
             ),
+            AgentClientToolRequestType::create(
+                AgentClientToolRequest::TYPE_ACT_ON_SCREEN,
+                'Act on the open screen: setFilters (filters), or sort, openRow, switchTab, press on an element the screen declares for the agent (reference, direction).',
+                static::REGISTERED_BY,
+                $this->isScreenActionRequestsEnabled()
+            ),
         ] as $agentClientToolRequestType) {
             $agentClientToolRequestTypes->add($agentClientToolRequestType);
         }
         return $agentClientToolRequestTypes;
+    }
+
+    /** Whether the host switched on the typed actions on the open screen (`AI.agentUI.screenActionRequests`, default false) */
+    public function isScreenActionRequestsEnabled(): bool
+    {
+        $settings = Config::get(static::CONFIG_KEY);
+        return is_array($settings) && ($settings['screenActionRequests'] ?? false) === true;
     }
 
     /** Whether the host switched on the view mode requests (`AI.agentUI.windowModeRequests`, default false) */

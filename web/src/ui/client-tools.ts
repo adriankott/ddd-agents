@@ -8,7 +8,7 @@
  */
 
 /** What the server asks a tab to do (`AgentClientToolRequest::TYPE_*`). */
-export type ClientToolRequestType = 'READ_SCREEN' | 'LIST_TARGETS' | 'OPEN_TARGET' | 'HIGHLIGHT' | 'SET_WINDOW_MODE';
+export type ClientToolRequestType = 'READ_SCREEN' | 'LIST_TARGETS' | 'OPEN_TARGET' | 'HIGHLIGHT' | 'SET_WINDOW_MODE' | 'ACT_ON_SCREEN';
 
 /** A request as the run-state read delivers it. */
 export interface ClientToolRequestDelivery {
@@ -49,6 +49,13 @@ export const CLIENT_TOOL_OUTCOMES = {
   unknownRequest: 'UNKNOWN_REQUEST',
   unknownMode: 'UNKNOWN_MODE',
   pictureUnavailable: 'PICTURE_UNAVAILABLE',
+  actionsUnavailable: 'ACTIONS_UNAVAILABLE',
+  unknownAction: 'UNKNOWN_ACTION',
+  noFilters: 'NO_FILTERS',
+  notDeclared: 'NOT_DECLARED',
+  writeAction: 'WRITE_ACTION',
+  disabled: 'DISABLED',
+  noEffect: 'NO_EFFECT',
 } as const;
 
 // ── The navigation targets ───────────────────────────────────────────────────────────────────────────────────────────
@@ -131,6 +138,13 @@ export interface ScreenNavigator {
   describeBlockers(): ScreenNavigationBlocker | null;
   open(target: ScreenTarget, request: ScreenOpenRequest): Promise<ScreenLocation>;
   currentLocation(): ScreenLocation;
+  /** Optional: the target the open screen shows; its declared filters are what the action `setFilters` may set */
+  currentTarget?(): ScreenTarget | null;
+  /**
+   * Optional: sets the given URL filters of the open screen (an empty value removes the filter) and keeps the rest of
+   * its URL. Called only with keys the target declares. Without it `setFilters` is answered `ACTIONS_UNAVAILABLE`.
+   */
+  applyFilters?(target: ScreenTarget, filters: Record<string, string>): Promise<ScreenLocation>;
 }
 
 /** Turns the current screen into Markdown. */
@@ -142,6 +156,43 @@ export interface ScreenReader {
 export interface ScreenHighlighter {
   mark(references: string[], note: string | null): ScreenMarkResult;
   clear(): void;
+}
+
+// ── Typed actions on the open screen ─────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * What the agent may do on the open screen (`actOnScreen`): a closed list. Every action but `setFilters` works on an
+ * element the screen DECLARES for it (`data-agent-action`), found by a reference of the newest read; the agent never
+ * names a selector, and nothing here saves, deletes or sends.
+ */
+export type ScreenActionKind = 'setFilters' | 'sort' | 'openRow' | 'switchTab' | 'press';
+
+export const SCREEN_ACTION_KINDS: ScreenActionKind[] = ['setFilters', 'sort', 'openRow', 'switchTab', 'press'];
+
+/** The direction of the action `sort`; `none` returns to the list's own order. */
+export type ScreenSortDirection = 'asc' | 'desc' | 'none';
+
+export const SCREEN_SORT_DIRECTIONS: ScreenSortDirection[] = ['asc', 'desc', 'none'];
+
+/** An action on a declared element of the screen (every kind but `setFilters`, which the navigator carries out). */
+export interface ScreenActionRequest {
+  action: Exclude<ScreenActionKind, 'setFilters'>;
+  /** A reference of the newest read: `col.<key>` (sort), `row.<key>` (openRow), `t.<slug>` (switchTab), `act.<key>` (press) */
+  reference: string;
+  /** Only for `sort` */
+  direction: ScreenSortDirection | null;
+}
+
+/** What an action did: `OK` or a refusal code, one sentence (it can name labels of the screen), small facts. */
+export interface ScreenActionResult {
+  outcome: string;
+  text: string;
+  details: Record<string, string | number | boolean | null>;
+}
+
+/** Carries out a typed action on a declared element (`DomScreenActor` is the DOM default). */
+export interface ScreenActor {
+  act(request: ScreenActionRequest): Promise<ScreenActionResult>;
 }
 
 /** The size presets of a screen picture (`pictureSize` of `getCurrentScreen`). */
@@ -211,6 +262,8 @@ export interface ScreenAdapters {
   agentWindow?: AgentWindowAdapter;
   /** Optional: the path guide shown before `OPEN_TARGET` */
   pathGuide?: ScreenPathGuide;
+  /** Optional: the typed actions on declared elements (`ACT_ON_SCREEN`); without it they are answered `ACTIONS_UNAVAILABLE` */
+  actions?: ScreenActor;
   /** Optional: handlers of further request types, by type; a type of the package is never replaced */
   requestHandlers?: Record<string, ClientToolRequestHandler>;
 }

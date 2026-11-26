@@ -35,8 +35,11 @@ class AgentClientToolRequest extends ValueObject
     /** @var string Set the view mode of the agent window (off unless the host switches it on) */
     public const string TYPE_SET_WINDOW_MODE = 'SET_WINDOW_MODE';
 
+    /** @var string A typed action on the open screen: set filters, sort, open a row, switch a tab, press a declared button (off unless the host switches it on) */
+    public const string TYPE_ACT_ON_SCREEN = 'ACT_ON_SCREEN';
+
     /** @var string[] The package's own types (the registered set is open: {@see AgentClientToolRequestsService::getRegisteredRequestTypes()}) */
-    public const array TYPES = [self::TYPE_READ_SCREEN, self::TYPE_LIST_TARGETS, self::TYPE_OPEN_TARGET, self::TYPE_HIGHLIGHT, self::TYPE_SET_WINDOW_MODE];
+    public const array TYPES = [self::TYPE_READ_SCREEN, self::TYPE_LIST_TARGETS, self::TYPE_OPEN_TARGET, self::TYPE_HIGHLIGHT, self::TYPE_SET_WINDOW_MODE, self::TYPE_ACT_ON_SCREEN];
 
     /** @var string The outcome of a request the client carried out */
     public const string OUTCOME_OK = 'OK';

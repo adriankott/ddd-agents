@@ -8,6 +8,7 @@ use DDD\Presentation\Mcp\Client\Agents\AgentMandatesMCPPackage;
 use DDD\Presentation\Mcp\Client\Agents\AgentMemoriesMCPPackage;
 use DDD\Presentation\Mcp\Client\Agents\AgentTaskRunReportsMCPPackage;
 use DDD\Presentation\Mcp\Client\Agents\AgentTaskSchedulesMCPPackage;
+use DDD\Presentation\Mcp\Client\Agents\AgentUIActionsMCPPackage;
 use DDD\Presentation\Mcp\Client\Agents\AgentUIMCPPackage;
 use DDD\Presentation\Mcp\Client\Agents\AgentUIWindowMCPPackage;
 use DDD\Presentation\Mcp\Client\Agents\WebSearchMCPPackage;
@@ -38,7 +39,7 @@ return [
     AISkill::AGENT_WEB_SEARCH => [WebSearchMCPPackage::class],
     // the user's client: requests over the realtime channel (AI.agentRealtimeChannel); the window-mode package only
     // while AI.agentUI.windowModeRequests is on (AgentUIWindowMCPPackage::isAvailable())
-    AISkill::AGENT_UI => [AgentUIMCPPackage::class, AgentUIWindowMCPPackage::class],
+    AISkill::AGENT_UI => [AgentUIMCPPackage::class, AgentUIWindowMCPPackage::class, AgentUIActionsMCPPackage::class],
     // offered only while the voice channel can run: AI.agentVoice.enabled, and the session worker's WebSocket library
     // is installed (AgentVoiceCallsMCPPackage::isAvailable())
     AISkill::AGENT_VOICE => [AgentVoiceCallsMCPPackage::class],

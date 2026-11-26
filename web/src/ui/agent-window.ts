@@ -9,18 +9,18 @@ export interface AgentWindowAdapterOptions {
   modes: string[];
   /** The mode of `stepAside()`; default `aside` */
   asideMode?: string;
-  /** The request types the window steps aside for; default `OPEN_TARGET`, `HIGHLIGHT`, a picture (`READ_SCREEN`) */
+  /** The request types the window steps aside for; default `OPEN_TARGET`, `HIGHLIGHT`, `ACT_ON_SCREEN`, a picture (`READ_SCREEN`) */
   stepAsideFor?: ClientToolRequestType[];
 }
 
 /**
  * An `AgentWindowAdapter` over the application's own window state: `stepAside()` remembers the mode and shows the
  * aside mode, `restore()` goes back to the remembered mode, `setMode()` shows a known mode. Stepping aside before the
- * agent opens a screen, marks elements or takes a picture is the default.
+ * agent opens a screen, marks elements, acts on the screen or takes a picture is the default.
  */
 export const createAgentWindowAdapter = (options: AgentWindowAdapterOptions): AgentWindowAdapter => {
   const asideMode = options.asideMode ?? 'aside';
-  const stepAsideFor = options.stepAsideFor ?? ['OPEN_TARGET', 'HIGHLIGHT', 'READ_SCREEN'];
+  const stepAsideFor = options.stepAsideFor ?? ['OPEN_TARGET', 'HIGHLIGHT', 'READ_SCREEN', 'ACT_ON_SCREEN'];
   let modeBeforeAside: string | null = null;
   return {
     stepAside: async () => {

@@ -71,6 +71,7 @@ config/app/AI/Prompts/AI/Agent/*Decision.md	decisions-and-guards
 config/app/AI/Prompts/AI/Agent/OwnerMessageInjectionGateRules.md	decisions-and-guards
 # Agent.UI and System.* (ddd-module-agents-tools-specialist): the UI tools with their client channel, the platform tools
 src/Domain/AI/**/ClientTools/**	tools
+src/Presentation/Mcp/Client/Agents/AgentUIActionsMCPPackage.php	tools
 src/Presentation/Mcp/Client/Agents/AgentUIMCPPackage.php	tools
 src/Presentation/Mcp/Client/Agents/AgentUIWindowMCPPackage.php	tools
 config/app/AI/agentUI.php	tools

@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.6.14
+
+**Agent.UI: typed actions on the user's open screen (`actOnScreen`), off by default.** npm `@mgamadeus/ddd-agents` 0.6.14 in
+lockstep.
+
+- **New tool `actOnScreen`** in a package of its own, `AgentUIActionsMCPPackage` (`agent.ui.actions`, bound to the skill
+  `Agent.UI`; offered only while `AI.agentUI.screenActionRequests` is true, like the window tool). A closed list of
+  actions: `setFilters` (the URL filters the open screen's target declares; the rest of the URL stays), `sort`
+  (`col.<key>`, `asc` / `desc` / `none`), `openRow` (`row.<key>`), `switchTab` (`t.<key>`), `press` (`act.<key>`). The
+  model names a declared filter key or a reference of the newest screen read, never a selector, and never types into
+  the page. Effect READ, never reused within a turn, the client's text and the route after the action untrusted. At
+  most `AI.agentUI.maxScreenActionsPerUserTurn` (default 3) actions per message of the user, counted on success.
+- **Nothing of it writes.** The client acts only on an element that declares the action (`data-agent-action` =
+  `sort`, `open`, `tab`, `press`; a tab list's `role="tab"` counts). A button is pressed only when it is declared with
+  `data-agent-action-effect="view"`; any other effect answers `WRITE_ACTION`, and a button without a declaration (the
+  reader's `b.…`) is refused on the server before anything is sent (`NOT_DECLARED`). The refusals tell the model to use
+  its data tool or to mark the button and let the user press it.
+- **New request type `ACT_ON_SCREEN`** (`AgentClientToolRequest::TYPE_ACT_ON_SCREEN`,
+  `AgentUIClientToolRequestTypeProviderService::isScreenActionRequestsEnabled()`).
+- **Client (`./ui`)**: `DomScreenActor` (`ScreenActor`; marks the element through the highlighter, waits
+  `ACTION_MARK_BEAT_MS`, then one pointer activation, `activateElement`), `ScreenAdapters.actions`, the optional
+  `ScreenNavigator.currentTarget()` / `applyFilters()`, the outcomes `ACTIONS_UNAVAILABLE`, `UNKNOWN_ACTION`,
+  `NO_FILTERS`, `NOT_DECLARED`, `WRITE_ACTION`, `DISABLED`, `NO_EFFECT`. Unsaved changes block what leaves the
+  screen, an open dialog everything outside it. `ScreenReferenceRegistry.remember()` / `findDeclared()` (`col.`,
+  `t.`, `act.` by action key, `row.` by row key).
+- **Reader**: only where the screen declares something, a read gains `Filters (actOnScreen, action setFilters): …`
+  (option `describeFilters`), key-based tab references with `Tabs (actOnScreen, action switchTab): …`, per table
+  `Sort (…): col.<key> "Label" (asc)` and `Rows open with actOnScreen …`, and `Actions (actOnScreen, action press): …`.
+  A screen without declarations reads as before.
+- **`AgentUIMCPPackage`**: the per-turn counter is public and shared (`countToolCallsOfUserTurn()`,
+  `readCounterOfUserTurn()`, `incrementCounterOfUserTurn()`); the existing methods delegate, behaviour unchanged.
+- **Evaluations**: `AgentScriptedUIClientService` answers `ACT_ON_SCREEN` from the fixture keys `filters`, `actions`
+  and `screensByAction` and logs each action or refusal.
+- **Host steps** (all optional; without them nothing changes): `screenActionRequests: true` in the host's
+  `agentUI.php`; the binding line in a replaced `skillPackages.php`; a same-path subclass of
+  `AgentUIActionsMCPPackage` where the host gates the UI tools; `actions: new DomScreenActor(…)` in the client's
+  adapters (with `@mgamadeus/ddd-admin-ui`: its `actorOptions`); `'ACT_ON_SCREEN'` wherever the host lists the request
+  types its agent window steps aside for.
+- `public-api.json` declares the purposed-start names of 0.6.9 (`PurposeStartRequest`, `PurposeSubject`,
+  `StartedPurposeConversation`, `WirePurposeStartResponse`).
+
 ## 0.6.13
 
 **The usage record names the conversation or voice call a cost was made for.** No web change; npm

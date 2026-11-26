@@ -102,7 +102,7 @@ conversation in the URL. Keep the default (or any value above 0) and let the for
 ## Agent.UI on the client (`/ui`)
 
 The UI tools of the agent (`getCurrentScreen`, `listScreens`, `openScreen`, `highlightOnScreen`, optionally
-`setAgentWindowMode`) send requests to the user's open client; `useAgentUIClient(adapters)` runs them and the
+`setAgentWindowMode` and `actOnScreen`) send requests to the user's open client; `useAgentUIClient(adapters)` runs them and the
 conversation client posts the answers (`createAgentsHttpConversationClient({ uiClient })`).
 
 ```ts
@@ -113,8 +113,30 @@ const uiClient = useAgentUIClient({
   picture: createDomScreenPictureCapturer(),          // optional: getCurrentScreen(format: picture)
   pathGuide: createDomScreenPathGuide({ findPathElements, currentRoute }), // optional
   agentWindow: createAgentWindowAdapter({ getMode, applyMode, modes: ['docked', 'aside'] }), // optional
+  actions: new DomScreenActor({ registry, currentLocation, describeBlockers, highlighter, describeAction, settle }), // optional: actOnScreen
 });
 ```
+
+- **Screen actions** (`actOnScreen`, off on the server unless `AI.agentUI.screenActionRequests`): with the `actions`
+  adapter the agent can sort a table, open a row, switch a tab and press a button, and with a navigator that answers
+  `currentTarget()` and `applyFilters(target, filters)` set the URL filters the open screen's target declares.
+  `DomScreenActor` acts only on an element that declares the action and that a reference of the newest read names; it
+  takes no selector, types nothing and submits no form:
+
+  | Declaration | Reference | Action |
+  |---|---|---|
+  | `data-agent-action="sort"` `data-agent-action-key="created"` on the sort control (the state: `aria-sort` of its cell) | `col.created` | `sort` (`asc`, `desc`, `none`) |
+  | `data-agent-action="open"` on the element with `data-row-key` | `row.<key>` | `openRow` |
+  | `data-agent-action="tab"` `data-agent-action-key="crashes"`, or `role="tab"` | `t.crashes` | `switchTab` |
+  | `data-agent-action="press"` `data-agent-action-key="load-more"` `data-agent-action-effect="view"` | `act.load-more` | `press` |
+
+  A button with any other effect, or without a declaration, is never pressed (`WRITE_ACTION`, `NOT_DECLARED`): declare
+  `view` only for a button that changes nothing stored. Before it acts the actor marks the element (the highlighter,
+  with the note of `describeAction(action, label)`, which the application translates) and waits `ACTION_MARK_BEAT_MS`;
+  unsaved changes block what leaves the screen, an open dialog everything outside it. The reader lists what is
+  declared (`Filters`, `Tabs`, `Sort`, `Actions` lines; `describeFilters` names the filters and their URL values), so a
+  screen without declarations offers nothing. `@mgamadeus/ddd-admin-ui` declares its tables, tabs and filter buttons
+  and brings the navigator and the actor's options.
 
 - A mark: `<a href="/orders" data-agent-anchor="orders" data-agent-group="Sales" data-agent-filters="customerId">`;
   further attributes `data-agent-label`, `data-agent-route` (`/orders/:orderId`), `data-agent-parameters`,

@@ -11,6 +11,8 @@
  * - `t.<slug>` a tab
  * - `a.<anchor>` an anchor the application set (`data-agent-anchor`)
  * - `nav.<key>` an entry or group of the application's main menu (`data-nav-key`, `data-nav-group`)
+ * - `col.<key>` a sortable column of a table (`data-agent-action="sort"`), for the action `sort`
+ * - `act.<key>` a button the screen declares for the agent (`data-agent-action="press"` with the effect `view`)
  */
 
 /**
@@ -91,13 +93,35 @@ export const formatFieldLine = (field: FieldFacts): string => {
   return `- ${capValue(field.label, 80) || field.reference} (${field.reference}, ${field.kind}): ${value}${flags.length > 0 ? ` · ${flags.join(' · ')}` : ''}`;
 };
 
+/** A column the table declares as sortable. */
+export interface SortColumnFacts {
+  reference: string;
+  label: string;
+  /** `asc`, `desc`, or null when the table is not sorted by it */
+  direction: 'asc' | 'desc' | null;
+}
+
 export interface TableFacts {
   caption: string | null;
   columns: string[];
   rows: { reference: string; cells: string[]; selected?: boolean }[];
   /** All rows of the table in the DOM (more than shown) */
   totalRows: number;
+  /** The columns declared sortable (`data-agent-action="sort"`) */
+  sortColumns?: SortColumnFacts[];
+  /** Whether the rows declare an open action (`data-agent-action="open"`) */
+  rowsOpen?: boolean;
 }
+
+/** The line that tells the agent the rows (or cards) of a list open with the action `openRow`. */
+export const ROWS_OPEN_LINE = 'Rows open with actOnScreen (action openRow, reference row.<key>).';
+
+/** `Sort (actOnScreen, action sort): col.created "Created" (desc) · col.id "ID"` */
+export const formatSortColumns = (sortColumns: SortColumnFacts[]): string | null => {
+  if (sortColumns.length === 0) return null;
+  const shown = sortColumns.map(column => `${column.reference} "${capValue(column.label, 40)}"${column.direction ? ` (${column.direction})` : ''}`);
+  return `Sort (actOnScreen, action sort): ${shown.join(' · ')}`;
+};
 
 /**
  * A table as `| … |` lines with the row reference first, at most {@link MAX_TABLE_ROWS} rows, cells cut to
@@ -119,6 +143,9 @@ export const formatTable = (table: TableFacts, maxRows: number = MAX_TABLE_ROWS)
     lines.push(`| ${row.reference}${row.selected ? ' (selected)' : ''} | ${cells.join(' | ')} |`);
   }
   if (table.totalRows > shownRows.length) lines.push(`… ${table.totalRows - shownRows.length} more rows on screen`);
+  const sortLine = formatSortColumns(table.sortColumns ?? []);
+  if (sortLine) lines.push(sortLine);
+  if (table.rowsOpen && shownRows.length > 0) lines.push(ROWS_OPEN_LINE);
   return lines;
 };
 
@@ -134,6 +161,13 @@ export const formatButtons = (buttons: ButtonFacts[]): string | null => {
   const shown = buttons.slice(0, MAX_BUTTONS).map(button => `${button.reference} "${capValue(button.label, 40)}"${button.disabled ? ' (disabled)' : ''}`);
   const more = buttons.length > MAX_BUTTONS ? ` · … ${buttons.length - MAX_BUTTONS} more` : '';
   return `Buttons: ${shown.join(' · ')}${more}`;
+};
+
+/** `Actions (actOnScreen, action press): act.load-more "Load more" · act.clear-filters "Clear filters" (disabled)` */
+export const formatActions = (actions: ButtonFacts[]): string | null => {
+  if (actions.length === 0) return null;
+  const shown = actions.slice(0, MAX_BUTTONS).map(action => `${action.reference} "${capValue(action.label, 40)}"${action.disabled ? ' (disabled)' : ''}`);
+  return `Actions (actOnScreen, action press): ${shown.join(' · ')}`;
 };
 
 /** Joins the parts of a read and cuts the whole at `maxChars`, saying so. */

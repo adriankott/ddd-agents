@@ -87,6 +87,37 @@ describe("DomScreenReader", () => {
     expect(snapshot.references["nav.home"]).toBe("Startseite");
   });
 
+  it("lists what the screen declares for actOnScreen: sortable columns, rows that open, declared buttons, the filters", () => {
+    document.body.innerHTML =
+      '<main><h1>Tickets</h1><table><thead><tr><th>ID</th>' +
+      '<th aria-sort="descending"><button data-agent-action="sort" data-agent-action-key="created">Created</button></th>' +
+      '<th><button data-agent-action="sort" data-agent-action-key="updated">Updated</button></th></tr></thead>' +
+      '<tbody><tr data-row-key="13066" data-agent-action="open"><td>13066</td><td>3 Nov</td><td>4 Nov</td></tr></tbody></table>' +
+      '<button data-agent-action="press" data-agent-action-key="load-more" data-agent-action-effect="view">Load more</button>' +
+      '<button data-agent-action="press" data-agent-action-key="archive" data-agent-action-effect="write">Archive</button><button>Delete</button></main>';
+    const { reader, registry } = createReader({ describeFilters: () => "status=OPEN · priority · channel" });
+
+    const snapshot = reader.read({ maxChars: 12000 });
+
+    expect(snapshot.markdown).toContain("Filters (actOnScreen, action setFilters): status=OPEN · priority · channel");
+    expect(snapshot.markdown).toContain('Sort (actOnScreen, action sort): col.created "Created" (desc) · col.updated "Updated"');
+    expect(snapshot.markdown).toContain("Rows open with actOnScreen (action openRow, reference row.<key>).");
+    expect(snapshot.markdown).toContain('Actions (actOnScreen, action press): act.load-more "Load more"');
+    expect(snapshot.markdown).toContain('Buttons: b.archive "Archive" · b.delete "Delete"');
+    expect(registry.find("col.updated")?.textContent).toBe("Updated");
+    expect(registry.findDeclared("act.load-more")?.textContent).toBe("Load more");
+    expect(registry.findDeclared("b.delete")).toBeNull();
+  });
+
+  it("writes none of the action lines for a screen that declares nothing", () => {
+    document.body.innerHTML =
+      `<main><h1>Tickets</h1><table><thead><tr><th>ID</th></tr></thead><tbody>${ticketRows(2)}</tbody></table><button>Delete</button></main>`;
+
+    const markdown = createReader().reader.read({ maxChars: 12000 }).markdown;
+
+    expect(markdown).not.toContain("actOnScreen");
+  });
+
   it("names the agent window and the browser size", () => {
     document.body.innerHTML = "<main><h1>Support-Center</h1></main>";
     const size = `${Math.round(window.innerWidth)}×${Math.round(window.innerHeight)} px`;

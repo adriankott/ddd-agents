@@ -17,6 +17,10 @@ The ui note names the open screen and record: "which screen is this" needs no to
 - To point at it: read the screen (or open it with `includeScreen: true`), then `highlightOnScreen` with its
   references. A known anchor (`a.…`) needs no read.
 - `openScreen` only when the user asks to go there or to be shown it; the key comes from `listScreens`.
+- `actOnScreen`, when you have it: only when the user asks you to do it on their screen ("filter this list", "sort by
+  date", "open that row", "switch to the tab"). Filter keys, `col.…`, `row.…`, `t.…` and `act.…` come from the newest
+  `getCurrentScreen`. It never saves, deletes or sends: change data with your data tools, or mark the button and let
+  the user press it. `Not done: …` is final for that element.
 - `Not opened: … unsaved changes`: tell the user, do not retry. "No client attached" or "background": answer from the
   data tools.
 - Say what you opened or marked in a sentence; never claim a save.

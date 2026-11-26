@@ -9,7 +9,10 @@ import {
   MAX_ANSWER_TEXT_CHARS,
   MIN_SECONDS_LEFT_TO_START,
   parseClientToolArguments,
+  SCREEN_ACTION_KINDS,
+  SCREEN_SORT_DIRECTIONS,
   type ClientToolRequestType,
+  type ScreenActionKind,
   type ScreenAdapters,
   type ScreenPictureRenderMode,
   type ScreenPictureSize,
@@ -17,10 +20,16 @@ import {
 } from "./client-tools";
 
 /** The request types of the package; a handler of the application never replaces them. */
-const PACKAGE_REQUEST_TYPES: string[] = ['READ_SCREEN', 'LIST_TARGETS', 'OPEN_TARGET', 'HIGHLIGHT', 'SET_WINDOW_MODE'];
+const PACKAGE_REQUEST_TYPES: string[] = ['READ_SCREEN', 'LIST_TARGETS', 'OPEN_TARGET', 'HIGHLIGHT', 'SET_WINDOW_MODE', 'ACT_ON_SCREEN'];
 
 /** The request types the agent window steps aside for by default. */
-const STEP_ASIDE_REQUEST_TYPES: ClientToolRequestType[] = ['OPEN_TARGET', 'HIGHLIGHT', 'READ_SCREEN'];
+const STEP_ASIDE_REQUEST_TYPES: ClientToolRequestType[] = ['OPEN_TARGET', 'HIGHLIGHT', 'READ_SCREEN', 'ACT_ON_SCREEN'];
+
+/** The most filters one `setFilters` action takes (the server's `AgentUIMCPPackage::MAX_FILTERS`). */
+const MAX_ACTION_FILTERS = 6;
+
+/** The most characters of one filter value (the server's `AgentUIMCPPackage::MAX_TOKEN_CHARS`). */
+const MAX_FILTER_VALUE_CHARS = 100;
 
 const PICTURE_SIZES: ScreenPictureSize[] = ['small', 'medium', 'large'];
 
@@ -106,6 +115,8 @@ export class ClientToolRequestRunner {
           return this.highlight(parameters);
         case 'SET_WINDOW_MODE':
           return await this.setWindowMode(parameters);
+        case 'ACT_ON_SCREEN':
+          return await this.actOnScreen(parameters);
         default:
           return await this.runRequestOfApplication(delivery, parameters);
       }
@@ -214,6 +225,57 @@ export class ClientToolRequestRunner {
     if (parameters.includeScreen !== true) return { outcome: CLIENT_TOOL_OUTCOMES.ok, text: '', details };
     const snapshot = this.adapters.reader.read({ maxChars: MAX_SCREEN_CHARS });
     return { outcome: CLIENT_TOOL_OUTCOMES.ok, text: snapshot.markdown, details };
+  }
+
+  /**
+   * A typed action on the open screen: `setFilters` through the navigator (the filters the screen's target declares),
+   * every other kind through the actor on an element the screen declares for it. With `includeScreen` the answer
+   * carries the screen after the action.
+   */
+  protected async actOnScreen(parameters: Record<string, unknown>): Promise<ClientToolAnswer> {
+    const action = SCREEN_ACTION_KINDS.find(kind => kind === parameters.action) as ScreenActionKind | undefined;
+    if (!action) return refusal(CLIENT_TOOL_OUTCOMES.unknownAction);
+    const answer = action === 'setFilters' ? await this.setFilters(parameters) : await this.actOnElement(action, parameters);
+    if (answer.outcome !== CLIENT_TOOL_OUTCOMES.ok || parameters.includeScreen !== true) return answer;
+    const snapshot = this.adapters.reader.read({ maxChars: MAX_SCREEN_CHARS });
+    return { ...answer, text: `${answer.text}\n${snapshot.markdown}` };
+  }
+
+  protected async actOnElement(action: Exclude<ScreenActionKind, 'setFilters'>, parameters: Record<string, unknown>): Promise<ClientToolAnswer> {
+    const actor = this.adapters.actions;
+    if (!actor) return refusal(CLIENT_TOOL_OUTCOMES.actionsUnavailable);
+    if (!isClientToolToken(parameters.reference)) return refusal(CLIENT_TOOL_OUTCOMES.missingParameter);
+    const direction = SCREEN_SORT_DIRECTIONS.find(candidate => candidate === parameters.direction) ?? null;
+    await this.stepAgentWindowAside('ACT_ON_SCREEN');
+    return actor.act({ action, reference: parameters.reference, direction });
+  }
+
+  /** Sets and clears URL filters of the open screen: only keys its target declares, the rest of the URL stays. */
+  protected async setFilters(parameters: Record<string, unknown>): Promise<ClientToolAnswer> {
+    const navigator = this.adapters.navigator;
+    if (!navigator.currentTarget || !navigator.applyFilters) return refusal(CLIENT_TOOL_OUTCOMES.actionsUnavailable);
+    const target = navigator.currentTarget();
+    if (!target || target.filters.length === 0) return refusal(CLIENT_TOOL_OUTCOMES.noFilters);
+    const entries = (Array.isArray(parameters.filters) ? parameters.filters : []).slice(0, MAX_ACTION_FILTERS);
+    if (entries.length === 0) return refusal(CLIENT_TOOL_OUTCOMES.missingParameter);
+    const filters: Record<string, string> = {};
+    for (const entry of entries) {
+      const [key, ...valueParts] = String(entry).split('=');
+      if (!target.filters.some(targetFilter => targetFilter.key === key) || valueParts.length === 0) {
+        return { outcome: CLIENT_TOOL_OUTCOMES.unknownFilter, text: `Filters of this screen: ${target.filters.map(filter => filter.key).join(', ')}.`, details: {} };
+      }
+      filters[key] = valueParts.join('=').slice(0, MAX_FILTER_VALUE_CHARS);
+    }
+    const blocker = navigator.describeBlockers();
+    if (blocker) return { outcome: blocker.outcome, text: blocker.reason, details: {} };
+    await this.stepAgentWindowAside('ACT_ON_SCREEN');
+    const location = await navigator.applyFilters(target, filters);
+    const changes = Object.entries(filters).map(([key, value]) => (value === '' ? `${key} cleared` : `${key}=${value}`));
+    return {
+      outcome: CLIENT_TOOL_OUTCOMES.ok,
+      text: `Filters of ${target.key}: ${changes.join(', ')}.`,
+      details: { route: location.route, title: location.title },
+    };
   }
 
   protected highlight(parameters: Record<string, unknown>): ClientToolAnswer {

@@ -30,7 +30,10 @@ use DDD\Infrastructure\Services\Service;
  * Refused in the `prod` environment ({@see isScriptedClientAllowed()}). A fixture is one JSON object: `markdown` (the
  * screen as `getCurrentScreen` reads it), `route`, `title`, `unsavedChanges`, `dialogOpen`, `references` (reference =>
  * label), `screensByTarget` (`<target>[.<tab>]` => fixture name); the fixture `catalog` holds `lines` (the
- * `listScreens` lines) and `targetKeys`.
+ * `listScreens` lines) and `targetKeys`. For `actOnScreen`: `filters` (the filter keys the screen declares), `actions`
+ * (reference => `sort`, `open`, `tab`, `press` or `press:write`: what the element declares; a reference of
+ * `references` without an entry declares nothing) and `screensByAction` (`<action> <reference>`, or `setFilters` =>
+ * the fixture the screen becomes).
  */
 class AgentScriptedUIClientService extends Service
 {
@@ -124,6 +127,7 @@ class AgentScriptedUIClientService extends Service
             AgentClientToolRequest::TYPE_OPEN_TARGET => $this->answerOpenTarget($screen, $request),
             AgentClientToolRequest::TYPE_HIGHLIGHT => $this->answerHighlight($screen, $request),
             AgentClientToolRequest::TYPE_SET_WINDOW_MODE => ['OK', null, [], 'window mode ' . (string)$request->getArgument('mode'), null],
+            AgentClientToolRequest::TYPE_ACT_ON_SCREEN => $this->answerActOnScreen($screen, $request),
             default => ['UNKNOWN_REQUEST', 'This request type is not known.', [], 'unknown request', null],
         };
         $state['log'][] = $logLine;
@@ -254,6 +258,99 @@ class AgentScriptedUIClientService extends Service
             'marked ' . ($markedLines === [] ? 'nothing' : implode(' ', array_slice($references, 0, 5))),
             null,
         ];
+    }
+
+    /** @var string[] The declaration (`actions` of a fixture) each element action needs, as the npm actor checks it */
+    public const array DECLARATION_OF_ACTION = ['sort' => 'sort', 'openRow' => 'open', 'switchTab' => 'tab', 'press' => 'press'];
+
+    /**
+     * A typed action as the npm runner and actor answer it: filters only of the screen's declared keys; every other
+     * action only on a reference the screen declares for it, a button only with the effect view; unsaved changes
+     * refuse what leaves the screen.
+     *
+     * @param mixed[] $screen
+     * @return mixed[] outcome, text, details, log line, next screen
+     * @throws BadRequestException
+     */
+    protected function answerActOnScreen(array $screen, AgentClientToolRequest $request): array
+    {
+        $action = (string)$request->getArgument('action');
+        $includesScreen = $request->getArgument('includeScreen') === true;
+        $hasUnsavedChanges = ($screen['unsavedChanges'] ?? false) === true;
+        if ($action === 'setFilters') {
+            $filters = $request->getArgument('filters');
+            $filters = is_array($filters) ? $filters : [];
+            $logLine = 'set filters ' . implode(' ', $filters);
+            $declaredFilterKeys = array_map('strval', (array)($screen['filters'] ?? []));
+            if ($declaredFilterKeys === []) {
+                return ['NO_FILTERS', '', [], 'refused ' . $logLine . ': no filters', null];
+            }
+            $changes = [];
+            foreach ($filters as $filter) {
+                [$filterKey, $filterValue] = array_pad(explode('=', (string)$filter, 2), 2, null);
+                if ($filterValue === null || !in_array($filterKey, $declaredFilterKeys, true)) {
+                    return ['UNKNOWN_FILTER', 'Filters of this screen: ' . implode(', ', $declaredFilterKeys) . '.', [], 'refused ' . $logLine . ': unknown filter', null];
+                }
+                $changes[] = $filterValue === '' ? $filterKey . ' cleared' : $filterKey . '=' . $filterValue;
+            }
+            if ($hasUnsavedChanges) {
+                return ['UNSAVED_CHANGES', 'The open form has unsaved changes.', $this->buildDetails($screen), 'refused ' . $logLine . ': unsaved changes', null];
+            }
+            return $this->buildActedAnswer($screen, 'Filters of the screen: ' . implode(', ', $changes) . '.', $logLine, 'setFilters', $includesScreen);
+        }
+        $reference = (string)$request->getArgument('reference');
+        $direction = (string)$request->getArgument('direction');
+        $logLine = match ($action) {
+            'sort' => 'sorted ' . $reference . ' ' . $direction,
+            'openRow' => 'opened row ' . $reference,
+            'switchTab' => 'switched tab ' . $reference,
+            'press' => 'pressed ' . $reference,
+            default => 'unknown action ' . $action,
+        };
+        $neededDeclaration = static::DECLARATION_OF_ACTION[$action] ?? null;
+        if ($neededDeclaration === null) {
+            return ['UNKNOWN_ACTION', '', [], 'refused ' . $logLine, null];
+        }
+        $labels = (array)($screen['references'] ?? []);
+        $declarations = (array)($screen['actions'] ?? []);
+        if (!isset($labels[$reference]) && !isset($declarations[$reference])) {
+            return ['NOT_ON_SCREEN', '', [], 'refused ' . $logLine . ': not on screen', null];
+        }
+        $name = $reference . (isset($labels[$reference]) ? ' "' . $labels[$reference] . '"' : '');
+        [$declaredAction, $declaredEffect] = array_pad(explode(':', (string)($declarations[$reference] ?? ''), 2), 2, 'view');
+        if ($declaredAction !== $neededDeclaration) {
+            return ['NOT_DECLARED', $name, [], 'refused ' . $logLine . ': not declared', null];
+        }
+        if ($action === 'press' && $declaredEffect !== 'view') {
+            return ['WRITE_ACTION', $name, [], 'refused ' . $logLine . ': write', null];
+        }
+        if ($hasUnsavedChanges && $action === 'openRow') {
+            return ['UNSAVED_CHANGES', 'The open form has unsaved changes.', $this->buildDetails($screen), 'refused ' . $logLine . ': unsaved changes', null];
+        }
+        $sentence = match ($action) {
+            'sort' => 'Sorted by ' . $name . ' ' . ($direction === 'asc' ? 'ascending' : ($direction === 'desc' ? 'descending' : 'in the list\'s own order')) . '.',
+            'openRow' => 'Opened ' . $name . '.',
+            'switchTab' => 'Switched to tab ' . $name . '.',
+            default => 'Pressed ' . $name . '.',
+        };
+        return $this->buildActedAnswer($screen, $sentence, $logLine, $action . ' ' . $reference, $includesScreen);
+    }
+
+    /**
+     * The answer of an action that ran: the sentence, the screen it leads to (`screensByAction`) and, when asked, that
+     * screen's Markdown.
+     *
+     * @param mixed[] $screen
+     * @return mixed[] outcome, text, details, log line, next screen
+     * @throws BadRequestException
+     */
+    protected function buildActedAnswer(array $screen, string $sentence, string $logLine, string $screenKey, bool $includesScreen): array
+    {
+        $screensByAction = (array)($screen['screensByAction'] ?? []);
+        $nextScreenName = isset($screensByAction[$screenKey]) ? (string)$screensByAction[$screenKey] : null;
+        $shownScreen = $nextScreenName !== null ? $this->loadFixture($nextScreenName) : $screen;
+        $text = $sentence . ($includesScreen ? "\n" . (string)($shownScreen['markdown'] ?? '') : '');
+        return ['OK', $text, $this->buildDetails($shownScreen), $logLine, $nextScreenName];
     }
 
     /**

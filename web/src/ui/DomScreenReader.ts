@@ -4,6 +4,7 @@ import {
   capValue,
   type FieldFacts,
   fieldReferenceNameOf,
+  formatActions,
   formatButtons,
   formatFieldLine,
   formatTable,
@@ -12,7 +13,9 @@ import {
   MAX_TABLE_ROWS,
   oneLine,
   ReferenceNames,
+  ROWS_OPEN_LINE,
   slugOf,
+  type SortColumnFacts,
   type TableFacts,
 } from "./screen-markdown";
 
@@ -30,7 +33,29 @@ export const AGENT_ATTRIBUTES = {
   navKey: 'data-nav-key',
   /** The key of a main menu group (@mgamadeus/ddd-admin-ui): `nav.<value>`; its entries sit inside it */
   navGroup: 'data-nav-group',
+  /**
+   * What the agent may do with the element (`actOnScreen`): `sort` (a column's sort control), `open` (a row or card
+   * that opens its record), `tab` (a tab), `press` (a button). Set by @mgamadeus/ddd-admin-ui on its tables, cards
+   * and tabs, by the application on its own buttons. An element without it is never acted on.
+   */
+  action: 'data-agent-action',
+  /** The stable key of a declared element: the sort key (`col.<value>`), the tab id, the button (`act.<value>`) */
+  actionKey: 'data-agent-action-key',
+  /** Only on `press`: `view` (changes what the screen shows, nothing stored). Anything else counts as a write and is refused. */
+  actionEffect: 'data-agent-action-effect',
 } as const;
+
+/** The values of `data-agent-action`. */
+export const AGENT_ACTIONS = { sort: 'sort', open: 'open', tab: 'tab', press: 'press' } as const;
+
+/** The one effect of a declared button the agent may press. */
+export const AGENT_ACTION_EFFECT_VIEW = 'view';
+
+const DECLARED_TAB_SELECTOR = `[${AGENT_ATTRIBUTES.action}="${AGENT_ACTIONS.tab}"]`;
+
+const DECLARED_SORT_SELECTOR = `[${AGENT_ATTRIBUTES.action}="${AGENT_ACTIONS.sort}"]`;
+
+const DECLARED_PRESS_SELECTOR = `[${AGENT_ATTRIBUTES.action}="${AGENT_ACTIONS.press}"]`;
 
 /** Elements never read. */
 const SKIPPED_SELECTOR = `[${AGENT_ATTRIBUTES.skip}], script, style, noscript, template, svg, [aria-hidden="true"], [hidden]`;
@@ -90,6 +115,33 @@ export class ScreenReferenceRegistry {
     return element?.isConnected ? element : null;
   }
 
+  /** Adds one reference to the newest read (an element found without a read, so the highlighter can mark it). */
+  remember(reference: string, element: Element): void {
+    this.elements.set(reference, element);
+  }
+
+  /**
+   * A declared element found on the page even without a read: `col.<key>` (sort), `t.<key>` (tab), `act.<key>`
+   * (press) by its action key, `row.<key>` by its row key. Null for every other reference.
+   */
+  findDeclared(reference: string): Element | null {
+    const separator = reference.indexOf('.');
+    if (separator <= 0) return null;
+    const key = reference.slice(separator + 1);
+    const selector = {
+      col: `[${AGENT_ATTRIBUTES.action}="${AGENT_ACTIONS.sort}"][${AGENT_ATTRIBUTES.actionKey}]`,
+      t: `[${AGENT_ATTRIBUTES.action}="${AGENT_ACTIONS.tab}"][${AGENT_ATTRIBUTES.actionKey}]`,
+      act: `[${AGENT_ATTRIBUTES.action}="${AGENT_ACTIONS.press}"][${AGENT_ATTRIBUTES.actionKey}]`,
+      row: `[${AGENT_ATTRIBUTES.rowKey}]`,
+    }[reference.slice(0, separator)];
+    if (!selector) return null;
+    const keyAttribute = reference.startsWith('row.') ? AGENT_ATTRIBUTES.rowKey : AGENT_ATTRIBUTES.actionKey;
+    for (const element of Array.from(document.querySelectorAll(selector))) {
+      if (slugOf(element.getAttribute(keyAttribute) ?? '') === slugOf(key) && !element.closest(`[${AGENT_ATTRIBUTES.skip}]`)) return element;
+    }
+    return null;
+  }
+
   /** An anchor is found on the page even without a read. */
   findAnchor(reference: string): Element | null {
     if (!reference.startsWith('a.')) return null;
@@ -115,6 +167,24 @@ const isRendered = (element: Element): boolean => {
 
 const isChecked = (checkbox: Element): boolean =>
   checkbox instanceof HTMLInputElement ? checkbox.checked : checkbox.getAttribute('aria-checked') === 'true';
+
+/** Whether a row or card declares that it opens its record (`data-agent-action="open"`). */
+export const isOpenableByAgent = (row: Element): boolean => row.getAttribute(AGENT_ATTRIBUTES.action) === AGENT_ACTIONS.open;
+
+/** Whether a button is declared for the agent with the effect `view`: the only buttons `actOnScreen` presses. */
+export const isPressableByAgent = (button: Element): boolean =>
+  button.getAttribute(AGENT_ATTRIBUTES.action) === AGENT_ACTIONS.press &&
+  button.getAttribute(AGENT_ATTRIBUTES.actionEffect) === AGENT_ACTION_EFFECT_VIEW;
+
+/** The sort a declared sort control shows: the `aria-sort` of its column header. */
+export const sortDirectionOf = (control: Element): 'asc' | 'desc' | null => {
+  const ariaSort = control.closest('th, [role="columnheader"]')?.getAttribute('aria-sort');
+  return ariaSort === 'ascending' ? 'asc' : ariaSort === 'descending' ? 'desc' : null;
+};
+
+/** Whether a tab is the open one: `aria-selected` (a tab list), `aria-current` (a route tab), `aria-pressed` (a button tab). */
+export const isOpenTab = (tab: Element): boolean =>
+  tab.getAttribute('aria-selected') === 'true' || tab.getAttribute('aria-current') !== null || tab.getAttribute('aria-pressed') === 'true';
 
 const textOf = (element: Element | null | undefined): string => {
   if (!element) return '';
@@ -146,6 +216,9 @@ export const labelOfElement = (element: Element): string => {
   if (placeholder) return oneLine(placeholder);
   return textOf(element).slice(0, 80);
 };
+
+/** The name of a tab: its accessible label, else its text. */
+const labelOfTab = (tab: Element): string => tab.getAttribute('aria-label') ?? textOf(tab);
 
 /**
  * The key of a table row: `data-row-key` (the package's list rows and cards, 0.3.10); a table of the host without it
@@ -206,6 +279,11 @@ export interface DomScreenReaderOptions {
    * browser window's size (`Agent window: … · browser 1440×900 px`), so the agent knows what the user sees beside it.
    */
   describeAgentWindow?: () => string | null;
+  /**
+   * Optional: the URL filters of the open screen with their values, e.g. `status=OPEN · priority · channel` (a filter
+   * without a value is not set). The read writes them as `Filters (actOnScreen, action setFilters): …`.
+   */
+  describeFilters?: () => string | null;
 }
 
 /**
@@ -244,6 +322,8 @@ export class DomScreenReader implements ScreenReader {
     const unsaved = this.options.describeUnsavedChanges();
     parts.push(`Unsaved changes: ${unsaved}`);
     parts.push(this.describeWindow());
+    const filters = this.options.describeFilters?.() ?? null;
+    if (filters) parts.push(`Filters (actOnScreen, action setFilters): ${oneLine(filters)}`);
 
     const root = this.options.findRoot();
     const dialogs = Array.from(document.querySelectorAll('[role="dialog"], [role="alertdialog"]')).filter(isRendered);
@@ -254,16 +334,17 @@ export class DomScreenReader implements ScreenReader {
     if (root) {
       // the page's own tabs only: a tab list inside a form is a field's (the language tabs of a translatable text,
       // 14 per field on a long form); its open tab shows in the field's value
-      const tabs = Array.from(root.querySelectorAll('[role="tab"], nav[aria-label] a[aria-current]'))
+      // a declared tab (`data-agent-action="tab"`) is listed with its key, also while it is not the open one
+      const tabs = Array.from(root.querySelectorAll(`[role="tab"], ${DECLARED_TAB_SELECTOR}, nav[aria-label] a[aria-current]`))
         .filter(tab => isRendered(tab) && tab.closest('form, fieldset') === null)
         .slice(0, MAX_PAGE_TABS);
       if (tabs.length > 0) {
         const tabNames = tabs.map(tab => {
-          const reference = register(`t.${slugOf(textOf(tab))}`, tab);
-          const current = tab.getAttribute('aria-selected') === 'true' || tab.getAttribute('aria-current') !== null;
-          return `${reference} "${capValue(textOf(tab), 40)}"${current ? ' (open)' : ''}`;
+          const reference = register(`t.${slugOf(tab.getAttribute(AGENT_ATTRIBUTES.actionKey) ?? textOf(tab))}`, tab);
+          return `${reference} "${capValue(labelOfTab(tab), 40)}"${isOpenTab(tab) ? ' (open)' : ''}`;
         });
-        parts.push(`Tabs: ${tabNames.join(' · ')}`);
+        const switchable = tabs.some(tab => tab.matches(`[role="tab"], ${DECLARED_TAB_SELECTOR}`));
+        parts.push(`Tabs${switchable ? ' (actOnScreen, action switchTab)' : ''}: ${tabNames.join(' · ')}`);
       }
       const messages = Array.from(root.querySelectorAll('[role="alert"], [role="status"]')).filter(isRendered);
       for (const message of messages) {
@@ -387,19 +468,26 @@ export class DomScreenReader implements ScreenReader {
       lines.push(formatFieldLine(facts));
     }
     const buttons: ButtonFacts[] = [];
-    for (const button of Array.from(container.querySelectorAll(BUTTON_SELECTOR))) {
+    const actions: ButtonFacts[] = [];
+    for (const button of Array.from(container.querySelectorAll(`${BUTTON_SELECTOR}, ${DECLARED_PRESS_SELECTOR}`))) {
       if (seen.has(button) || !isRendered(button) || button.closest('table, [role="grid"], [role="tablist"]')) continue;
+      // a declared tab stands in the `Tabs:` line of the page
+      if (button.matches(DECLARED_TAB_SELECTOR) && button.closest('form, fieldset') === null) continue;
       seen.add(button);
       const label = labelOfElement(button);
       if (label === '') continue;
-      buttons.push({
-        reference: register(`b.${slugOf(label)}`, button),
-        label,
-        disabled: button.hasAttribute('disabled') || button.getAttribute('aria-disabled') === 'true',
-      });
+      const disabled = button.hasAttribute('disabled') || button.getAttribute('aria-disabled') === 'true';
+      const actionKey = isPressableByAgent(button) ? button.getAttribute(AGENT_ATTRIBUTES.actionKey) : null;
+      if (actionKey) {
+        actions.push({ reference: register(`act.${slugOf(actionKey)}`, button), label, disabled });
+        continue;
+      }
+      buttons.push({ reference: register(`b.${slugOf(label)}`, button), label, disabled });
     }
     const buttonLine = formatButtons(buttons);
     if (buttonLine) lines.push(buttonLine);
+    const actionLine = formatActions(actions);
+    if (actionLine) lines.push(actionLine);
     return lines;
   }
 
@@ -424,6 +512,7 @@ export class DomScreenReader implements ScreenReader {
         lines.push(`- ${register(`row.${rowKeyOf(card, null, 0)}`, card)}${selected}: ${capValue(textOf(card), 160)}`);
       }
       if (cards.length > MAX_TABLE_ROWS) lines.push(`… ${cards.length - MAX_TABLE_ROWS} more cards on screen`);
+      if (cards.some(isOpenableByAgent)) lines.push(ROWS_OPEN_LINE);
     }
     return lines;
   }
@@ -484,7 +573,20 @@ export class DomScreenReader implements ScreenReader {
       }),
       selected: row.getAttribute('aria-selected') === 'true' || row.getAttribute('data-state') === 'selected' || this.isRowChecked(row),
     }));
-    return { caption: textOf(table.querySelector('caption')) || table.getAttribute('aria-label'), columns, rows, totalRows: bodyRows.length };
+    const sortColumns: SortColumnFacts[] = [];
+    for (const control of Array.from(table.querySelectorAll(DECLARED_SORT_SELECTOR))) {
+      const sortKey = control.getAttribute(AGENT_ATTRIBUTES.actionKey);
+      if (!sortKey || !isRendered(control)) continue;
+      sortColumns.push({ reference: register(`col.${slugOf(sortKey)}`, control), label: labelOfElement(control), direction: sortDirectionOf(control) });
+    }
+    return {
+      caption: textOf(table.querySelector('caption')) || table.getAttribute('aria-label'),
+      columns,
+      rows,
+      totalRows: bodyRows.length,
+      sortColumns,
+      rowsOpen: bodyRows.some(isOpenableByAgent),
+    };
   }
 
   /** Whether the row's selection checkbox is checked. */

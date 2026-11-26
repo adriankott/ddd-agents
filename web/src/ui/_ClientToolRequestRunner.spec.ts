@@ -225,6 +225,87 @@ describe('ClientToolRequestRunner', () => {
   });
 });
 
+describe('ClientToolRequestRunner: actOnScreen', () => {
+  const withActions = (blocker: ScreenNavigationBlocker | null = null) => {
+    const created = createAdapters(blocker);
+    const applied: string[] = [];
+    const acted: string[] = [];
+    created.adapters.navigator.currentTarget = () => ORDERS_TARGET;
+    created.adapters.navigator.applyFilters = async (target, filters) => {
+      applied.push(`${target.key} ${JSON.stringify(filters)}`);
+      return { route: '/orders?customerId=3', title: 'Orders' };
+    };
+    created.adapters.actions = {
+      act: async request => {
+        acted.push(`${request.action} ${request.reference} ${request.direction ?? ''}`.trim());
+        return { outcome: 'OK', text: `Did ${request.action}.`, details: { route: '/orders/7', title: 'Order 7', routeChanged: true } };
+      },
+    };
+    return { ...created, applied, acted };
+  };
+
+  it('sets and clears only the filters the open screen declares', async () => {
+    const { adapters, applied } = withActions();
+    const runner = new ClientToolRequestRunner(adapters);
+
+    const answer = await runner.run(delivery('ACT_ON_SCREEN', { action: 'setFilters', filters: ['customerId=3'] }));
+    const cleared = await runner.run(delivery('ACT_ON_SCREEN', { action: 'setFilters', filters: ['customerId='] }));
+    const unknown = await runner.run(delivery('ACT_ON_SCREEN', { action: 'setFilters', filters: ['email=x'] }));
+    const none = await runner.run(delivery('ACT_ON_SCREEN', { action: 'setFilters' }));
+
+    assert.equal(answer.outcome, 'OK');
+    assert.equal(answer.text, 'Filters of orders: customerId=3.');
+    assert.equal(cleared.text, 'Filters of orders: customerId cleared.');
+    assert.equal(unknown.outcome, 'UNKNOWN_FILTER');
+    assert.match(unknown.text, /customerId/);
+    assert.equal(none.outcome, 'MISSING_PARAMETER');
+    assert.deepEqual(applied, ['orders {"customerId":"3"}', 'orders {"customerId":""}']);
+  });
+
+  it('refuses setFilters on a screen without filters, with unsaved changes, and without a navigator that can', async () => {
+    const withoutFilters = withActions();
+    withoutFilters.adapters.navigator.currentTarget = () => ORDER_TARGET;
+    assert.equal((await new ClientToolRequestRunner(withoutFilters.adapters).run(delivery('ACT_ON_SCREEN', { action: 'setFilters', filters: ['customerId=3'] }))).outcome, 'NO_FILTERS');
+
+    const unsaved = withActions({ outcome: 'UNSAVED_CHANGES', reason: 'unsaved' });
+    assert.equal((await new ClientToolRequestRunner(unsaved.adapters).run(delivery('ACT_ON_SCREEN', { action: 'setFilters', filters: ['customerId=3'] }))).outcome, 'UNSAVED_CHANGES');
+    assert.deepEqual(unsaved.applied, []);
+
+    const plain = createAdapters();
+    assert.equal((await new ClientToolRequestRunner(plain.adapters).run(delivery('ACT_ON_SCREEN', { action: 'setFilters', filters: ['customerId=3'] }))).outcome, 'ACTIONS_UNAVAILABLE');
+  });
+
+  it('hands the other actions to the actor with a valid reference and direction only', async () => {
+    const { adapters, acted } = withActions();
+    const runner = new ClientToolRequestRunner(adapters);
+
+    const sorted = await runner.run(delivery('ACT_ON_SCREEN', { action: 'sort', reference: 'col.created', direction: 'desc' }));
+    const opened = await runner.run(delivery('ACT_ON_SCREEN', { action: 'openRow', reference: 'row.7', includeScreen: true }));
+    const outcomes = await Promise.all([
+      runner.run(delivery('ACT_ON_SCREEN', { action: 'click', reference: 'b.save' })),
+      runner.run(delivery('ACT_ON_SCREEN', { action: 'press', reference: 'button.danger > span' })),
+      runner.run(delivery('ACT_ON_SCREEN', { action: 'press' })),
+    ]);
+
+    assert.equal(sorted.outcome, 'OK');
+    assert.equal(opened.text, 'Did openRow.\n# Home');
+    assert.deepEqual(opened.details, { route: '/orders/7', title: 'Order 7', routeChanged: true });
+    assert.deepEqual(outcomes.map(answer => answer.outcome), ['UNKNOWN_ACTION', 'MISSING_PARAMETER', 'MISSING_PARAMETER']);
+    assert.deepEqual(acted, ['sort col.created desc', 'openRow row.7']);
+  });
+
+  it('answers ACTIONS_UNAVAILABLE without an actor, and steps the agent window aside before acting', async () => {
+    const plain = createAdapters();
+    assert.equal((await new ClientToolRequestRunner(plain.adapters).run(delivery('ACT_ON_SCREEN', { action: 'press', reference: 'act.more' }))).outcome, 'ACTIONS_UNAVAILABLE');
+
+    const { adapters } = withActions();
+    const steppedAside: string[] = [];
+    adapters.agentWindow = { stepAside: requestType => void steppedAside.push(requestType), restore: () => undefined, setMode: () => true };
+    await new ClientToolRequestRunner(adapters).run(delivery('ACT_ON_SCREEN', { action: 'press', reference: 'act.more' }));
+    assert.deepEqual(steppedAside, ['ACT_ON_SCREEN']);
+  });
+});
+
 describe('MAX_SCREEN_CHARS', () => {
   it('is the server cut of a UI tool answer, half the answer cap', () => {
     const dtoFile = resolve(dirname(fileURLToPath(import.meta.url)), '../../../src/Presentation/Mcp/Client/Agents/Dtos/AgentUIToolResponseDto.php');

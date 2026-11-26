@@ -102,7 +102,9 @@ section 5.
 - **Agent.UI** (`config/app/AI/agentUI.php`, `config/app/AI/agentRealtimeChannel.php`): no tables; requests travel
   through the realtime port (`AgentRealtimeChannelService`: a mailbox in the shared cache read with the run state, a
   host transport optional); `openScreen` at most once per user turn by default (`maxOpenScreenPerUserTurn`), the window
-  tool `setAgentWindowMode` off by default (`windowModeRequests`).
+  tool `setAgentWindowMode` off by default (`windowModeRequests`), the screen actions (`actOnScreen`: set URL filters,
+  sort, open a row, switch a tab, press a button declared with the effect `view`; never a save, a delete or a send) off
+  by default (`screenActionRequests`, at most `maxScreenActionsPerUserTurn` per user turn, default 3).
 - **Account-level realtime read** (`GET …/realtimeMessages` of the chat controller traits): the open realtime messages
   addressed to the signed-in account (`AgentRealtimeAudience::forAccount()`, e.g. a call's ring) and the listener
   credential without a conversation — for a client that shows no conversation; same gate, expiry and target-client

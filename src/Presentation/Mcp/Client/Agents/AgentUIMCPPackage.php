@@ -422,11 +422,21 @@ class AgentUIMCPPackage extends MCPPackage
      */
     public static function countOpenScreenCallsOfUserTurn(AgentToolCallProvenance $agentToolCallProvenance): int
     {
+        return static::countToolCallsOfUserTurn($agentToolCallProvenance, 'openScreen');
+    }
+
+    /**
+     * The calls of the tool `$toolName` in the owner's thread after the user's message this call answers (the call
+     * itself left out, a failed call not counted); 0 where there is no owner thread to read.
+     */
+    public static function countToolCallsOfUserTurn(AgentToolCallProvenance $agentToolCallProvenance, string $toolName): int
+    {
         $ownerThreadMessages = $agentToolCallProvenance->getOwnerThreadMessages();
         $sourceUserMessageIndex = $agentToolCallProvenance->sourceUserMessage?->indexInConversation ?? null;
         if ($ownerThreadMessages === null || $sourceUserMessageIndex === null) {
             return 0;
         }
+        $toolNamePattern = '/(^|[._])' . preg_quote($toolName, '/') . '$/';
         $openScreenCalls = 0;
         foreach ($ownerThreadMessages->getElements() as $conversationMessage) {
             if (($conversationMessage->indexInConversation ?? -1) <= $sourceUserMessageIndex
@@ -436,7 +446,7 @@ class AgentUIMCPPackage extends MCPPackage
                 continue;
             }
             $toolCall = $conversationMessage->toolCall;
-            if (preg_match('/(^|[._])openScreen$/', (string)($toolCall->name ?? '')) !== 1
+            if (preg_match($toolNamePattern, (string)($toolCall->name ?? '')) !== 1
                 || ($toolCall->status ?? null) === AIConversationMessage::STATUS_FAILED
                 || ($agentToolCallProvenance->toolCallId !== null && $toolCall->toolCallId === $agentToolCallProvenance->toolCallId)
             ) {
@@ -459,27 +469,42 @@ class AgentUIMCPPackage extends MCPPackage
      */
     public static function readOpenedScreensOfUserTurn(AgentToolCallProvenance $agentToolCallProvenance): int
     {
+        return static::readCounterOfUserTurn($agentToolCallProvenance, static::OPENED_SCREENS_KEY_PREFIX);
+    }
+
+    /** Counts one opened screen for the user's message (atomic; nothing without a shared cache) */
+    protected static function countOpenedScreenOfUserTurn(AgentToolCallProvenance $agentToolCallProvenance): void
+    {
+        static::incrementCounterOfUserTurn($agentToolCallProvenance, static::OPENED_SCREENS_KEY_PREFIX);
+    }
+
+    /**
+     * A counter of the shared cache for the user's message this call answers (`$keyPrefix` + the message id) — it also
+     * sees the calls of the current step, whose rows are not written yet; 0 without a shared cache or a source message.
+     */
+    public static function readCounterOfUserTurn(AgentToolCallProvenance $agentToolCallProvenance, string $keyPrefix): int
+    {
         $sourceUserMessageId = $agentToolCallProvenance->getSourceUserMessageId();
         if ($sourceUserMessageId === null) {
             return 0;
         }
         try {
-            $openedScreens = static::getSharedCache()?->get(static::OPENED_SCREENS_KEY_PREFIX . $sourceUserMessageId);
+            $count = static::getSharedCache()?->get($keyPrefix . $sourceUserMessageId);
         } catch (Throwable) {
             return 0;
         }
-        return is_numeric($openedScreens) ? (int)$openedScreens : 0;
+        return is_numeric($count) ? (int)$count : 0;
     }
 
-    /** Counts one opened screen for the user's message (atomic; nothing without a shared cache) */
-    protected static function countOpenedScreenOfUserTurn(AgentToolCallProvenance $agentToolCallProvenance): void
+    /** Adds one to a counter of the user's message (atomic; nothing without a shared cache) */
+    public static function incrementCounterOfUserTurn(AgentToolCallProvenance $agentToolCallProvenance, string $keyPrefix): void
     {
         $sourceUserMessageId = $agentToolCallProvenance->getSourceUserMessageId();
         if ($sourceUserMessageId === null) {
             return;
         }
         try {
-            static::getSharedCache()?->increment(static::OPENED_SCREENS_KEY_PREFIX . $sourceUserMessageId, 1, static::OPENED_SCREENS_TTL_SECONDS);
+            static::getSharedCache()?->increment($keyPrefix . $sourceUserMessageId, 1, static::OPENED_SCREENS_TTL_SECONDS);
         } catch (Throwable) {
             // a cache without counters: the rows of the turn still cap the next steps
         }
