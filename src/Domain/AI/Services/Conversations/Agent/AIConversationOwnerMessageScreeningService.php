@@ -125,7 +125,7 @@ class AIConversationOwnerMessageScreeningService extends Service
                 applied: $applied,
                 elapsedMs: $elapsedMs,
                 modelVersion: $argusOwnerMessageInjectionDecision?->modelVersion,
-                failureReason: $argusOwnerMessageInjectionDecision?->transportFailureReason,
+                failureReason: $argusOwnerMessageInjectionDecision?->transportFailureReason ?? $argusOwnerMessageInjectionDecision?->unusableAnswerReason,
                 state: $argusOwnerMessageInjectionDecision?->buildState(),
                 answers: $argusOwnerMessageInjectionDecision?->rawAnswers,
                 outcome: [

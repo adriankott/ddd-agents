@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DDD\Tests\Agents\Domain\AI\Services\Decisions;
 
+use DDD\Domain\AI\Entities\Conversations\Agent\Decisions\AgentDecision;
 use DDD\Domain\AI\Entities\Conversations\Agent\Decisions\AgentDecisionCallOutcome;
 use DDD\Domain\AI\Entities\Conversations\Agent\Decisions\AgentDecisionModelSettings;
 use DDD\Domain\AI\Exceptions\MissingAIScopeException;
@@ -93,6 +94,35 @@ class AgentDecisionCallsServiceTest extends UnitTestCase
         self::assertSame('timeout', $outcome->failureReason);
         self::assertTrue($outcome->childrenSettled);
         self::assertSame([[60, 'timeout']], $breaker->trips);
+    }
+
+    public function testAnUnusableAnswerKeepsItsReasonAndNeverTripsTheBreaker(): void
+    {
+        $breaker = $this->breaker(false);
+        $primary = new ArgusAgentStallRecoveryDecision();
+        $outcome = $this->runner($breaker)->runDecisionBatch($this->batch(static function () use ($primary) {
+            $primary->httpStatusCode = 400;
+            $primary->unusableAnswerReason = 'http 400: example-model is not a valid model ID';
+        }, $primary), $primary, 1.0, 60, 'test');
+
+        self::assertSame(AgentDecisionCallOutcome::OUTCOME_ANSWERED, $outcome->outcome);
+        self::assertSame('http 400: example-model is not a valid model ID', $outcome->failureReason);
+        self::assertSame(AgentDecision::FALLBACK_UNPARSABLE, $outcome->resolveDecidedBy(false, AgentDecisionModelSettings::MODE_ON));
+        self::assertSame([], $breaker->trips);
+    }
+
+    public function testWithoutAPrimaryAChildsUnusableAnswerReasonIsTheBatchsReason(): void
+    {
+        $breaker = $this->breaker(false);
+        $usableChild = new ArgusAgentStallRecoveryDecision();
+        $unusableChild = new ArgusAgentStallRecoveryDecision();
+        $outcome = $this->runner($breaker)->runDecisionBatch($this->batch(static function () use ($unusableChild) {
+            $unusableChild->unusableAnswerReason = 'http 401: example key rejected';
+        }, $usableChild, $unusableChild), null, 1.0, 60, 'sub-skill');
+
+        self::assertSame(AgentDecisionCallOutcome::OUTCOME_ANSWERED, $outcome->outcome);
+        self::assertSame('http 401: example key rejected', $outcome->failureReason);
+        self::assertSame([], $breaker->trips);
     }
 
     public function testASiblingsTransportFailureTripsTheBreakerButThePrimaryAnswerStands(): void

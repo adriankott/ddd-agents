@@ -48,6 +48,14 @@ trait ArgusAgentDecisionTrait
     /** @var string|null The transport-level reason when this call was REJECTED inside a settled batch (a timeout, a connection error). */
     public ?string $transportFailureReason = null;
 
+    /**
+     * @var string|null Why an answer that arrived is unusable before any answer is read: `http <status>: <message>`
+     *     (the provider's error message, untrusted, cut at {@see UNUSABLE_ANSWER_MESSAGE_MAX_LENGTH} characters, control
+     *     characters removed) for a response without an `answers` object; null for a usable answer, a transport failure,
+     *     or an `answers` object the site could not read.
+     */
+    public ?string $unusableAnswerReason = null;
+
     /** @var string The batch child key — what keeps two decision children of one container apart (`site` + pass). */
     public string $decisionKeyInBatch = 'decision';
 
@@ -153,6 +161,7 @@ trait ArgusAgentDecisionTrait
         $this->httpStatusCode = $apiOperation?->responseStatusCode
             ?? (is_object($callResponseData) && isset($callResponseData->status_code) ? (int)$callResponseData->status_code : null);
         $this->transportFailureReason = $apiOperation?->rejectionReason;
+        $this->unusableAnswerReason = null;
 
         $responseObject = $this->unwrapDecisionResponse($callResponseData);
         // Book what the provider billed BEFORE judging the answers: a 200 whose shape we cannot read still cost money.
@@ -173,6 +182,9 @@ trait ArgusAgentDecisionTrait
             // own 400 / 401 / 422 is a misconfiguration the caller logs loudly, never a breaker trip.
             $this->transportFailed = $this->httpStatusCode === null
                 || in_array($this->httpStatusCode, self::transportFailureStatusCodes(), true);
+            if (!$this->transportFailed) {
+                $this->unusableAnswerReason = $this->buildUnusableAnswerReason($callResponseData, $responseObject);
+            }
             $this->postProcessLoadResponse($callResponseData, false);
             $this->clearArgusCache();
             return;
@@ -187,6 +199,40 @@ trait ArgusAgentDecisionTrait
     /** The language-model trait's text hook — a decision answer is parsed in {@see handleLoadResponseInternal()}, nothing arrives here. */
     protected function applyLoadResult(string $resultText): void
     {
+    }
+
+    /** @var int The characters of the provider's error message kept in {@see $unusableAnswerReason}. */
+    public const int UNUSABLE_ANSWER_MESSAGE_MAX_LENGTH = 160;
+
+    /**
+     * `http <status>: <message>` of a response without an `answers` object: the status of the operation (`none` when
+     * it named none) and the provider's error message (`{error:{message}}` of the direct OpenRouter route, a `message`
+     * or `error` string, else `no answers object`). The message is untrusted provider text: control characters and
+     * line breaks become spaces, it is cut at {@see UNUSABLE_ANSWER_MESSAGE_MAX_LENGTH} characters, and it is only
+     * stored and logged, never handed to a model.
+     */
+    protected function buildUnusableAnswerReason(mixed $callResponseData, mixed $responseObject): string
+    {
+        $errorMessage = null;
+        foreach ([$responseObject, $callResponseData] as $candidateResponse) {
+            if (!is_object($candidateResponse)) {
+                continue;
+            }
+            $errorValue = $candidateResponse->error ?? null;
+            if (is_object($errorValue) && isset($errorValue->message) && is_scalar($errorValue->message)) {
+                $errorMessage = (string)$errorValue->message;
+            } elseif (is_string($errorValue)) {
+                $errorMessage = $errorValue;
+            } elseif (isset($candidateResponse->message) && is_scalar($candidateResponse->message)) {
+                $errorMessage = (string)$candidateResponse->message;
+            }
+            if ($errorMessage !== null && trim($errorMessage) !== '') {
+                break;
+            }
+            $errorMessage = null;
+        }
+        $errorMessage = trim((string)preg_replace('/[\x00-\x1F\x7F]+/', ' ', $errorMessage ?? 'no answers object'));
+        return 'http ' . ($this->httpStatusCode ?? 'none') . ': ' . mb_substr($errorMessage, 0, self::UNUSABLE_ANSWER_MESSAGE_MAX_LENGTH);
     }
 
     /** OpenRouter answers the System One route with the bare object; the Argus gateway shapes wrap it. */

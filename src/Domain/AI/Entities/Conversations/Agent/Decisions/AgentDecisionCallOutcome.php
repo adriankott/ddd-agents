@@ -28,7 +28,11 @@ class AgentDecisionCallOutcome extends ValueObject
 
     public string $outcome = self::OUTCOME_ANSWERED;
 
-    /** The reason of a refusal, a transport failure, a timeout spent on our own work or our own error — null when the call answered. */
+    /**
+     * The reason of a refusal, a transport failure, a timeout spent on our own work or our own error; for a call that
+     * answered without an `answers` object (a non-transport status such as 400, 401, 402, 404, 422) `http <status>: <message>`
+     * with the provider's message cut and cleaned; null for a call that answered with an `answers` object.
+     */
     public ?string $failureReason = null;
 
     /** The call's milliseconds, null when no call was made. */

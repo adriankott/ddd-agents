@@ -730,7 +730,7 @@ class AgentSkillPreloadDecisionsService extends Service
                     $argusSubSkillDecision->transportFailed => AgentSkillPreloadDecision::FALLBACK_TRANSPORT,
                     default => null,
                 };
-                $subSkillFailureReason = $requestRefused ? $decisionCallOutcome->failureReason : $argusSubSkillDecision->transportFailureReason;
+                $subSkillFailureReason = $requestRefused ? $decisionCallOutcome->failureReason : ($argusSubSkillDecision->transportFailureReason ?? $argusSubSkillDecision->unusableAnswerReason);
                 $subSkillRequestId = bin2hex(random_bytes(8));
                 $subSkillApplied = true;
                 try {

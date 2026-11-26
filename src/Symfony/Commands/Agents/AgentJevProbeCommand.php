@@ -182,7 +182,7 @@ class AgentJevProbeCommand extends AgentConsoleCommand
                 $this->closeUsageEnvelope($usageEnvelopeContext);
             }
             if (!$argusDecision->decided) {
-                $failure = $argusDecision->transportFailureReason ?? 'unparsable';
+                $failure = $argusDecision->transportFailureReason ?? $argusDecision->unusableAnswerReason ?? 'unparsable';
             }
         } catch (Throwable $callError) {
             $failure = mb_substr($callError->getMessage(), 0, 120);

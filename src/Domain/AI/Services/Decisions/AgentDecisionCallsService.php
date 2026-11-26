@@ -176,6 +176,14 @@ class AgentDecisionCallsService extends Service
                     $siblingTransportFailed = true;
                 }
             }
+            if ($outcome === AgentDecisionCallOutcome::OUTCOME_ANSWERED) {
+                $failureReason = $this->findUnusableAnswerReason($decisionBatch, $primaryDecision);
+                if ($failureReason !== null) {
+                    // an answer without an `answers` object and with a non-transport status (our own 400, 401, 402,
+                    // 404, 422): the site falls back as unparsable, the breaker stays as it is, the reason is kept
+                    DDDService::instance()->getLogger()->warning("[AgentDecisionModel] {$siteLabel} decision answer unusable", ['reason' => $failureReason]);
+                }
+            }
         } elseif ($loadError instanceof AiBudgetExceededException || $loadError instanceof AIScopeNotEligibleException
             || $loadError instanceof MissingAIEnvelopeException || $loadError instanceof MissingAIScopeException
         ) {
@@ -197,6 +205,25 @@ class AgentDecisionCallsService extends Service
         $decisionCallOutcome->childrenSettled = $childrenSettled;
         $decisionCallOutcome->thrownExceptionSummary = $thrownExceptionSummary;
         return $decisionCallOutcome;
+    }
+
+    /**
+     * Why the answer of an answered batch is unusable ({@see \DDD\Domain\AI\Repo\Argus\Conversations\Decisions\ArgusAgentDecisionTrait::$unusableAnswerReason}):
+     * the primary decision's, else the first child's that has one; null when every answer arrived with an `answers`
+     * object.
+     */
+    protected function findUnusableAnswerReason(ArgusAgentDecisions $decisionBatch, ?object $primaryDecision): ?string
+    {
+        $unusableAnswerReason = $primaryDecision !== null ? ($primaryDecision->unusableAnswerReason ?? null) : null;
+        if ($unusableAnswerReason !== null) {
+            return $unusableAnswerReason;
+        }
+        foreach ($decisionBatch->getElements() as $decisionChild) {
+            if (($decisionChild->unusableAnswerReason ?? null) !== null) {
+                return $decisionChild->unusableAnswerReason;
+            }
+        }
+        return null;
     }
 
     /**

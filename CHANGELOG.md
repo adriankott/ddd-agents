@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.7.6
+
+- **A decision answer that is unusable keeps its reason.** An answer without an `answers` object and with a
+  non-transport status (400, 401, 402, 404, 422, or 200 without answers) stores
+  `ArgusAgentDecisionTrait::$unusableAnswerReason` = `http <status>: <message>`. The message is the provider's error
+  text: control characters and line breaks become spaces, it is cut at 160 characters, and it is never given to a
+  model. `AgentDecisionCallsService::classifyDecisionBatchOutcome()` copies it into
+  `AgentDecisionCallOutcome::$failureReason` (so into the sites' decision records) and logs the warning
+  `[AgentDecisionModel] <site> decision answer unusable`. The skill preload, the owner-message screening and
+  `app:agent:jev-probe` show it as well. Behaviour is unchanged: the site still falls back as unparsable and the breaker
+  is not tripped. No config or schema change; npm 0.7.6 in lockstep.
+
 ## 0.7.5
 
 - Tools skill: new reference `file-sources-in-the-drive-tools.md` (find per source, view/copy/show generic;
