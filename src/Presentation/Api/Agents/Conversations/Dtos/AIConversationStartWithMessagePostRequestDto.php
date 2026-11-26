@@ -6,6 +6,7 @@ namespace DDD\Presentation\Api\Agents\Conversations\Dtos;
 
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
 use DDD\Domain\AI\Entities\Conversations\Messages\AgentClientContext;
+use DDD\Domain\AI\Entities\Conversations\Subjects\AIConversationSubject;
 use DDD\Presentation\Base\Dtos\RequestDto;
 use DDD\Domain\AI\Entities\ClientTools\AgentUIState;
 use DDD\Presentation\Base\OpenApi\Attributes\Parameter;
@@ -100,6 +101,18 @@ class AIConversationStartWithMessagePostRequestDto extends RequestDto
      */
     #[Parameter(in: Parameter::BODY, required: false)]
     public ?string $entryPointKey = null;
+
+    /**
+     * @var AIConversationSubject|null The record the new conversation is about (its entity class and id), e.g. the
+     * order whose page the start comes from. The conversation is bound to it for its life: the agent reads what
+     * the record is in every call, and the record's conversations are listed by `GET …/listConversationsOfSubject`
+     * ({@see \DDD\Presentation\Api\Agents\Conversations\Controller\AgentConversationSubjectsTrait}).
+     * The class must be one the application allows for a start and the caller must be able to read the record:
+     * a malformed subject answers 400, a class that is not allowed and a record the caller cannot read answer 404.
+     * Ignored when the start reopens a conversation of its entry point (that conversation keeps its own subject).
+     */
+    #[Parameter(in: Parameter::BODY, required: false)]
+    public ?AIConversationSubject $subject = null;
 
     /**
      * @var AgentClientContext|null What the owner's client shows while the owner writes: the route path, its

@@ -18,16 +18,27 @@ use Symfony\Component\Validator\Constraints\Length;
 use Symfony\Component\Validator\Constraints\NotNull;
 
 /**
- * The subject of one purposed conversation ({@see AIConversationSubject}), one row per conversation in its own table
+ * The subject of one conversation ({@see AIConversationSubject}), one row per conversation in its own table
  * `AIConversationSubjectBindings`. It is not a column of `AIConversations`: every conversation read selects all
  * columns of that table, so a new column there would break every read of a host that has not run the DDL yet. Here
  * a missing table only means "no subjects": {@see AIConversationSubjectBindingsService::isBindingTableAvailable()}.
  *
- * Space and purpose are copied from the conversation at creation (never changed), so the reuse lookup reads this
- * table alone on its composite index.
+ * Two kinds of conversation carry a subject:
+ * - a PURPOSED conversation started for one record (`purposeName` set): one open conversation per space, purpose and
+ *   record, found on the composite index;
+ * - a FREE conversation started about one record (`purposeName` null): any number per record, listed newest first
+ *   on the subject index ({@see \DDD\Domain\AI\Services\Conversations\AIConversationsService::findAllVisibleToCustomerOfSubject()}).
+ *
+ * Space and purpose are copied from the conversation at creation (never changed); `agentSpaceId` is null for a
+ * conversation at account level. What the application says about the record (its name, one line for the model, its
+ * link) is not stored here but on the conversation's working state
+ * ({@see \DDD\Domain\AI\Entities\Conversations\Agent\AgentWorkingState::$subjectDescription}), so this table needs no
+ * further column and the model's text is loaded with the conversation.
  */
-// the reuse lookup: space + purpose + subject, newest first
+// the reuse lookup of a purposed start: space + purpose + subject, newest first
 #[DatabaseIndex(DatabaseIndex::TYPE_INDEX, ['agentSpaceId', 'purposeName', 'subjectEntityClass', 'subjectEntityId'])]
+// the conversations of one record, across spaces and purposes
+#[DatabaseIndex(DatabaseIndex::TYPE_INDEX, ['subjectEntityClass', 'subjectEntityId'])]
 // one subject per conversation
 #[DatabaseIndex(DatabaseIndex::TYPE_UNIQUE, ['aiConversationId'])]
 #[LazyLoadRepo(LazyLoadRepo::DB, DBAIConversationSubjectBinding::class)]
@@ -38,20 +49,18 @@ class AIConversationSubjectBinding extends Entity
     /** @var string The service lives under Services/Conversations/ */
     public const string SERVICE_NAME = AIConversationSubjectBindingsService::class;
 
-    /** @var int|null The purposed conversation */
+    /** @var int|null The conversation */
     #[NotNull]
     public ?int $aiConversationId;
 
-    /** @var int|null The space of the conversation (purposed conversations with a subject always have one) */
-    #[NotNull]
+    /** @var int|null The space of the conversation; null for a conversation at account level */
     #[DatabaseIndex(indexType: DatabaseIndex::TYPE_NONE)]
-    public ?int $agentSpaceId;
+    public ?int $agentSpaceId = null;
 
-    /** @var string|null The purpose of the conversation */
-    #[NotNull]
+    /** @var string|null The purpose of a purposed conversation; null for a free conversation about the record */
     #[Length(max: 255)]
     #[DatabaseIndex(indexType: DatabaseIndex::TYPE_NONE)]
-    public ?string $purposeName;
+    public ?string $purposeName = null;
 
     /** @var string|null {@see AIConversationSubject::$subjectEntityClass}, without a leading backslash */
     #[NotNull]

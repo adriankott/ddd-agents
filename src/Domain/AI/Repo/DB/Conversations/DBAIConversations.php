@@ -9,7 +9,9 @@ use DDD\Domain\AI\Entities\AgentSpaces\AgentSpaceSqlCondition;
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Entities\Conversations\AIConversations;
 use DDD\Domain\AI\Entities\Conversations\Purposes\AIConversationPurpose;
+use DDD\Domain\AI\Entities\Conversations\Subjects\AIConversationSubject;
 use DDD\Domain\AI\Services\AgentSpaces\AgentSpacesService;
+use DDD\Domain\AI\Services\Conversations\AIConversationSubjectBindingsService;
 use DDD\Domain\AI\Services\Conversations\Environments\AgentEnvironmentNamesService;
 use DDD\Domain\Base\Repo\DB\Attributes\EntityCache;
 use DDD\Domain\Base\Repo\DB\DBEntitySet;
@@ -17,6 +19,7 @@ use DDD\Domain\Base\Repo\DB\Doctrine\EntityManagerFactory;
 use DDD\Domain\Base\Repo\DB\Doctrine\DoctrineQueryBuilder;
 use DDD\Infrastructure\Exceptions\BadRequestException;
 use DDD\Infrastructure\Exceptions\InternalErrorException;
+use DDD\Infrastructure\Services\DDDService;
 use Psr\Cache\InvalidArgumentException;
 use ReflectionException;
 
@@ -138,6 +141,32 @@ class DBAIConversations extends DBEntitySet
     {
         $queryBuilder = self::createQueryBuilder(true);
         static::restrictToCustomerVisibleConversations($queryBuilder);
+        return $this->find($queryBuilder);
+    }
+
+    /**
+     * Every conversation about one record ({@see AIConversationSubject}) that the authenticated account may read AND
+     * a customer may see, under the default query options (a list read orders it newest first): the free
+     * conversations started about the record and the purposed ones started for it, of every space of the account.
+     * Empty where the subject table is missing.
+     *
+     * @throws BadRequestException
+     * @throws InternalErrorException
+     * @throws InvalidArgumentException
+     * @throws ReflectionException
+     */
+    public function findAllVisibleToCustomerOfSubject(AIConversationSubject $aIConversationSubject): AIConversations
+    {
+        /** @var AIConversationSubjectBindingsService $aIConversationSubjectBindingsService */
+        $aIConversationSubjectBindingsService = DDDService::instance()->getService(AIConversationSubjectBindingsService::class);
+        $queryBuilder = self::createQueryBuilder(true);
+        static::restrictToCustomerVisibleConversations($queryBuilder);
+        if ($aIConversationSubjectBindingsService->isBindingTableAvailable()) {
+            AIConversationSubjectBindingsService::restrictConversationQueryToSubject($queryBuilder, static::getBaseModelAlias(), $aIConversationSubject);
+        } else {
+            // no table, no subjects: the read answers an empty set and never names the missing table
+            $queryBuilder->andWhere(static::getBaseModelAlias() . '.id IS NULL');
+        }
         return $this->find($queryBuilder);
     }
 

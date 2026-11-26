@@ -20,6 +20,9 @@ import {
   type ConversationSearchOptions,
   type ConversationSignal,
   type PostedMessage,
+  type BoundConversationSubject,
+  type ConversationsOfSubject,
+  type ConversationSubject,
   type PurposeStartRequest,
   type SelectableModel,
   type StartedConversation,
@@ -39,6 +42,7 @@ import { withPollingChangeSubscription } from "../polling/withPollingChangeSubsc
 import {
   mapClientContextToWire,
   mapHttpFailureToAgentsClientError,
+  mapWireBoundConversationSubject,
   mapWireConversation,
   mapWireConversationActivity,
   mapWireConversationMessage,
@@ -57,7 +61,10 @@ import type {
   WireConversationResponse,
   WireConversationRunStateResponse,
   WireConversationSearchResponse,
+  WireBoundConversationSubjectsResponse,
+  WireConversationsOfSubjectResponse,
   WireConversationsResponse,
+  WireConversationSubjectResponse,
   WireConversationStartResponse,
   WireErrorBody,
   WirePurposeStartResponse,
@@ -268,23 +275,70 @@ class AgentsHttpConversationClient implements AgentsConversationClient {
     return { messages: page.messages };
   };
 
-  listConversations = async (agentSpaceKey: number, options: ConversationListQueryOptions = {}): Promise<AgentsConversation[]> => {
+  /** The query of the root conversations list (of one space, or of all), newest first: shared by the list and the read of its records. */
+  protected buildConversationsListQuery(agentSpaceKey: number, options: ConversationListQueryOptions) {
     const filters = ["rootConversationId eq null"];
     if (agentSpaceKey > 0) filters.push(`agentSpaceId eq ${quoteFilterValue(agentSpaceKey)}`);
+    return {
+      filters: filters.join(" and "),
+      orderBy: "id desc",
+      top: options.paging?.top,
+      skip: options.paging?.skip,
+    };
+  }
+
+  listConversations = async (agentSpaceKey: number, options: ConversationListQueryOptions = {}): Promise<AgentsConversation[]> => {
     const response = await this.request<WireConversationsResponse>({
       operation: "listConversations",
       method: "GET",
       path: "/listAllConversations",
+      query: this.buildConversationsListQuery(agentSpaceKey, options),
+    });
+    const conversations = readWireSetElements(response.aiConversations).map(mapWireConversation);
+    // Without a summary there is no title yet; the list leaves such a conversation out unless asked for it.
+    return options.includeUnsummarized ? conversations : conversations.filter((conversation) => conversation.title !== null);
+  };
+
+  listConversationsOfSubject = async (subject: ConversationSubject, options: ConversationListQueryOptions = {}): Promise<ConversationsOfSubject> => {
+    const response = await this.request<WireConversationsOfSubjectResponse>({
+      operation: "listConversationsOfSubject",
+      method: "GET",
+      path: "/listConversationsOfSubject",
       query: {
-        filters: filters.join(" and "),
+        subjectEntityClass: subject.entityClass,
+        subjectEntityId: subject.entityId,
+        filters: "rootConversationId eq null",
         orderBy: "id desc",
         top: options.paging?.top,
         skip: options.paging?.skip,
       },
     });
     const conversations = readWireSetElements(response.aiConversations).map(mapWireConversation);
-    // Without a summary there is no title yet; the list leaves such a conversation out unless asked for it.
-    return options.includeUnsummarized ? conversations : conversations.filter((conversation) => conversation.title !== null);
+    return {
+      subject: mapWireBoundConversationSubject(response.subject),
+      conversations: options.includeUnsummarized ? conversations : conversations.filter((conversation) => conversation.title !== null),
+    };
+  };
+
+  listSubjectsOfConversations = async (agentSpaceKey: number, options: ConversationListQueryOptions = {}): Promise<BoundConversationSubject[]> => {
+    const response = await this.request<WireBoundConversationSubjectsResponse>({
+      operation: "listSubjectsOfConversations",
+      method: "GET",
+      path: "/listSubjectsOfConversations",
+      query: this.buildConversationsListQuery(agentSpaceKey, options),
+    });
+    return readWireSetElements(response.subjects)
+      .map(mapWireBoundConversationSubject)
+      .filter((subject): subject is BoundConversationSubject => subject !== null);
+  };
+
+  getConversationSubject = async (conversationId: number): Promise<BoundConversationSubject | null> => {
+    const response = await this.request<WireConversationSubjectResponse>({
+      operation: "getConversationSubject",
+      method: "GET",
+      path: `/${conversationId}/subject`,
+    });
+    return mapWireBoundConversationSubject(response.subject);
   };
 
   searchConversations = async (text: string, options: ConversationSearchOptions = {}): Promise<ConversationSearchGroup[]> => {
@@ -337,6 +391,9 @@ class AgentsHttpConversationClient implements AgentsConversationClient {
         aiConversationMessage: { message: composeAttachmentMessageText(request.text, request.attachments) },
         ...(request.startSignalText ? { signalText: request.startSignalText } : {}),
         ...(request.entryPointKey ? { entryPointKey: request.entryPointKey } : {}),
+        ...(request.subject
+          ? { subject: { subjectEntityClass: request.subject.entityClass, subjectEntityId: request.subject.entityId } }
+          : {}),
         ...this.readClientContextBody("startConversation"),
       },
     });

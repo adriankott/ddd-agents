@@ -7,6 +7,7 @@ namespace DDD\Tests\Agents\Voice\Domain\AI\Services\Voice\CallTasks;
 use DDD\Domain\AI\Entities\AgentSpaces\AgentSpace;
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Entities\Conversations\Messages\AgentClientContext;
+use DDD\Domain\AI\Entities\Conversations\Subjects\AIConversationSubject;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessages;
 use DDD\Domain\AI\Entities\Conversations\Messages\CompactionSettings;
 use DDD\Domain\AI\Entities\Conversations\Messages\ContextRetentionSettings;
@@ -52,7 +53,8 @@ class RecordingAIConversationAgentService extends AIConversationAgentService
         ?OwnerDevice $ownerDevice = null,
         bool $messageWrittenByPlatform = false,
         ?string $entryPointKey = null,
-        ?AgentClientContext $clientContext = null
+        ?AgentClientContext $clientContext = null,
+        ?AIConversationSubject $aIConversationSubject = null
     ): AIConversation {
         $this->driveRequests[] = [
             'scope' => $scope,

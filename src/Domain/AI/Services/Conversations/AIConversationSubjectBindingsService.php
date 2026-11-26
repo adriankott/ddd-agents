@@ -7,23 +7,41 @@ namespace DDD\Domain\AI\Services\Conversations;
 use DDD\Domain\AI\Entities\AgentSpaces\AgentSpace;
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Entities\Conversations\AIConversationRunState;
+use DDD\Domain\AI\Entities\Conversations\AIConversations;
+use DDD\Domain\AI\Entities\Conversations\Subjects\AIConversationBoundSubject;
+use DDD\Domain\AI\Entities\Conversations\Subjects\AIConversationBoundSubjects;
 use DDD\Domain\AI\Entities\Conversations\Subjects\AIConversationSubject;
 use DDD\Domain\AI\Entities\Conversations\Subjects\AIConversationSubjectBinding;
+use DDD\Domain\AI\Entities\Conversations\Subjects\AIConversationSubjectDescription;
 use DDD\Domain\AI\Repo\DB\Conversations\DBAIConversationModel;
 use DDD\Domain\AI\Repo\DB\Conversations\Subjects\DBAIConversationSubjectBindingModel;
+use DDD\Domain\AI\Services\Conversations\Subjects\AIConversationSubjectDescriber;
+use DDD\Domain\Base\Entities\Entity;
+use DDD\Domain\Base\Repo\DB\Doctrine\DoctrineQueryBuilder;
 use DDD\Domain\Base\Repo\DB\Dialect\SqlDialect;
 use DDD\Domain\Base\Repo\DB\Doctrine\EntityManagerFactory;
 use DDD\Domain\Base\Services\EntitiesService;
 use DDD\Infrastructure\Exceptions\InternalErrorException;
+use DDD\Infrastructure\Services\DDDService;
 use Doctrine\DBAL\ArrayParameterType;
+use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
+use Symfony\Contracts\Service\Attribute\Required;
+use Throwable;
 
 /**
- * The subjects of purposed conversations ({@see AIConversationSubject}): which conversation works on which record, so
- * a purposed start with a subject resumes the open conversation of the same space, purpose and subject.
+ * The subjects of conversations ({@see AIConversationSubject}): which conversation is about which record.
+ *
+ * - A purposed start with a subject resumes the open conversation of the same space, purpose and subject
+ *   ({@see findNewestConversationIdOfSubject()}).
+ * - A free conversation started about a record is bound to it; the record's conversations are listed newest first
+ *   ({@see restrictConversationQueryToSubject()}, {@see AIConversationsService::findAllVisibleToCustomerOfSubject()}).
+ * - What the record is comes from the application ({@see AIConversationSubjectDescriber}), is stored once on the
+ *   conversation's working state when it is bound ({@see AIConversationsService::persistSubjectDescriptionSlice()})
+ *   and reaches the model in every call of the conversation (the system segment `CONVERSATION_SUBJECT`).
  *
  * The rows live in their own table ({@see AIConversationSubjectBinding}). A host that has not created it yet keeps
  * working without subjects: {@see isBindingTableAvailable()} is false, a start with a subject then behaves like a start
- * without one (the singleton of the space and purpose), and nothing is stored or read here.
+ * without one, and nothing is stored or read here.
  */
 class AIConversationSubjectBindingsService extends EntitiesService
 {
@@ -37,6 +55,18 @@ class AIConversationSubjectBindingsService extends EntitiesService
 
     /** @var int When {@see $bindingTableAvailable} was last asked (unix seconds) */
     protected static int $bindingTableCheckedAt = 0;
+
+    /** @var iterable<AIConversationSubjectDescriber> */
+    protected iterable $aIConversationSubjectDescribers = [];
+
+    /** @param iterable<AIConversationSubjectDescriber> $aIConversationSubjectDescribers */
+    #[Required]
+    public function setAIConversationSubjectDescribers(
+        #[AutowireIterator(AIConversationSubjectDescriber::TAG)]
+        iterable $aIConversationSubjectDescribers
+    ): void {
+        $this->aIConversationSubjectDescribers = $aIConversationSubjectDescribers;
+    }
 
     /**
      * Whether `AIConversationSubjectBindings` exists in the connected database (MariaDB or PostgreSQL). A yes is kept
@@ -68,30 +98,179 @@ class AIConversationSubjectBindingsService extends EntitiesService
     }
 
     /**
-     * Store the subject of a freshly started purposed conversation. Nothing when the table is missing.
+     * Store the subject of a freshly started conversation: a purposed one (the row carries its purpose) or a free one
+     * (no purpose), in a space or at account level. The application's describer is asked once, here, and its answer
+     * is stored on the conversation's working state ({@see describeSubject()},
+     * {@see AIConversationsService::persistSubjectDescriptionSlice()}): called before the first turn is dispatched, the
+     * first model call already reads what the record is. Nothing when the table is missing.
      *
-     * @param AIConversation $conversation a stored purposed conversation of a space
+     * @param AIConversation $conversation a stored conversation
      * @param AIConversationSubject $aIConversationSubject
+     * @param Entity|null $subjectEntity the record when the caller has read it already; else it is read under the caller's rights for the describer
      * @return AIConversationSubjectBinding|null null when the table is missing
-     * @throws InternalErrorException when the conversation is not stored, has no space or no purpose
+     * @throws InternalErrorException when the conversation is not stored
      */
-    public function bindSubjectToConversation(AIConversation $conversation, AIConversationSubject $aIConversationSubject): ?AIConversationSubjectBinding
+    public function bindSubjectToConversation(AIConversation $conversation, AIConversationSubject $aIConversationSubject, ?Entity $subjectEntity = null): ?AIConversationSubjectBinding
     {
-        if (!isset($conversation->id) || ($conversation->agentSpaceId ?? null) === null || ($conversation->purposeName ?? null) === null) {
-            throw new InternalErrorException('A subject is bound only to a stored purposed conversation of a space.');
+        if (!isset($conversation->id)) {
+            throw new InternalErrorException('A subject is bound only to a stored conversation.');
         }
         if (!$this->isBindingTableAvailable()) {
             return null;
         }
         $aIConversationSubjectBinding = AIConversationSubjectBinding::newInstance();
         $aIConversationSubjectBinding->aiConversationId = (int)$conversation->id;
-        $aIConversationSubjectBinding->agentSpaceId = (int)$conversation->agentSpaceId;
-        $aIConversationSubjectBinding->purposeName = (string)$conversation->purposeName;
+        $aIConversationSubjectBinding->agentSpaceId = ($conversation->agentSpaceId ?? null) !== null ? (int)$conversation->agentSpaceId : null;
+        $purposeName = trim((string)($conversation->purposeName ?? ''));
+        $aIConversationSubjectBinding->purposeName = $purposeName !== '' ? $purposeName : null;
         $aIConversationSubjectBinding->subjectEntityClass = $aIConversationSubject->getNormalizedEntityClass();
         $aIConversationSubjectBinding->subjectEntityId = (int)$aIConversationSubject->subjectEntityId;
         /** @var AIConversationSubjectBinding $storedBinding */
         $storedBinding = $aIConversationSubjectBinding->insert();
+        $aIConversationSubjectDescription = $this->describeSubject($aIConversationSubject, $subjectEntity);
+        if ($aIConversationSubjectDescription !== null) {
+            /** @var AIConversationsService $aIConversationsService */
+            $aIConversationsService = DDDService::instance()->getService(AIConversationsService::class);
+            $aIConversationsService->persistSubjectDescriptionSlice($conversation, $aIConversationSubjectDescription);
+        }
         return $storedBinding;
+    }
+
+    /**
+     * What the application says about the record: the answer of the first describer that names the record's class
+     * (or a parent class of it) and returns one. Null when no describer names the class, none has an answer, the
+     * record cannot be read under the caller's rights, or the describer failed (logged as a warning; the conversation
+     * is then bound without a description and its model reads no record segment).
+     *
+     * @param AIConversationSubject $aIConversationSubject
+     * @param Entity|null $subjectEntity the record when the caller has read it already
+     * @return AIConversationSubjectDescription|null
+     */
+    public function describeSubject(AIConversationSubject $aIConversationSubject, ?Entity $subjectEntity = null): ?AIConversationSubjectDescription
+    {
+        $subjectEntityClass = $aIConversationSubject->getNormalizedEntityClass();
+        foreach ($this->aIConversationSubjectDescribers as $aIConversationSubjectDescriber) {
+            if (!$this->isDescriberOfEntityClass($aIConversationSubjectDescriber, $subjectEntityClass)) {
+                continue;
+            }
+            try {
+                $subjectEntity ??= $aIConversationSubject->findReadableSubjectEntity();
+                $aIConversationSubjectDescription = $aIConversationSubjectDescriber->describeSubject($aIConversationSubject, $subjectEntity);
+            } catch (Throwable $throwable) {
+                DDDService::instance()->getLogger()->warning(
+                    'AIConversationSubjectBindingsService: the subject ' . $aIConversationSubject->describe() . ' could not be described',
+                    ['describer' => $aIConversationSubjectDescriber::class, 'error' => mb_substr($throwable->getMessage(), 0, 500)]
+                );
+                return null;
+            }
+            if ($aIConversationSubjectDescription instanceof AIConversationSubjectDescription && $aIConversationSubjectDescription->hasDescription()) {
+                return $aIConversationSubjectDescription;
+            }
+        }
+        return null;
+    }
+
+    /** Whether `$aIConversationSubjectDescriber` names `$subjectEntityClass` or a parent class of it. */
+    protected function isDescriberOfEntityClass(AIConversationSubjectDescriber $aIConversationSubjectDescriber, string $subjectEntityClass): bool
+    {
+        foreach ($aIConversationSubjectDescriber->getSubjectEntityClasses() as $describedEntityClass) {
+            if (is_a($subjectEntityClass, ltrim($describedEntityClass, '\\'), true)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The binding of a conversation, or null: none, or the table is missing. Read without the rights filter: the
+     * caller holds the conversation, which it read under its rights (or builds its prompt on a worker).
+     *
+     * @param int $aiConversationId
+     * @return AIConversationSubjectBinding|null
+     */
+    public function findBindingOfConversation(int $aiConversationId): ?AIConversationSubjectBinding
+    {
+        if ($aiConversationId <= 0 || !$this->isBindingTableAvailable()) {
+            return null;
+        }
+        $repoClass = $this->getEntityRepoClassInstance();
+        $queryBuilder = $repoClass::createQueryBuilder();
+        $baseModelAlias = $repoClass::getBaseModelAlias();
+        $queryBuilder->andWhere("{$baseModelAlias}.aiConversationId = :aiConversationId")
+            ->setParameter('aiConversationId', $aiConversationId)
+            ->setMaxResults(1);
+        DDDService::instance()->deactivateEntityRightsRestrictions();
+        try {
+            $aIConversationSubjectBinding = $repoClass->find($queryBuilder, false);
+        } finally {
+            DDDService::instance()->restoreEntityRightsRestrictionsStateSnapshot();
+        }
+        return $aIConversationSubjectBinding instanceof AIConversationSubjectBinding ? $aIConversationSubjectBinding : null;
+    }
+
+    /**
+     * The records a set of conversations is bound to, one entry per bound conversation (a conversation without a
+     * record has none): the binding and what the conversation's working state stores about the record. One read of
+     * the binding rows, without the rights filter: the caller holds the conversations, which it read under its
+     * rights. Empty where the table is missing.
+     *
+     * @param AIConversations $aIConversations conversations the caller read under its rights
+     * @return AIConversationBoundSubjects
+     */
+    public function findBoundSubjectsOfConversations(AIConversations $aIConversations): AIConversationBoundSubjects
+    {
+        $aIConversationBoundSubjects = new AIConversationBoundSubjects();
+        $conversationsById = [];
+        foreach ($aIConversations->getElements() as $aIConversation) {
+            if (isset($aIConversation->id)) {
+                $conversationsById[(int)$aIConversation->id] = $aIConversation;
+            }
+        }
+        if ($conversationsById === [] || !$this->isBindingTableAvailable()) {
+            return $aIConversationBoundSubjects;
+        }
+        $repoClass = $this->getEntitySetRepoClassInstance();
+        $queryBuilder = $repoClass::createQueryBuilder();
+        $baseModelAlias = $repoClass::getBaseModelAlias();
+        $queryBuilder->andWhere("{$baseModelAlias}.aiConversationId IN (:aiConversationIds)")
+            ->setParameter('aiConversationIds', array_keys($conversationsById), ArrayParameterType::INTEGER);
+        DDDService::instance()->deactivateEntityRightsRestrictions();
+        try {
+            $aIConversationSubjectBindings = $repoClass->find($queryBuilder, false);
+        } finally {
+            DDDService::instance()->restoreEntityRightsRestrictionsStateSnapshot();
+        }
+        foreach ($aIConversationSubjectBindings?->getElements() ?? [] as $aIConversationSubjectBinding) {
+            $aIConversation = $conversationsById[(int)($aIConversationSubjectBinding->aiConversationId ?? 0)] ?? null;
+            if ($aIConversation === null) {
+                continue;
+            }
+            $aIConversationBoundSubject = AIConversationBoundSubject::of($aIConversationSubjectBinding, $aIConversation->getAgentWorkingState()?->subjectDescription);
+            $aIConversationBoundSubjects->add($aIConversationBoundSubject);
+        }
+        return $aIConversationBoundSubjects;
+    }
+
+    /**
+     * Restrict a conversation query to the conversations bound to `$aIConversationSubject`, of every space and
+     * purpose. The caller's own conditions (read rights, visibility) stay as they are.
+     *
+     * @param DoctrineQueryBuilder $queryBuilder a builder on the conversation model
+     * @param string $conversationAlias the alias of the conversation model in the query
+     * @param AIConversationSubject $aIConversationSubject
+     * @return void
+     */
+    public static function restrictConversationQueryToSubject(DoctrineQueryBuilder $queryBuilder, string $conversationAlias, AIConversationSubject $aIConversationSubject): void
+    {
+        $bindingModelClass = DBAIConversationSubjectBindingModel::class;
+        $queryBuilder->andWhere(
+            "EXISTS (SELECT subjectBindingOfConversation.id FROM {$bindingModelClass} subjectBindingOfConversation"
+            . " WHERE subjectBindingOfConversation.aiConversationId = {$conversationAlias}.id"
+            . ' AND subjectBindingOfConversation.subjectEntityClass = :subjectEntityClassOfBinding'
+            . ' AND subjectBindingOfConversation.subjectEntityId = :subjectEntityIdOfBinding)'
+        )
+            ->setParameter('subjectEntityClassOfBinding', $aIConversationSubject->getNormalizedEntityClass())
+            ->setParameter('subjectEntityIdOfBinding', (int)$aIConversationSubject->subjectEntityId);
     }
 
     /**

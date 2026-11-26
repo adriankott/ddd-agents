@@ -219,6 +219,103 @@ describe("createAgentsHttpConversationClient", () => {
     expect(reopened).toEqual({ conversationId: 31, resumedExisting: true, prefillDelivered: false });
   });
 
+  test("a start with a subject names the record; the record's conversations are listed newest first; a conversation's subject is read", async () => {
+    const { client, requests } = buildClient([
+      { body: { aiConversation: { id: 7 } } },
+      {
+        body: {
+          aiConversations: { elements: [{ id: 9, summary: { title: "Budget" } }, { id: 8 }] },
+          subject: {
+            subjectEntityClass: "App\\Domain\\Shop\\Entities\\Orders\\Order",
+            subjectEntityId: 10683,
+            name: "Spring order 2026",
+            link: "/orders/10683",
+          },
+        },
+      },
+      {
+        body: {
+          subject: {
+            subjectEntityClass: "App\\Domain\\Shop\\Entities\\Orders\\Order",
+            subjectEntityId: 10683,
+            name: "Spring order 2026",
+            link: "/orders/10683",
+            purposeName: null,
+          },
+        },
+      },
+      { body: { subject: null } },
+      {
+        body: {
+          subjects: {
+            elements: [
+              {
+                aiConversationId: 9,
+                subjectEntityClass: "App\\Domain\\Shop\\Entities\\Orders\\Order",
+                subjectEntityId: 10683,
+                name: "Spring order 2026",
+                link: "/orders/10683",
+              },
+              { aiConversationId: 7, subjectEntityClass: "", subjectEntityId: 0 },
+            ],
+          },
+        },
+      },
+    ]);
+    const subject = { entityClass: "App\\Domain\\Shop\\Entities\\Orders\\Order", entityId: 10683 };
+
+    await client.startConversation({ agentSpaceKey: 0, text: "How is it going?", subject });
+    const conversationsOfSubject = await client.listConversationsOfSubject?.(subject, { paging: { top: 20 } });
+    const bound = await client.getConversationSubject?.(9);
+    const unbound = await client.getConversationSubject?.(8);
+    const subjectsOfThePage = await client.listSubjectsOfConversations?.(0, { paging: { top: 50 } });
+
+    expect(requests[0].body).toMatchObject({
+      subject: { subjectEntityClass: "App\\Domain\\Shop\\Entities\\Orders\\Order", subjectEntityId: 10683 },
+    });
+    expect(requests[1].method).toBe("GET");
+    expect(requests[1].url.pathname).toBe("/api/agents/conversations/listConversationsOfSubject");
+    expect(requests[1].url.searchParams.get("subjectEntityClass")).toBe("App\\Domain\\Shop\\Entities\\Orders\\Order");
+    expect(requests[1].url.searchParams.get("subjectEntityId")).toBe("10683");
+    expect(requests[1].url.searchParams.get("orderBy")).toBe("id desc");
+    expect(requests[1].url.searchParams.get("top")).toBe("20");
+    expect(conversationsOfSubject?.conversations.map((conversation) => conversation.id)).toEqual([9]);
+    // the record itself as the application names it now, also before a conversation about it exists
+    expect(conversationsOfSubject?.subject).toEqual({
+      conversationId: null,
+      entityClass: "App\\Domain\\Shop\\Entities\\Orders\\Order",
+      entityId: 10683,
+      name: "Spring order 2026",
+      link: "/orders/10683",
+      purposeId: null,
+    });
+    expect(requests[2].url.pathname).toBe("/api/agents/conversations/9/subject");
+    expect(bound).toEqual({
+      conversationId: null,
+      entityClass: "App\\Domain\\Shop\\Entities\\Orders\\Order",
+      entityId: 10683,
+      name: "Spring order 2026",
+      link: "/orders/10683",
+      purposeId: null,
+    });
+    expect(unbound).toBeNull();
+    // the records of a page of the list: the list's own query, one entry per bound conversation
+    expect(requests[4].url.pathname).toBe("/api/agents/conversations/listSubjectsOfConversations");
+    expect(requests[4].url.searchParams.get("filters")).toBe("rootConversationId eq null");
+    expect(requests[4].url.searchParams.get("orderBy")).toBe("id desc");
+    expect(requests[4].url.searchParams.get("top")).toBe("50");
+    expect(subjectsOfThePage).toEqual([
+      {
+        conversationId: 9,
+        entityClass: "App\\Domain\\Shop\\Entities\\Orders\\Order",
+        entityId: 10683,
+        name: "Spring order 2026",
+        link: "/orders/10683",
+        purposeId: null,
+      },
+    ]);
+  });
+
   test("a purposed start without a conversation id in the answer is refused", async () => {
     const { client } = buildClient([{ body: {} }]);
     await expect(client.startPurpose?.({ purposeId: "Support.AnswerTicket" })).rejects.toThrow("no conversation id");

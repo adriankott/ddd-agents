@@ -26,10 +26,10 @@ class DBAIConversationSubjectBindingModel extends DoctrineModel
 	public int $aiConversationId;
 
 	#[ORM\Column(type: 'integer')]
-	public int $agentSpaceId;
+	public ?int $agentSpaceId;
 
 	#[ORM\Column(type: 'string')]
-	public string $purposeName;
+	public ?string $purposeName;
 
 	#[ORM\Column(type: 'string')]
 	public string $subjectEntityClass;

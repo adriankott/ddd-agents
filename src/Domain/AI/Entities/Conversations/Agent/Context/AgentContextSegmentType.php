@@ -17,6 +17,13 @@ enum AgentContextSegmentType: string
     case SUB_AGENT_DIRECTIVE = 'SUB_AGENT_DIRECTIVE';
     /** The conversation PURPOSE directive: a purposed conversation's mission + prohibitions, right after the sub-agent directive. Per-conversation stable → extends the cacheable prefix. */
     case PURPOSE_DIRECTIVE = 'PURPOSE_DIRECTIVE';
+    /**
+     * The record a bound conversation is about ({@see \DDD\Domain\AI\Entities\Conversations\Subjects\AIConversationSubjectBinding}):
+     * what the application's describer said when the conversation was bound — one line, the record's name as marked
+     * data, its link. Right after the purpose directive; roots only; stored once on the conversation's working state,
+     * so it is byte-stable for the conversation's life → extends the cacheable prefix.
+     */
+    case CONVERSATION_SUBJECT = 'CONVERSATION_SUBJECT';
     /** The scheduled-run role directive ({@see \DDD\Domain\AI\Entities\Conversations\Schedules\AIConversationSchedule::RUN_DIRECTIVE}): the run IS one firing of a schedule — executes the mission, never administers schedules. Right after the purpose directive; static → extends the cacheable prefix. */
     case SCHEDULED_RUN_DIRECTIVE = 'SCHEDULED_RUN_DIRECTIVE';
     /** The space's time-zone rule — stable per conversation, part of the cacheable prefix. */

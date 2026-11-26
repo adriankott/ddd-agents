@@ -11,10 +11,12 @@ use DDD\Infrastructure\Exceptions\BadRequestException;
 use DDD\Infrastructure\Exceptions\NotFoundException;
 
 /**
- * The record a purposed conversation works on, e.g. one support ticket: the entity class (the `objectType` a client
- * reads on the record) and its id. A purposed start with a subject resumes the open conversation of the same space,
- * purpose AND subject, so every record gets its own conversation; a start without one keeps the singleton per space
- * and purpose.
+ * The record a conversation is about, e.g. one support ticket or one order: the entity class (the `objectType` a
+ * client reads on the record) and its id.
+ *
+ * - A purposed start with a subject resumes the open conversation of the same space, purpose AND subject, so every
+ *   record gets its own conversation; a purposed start without one keeps the singleton per space and purpose.
+ * - A free conversation started with a subject is bound to the record; any number of them may exist per record.
  *
  * Both fields come from the client, so the server checks them before anything is stored
  * ({@see findCapViolation()}, {@see findReadableSubjectEntity()}): the class must be a stored entity class of this
@@ -100,7 +102,7 @@ class AIConversationSubject extends ValueObject
         }
         $subjectEntity = $entitiesService->find($this->subjectEntityId);
         if (!$subjectEntity instanceof Entity) {
-            throw new NotFoundException('The subject of this purpose was not found.');
+            throw new NotFoundException('The subject was not found.');
         }
         return $subjectEntity;
     }

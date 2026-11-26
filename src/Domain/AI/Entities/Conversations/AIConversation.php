@@ -2847,7 +2847,21 @@ class AIConversation extends Entity
         return $subAgentDirectivePrompt?->getPromptTextWithParametersApplied() ?? '';
     }
 
-    /** Phase C: the purpose directive of a root, or the static scheduled-run directive of a purpose-less run. */
+    /**
+     * The text of the `CONVERSATION_SUBJECT` segment: what the application said about the record this conversation is
+     * bound to, rendered from the description its working state stores since it was bound
+     * ({@see \DDD\Domain\AI\Entities\Conversations\Agent\AgentWorkingState::$subjectDescription}) — a loaded column, no
+     * service or repository touch. Null for a conversation without a subject or without a description.
+     */
+    public function findConversationSubjectBlock(): ?string
+    {
+        if (!isset($this->agentWorkingState)) {
+            return null;
+        }
+        return $this->agentWorkingState->subjectDescription?->renderContextText();
+    }
+
+    /** Phase C: the purpose directive of a root, the record a bound root is about, or the static scheduled-run directive of a purpose-less run. */
     protected function putDirectivesIntoContext(AgentModelInput $agentContext): void
     {
         // Conversation PURPOSE directive — resolved ON the object from this conversation's purposeName
@@ -2860,6 +2874,12 @@ class AIConversation extends Entity
             $agentContext->purposeName = $aIConversationPurpose?->name;
             $agentContext->purposeInheritsFromName = $aIConversationPurpose?->inheritsFromPurposeName;
             $agentContext->widgetTypesThatEndThePurpose = $aIConversationPurpose?->getWidgetTypesThatEndThisPurpose() ?? [];
+        }
+        // The record a bound conversation is about — the description its working state stores since it was bound
+        // (a loaded column). Never for a delegation child: a child gets a focused task from its parent, which names
+        // the record when the task needs it.
+        if (!$agentContext->isDelegation) {
+            $agentContext->conversationSubject = $this->findConversationSubjectBlock();
         }
         // Scheduled-run role directive for a run conversation WITHOUT a purpose — the runs spawned before the
         // `Schedule.Run` purpose carried the role statement (execute the mission, never administer schedules) as this

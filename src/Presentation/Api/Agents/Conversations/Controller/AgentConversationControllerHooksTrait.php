@@ -13,6 +13,7 @@ use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessages;
 use DDD\Domain\AI\Entities\Conversations\Messages\OwnerDevice;
 use DDD\Domain\AI\Entities\Conversations\Messages\RunSettingsOverride;
 use DDD\Domain\AI\Entities\Conversations\SignalSources\ConversationSignalSources;
+use DDD\Domain\AI\Entities\Conversations\Subjects\AIConversationSubject;
 use DDD\Domain\AI\Entities\Conversations\Usage\AgentAIUsageScope;
 use DDD\Domain\AI\Entities\UsageLogs\AIUsageEnvelopeContext;
 use DDD\Domain\AI\Services\AgentSpaces\AgentSpacesService;
@@ -26,6 +27,7 @@ use DDD\Domain\AI\Services\ClientTools\AgentClientToolRequestsService;
 use DDD\Domain\AI\Services\AIUsageEnvelopesService;
 use DDD\Domain\AI\Services\Conversations\AIConversationsService;
 use DDD\Domain\AI\Services\SystemPrompts\AgentBaseSystemPromptCacheService;
+use DDD\Domain\Base\Entities\Entity;
 use DDD\Infrastructure\Exceptions\BadRequestException;
 use DDD\Infrastructure\Exceptions\ForbiddenException;
 use DDD\Infrastructure\Exceptions\InternalErrorException;
@@ -130,6 +132,45 @@ trait AgentConversationControllerHooksTrait
     protected function isSubjectEntityClassAllowedForPurposeStart(string $purposeName, string $subjectEntityClass): bool
     {
         return false;
+    }
+
+    /**
+     * Whether a client may name a record of `$subjectEntityClass` as the subject of a FREE conversation: at its start
+     * ({@see AgentConversationStartTrait::buildConversationStartedResponse()}) and in the list of a record's
+     * conversations ({@see AgentConversationSubjectsTrait::listConversationsOfSubject()}). The record itself is read
+     * under the caller's read rights afterwards; this hook narrows which entity classes a client may name at all, so
+     * a class without read rights is no probe for which ids exist. Default: no class — a request that names a subject
+     * answers 404 until the application lists the classes of the records its clients start conversations about; a
+     * refused class answers 404 like an unknown record. A request without a subject is not affected.
+     *
+     * The classes of purposed starts are listed apart ({@see self::isSubjectEntityClassAllowedForPurposeStart()}): a
+     * purpose works on the classes it was written for, a free conversation on any record the application offers.
+     *
+     * @param string $subjectEntityClass fully qualified, without a leading backslash
+     * @return bool
+     */
+    protected function isSubjectEntityClassAllowedForConversationStart(string $subjectEntityClass): bool
+    {
+        return false;
+    }
+
+    /**
+     * The record a request names as the subject of a free conversation, checked: 400 for a malformed subject, 404 for
+     * a class the application does not allow ({@see self::isSubjectEntityClassAllowedForConversationStart()}) and for
+     * a record the caller cannot read (or that does not exist) — one answer for both.
+     *
+     * @param AIConversationSubject $aIConversationSubject
+     * @return Entity the record, read under the caller's rights
+     * @throws BadRequestException
+     * @throws NotFoundException
+     */
+    protected function findReadableSubjectEntityOfConversationRequest(AIConversationSubject $aIConversationSubject): Entity
+    {
+        if ($aIConversationSubject->findCapViolation() === null
+            && !$this->isSubjectEntityClassAllowedForConversationStart($aIConversationSubject->getNormalizedEntityClass())) {
+            throw new NotFoundException('The subject of this conversation was not found.');
+        }
+        return $aIConversationSubject->findReadableSubjectEntity();
     }
 
     /**

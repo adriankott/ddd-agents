@@ -156,6 +156,31 @@ export interface WirePurposeStartResponse {
   prefillDelivered?: boolean | null;
 }
 
+/** `AIConversationBoundSubject`. */
+export interface WireBoundConversationSubject {
+  aiConversationId?: number | null;
+  subjectEntityClass?: string | null;
+  subjectEntityId?: number | null;
+  purposeName?: string | null;
+  name?: string | null;
+  link?: string | null;
+}
+
+/** `AIConversationSubjectGetResponseDto`. */
+export interface WireConversationSubjectResponse {
+  subject?: WireBoundConversationSubject | null;
+}
+
+/** `AIConversationBoundSubjectsGetResponseDto`: `subjects` is the set `AIConversationBoundSubjects`. */
+export interface WireBoundConversationSubjectsResponse {
+  subjects?: WireSet<WireBoundConversationSubject> | null;
+}
+
+/** `AIConversationsOfSubjectGetResponseDto`. */
+export interface WireConversationsOfSubjectResponse extends WireConversationsResponse {
+  subject?: WireBoundConversationSubject | null;
+}
+
 /** `AIConversationsGetResponseDto`. */
 export interface WireConversationsResponse {
   aiConversations?: WireSet<WireConversation> | null;

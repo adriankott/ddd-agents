@@ -79,6 +79,7 @@ class AgentContextSegment extends ValueObject
                 . ($this->purposeInheritsFromName !== null && $this->purposeInheritsFromName !== ''
                     ? ' (inherits ' . $this->purposeInheritsFromName . ')'
                     : ''),
+            AgentContextSegmentType::CONVERSATION_SUBJECT => 'Record of this conversation (subject)',
             AgentContextSegmentType::SCHEDULED_RUN_DIRECTIVE => 'Scheduled run directive',
             AgentContextSegmentType::TIME_RULE => 'Time rule (' . AgentApplicationWording::current()->agentSpaceContextSubjectName . ' zone)',
             AgentContextSegmentType::OWNER_PRESENCE => 'Owner presence (who the agent is talking to)',

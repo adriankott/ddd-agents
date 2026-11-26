@@ -17,6 +17,9 @@ import type {
   ConversationSignal,
   ConversationSubscriptionEndReason,
   PostedMessage,
+  BoundConversationSubject,
+  ConversationsOfSubject,
+  ConversationSubject,
   PurposeStartRequest,
   SelectableModel,
   StartedConversation,
@@ -74,7 +77,8 @@ export interface AgentsConversationClient {
   /**
    * Start a conversation with its first message. `text` may be empty only together with `startSignalText` (the agent
    * speaks first); `entryPointKey` reopens the recent conversation of that entry point instead of starting an
-   * identical one; `model` is a name from `getSelectableModels`.
+   * identical one; `model` is a name from `getSelectableModels`; `subject` binds the NEW conversation to a record
+   * (the agent then reads what the record is in every call; a reopened conversation keeps its own subject).
    */
   startConversation: (request: {
     agentSpaceKey: number;
@@ -83,7 +87,28 @@ export interface AgentsConversationClient {
     entryPointKey?: string;
     model?: string;
     attachments?: ConversationAttachmentReference[];
+    subject?: ConversationSubject;
   }) => Promise<StartedConversation>;
+
+  /**
+   * The user's root conversations about one record, newest first (`GET …/listConversationsOfSubject`): the free ones
+   * started about it and the purposed ones started for it, of every agent space. Optional: a binding without it
+   * offers no list per record.
+   */
+  listConversationsOfSubject?: (subject: ConversationSubject, options?: ConversationListQueryOptions) => Promise<ConversationsOfSubject>;
+
+  /**
+   * The record one conversation is bound to (`GET …/{conversationId}/subject`), or null for a conversation without
+   * one. Optional like {@link listConversationsOfSubject}.
+   */
+  getConversationSubject?: (conversationId: number) => Promise<BoundConversationSubject | null>;
+
+  /**
+   * The records the conversations of a page of {@link listConversations} are bound to
+   * (`GET …/listSubjectsOfConversations`, the same space and paging): one entry per bound conversation
+   * (`conversationId`). Optional like {@link listConversationsOfSubject}.
+   */
+  listSubjectsOfConversations?: (agentSpaceKey: number, options?: ConversationListQueryOptions) => Promise<BoundConversationSubject[]>;
 
   /**
    * Start a purposed conversation (`POST …/startPurpose`), or reopen its open one; the chat then opens the answered

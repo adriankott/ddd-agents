@@ -16,6 +16,9 @@ import type {
   ConversationSearchOptions,
   ConversationSignal,
   ConversationSubscriptionEndReason,
+  BoundConversationSubject,
+  ConversationsOfSubject,
+  ConversationSubject,
   PostedMessage,
   SelectableModel,
   PurposeStartRequest,
@@ -45,6 +48,9 @@ class PollingAgentsConversationClient implements AgentsConversationClientWithCha
   readonly getConversationRunState?: (conversationId: number) => Promise<ConversationRunStateRead>;
   readonly getAccountRealtimeMessages?: (clientId?: string) => Promise<AccountRealtimeRead>;
   readonly startPurpose?: (request: PurposeStartRequest) => Promise<StartedPurposeConversation>;
+  readonly listConversationsOfSubject?: (subject: ConversationSubject, options?: ConversationListQueryOptions) => Promise<ConversationsOfSubject>;
+  readonly getConversationSubject?: (conversationId: number) => Promise<BoundConversationSubject | null>;
+  readonly listSubjectsOfConversations?: (agentSpaceKey: number, options?: ConversationListQueryOptions) => Promise<BoundConversationSubject[]>;
 
   constructor(
     protected readonly binding: AgentsConversationClient,
@@ -57,6 +63,9 @@ class PollingAgentsConversationClient implements AgentsConversationClientWithCha
     this.getConversationRunState = binding.getConversationRunState?.bind(binding);
     this.getAccountRealtimeMessages = binding.getAccountRealtimeMessages?.bind(binding);
     this.startPurpose = binding.startPurpose?.bind(binding);
+    this.listConversationsOfSubject = binding.listConversationsOfSubject?.bind(binding);
+    this.getConversationSubject = binding.getConversationSubject?.bind(binding);
+    this.listSubjectsOfConversations = binding.listSubjectsOfConversations?.bind(binding);
   }
 
   getConversationMetadata = (conversationId: number): Promise<AgentsConversation> =>

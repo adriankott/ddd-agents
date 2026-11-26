@@ -5,6 +5,7 @@ import {
   type AgentsClientErrorKind,
   type AgentsConversation,
   type AgentsConversationMessage,
+  type BoundConversationSubject,
   type ConversationActivity,
   type ConversationActivityElement,
   type ConversationMessageAuthorType,
@@ -21,6 +22,7 @@ import {
 } from "../../contract/conversation";
 import type {
   WireActivityLine,
+  WireBoundConversationSubject,
   WireClientContext,
   WireClientContextRouteParameter,
   WireConversation,
@@ -322,4 +324,18 @@ export const mapClientContextToWire = (clientContext: AgentsClientContext | null
   const tab = readClientContextText(clientContext.tab, AGENTS_CLIENT_CONTEXT_LIMITS.tabChars);
   if (tab !== undefined) wireClientContext.tab = tab;
   return Object.keys(wireClientContext).length > 0 ? wireClientContext : undefined;
+};
+
+/** The record of an answer (`AIConversationBoundSubject`), or null when it names none. */
+export const mapWireBoundConversationSubject = (wireSubject: WireBoundConversationSubject | null | undefined): BoundConversationSubject | null => {
+  const entityId = Number(wireSubject?.subjectEntityId ?? 0);
+  if (!wireSubject || !wireSubject.subjectEntityClass || !Number.isInteger(entityId) || entityId < 1) return null;
+  return {
+    conversationId: wireSubject.aiConversationId ?? null,
+    entityClass: wireSubject.subjectEntityClass,
+    entityId,
+    name: wireSubject.name ?? null,
+    link: wireSubject.link ?? null,
+    purposeId: wireSubject.purposeName ?? null,
+  };
 };

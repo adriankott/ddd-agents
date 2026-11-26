@@ -23,6 +23,10 @@ use DDD\Presentation\Api\Agents\Conversations\Dtos\AIConversationStartWithMessag
  *
  * Drives ONE agentic turn asynchronously; with an entry-point key a recent conversation of that entry point in the
  * same space (or at account level) is reopened instead (nothing appended, no turn).
+ *
+ * A start may name the record the conversation is about (`subject`): the new conversation is bound to it before its
+ * first turn runs. Which entity classes a client may name is the application's list
+ * ({@see AgentConversationControllerHooksTrait::isSubjectEntityClassAllowedForConversationStart()}, default: none).
  */
 trait AgentConversationStartTrait
 {
@@ -68,6 +72,12 @@ trait AgentConversationStartTrait
             $runSettings = RunSettings::newInstance();
             $runSettings->storeRequestSnapshot = true;
         }
+        // the record the new conversation is about: refused before anything is stored (400 malformed, 404 a class
+        // the application does not allow or a record the caller cannot read)
+        $aIConversationSubject = $requestDto->subject ?? null;
+        if ($aIConversationSubject !== null) {
+            $this->findReadableSubjectEntityOfConversationRequest($aIConversationSubject);
+        }
         $responseDto = new AIConversationStartWithMessagePostResponseDto();
         if (($requestDto->entryPointKey ?? null) !== null) {
             $aIConversationEntryPointStart = $aiConversationAgentService->startOrReopenConversationAtEntryPoint(
@@ -81,7 +91,8 @@ trait AgentConversationStartTrait
                 $runSettingsOverride,
                 $this->readOwnerDeviceFromRequest(),
                 $requestDto->clientContext ?? null,
-                $runSettings
+                $runSettings,
+                $aIConversationSubject
             );
             $responseDto->aiConversation = $aIConversationEntryPointStart->conversation;
             $responseDto->reopenedExistingConversation = $aIConversationEntryPointStart->reopenedExisting;
@@ -102,7 +113,8 @@ trait AgentConversationStartTrait
                 runSettings: $runSettings,
                 runSettingsOverride: $runSettingsOverride,
                 ownerDevice: $this->readOwnerDeviceFromRequest(),
-                clientContext: $requestDto->clientContext ?? null
+                clientContext: $requestDto->clientContext ?? null,
+                aIConversationSubject: $aIConversationSubject
             );
         }
         // the turn of a new conversation usually runs on a worker: the client's run-state reads stamp it again

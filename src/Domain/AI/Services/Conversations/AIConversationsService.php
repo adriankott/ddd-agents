@@ -53,6 +53,7 @@ use DDD\Domain\AI\Repo\Argus\Conversations\ArgusAIConversationSummary;
 use DDD\Domain\AI\Repo\DB\Conversations\DBAIConversation;
 use DDD\Domain\AI\Repo\DB\Conversations\DBAIConversations;
 use DDD\Domain\AI\Entities\Conversations\Subjects\AIConversationSubject;
+use DDD\Domain\AI\Entities\Conversations\Subjects\AIConversationSubjectDescription;
 use DDD\Domain\AI\Repo\DB\Conversations\Subjects\DBAIConversationSubjectBindingModel;
 use DDD\Domain\AI\Entities\Conversations\Eligibility\AgentAutomationEligibility;
 use DDD\Domain\AI\Entities\Conversations\Eligibility\AgentEligibilityLogContext;
@@ -2871,6 +2872,22 @@ class AIConversationsService extends EntitiesService
     }
 
     /**
+     * Every conversation about one record that the authenticated account may read and a customer may see (the
+     * default query options apply): the free conversations started about the record and the purposed ones started
+     * for it. The caller has checked that the account may read the record
+     * ({@see AIConversationSubject::findReadableSubjectEntity()}).
+     *
+     * @throws BadRequestException
+     * @throws InternalErrorException
+     * @throws InvalidArgumentException
+     * @throws ReflectionException
+     */
+    public function findAllVisibleToCustomerOfSubject(AIConversationSubject $aIConversationSubject): AIConversations
+    {
+        return $this->getEntitySetRepoClassInstance()->findAllVisibleToCustomerOfSubject($aIConversationSubject);
+    }
+
+    /**
      * The ROOT conversation of the delegation tree a tool call runs in — the calling conversation itself when it is
      * the root. A tool that belongs to one kind of run authorises through the root: a look-up child carries no
      * purpose of its own. Null on the HTTP-MCP path, where no conversation exists.
@@ -3026,6 +3043,34 @@ class AIConversationsService extends EntitiesService
         }
         $agentWorkingState = $conversation->getAgentWorkingState() ?? new AgentWorkingState();
         $agentWorkingState->localSituationText = $localSituationText;
+        $conversation->agentWorkingState = $agentWorkingState;
+    }
+
+    /**
+     * Persist what the application said about the record a freshly bound conversation is about — its own top-level
+     * key on the `agentWorkingState` merge column, written ONCE: the statement applies only while the key is still
+     * absent or JSON null, so a second call can never change what the conversation's `CONVERSATION_SUBJECT` segment
+     * was built from. Nothing for a description without a line for the model.
+     */
+    public function persistSubjectDescriptionSlice(AIConversation $conversation, AIConversationSubjectDescription $aIConversationSubjectDescription): void
+    {
+        if (!isset($conversation->id) || !$aIConversationSubjectDescription->hasDescription()) {
+            return;
+        }
+        $affectedRows = (int)EntityManagerFactory::getInstance()->getConnection()->executeStatement(
+            'UPDATE `' . DBAIConversationModel::getTableName() . '`'
+            . ' SET `agentWorkingState` = ' . self::buildAgentWorkingStateMergePatchSql()
+            . ' WHERE `id` = :id AND ' . self::buildAgentWorkingStateKeyIsUnsetSql('subjectDescription'),
+            [
+                'slice' => (string)json_encode(['subjectDescription' => $aIConversationSubjectDescription->toRepositoryArray()], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+                'id' => $conversation->id,
+            ]
+        );
+        if ($affectedRows === 0) {
+            return;
+        }
+        $agentWorkingState = $conversation->getAgentWorkingState() ?? new AgentWorkingState();
+        $agentWorkingState->subjectDescription = $aIConversationSubjectDescription;
         $conversation->agentWorkingState = $agentWorkingState;
     }
 

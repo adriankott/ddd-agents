@@ -1139,13 +1139,10 @@ class AIConversationAgentService extends Service implements AgentModelCallRunner
             maxStepsPerTurn: $aIConversationPurpose->maxStepsPerTurn,
             purposeName: $purposeName,
             contextRetentionSettings: $purposeStartSettings->contextRetentionSettings,
-            runSettings: $purposeStartSettings->runSettings
+            runSettings: $purposeStartSettings->runSettings,
+            // bound inside the drive, before the kickoff turn is dispatched
+            aIConversationSubject: $aIConversationSubject
         ));
-        if ($aIConversationSubject !== null) {
-            /** @var AIConversationSubjectBindingsService $aIConversationSubjectBindingsService */
-            $aIConversationSubjectBindingsService = DDDService::instance()->getService(AIConversationSubjectBindingsService::class);
-            $aIConversationSubjectBindingsService->bindSubjectToConversation($agentPurposedConversationStart->conversation, $aIConversationSubject);
-        }
         return $agentPurposedConversationStart;
     }
 
@@ -1162,6 +1159,9 @@ class AIConversationAgentService extends Service implements AgentModelCallRunner
      * entry point's start lock ({@see AIConversationsService::lockEntryPointStart()}): the look-up and the creation of
      * one start finish before the other start looks, so the second finds the conversation the first created.
      *
+     * `$aIConversationSubject` binds a NEW conversation to a record ({@see driveConversation()}); a reopened one keeps
+     * the subject it was started with, or none.
+     *
      * @throws BadRequestException a key that is empty, too long or holds other characters than
      *                             {@see AIConversation::ENTRY_POINT_KEY_PATTERN}; no authenticated account; and every
      *                             refusal of {@see driveConversation()}
@@ -1177,7 +1177,8 @@ class AIConversationAgentService extends Service implements AgentModelCallRunner
         ?RunSettingsOverride $runSettingsOverride = null,
         ?OwnerDevice $ownerDevice = null,
         ?AgentClientContext $clientContext = null,
-        ?RunSettings $runSettings = null
+        ?RunSettings $runSettings = null,
+        ?AIConversationSubject $aIConversationSubject = null
     ): AIConversationEntryPointStart {
         $entryPointKey = trim($entryPointKey);
         if ($entryPointKey === '' || mb_strlen($entryPointKey) > 255 || preg_match(AIConversation::ENTRY_POINT_KEY_PATTERN, $entryPointKey) !== 1) {
@@ -1209,7 +1210,8 @@ class AIConversationAgentService extends Service implements AgentModelCallRunner
                 runSettingsOverride: $runSettingsOverride,
                 ownerDevice: $ownerDevice,
                 entryPointKey: $entryPointKey,
-                clientContext: $clientContext
+                clientContext: $clientContext,
+                aIConversationSubject: $aIConversationSubject
             ));
         } finally {
             $aIConversationsService->unlockEntryPointStart($aIConversationEntryPointStartLock);
@@ -1265,6 +1267,12 @@ class AIConversationAgentService extends Service implements AgentModelCallRunner
      * @param AgentClientContext|null $clientContext what the owner's client shows (route, record, tab): refused over a
      *                                               cap (HTTP 400) before anything is stored, then stored on the
      *                                               owner's row ({@see AgentClientContextService})
+     * @param AIConversationSubject|null $aIConversationSubject the record a NEW conversation is about: bound to it at
+     *                                    creation, before the first turn is dispatched, so the first model call
+     *                                    already reads what the record is
+     *                                    ({@see AIConversationSubjectBindingsService::bindSubjectToConversation()});
+     *                                    ignored when continuing — a conversation keeps the subject it was started
+     *                                    with, or none. The caller has checked that the account may read the record
      * @return AIConversation the driven conversation (messages expanded)
      * @throws BadRequestException when the account the drive runs as cannot be resolved, or a start without a space
      *                             is not allowed
@@ -1294,7 +1302,8 @@ class AIConversationAgentService extends Service implements AgentModelCallRunner
         ?OwnerDevice $ownerDevice = null,
         bool $messageWrittenByPlatform = false,
         ?string $entryPointKey = null,
-        ?AgentClientContext $clientContext = null
+        ?AgentClientContext $clientContext = null,
+        ?AIConversationSubject $aIConversationSubject = null
     ): AIConversation {
         /** @var AIConversationMessagesService $aIConversationMessagesService */
         $aIConversationMessagesService = DDDService::instance()->getService(AIConversationMessagesService::class);
@@ -1421,6 +1430,13 @@ class AIConversationAgentService extends Service implements AgentModelCallRunner
                             onlyWhereUnset: false
                         );
                     }
+                }
+                // the record the conversation is about — bound once at creation, after the purpose stamp (the binding
+                // copies the purpose) and before the dispatch (the first model call reads the binding's description)
+                if ($aIConversationSubject !== null) {
+                    /** @var AIConversationSubjectBindingsService $aIConversationSubjectBindingsService */
+                    $aIConversationSubjectBindingsService = DDDService::instance()->getService(AIConversationSubjectBindingsService::class);
+                    $aIConversationSubjectBindingsService->bindSubjectToConversation($conversation, $aIConversationSubject);
                 }
                 if ($runSettings !== null) {
                     $conversation->runSettings = $runSettings;

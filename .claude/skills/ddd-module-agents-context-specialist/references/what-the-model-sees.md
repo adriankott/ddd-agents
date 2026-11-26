@@ -42,6 +42,7 @@ loaded skills' resident schemas, `load_tool` last); the tools skill owns the sch
 | `BASE_PROMPT` | always: the cached base prompt, its `[surface=screen]` / `[surface=phone]` sections rendered for this call, `{%COMPOSED_VIEW_KIT%}` filled when `teachesComposedViewKit()` | the agent space (the surface changes it) |
 | `SUB_AGENT_DIRECTIVE` | a delegation | the conversation |
 | `PURPOSE_DIRECTIVE` | a purposed root; conditional sections rendered for the variants | the conversation |
+| `CONVERSATION_SUBJECT` | a root bound to a record whose describer answered (`AIConversationSubjectDescriber`): what the record is, its name as marked data, its link; rendered from `AgentWorkingState::$subjectDescription` | the conversation (written once when it is bound) |
 | `SCHEDULED_RUN_DIRECTIVE` | a scheduled run, never its children | the conversation |
 | `TIME_RULE` | a zone is known: "Times are the … local time: <zone>." | the conversation (a zone change is a note under `onceWhenChanged`) |
 | `OWNER_PRESENCE` | a root; a delegation child only as `PRESENT_ON_THE_PHONE` while its root's owner is on the phone line: "Who you are talking to" | the conversation, except at a call's start and end |

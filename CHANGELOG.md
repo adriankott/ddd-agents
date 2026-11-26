@@ -1,5 +1,82 @@
 # Changelog
 
+## 0.7.2
+
+**Free conversations about one record, the list of a record's conversations, and what the model reads about the
+record of a bound conversation.** npm `@mgamadeus/ddd-agents` 0.7.2 in lockstep (`subject` on a start, the list and
+the subject read on the client port).
+
+- **A conversation without a purpose can be bound to a record.** A start names it:
+  `AIConversationStartWithMessagePostRequestDto::$subject` (`subjectEntityClass`, `subjectEntityId`), in PHP
+  `AIConversationAgentService::driveConversation(…, aIConversationSubject: $subject)` and
+  `startOrReopenConversationAtEntryPoint(…, aIConversationSubject: $subject)`. Any number of free conversations may
+  exist per record; a free conversation is never the singleton of a purposed start. The binding of a free conversation
+  has `purposeName` null, one at account level `agentSpaceId` null.
+  `AIConversationSubjectBindingsService::bindSubjectToConversation()` no longer refuses a conversation without a
+  purpose or a space.
+- **Which classes a client may name:** new hook
+  `AgentConversationControllerHooksTrait::isSubjectEntityClassAllowedForConversationStart(string $subjectEntityClass)`,
+  default no class. A start that names a subject answers 404 for a class that is not listed and for a record the
+  caller cannot read, 400 for a malformed subject; a start without a subject is not affected. The classes of purposed
+  starts stay with `isSubjectEntityClassAllowedForPurposeStart()`. New protected
+  `findReadableSubjectEntityOfConversationRequest()`.
+- **The conversations of a record, with their own trait `AgentConversationSubjectsTrait`** (a controller adds it on
+  purpose; an update never mounts the routes): `GET …/listConversationsOfSubject?subjectEntityClass=…&subjectEntityId=…`
+  (query options of the conversations list) answers the caller's visible conversations of the record, free and
+  purposed, of every space (`AIConversationsService::findAllVisibleToCustomerOfSubject()`,
+  `DBAIConversations::findAllVisibleToCustomerOfSubject()`,
+  `AIConversationSubjectBindingsService::restrictConversationQueryToSubject()`), under the same class and read
+  checks as the start, and the record itself as the describer names it now (`subject` of
+  `AIConversationsOfSubjectGetResponseDto`: class, id, name, link — what a client shows before a conversation about
+  the record exists; `AIConversationBoundSubject::ofSubject()`); `GET …/{aiConversationId}/subject` answers the
+  record one conversation is bound to (`AIConversationBoundSubject`: conversation id, class, id, purpose, name,
+  link) or null;
+  `GET …/listSubjectsOfConversations` (the query options of `listAllConversations`) answers the records of a page of
+  the caller's conversations as the set `AIConversationBoundSubjects` (`subjects.elements`, one element per bound
+  conversation, keyed by the conversation: `findSubjectOfConversation()`), so a history can name each conversation's
+  record with one request. New `AIConversationSubjectBindingsService::findBindingOfConversation()` and
+  `findBoundSubjectsOfConversations()`.
+- **The model reads what the record of a bound conversation is, in every call.** New port
+  `AIConversationSubjectDescriber` (tag `ai.conversation_subject_describer`): `getSubjectEntityClasses()` and
+  `describeSubject(AIConversationSubject, Entity): ?AIConversationSubjectDescription` (one line in the application's
+  words, the record's display name, its link). The answer of the first describer that names the record's class or a
+  parent class is stored once on the conversation's working state when it is bound
+  (`AgentWorkingState::$subjectDescription`, `AIConversationsService::persistSubjectDescriptionSlice()`, written only
+  while the key is unset) and rendered as the new system segment `CONVERSATION_SUBJECT` right after the purpose
+  directive (`AgentModelInput::$conversationSubject`, `AIConversation::findConversationSubjectBlock()`). The text is
+  byte-stable for the conversation's life, so a reopened conversation knows its record and the prompt cache holds; the
+  record's name stands between the marks of untrusted content. Before, a purposed conversation of a record knew it only
+  from what its starter put into the kickoff. Without a describer, or when it fails (a warning in the log), the
+  conversation is bound without the segment. A conversation bound before a describer existed gets none.
+- **Changed: a new conversation is bound inside the drive,** after the purpose stamp and before its first turn is
+  dispatched. `resumeOrStartPurposedConversation()` hands its subject to `driveConversation()` instead of binding after
+  the drive returned (the kickoff turn could start before the row existed).
+- **Changed signatures:** `AIConversationAgentService::driveConversation()` and
+  `startOrReopenConversationAtEntryPoint()` take a last optional parameter `?AIConversationSubject $aIConversationSubject`.
+  A class that overrides one of them adds the parameter.
+- **Schema, and what a host does on adoption:** `AIConversationSubjectBindings.purposeName` and `.agentSpaceId`
+  become nullable (DROP NOT NULL), and the table gets the index `AIConversationSubjectBindings_idx_sub_sub` on
+  `subjectEntityClass, subjectEntityId`; the schema diff shows both, apply it with the update. No new column: the
+  description lives on the conversation's working state. On a table of 0.6.9–0.7.1 a free start with a subject fails
+  on the NOT NULL column until the diff is applied, so apply it before a class is allowed; purposed starts are not
+  affected. Nothing else is needed: without the trait and an allowed class a host behaves as before. To use it, a
+  host adds `AgentConversationSubjectsTrait` to its conversations controller, lists its classes in
+  `isSubjectEntityClassAllowedForConversationStart()`, and registers a describer (`AIConversationSubjectDescriber`).
+- **Web:** `startConversation({ …, subject })`; optional `listConversationsOfSubject(subject, options)` (answers
+  `ConversationsOfSubject`: `subject` and `conversations`), `listSubjectsOfConversations(agentSpaceKey, options)` and
+  `getConversationSubject(conversationId)` on
+  `AgentsConversationClient` (the HTTP binding and the polling wrapper have them). New contract types
+  `ConversationSubject` (`PurposeSubject` is now its alias), `BoundConversationSubject` and `ConversationsOfSubject`;
+  `public-api.json` declares them and the wire names of `./client`.
+- Tests: the list across spaces and purposes for its account only, another record, another class and another account
+  (MariaDB and PostgreSQL); a free conversation is not the purposed singleton; the binding without a purpose and
+  without a space; the description stored once and rendered for the drive's object and every later load; a failing
+  and a missing describer; a host without the table; the describer of a parent class; the cleaned description and
+  its round trip through the working state; the segment's text, the name's marks and its place after the purpose
+  directive; the start with a subject (default 404, unreadable 404, malformed 400, the subject handed to the drive
+  and to the entry-point start); the list route's checks; the routes only with their trait; the drive binds between
+  the purpose stamp and the dispatch; the HTTP binding's body, query and answers.
+
 ## 0.7.1
 
 **Voice: samples for a voice picker.** npm `@mgamadeus/ddd-agents` 0.7.1 in lockstep. No table change.

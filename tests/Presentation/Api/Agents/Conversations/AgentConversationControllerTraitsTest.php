@@ -8,6 +8,8 @@ use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Entities\Conversations\AIConversationSummary;
 use DDD\Infrastructure\Base\DateTime\DateTime;
 use DDD\Presentation\Api\Agents\Conversations\Controller\AgentConversationPurposeStartTrait;
+use DDD\Presentation\Api\Agents\Conversations\Controller\AgentConversationReadsTrait;
+use DDD\Presentation\Api\Agents\Conversations\Controller\AgentConversationSubjectsTrait;
 use DDD\Presentation\Api\Agents\Conversations\Controller\AgentConversationWritesTrait;
 use DDD\Presentation\Api\Agents\Conversations\Dtos\AIConversationRunStateGetResponseDto;
 use DDD\Presentation\Base\Router\Routes\Delete;
@@ -38,6 +40,9 @@ class AgentConversationControllerTraitsTest extends TestCase
         'getAccountRealtimeMessages' => ['GET', '/realtimeMessages'],
         'postMessage' => ['POST', '/{aiConversationId}/postMessage'],
         'startPurpose' => ['POST', '/startPurpose'],
+        'listConversationsOfSubject' => ['GET', '/listConversationsOfSubject'],
+        'getAIConversationSubject' => ['GET', '/{aiConversationId}/subject'],
+        'listSubjectsOfConversations' => ['GET', '/listSubjectsOfConversations'],
         'injectSignal' => ['POST', '/{aiConversationId}/injectSignal'],
         'retryFailedRun' => ['POST', '/{aiConversationId}/retry'],
         'patchTitle' => ['PATCH', '/{aiConversationId}/title'],
@@ -54,6 +59,20 @@ class AgentConversationControllerTraitsTest extends TestCase
         );
         self::assertNotContains('startPurpose', $writesTraitMethodNames, 'an update must not mount a new client route in a controller that uses the write routes');
         self::assertTrue((new ReflectionClass(AgentConversationPurposeStartTrait::class))->hasMethod('startPurpose'));
+    }
+
+    public function testTheRoutesOfARecordsConversationsComeOnlyWithTheirOwnTrait(): void
+    {
+        $readsTraitMethodNames = array_map(
+            static fn (ReflectionMethod $reflectionMethod): string => $reflectionMethod->getName(),
+            (new ReflectionClass(AgentConversationReadsTrait::class))->getMethods()
+        );
+        self::assertNotContains('listConversationsOfSubject', $readsTraitMethodNames, 'an update must not mount a new client route in a controller that uses the read routes');
+        self::assertNotContains('getAIConversationSubject', $readsTraitMethodNames);
+        self::assertNotContains('listSubjectsOfConversations', $readsTraitMethodNames);
+        self::assertTrue((new ReflectionClass(AgentConversationSubjectsTrait::class))->hasMethod('listConversationsOfSubject'));
+        self::assertTrue((new ReflectionClass(AgentConversationSubjectsTrait::class))->hasMethod('getAIConversationSubject'));
+        self::assertTrue((new ReflectionClass(AgentConversationSubjectsTrait::class))->hasMethod('listSubjectsOfConversations'));
     }
 
     public function testAControllerUsingTheTraitsGetsTheChatRoutesAndTheStartStaysUnrouted(): void

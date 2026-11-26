@@ -264,14 +264,43 @@ export interface StartedConversation {
 }
 
 /**
- * The record a purposed conversation works on: the entity class as the record's `objectType` and its id. The server
- * checks both (a record the user cannot read answers 404).
+ * The record a conversation is about: the entity class as the record's `objectType` and its id. The server checks
+ * both (a class the application does not allow and a record the user cannot read answer 404).
  */
-export interface PurposeSubject {
+export interface ConversationSubject {
   /** generic — the record's entity class, e.g. `App\\Domain\\Support\\Entities\\Tickets\\SupportTicket` */
   entityClass: string;
   /** generic */
   entityId: number;
+}
+
+/** The record a purposed conversation works on ({@link ConversationSubject}); the name of before free conversations had subjects. */
+export type PurposeSubject = ConversationSubject;
+
+/**
+ * The record one conversation is bound to, with what the application said about it when the conversation started:
+ * its display name and where the owner opens it. `purposeId` is null for a free conversation about the record.
+ */
+export interface BoundConversationSubject extends ConversationSubject {
+  /** generic — the conversation that is bound to the record; null for a record named without a conversation */
+  conversationId: number | null;
+  /** generic — the record's display name when the conversation started; data, never markup */
+  name: string | null;
+  /** generic — an absolute URL or a path of the application */
+  link: string | null;
+  /** generic — the purpose of a purposed conversation for the record */
+  purposeId: string | null;
+}
+
+/**
+ * The user's conversations about one record (`listConversationsOfSubject`) and the record itself as the application
+ * names it now: `subject` carries its name and link (no purpose), also when no conversation about it exists yet;
+ * null when the answer named no record.
+ */
+export interface ConversationsOfSubject {
+  subject: BoundConversationSubject | null;
+  /** generic — root conversations, newest first */
+  conversations: AgentsConversation[];
 }
 
 /** The start of a purposed conversation (`startPurpose`). */

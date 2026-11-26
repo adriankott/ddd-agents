@@ -159,6 +159,9 @@ src/Domain/AI/**/Skills/**	skills-and-purposes
 src/Domain/AI/**/Purposes/**	skills-and-purposes
 src/Domain/AI/**/Subjects/**	skills-and-purposes
 src/Domain/AI/Services/Conversations/AIConversationSubjectBindingsService.php	skills-and-purposes
+src/Presentation/Api/Agents/Conversations/Controller/AgentConversationSubjectsTrait.php	skills-and-purposes
+src/Presentation/Api/Agents/Conversations/Dtos/AIConversationsOfSubjectGetRequestDto.php	skills-and-purposes
+src/Presentation/Api/Agents/Conversations/Dtos/AIConversationSubjectGetResponseDto.php	skills-and-purposes
 src/Domain/AI/Entities/Conversations/Variants/**	skills-and-purposes
 src/Domain/AI/Entities/Conversations/Agent/Progress/**	skills-and-purposes
 src/Domain/AI/Entities/Conversations/Agent/OfferedSkillCatalog.php	skills-and-purposes

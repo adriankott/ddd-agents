@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DDD\Domain\AI\Entities\Conversations\Agent;
 
+use DDD\Domain\AI\Entities\Conversations\Subjects\AIConversationSubjectDescription;
 use DDD\Domain\AI\Entities\Conversations\Agent\Decisions\OwnerConsent\OwnerConsentUses;
 use DDD\Domain\AI\Entities\Conversations\Agent\Decisions\AgentDecisionModelSettings;
 use DDD\Domain\AI\Entities\Conversations\Agent\Decisions\AgentDecisionRecord;
@@ -301,6 +302,15 @@ class AgentWorkingState extends ValueObject
      */
     public ?string $localSituationText = null;
 
+    /**
+     * @var AIConversationSubjectDescription|null What the application said about the record this conversation is bound
+     *      to (its name, one line for the model, its link), as it stood when the conversation was bound. Written ONCE
+     *      by {@see \DDD\Domain\AI\Services\Conversations\AIConversationsService::persistSubjectDescriptionSlice()} and
+     *      never changed — the `CONVERSATION_SUBJECT` segment built from it stays byte-stable for the whole
+     *      conversation. Null = a conversation without a subject, or one no describer answered for.
+     */
+    public ?AIConversationSubjectDescription $subjectDescription = null;
+
     /** @var int|null The turn stamp of {@see $turnMinimumSteps} — the initiator message index of the turn that declared it. */
     public ?int $turnMinimumStepsTurnInitiatorMessageIndex = null;
 
@@ -450,6 +460,7 @@ class AgentWorkingState extends ValueObject
         'decisions',
         'dayContextText',
         'localSituationText',
+        'subjectDescription',
         'variants',
         'securityFilteredOwnerMessageIndexes',
         'platformWrittenOwnerMessageIndexes',
@@ -495,6 +506,7 @@ class AgentWorkingState extends ValueObject
                 'decisions' => array_map(static fn (AgentDecisionRecord $record): array => $record->mapToRepository(), $this->decisions),
                 'dayContextText' => $this->dayContextText,
                 'localSituationText' => $this->localSituationText,
+                'subjectDescription' => $this->subjectDescription?->toRepositoryArray(),
                 'variants' => $this->variants?->toRepositoryArray(),
                 'securityFilteredOwnerMessageIndexes' => $this->securityFilteredOwnerMessageIndexes,
                 'platformWrittenOwnerMessageIndexes' => $this->platformWrittenOwnerMessageIndexes,
@@ -576,6 +588,9 @@ class AgentWorkingState extends ValueObject
         $this->dayContextText = $dayContextText !== '' ? $dayContextText : null;
         $localSituationText = trim((string)($repoArray['localSituationText'] ?? ''));
         $this->localSituationText = $localSituationText !== '' ? $localSituationText : null;
+        $this->subjectDescription = is_array($repoArray['subjectDescription'] ?? null)
+            ? AIConversationSubjectDescription::fromRepositoryArray($repoArray['subjectDescription'])
+            : null;
         $this->decisions = [];
         foreach (is_array($repoArray['decisions'] ?? null) ? $repoArray['decisions'] : [] as $decisionRow) {
             if (!is_array($decisionRow)) {

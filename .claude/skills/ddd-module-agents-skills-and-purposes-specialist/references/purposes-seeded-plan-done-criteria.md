@@ -122,7 +122,8 @@ A purpose that works on one record at a time (one support ticket, one order) sta
   (`findNewestPurposedConversationOfAgentSpace()` leaves out every conversation with a subject row), so existing
   callers keep one conversation per space and purpose.
 - The subject is stored in its own table `AIConversationSubjectBindings` (`AIConversationSubjectBinding`, one row per
-  conversation, FK with ON DELETE CASCADE, index on space + purpose + class + id), not as a column of
+  conversation, FK with ON DELETE CASCADE, index on space + purpose + class + id and on class + id; `purposeName` and
+  `agentSpaceId` are nullable since free conversations carry a subject too), not as a column of
   `AIConversations`: every conversation read selects all columns of that table, so a new column there would break
   every read until the DDL ran. Without the table (`AIConversationSubjectBindingsService::isBindingTableAvailable()`,
   information_schema, a "missing" answer is asked again after 60 s) a subject is ignored and nothing fails.
@@ -131,6 +132,74 @@ A purpose that works on one record at a time (one support ticket, one order) sta
 - The caller checks that the account may read the record: `AIConversationSubject::findReadableSubjectEntity()` (the
   class must be an entity class with an `EntitiesService`; the record is read under the caller's read rights; 400 for a
   malformed class, 404 for an unknown or unreadable record).
+
+- The new conversation is bound INSIDE the drive (`driveConversation(…, aIConversationSubject: $subject)`), after the
+  purpose stamp and before the kickoff turn is dispatched, so the first model call reads the record segment below.
+
+### What the model reads about the record
+
+An application says what a record is through the port `AIConversationSubjectDescriber`
+(`src/Domain/AI/Services/Conversations/Subjects/`, tag `ai.conversation_subject_describer`, autoconfigured):
+`getSubjectEntityClasses(): string[]` and `describeSubject(AIConversationSubject, Entity): ?AIConversationSubjectDescription`.
+The first describer that names the record's class (or a parent class) and answers wins. The answer
+(`AIConversationSubjectDescription::of($description, $name, $link)`: one line in the application's words without
+end-user text, the record's display name, an absolute URL or a path) is stored ONCE on the conversation's working
+state when it is bound (`AgentWorkingState::$subjectDescription`, `AIConversationsService::persistSubjectDescriptionSlice()`)
+and rendered into the system segment `CONVERSATION_SUBJECT` right after the purpose directive in every model call of
+the conversation: byte-stable, so a reopened conversation still knows its record and the prompt cache holds. The name
+is shown between the marks of untrusted content. Without a describer (or when it fails: logged as a warning) the
+conversation is bound and has no record segment. A conversation bound before a describer existed gets none later.
+
+```php
+class SupportTicketSubjectDescriber extends Service implements AIConversationSubjectDescriber
+{
+    public function getSubjectEntityClasses(): array
+    {
+        return [SupportTicket::class];
+    }
+
+    public function describeSubject(AIConversationSubject $aIConversationSubject, Entity $subjectEntity): ?AIConversationSubjectDescription
+    {
+        /** @var SupportTicket $subjectEntity */
+        return AIConversationSubjectDescription::of(
+            'support ticket ' . $subjectEntity->id,
+            $subjectEntity->title ?? null,
+            '/support-tickets/' . $subjectEntity->id
+        );
+    }
+}
+```
+
+### Free conversations about a record
+
+A conversation WITHOUT a purpose can be bound to a record as well: the start names it
+(`AIConversationStartWithMessagePostRequestDto::$subject`; PHP: `driveConversation(…, aIConversationSubject: $subject)`,
+`startOrReopenConversationAtEntryPoint(…, aIConversationSubject: $subject)`). Any number of them may exist per record;
+a free conversation is never the singleton of a purposed start. The binding has `purposeName` null (and `agentSpaceId`
+null at account level).
+
+- Which classes a client may name: `isSubjectEntityClassAllowedForConversationStart(string $subjectEntityClass)` of
+  the controller hooks (default: none → 404; a malformed subject 400; an unreadable record 404). It is asked for the
+  start and for the list below. The classes of purposed starts stay with `isSubjectEntityClassAllowedForPurposeStart()`.
+- The routes of a record's conversations come with their own trait, `AgentConversationSubjectsTrait` (an update never
+  mounts them): `GET …/listConversationsOfSubject?subjectEntityClass=…&subjectEntityId=…` (query options of the
+  conversations list; body `buildConversationsOfSubjectListResponse()`; the caller's conversations of the record of
+  every space, free and purposed, `AIConversationsService::findAllVisibleToCustomerOfSubject()`, plus `subject`: the
+  record as the describer names it now, also when it has no conversation yet) and
+  `GET …/{aiConversationId}/subject` (body `buildConversationSubjectResponse()`; answers `subject`:
+  `aiConversationId`, `subjectEntityClass`, `subjectEntityId`, `purposeName`, `name`, `link`, or null) and
+  `GET …/listSubjectsOfConversations` (the query options of `listAllConversations`; body
+  `buildSubjectsOfConversationsListResponse()`; answers `subjects`, the set `AIConversationBoundSubjects`
+  (`subjects.elements`), one element per bound conversation of that page,
+  `AIConversationSubjectBindingsService::findBoundSubjectsOfConversations()`).
+- Web: `startConversation({ …, subject })`, `listConversationsOfSubject(subject, options)`,
+  `listSubjectsOfConversations(agentSpaceKey, options)` and `getConversationSubject(conversationId)` on
+  `AgentsConversationClient` (the last three optional); contract types
+  `ConversationSubject` (`PurposeSubject` is its alias), `BoundConversationSubject` and `ConversationsOfSubject`
+  (the list's answer: `subject`, `conversations`).
+- Schema: the table of a host on 0.6.9–0.7.1 needs `purposeName` and `agentSpaceId` nullable and the index on
+  `subjectEntityClass, subjectEntityId` (the schema diff shows both). Until then a free start with a subject fails on
+  the NOT NULL column, so apply the diff before a class is allowed; purposed starts are not affected.
 
 ### The route
 

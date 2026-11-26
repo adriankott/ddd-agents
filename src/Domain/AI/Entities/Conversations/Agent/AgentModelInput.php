@@ -147,6 +147,16 @@ class AgentModelInput extends ValueObject
      */
     public ?string $purposeDirective = null;
 
+    /**
+     * The record the conversation is about: the text of the `CONVERSATION_SUBJECT` segment, rendered by the
+     * conversation from the description its working state stores
+     * ({@see \DDD\Domain\AI\Entities\Conversations\AIConversation::findConversationSubjectBlock()}). The block carries its
+     * own header. Emitted right after the purpose directive; stored once when the conversation is bound, so it
+     * extends the cacheable prefix. Null/empty = a conversation without a subject, or one no describer answered for
+     * → segment omitted.
+     */
+    public ?string $conversationSubject = null;
+
     /** @var string|null Provenance of {@see $purposeDirective}: the purpose name — shown on the segment, never in the prompt. */
     public ?string $purposeName = null;
 
@@ -851,6 +861,12 @@ class AgentModelInput extends ValueObject
                 $directiveSectionIds = $purposeSegment->skillSectionIds;
             }
             $systemSegments[] = $purposeSegment;
+        }
+        // The record a bound conversation is about — right after the purpose directive (a purposed conversation for a
+        // record reads its mission, then which record). Stored once when the conversation is bound → byte-stable, part of
+        // the cacheable prefix. The block carries its own header; AgentModelInput owns the leading separator.
+        if ($this->conversationSubject !== null && $this->conversationSubject !== '') {
+            $systemSegments[] = AgentContextSegment::of(AgentContextSegmentType::CONVERSATION_SUBJECT, "\n\n" . $this->conversationSubject);
         }
         // Scheduled-run role directive — the run IS one firing of a schedule, executes the mission, never administers
         // schedules. Right after the purpose directive; a static const, so it extends the cacheable prefix. The block
