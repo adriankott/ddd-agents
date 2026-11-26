@@ -38,7 +38,40 @@ class ArgusAgentOwnerConsentDecisionTest extends UnitTestCase
         self::assertSame('phone', $state['channel']);
         self::assertSame(['ASSISTANT', 'OWNER'], array_column($state['dialogue'], 'speaker'));
         self::assertStringEndsWith('Soll ich ändern?', $state['dialogue'][0]['text'], 'an explanation keeps its end, where the question stands');
-        self::assertSame(ArgusAgentOwnerConsentDecision::MAX_LINE_CHARS, mb_strlen($state['dialogue'][0]['text']));
+        self::assertSame(
+            ArgusAgentOwnerConsentDecision::MAX_LINE_CHARS + mb_strlen($request->targetLine) + mb_strlen($request->consequenceLine),
+            mb_strlen($state['dialogue'][0]['text']),
+            'an explanation keeps room for the whole step and its consequence on top of the line limit'
+        );
+    }
+
+    public function testALongStepKeepsTheWholeExplanationUpToTheCap(): void
+    {
+        $replyText = str_repeat('Hallo Greta, ich habe deine Fahrten geprüft. ', 14);
+        $request = OwnerConsentRequest::forAction(
+            'replyToSupportTicket',
+            'SUPPORT_REPLY',
+            'send this reply on support ticket #13129 into the app, exactly this text: "' . $replyText . '"',
+            'the message cannot be taken back',
+            'supportReply:13129'
+        );
+        // the draft first, then a second step: the old 700-character tail lost the draft's start and the first question
+        $explanation = 'Soll ich diese Antwort auf Ticket #13129 senden? Text: ' . $replyText . ' 2. Und die drei Fahrten freigeben? ' . str_repeat('Details. ', 40);
+        $dialogue = new OwnerConsentDialogue();
+        $dialogue->add(OwnerConsentDialogueLine::create(OwnerConsentDialogueLine::SPEAKER_ASSISTANT, 10, $explanation));
+        $dialogue->add(OwnerConsentDialogueLine::create(OwnerConsentDialogueLine::SPEAKER_OWNER, 11, 'Ja zu allen vier.'));
+
+        $state = ArgusAgentOwnerConsentDecision::forRequest($request, $dialogue, ArgusAgentOwnerConsentDecision::CHANNEL_CHAT)->buildState();
+        self::assertSame($explanation, $state['dialogue'][0]['text'], 'the whole explanation with the draft and its question is read');
+
+        $endlessExplanation = str_repeat('y', 9000) . ' Soll ich senden?';
+        $longDialogue = new OwnerConsentDialogue();
+        $longDialogue->add(OwnerConsentDialogueLine::create(OwnerConsentDialogueLine::SPEAKER_ASSISTANT, 10, $endlessExplanation));
+        $longDialogue->add(OwnerConsentDialogueLine::create(OwnerConsentDialogueLine::SPEAKER_OWNER, 11, 'Ja.'));
+        $hugeRequest = OwnerConsentRequest::forAction('replyToSupportTicket', 'SUPPORT_REPLY', str_repeat('z', 6000), 'cannot be taken back', 'supportReply:1');
+        $longState = ArgusAgentOwnerConsentDecision::forRequest($hugeRequest, $longDialogue, ArgusAgentOwnerConsentDecision::CHANNEL_CHAT)->buildState();
+        self::assertSame(ArgusAgentOwnerConsentDecision::MAX_ASSISTANT_LINE_CHARS, mb_strlen($longState['dialogue'][0]['text']), 'the cap holds');
+        self::assertStringEndsWith('Soll ich senden?', $longState['dialogue'][0]['text']);
     }
 
     public function testTheQuestionsNameTheTrapsOfTheProbe(): void

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.7
+
+- **Fix: a clear yes to a step with a long target was refused.** `ArgusAgentOwnerConsentDecision::buildState()` cut
+  every assistant line to its last 700 characters, so an explanation that shows a long step (a reply with its exact
+  text) lost its start and the step-explained probability stayed below the threshold. An assistant line now keeps its
+  end up to `MAX_LINE_CHARS` plus the length of the step and the consequence, at most `MAX_ASSISTANT_LINE_CHARS`
+  (4000; `getAssistantLineLimit()`). Owner and widget lines stay at 700; thresholds and questions are unchanged.
+
 ## 0.8.6
 
 - **`rightsHeldByNobody` no longer asks a host to map the right of a switched-off feature that the rights catalogue

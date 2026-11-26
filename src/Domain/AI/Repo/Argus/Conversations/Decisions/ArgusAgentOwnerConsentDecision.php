@@ -67,6 +67,12 @@ class ArgusAgentOwnerConsentDecision extends ValueObject
     /** A dialogue line is cut to this many characters (an assistant explanation keeps its END, where the question stands). */
     public const int MAX_LINE_CHARS = 700;
 
+    /**
+     * The most an assistant explanation keeps: it must hold the whole step (a reply step names its exact text) and its
+     * question, so it keeps {@see MAX_LINE_CHARS} plus the length of the step and of the consequence, up to this.
+     */
+    public const int MAX_ASSISTANT_LINE_CHARS = 4000;
+
     /** @var string The step with its target, from the tool's loaded data ({@see OwnerConsentRequest::$targetLine}). */
     public string $step = '';
 
@@ -168,7 +174,7 @@ class ArgusAgentOwnerConsentDecision extends ValueObject
                 // an assistant explanation ends with its question; an owner line starts with its answer; a widget
                 // line starts with the question that names the step and its target
                 'text' => $dialogueLine->speaker === OwnerConsentDialogueLine::SPEAKER_ASSISTANT
-                    ? mb_substr($dialogueLine->text, -self::MAX_LINE_CHARS)
+                    ? mb_substr($dialogueLine->text, -$this->getAssistantLineLimit())
                     : mb_substr($dialogueLine->text, 0, self::MAX_LINE_CHARS),
             ];
         }
@@ -178,6 +184,17 @@ class ArgusAgentOwnerConsentDecision extends ValueObject
             self::STATE_DIALOGUE => $dialogueState,
             self::STATE_CHANNEL => $this->channel,
         ];
+    }
+
+    /**
+     * How many characters of an assistant explanation the decision reads (its END): {@see MAX_LINE_CHARS} plus the
+     * step and the consequence, at most {@see MAX_ASSISTANT_LINE_CHARS}. A fixed 700 cut the start of every explanation
+     * whose step is long — a support reply shown in full before its question lost its first lines, and an explanation
+     * of two steps lost the first one, so a clear yes could never pass.
+     */
+    public function getAssistantLineLimit(): int
+    {
+        return min(self::MAX_ASSISTANT_LINE_CHARS, self::MAX_LINE_CHARS + mb_strlen($this->step) + mb_strlen($this->consequence));
     }
 
     protected function buildQuestionsForRequest(): array
