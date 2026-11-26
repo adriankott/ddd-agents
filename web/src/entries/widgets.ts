@@ -102,3 +102,30 @@ export {
   readConceptExplainerValue,
 } from "../widgets/ConceptExplainerConversationWidget/shared/concept-explainer-widget-payload";
 export { formatConceptExplainerNumber } from "../widgets/ConceptExplainerConversationWidget/shared/use-concept-explainer-language";
+// The pictures of files by reference and the two widgets on them (`registerFilePreviewSource` sits in the root entry).
+export {
+  FILE_PREVIEW_SOURCE_MISSING,
+  readFilePreviewSource,
+  unregisterFilePreviewSource,
+  useFilePictureUrl,
+  type FilePictureState,
+} from "../widgets/_shared/file-preview-source";
+export { ImageGalleryConversationWidget } from "../widgets/ImageGalleryConversationWidget/ImageGalleryConversationWidget";
+export {
+  IMAGE_GALLERY_MAX_FILES,
+  IMAGE_GALLERY_WIDGET_TYPE,
+  buildImageGalleryDeclineSentence,
+  buildImageGalleryPickSentence,
+  parseImageGalleryPayload,
+  type ImageGalleryFile,
+  type ImageGalleryPayload,
+} from "../widgets/ImageGalleryConversationWidget/shared/image-gallery-payload";
+export { AttachedFilesConversationWidget } from "../widgets/AttachedFilesConversationWidget/AttachedFilesConversationWidget";
+export { AttachedFilesStrip, type AttachedFileUpload } from "../widgets/AttachedFilesConversationWidget/AttachedFilesStrip";
+export {
+  ATTACHED_FILES_MAX,
+  ATTACHED_FILES_WIDGET_TYPE,
+  buildAttachedFilesComposerWidget,
+  readAttachedFiles,
+  type AttachedFile,
+} from "../widgets/AttachedFilesConversationWidget/attached-files";

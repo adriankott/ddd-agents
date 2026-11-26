@@ -1,0 +1,51 @@
+{
+  "wireName": "ImageGallery",
+  "description": "The owner's pick on an ImageGallery. Confirm and 'None of these' post a FRONTEND_WIDGET_CLICK signal through injectSignal. The sentence starts with the wire name, then the gallery's name when the block has one, then a colon: one picture 'ImageGallery: the operator picked A (media/901)', several 'ImageGallery: the operator picked 2 pictures: A (media/901), C (media/903)' in letter order, none 'ImageGallery: the operator declined all pictures'. The letter of a picture is its position in files (A for the first). The backend reader is ImageGalleryConversationWidget (readAnswer() takes each letter with its reference when the gallery shows that reference under that letter). A stored contract: the wording never changes without the reader accepting both forms.",
+  "exampleBlocks": [
+    "```widget\n{\"type\":\"ImageGallery\",\"agentSpaceId\":42,\"title\":\"Prize picture: Fahrradhelm\",\"name\":\"pick-REWARD_PHOTO-8841\",\"selection\":\"one\",\"files\":[{\"reference\":\"media/901\",\"label\":\"#901\",\"caption\":\"1200×800 png\"},{\"reference\":\"media/902\",\"label\":\"#902\"}],\"emittedBy\":\"tool:findMediaItems\"}\n```",
+    "```widget\n{\"type\":\"ImageGallery\",\"selection\":\"many\",\"display\":\"canvas\",\"files\":[{\"reference\":\"media/901\"},{\"reference\":\"drive/812\"},{\"reference\":\"media/903\"}]}\n```",
+    "```widget\n{\"type\":\"ImageGallery\",\"selection\":\"one\",\"files\":[{\"reference\":\"media/901\"},{\"reference\":\"media/902\"}]}\n```"
+  ],
+  "exampleReactions": [
+    {
+      "exampleBlock": 0,
+      "messageType": "SIGNAL",
+      "signalSource": "FRONTEND_WIDGET_CLICK",
+      "pickedLetters": ["A"],
+      "text": "ImageGallery pick-REWARD_PHOTO-8841: the operator picked A (media/901)",
+      "expectsAnswer": true,
+      "expectsDecline": false,
+      "expectedFileReferences": ["media/901"]
+    },
+    {
+      "exampleBlock": 1,
+      "messageType": "SIGNAL",
+      "signalSource": "FRONTEND_WIDGET_CLICK",
+      "pickedLetters": ["C", "A"],
+      "text": "ImageGallery: the operator picked 2 pictures: A (media/901), C (media/903)",
+      "expectsAnswer": true,
+      "expectsDecline": false,
+      "expectedFileReferences": ["media/901", "media/903"]
+    },
+    {
+      "exampleBlock": 2,
+      "messageType": "SIGNAL",
+      "signalSource": "FRONTEND_WIDGET_CLICK",
+      "pickedLetters": ["A"],
+      "text": "ImageGallery: the operator picked A (media/901)",
+      "expectsAnswer": true,
+      "expectsDecline": false,
+      "expectedFileReferences": ["media/901"]
+    },
+    {
+      "exampleBlock": 2,
+      "messageType": "SIGNAL",
+      "signalSource": "FRONTEND_WIDGET_CLICK",
+      "declined": true,
+      "text": "ImageGallery: the operator declined all pictures",
+      "expectsAnswer": false,
+      "expectsDecline": true,
+      "expectedFileReferences": []
+    }
+  ]
+}

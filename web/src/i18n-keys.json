@@ -167,6 +167,17 @@
       ]
     },
     {
+      "key": "%count% pictures",
+      "defaultText": "%count% pictures",
+      "placeholders": [
+        "count"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/ImageGalleryConversationWidget/ImageGalleryConversationWidget.tsx"
+      ]
+    },
+    {
       "key": "%count% place",
       "defaultText": "%count% place",
       "placeholders": [
@@ -255,6 +266,15 @@
       "contexts": [],
       "usedIn": [
         "src/widgets/DriveFilesConversationWidget/DriveFilesConversationWidget.tsx"
+      ]
+    },
+    {
+      "key": "1 picture",
+      "defaultText": "1 picture",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/ImageGalleryConversationWidget/ImageGalleryConversationWidget.tsx"
       ]
     },
     {
@@ -476,7 +496,8 @@
       "placeholders": [],
       "contexts": [],
       "usedIn": [
-        "src/voice/AgentVoiceCallBand/AgentVoiceCallBand.tsx"
+        "src/voice/AgentVoiceCallBand/AgentVoiceCallBand.tsx",
+        "src/widgets/ImageGalleryConversationWidget/ImageGallery.tsx"
       ]
     },
     {
@@ -790,6 +811,17 @@
       ]
     },
     {
+      "key": "Enlarge picture %letter%",
+      "defaultText": "Enlarge picture %letter%",
+      "placeholders": [
+        "letter"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/ImageGalleryConversationWidget/ImageGallery.tsx"
+      ]
+    },
+    {
       "key": "Enter an amount, such as 250 or 1,250.75",
       "defaultText": "Enter an amount, such as 250 or 1,250.75",
       "placeholders": [],
@@ -988,7 +1020,8 @@
       "placeholders": [],
       "contexts": [],
       "usedIn": [
-        "src/kit/components/media/ImageGroup.composed.tsx"
+        "src/kit/components/media/ImageGroup.composed.tsx",
+        "src/widgets/ImageGalleryConversationWidget/ImageGallery.tsx"
       ]
     },
     {
@@ -1139,6 +1172,15 @@
       ],
       "usedIn": [
         "src/voice/admin/agent-voice-admin-format.ts"
+      ]
+    },
+    {
+      "key": "None of these",
+      "defaultText": "None of these",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/ImageGalleryConversationWidget/ImageGallery.tsx"
       ]
     },
     {
@@ -1322,6 +1364,42 @@
       ]
     },
     {
+      "key": "Pick a picture",
+      "defaultText": "Pick a picture",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/ImageGalleryConversationWidget/ImageGallery.tsx"
+      ]
+    },
+    {
+      "key": "Picture could not be loaded",
+      "defaultText": "Picture could not be loaded",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/ImageGalleryConversationWidget/ImageGallery.tsx"
+      ]
+    },
+    {
+      "key": "Pictures",
+      "defaultText": "Pictures",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/ImageGalleryConversationWidget/ImageGalleryConversationWidget.tsx"
+      ]
+    },
+    {
+      "key": "Pictures are not connected here",
+      "defaultText": "Pictures are not connected here",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/ImageGalleryConversationWidget/ImageGallery.tsx"
+      ]
+    },
+    {
       "key": "Planning what to do…",
       "defaultText": "Planning what to do…",
       "placeholders": [],
@@ -1377,7 +1455,8 @@
       "placeholders": [],
       "contexts": [],
       "usedIn": [
-        "src/kit/components/media/ImageGroup.composed.tsx"
+        "src/kit/components/media/ImageGroup.composed.tsx",
+        "src/widgets/ImageGalleryConversationWidget/ImageGallery.tsx"
       ]
     },
     {
@@ -1438,6 +1517,17 @@
       "usedIn": [
         "src/voice/admin/AgentVoiceCallDetailScreen/AgentVoiceCallDetailScreen.tsx",
         "src/voice/admin/AgentVoiceCallsScreen/AgentVoiceCallsScreen.tsx"
+      ]
+    },
+    {
+      "key": "Remove %name%",
+      "defaultText": "Remove %name%",
+      "placeholders": [
+        "name"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/AttachedFilesConversationWidget/AttachedFilesStrip.tsx"
       ]
     },
     {
@@ -2503,12 +2593,43 @@
       ]
     },
     {
+      "key": "Uploading…",
+      "defaultText": "Uploading…",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/AttachedFilesConversationWidget/AttachedFilesStrip.tsx"
+      ]
+    },
+    {
       "key": "Usage limit reached",
       "defaultText": "Usage limit reached",
       "placeholders": [],
       "contexts": [],
       "usedIn": [
         "src/chat/ConversationErrorWidget/ConversationErrorWidget.tsx"
+      ]
+    },
+    {
+      "key": "Use %count% pictures",
+      "defaultText": "Use %count% pictures",
+      "placeholders": [
+        "count"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/ImageGalleryConversationWidget/ImageGallery.tsx"
+      ]
+    },
+    {
+      "key": "Use picture %letter%",
+      "defaultText": "Use picture %letter%",
+      "placeholders": [
+        "letter"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/widgets/ImageGalleryConversationWidget/ImageGallery.tsx"
       ]
     },
     {

@@ -19,6 +19,12 @@ export {
   type DriveFileCardsSource,
 } from "../widgets/DriveFilesConversationWidget/shared/drive-file-cards-source";
 export type { DriveFileCard, DriveFileContent, DriveFilesRequest } from "../widgets/DriveFilesConversationWidget/shared/drive-files";
+// The pictures of files by reference (`ImageGallery`, `AttachedFiles`): the host's file route under the viewer's rights.
+export {
+  registerFilePreviewSource,
+  type FilePreviewSource,
+  type FilePreviewVariant,
+} from "../widgets/_shared/file-preview-source";
 // The canvas a store's files and folders open in (a file viewer, a folder browser); stores without one keep the tab.
 export {
   registerDriveFileCanvasOpener,

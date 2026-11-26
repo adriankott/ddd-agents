@@ -28,6 +28,7 @@ import conversationWidgetAstPlugin from "./conversationWidgetAstPlugin";
  * suffix is reserved as the legacy marker and asserted below for every registered widget.
  */
 const PACKAGE_CANONICAL_WIRE_NAMES = [
+  "AttachedFiles",
   "Clock",
   "ComposedView",
   "ConceptExplainer",
@@ -36,6 +37,7 @@ const PACKAGE_CANONICAL_WIRE_NAMES = [
   "CustomVisualization",
   "DriveFiles",
   "EntityMention",
+  "ImageGallery",
   "MultiChoice",
   "QuickReplies",
   "SuggestedActions",

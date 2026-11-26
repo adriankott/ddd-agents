@@ -3413,11 +3413,13 @@
         }
     },
     "widgetTypes": [
+        "AttachedFiles",
         "ComposedView",
         "ConversationSearchResults",
         "CustomVisualization",
         "DriveFiles",
         "EntityMention",
+        "ImageGallery",
         "MultiChoice",
         "QuickReplies",
         "SuggestedActions",

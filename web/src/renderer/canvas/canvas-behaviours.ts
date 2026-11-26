@@ -18,7 +18,12 @@ import { getCanvasKindIds, readCanvasKindDeclaration } from "./canvas-kind-decla
  */
 
 /** The canvases of the package's own widgets. */
-export type PackageCanvasId = "conversationSearchResults" | "webSearchResults" | "entityDetail" | "mapFullScreen";
+export type PackageCanvasId =
+  | "conversationSearchResults"
+  | "webSearchResults"
+  | "entityDetail"
+  | "mapFullScreen"
+  | "imageGallery";
 
 /**
  * The id of a canvas: one of the package's (`PackageCanvasId`), one an app declares
@@ -99,6 +104,8 @@ export const packageCanvasBehaviours: Readonly<Record<PackageCanvasId, CanvasBeh
   entityDetail: { lifetime: "turn", layout: "split", widthPercent: 40, narrowViewport: "none", fullBleed: false },
   // A ComposedView `Map` node, full screen — the widest split a turn canvas takes, the map flush.
   mapFullScreen: { lifetime: "turn", layout: "split", widthPercent: 65, narrowViewport: "none", fullBleed: true },
+  // An ImageGallery of many pictures (or `display: "canvas"`): the gallery beside the chat (a phone keeps the card).
+  imageGallery: { lifetime: "turn", layout: "split", narrowViewport: "none", fullBleed: false },
 };
 
 const hasOwnCanvasBehaviour = (behaviours: Readonly<Record<string, CanvasBehaviour>>, canvasId: string): boolean =>

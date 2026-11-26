@@ -124,6 +124,8 @@ with one wire name, the one that extends the other wins (`ComposedViewFolderClas
 | `EntityMention` | `EntityMentionConversationWidget` | written by the owner's composer, never by the agent |
 | `ToolTrace` | `ToolTraceConversationWidget` | one tool step the chat shows |
 | `SuggestedActions` | `SuggestedActionsConversationWidget` | suggested next owner messages; read as a leaf attribute, a fence of it renders nothing |
+| `ImageGallery` | `ImageGalleryConversationWidget` | pictures of any file source by reference (`media/901`, `drive/812`, at most 12, letters A–L), inline or on the canvas, selection none / one / many; answerable (`readAnswer()` → `ImageGalleryPick`, a letter counts only under the reference the gallery shows); pick sentences pinned by `image-gallery-widget-contract.json`; the web reads pictures only through the host's `FilePreviewSource` |
+| `AttachedFiles` | `AttachedFilesConversationWidget` | the files the owner attached to a message, by reference; written by the owner's composer (`buildAttachedFilesComposerWidget()`, the host uploads), never by the agent |
 
 `QuickReplies` and `MultiChoice` share the abstract `OwnerQuestionConversationWidget` and carry no wire name of their
 own there.

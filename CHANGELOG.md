@@ -1,8 +1,36 @@
 # Changelog
 
+## 0.8.1
+
+- **New widget `ImageGallery`: pictures of any file source to look at or to pick from.** The block carries file
+  references only (`media/901`, `drive/812`), never a URL: `title`, `name` (what the gallery is for, named in every
+  reaction), `selection` `none` | `one` | `many`, `display` `inline` | `canvas`, `files[]` of
+  `{reference, label?, caption?}` (at most 12, letters A–L by position). Tiles with the letter, a lightbox (PREVIEW,
+  previous / next, Escape), the canvas body `imageGallery`. The pick posts a FRONTEND_WIDGET_CLICK signal, a stored
+  contract pinned by `image-gallery-widget-contract.json`:
+  `ImageGallery[ <name>]: the operator picked A (media/901)`, several
+  `… picked 2 pictures: A (media/901), C (media/903)`, none `… the operator declined all pictures`.
+  `ImageGalleryConversationWidget::readAnswer()` answers an `ImageGalleryPick` (letters, file references) and counts a
+  letter only when the gallery shows that reference under it; `isDeclined()`, `isReactionToThisWidget()` (a named
+  gallery ignores the picks of another), `addFile()`, `buildPickSentence()`, `buildDeclineSentence()`.
+- **New widget `AttachedFiles`: the files an owner attached to a message, by reference.**
+  `{files: [{reference, name, isImage}]}` (at most 12), sent with the owner's message (`sentInCustomerMessage`,
+  shown above the bubble). `AttachedFilesConversationWidget::getFileReferences()`. Web: `AttachedFilesStrip` (chips with
+  thumbnail, remove, running and failed uploads) and `buildAttachedFilesComposerWidget()` for `hostComposerWidgets`;
+  the host uploads the files itself (its own store) and clears the widget in `onComposerWidgetsSent`.
+- **New port `FilePreviewSource`: where file widgets read their pictures.** `registerFilePreviewSource({
+  readPictureUrl(reference, variant: 'THUMBNAIL' | 'PREVIEW', signal) })` once before the first chat; typically the
+  host's file route (`FileSourcesControllerTrait` `…/files/{source}/{id}/content?variant=`) fetched with the session
+  and answered as an object URL. Without a source a tile says "Pictures are not connected here". `useFilePictureUrl()`
+  for host widgets.
+- Composed-view schema and parity fixture list the two new wire names; `public-api.json` and `i18n-keys.json`
+  regenerated (12 new keys).
+- No config or schema change.
+- Docs: the widget table of the widgets skill lists `ImageGallery` and `AttachedFiles`.
+
 ## 0.8.0
 
-**The goal register** (built by RC against 0.7.8, released on 0.7.9). Off by default (`AI.agentGoals.enabled`); new
+**The goal register** (contributed against 0.7.8, released on 0.7.9). Off by default (`AI.agentGoals.enabled`); new
 table `AgentGoals` only when a host switches it on and uses the package's store.
 
 - New: the goal register. `AgentGoal` / `AgentGoals` hold what the owner wants to reach (holder `OWNER`) and what

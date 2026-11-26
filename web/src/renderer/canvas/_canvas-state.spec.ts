@@ -93,6 +93,7 @@ describe("canvas behaviours", () => {
       "webSearchResults",
       "entityDetail",
       "mapFullScreen",
+      "imageGallery",
     ]);
     const declaredCanvasIds = getDeclaredCanvasIds();
     expect(declaredCanvasIds).toEqual([...new Set(declaredCanvasIds)]);

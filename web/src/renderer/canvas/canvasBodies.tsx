@@ -5,6 +5,7 @@ import { ConversationSearchResultsCanvasBody } from "../../widgets/ConversationS
 import { WebSearchResultsCanvasBody } from "../../widgets/WebSearchResultsConversationWidget/WebSearchResultsCanvasBody";
 import { EntityDetailCanvasBody } from "../../kit/entity-detail/EntityDetailCanvasBody";
 import { MapFullScreenCanvasBody } from "../../kit/map-full-screen/MapFullScreenCanvasBody";
+import { ImageGalleryCanvasBody } from "../../widgets/ImageGalleryConversationWidget/ImageGalleryCanvasBody";
 
 export type { CanvasBodyProps } from "./canvas-body-props";
 export { canvasFeatureFlagOf } from "./canvas-feature-flags";
@@ -25,6 +26,7 @@ export const canvasBodies = {
   webSearchResults: WebSearchResultsCanvasBody,
   entityDetail: EntityDetailCanvasBody,
   mapFullScreen: MapFullScreenCanvasBody,
+  imageGallery: ImageGalleryCanvasBody,
 } as Record<CanvasId, React.ComponentType<CanvasBodyProps>>;
 
 /** Adds an app's canvas bodies (canvas id → body). Runs outside React, before the first render. */
