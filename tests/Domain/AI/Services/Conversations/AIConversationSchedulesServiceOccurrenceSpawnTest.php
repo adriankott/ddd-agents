@@ -88,6 +88,8 @@ class AIConversationSchedulesServiceOccurrenceSpawnTest extends IntegrationTestC
                     'runAsAccountId' => static::ACCOUNT_ID,
                     'purposeName' => AIConversationPurpose::SCHEDULE_RUN,
                     'reportChannel' => $reportChannel,
+                    // Schedule.Run pins no model
+                    'aiModelName' => null,
                 ],
             ],
             $this->agentService->recordedDrives

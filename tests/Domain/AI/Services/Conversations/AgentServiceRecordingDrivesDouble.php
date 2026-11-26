@@ -38,6 +38,7 @@ class AgentServiceRecordingDrivesDouble extends AIConversationAgentService
             'runAsAccountId' => $runAsAccount instanceof Account ? (int)$runAsAccount->id : null,
             'purposeName' => $driveArgumentsByName['purposeName'] ?? null,
             'reportChannel' => $driveArgumentsByName['reportChannel'] ?? null,
+            'aiModelName' => $driveArgumentsByName['aiModelName'] ?? null,
         ];
         $drivenConversation = new AIConversation();
         $drivenConversation->id = static::DRIVEN_CONVERSATION_ID;

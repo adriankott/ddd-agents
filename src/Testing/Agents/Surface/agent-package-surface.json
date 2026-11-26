@@ -443,6 +443,7 @@
                             "type": "string"
                         },
                         "reportChannel": "#2b282c930613 (287 characters)",
+                        "purposeName": "#8e221dc19d1f (277 characters)",
                         "agentSpaceId": {
                             "description": "The space the task works for; omit it for the space this conversation works for",
                             "name": "agentSpaceId",
@@ -469,6 +470,7 @@
                             "task": "#4dada8b91c23 (219 characters)",
                             "title": "#9c1266888302 (122 characters)",
                             "reportChannel": "#f3b8b3d7d882 (180 characters)",
+                            "purposeName": "#2f87e56991e8 (172 characters)",
                             "agentSpaceId": "#1e2c96c982c3 (114 characters)"
                         },
                         "rest": "#6371ede770a4 (484 characters)"
@@ -498,6 +500,7 @@
                         "runAtLocalTime": "#c5d4cea2ed48 (356 characters)",
                         "reportChannel": "#8266869ba5ee (278 characters)",
                         "timezoneIdentifier": "#b7e2247f3ea9 (300 characters)",
+                        "purposeName": "#8e221dc19d1f (277 characters)",
                         "agentSpaceId": {
                             "description": "The space the task works for; omit it for the space this conversation works for",
                             "name": "agentSpaceId",
@@ -527,6 +530,7 @@
                             "runAtLocalTime": "#22d4d47d2b26 (248 characters)",
                             "reportChannel": "#9b38ff1aa30b (171 characters)",
                             "timezoneIdentifier": "#f29282306637 (188 characters)",
+                            "purposeName": "#2f87e56991e8 (172 characters)",
                             "agentSpaceId": "#1e2c96c982c3 (114 characters)"
                         },
                         "rest": "#e396931916a8 (442 characters)"
@@ -558,6 +562,7 @@
                         "maxRuns": "#a489d2ede2fa (254 characters)",
                         "reportChannel": "#efc798c787b6 (288 characters)",
                         "timezoneIdentifier": "#b7e2247f3ea9 (300 characters)",
+                        "purposeName": "#8e221dc19d1f (277 characters)",
                         "agentSpaceId": {
                             "description": "The space the task works for; omit it for the space this conversation works for",
                             "name": "agentSpaceId",
@@ -587,6 +592,7 @@
                             "maxRuns": "#88dafd173c0a (153 characters)",
                             "reportChannel": "#592621501f8e (181 characters)",
                             "timezoneIdentifier": "#f29282306637 (188 characters)",
+                            "purposeName": "#2f87e56991e8 (172 characters)",
                             "agentSpaceId": "#1e2c96c982c3 (114 characters)"
                         },
                         "rest": "#289ae02c218e (451 characters)"
@@ -920,7 +926,7 @@
                     "requiredAccountRightNames": [
                         "scheduleAgentTasks"
                     ],
-                    "summary": "#67b134e527ef (286 characters)",
+                    "summary": "#bad4f210928c (299 characters)",
                     "title": "updateTaskSchedule",
                     "parameters": {
                         "scheduleId": {
@@ -943,7 +949,8 @@
                         "runInMinutes": "#fd40ec947533 (269 characters)",
                         "doneCriteria": "#30f3999229e9 (282 characters)",
                         "reportChannel": "#0ef3fdf27db8 (248 characters)",
-                        "timezoneIdentifier": "#cac55bb2be3f (272 characters)"
+                        "timezoneIdentifier": "#cac55bb2be3f (272 characters)",
+                        "purposeName": "#f6c5233d46f1 (287 characters)"
                     },
                     "inputSchemaWithoutParameters": "#b2a22207bbd8 (404 characters)",
                     "declarations": {
@@ -956,7 +963,7 @@
                         "MCPToolEffect": [
                             "WRITE"
                         ],
-                        "MCPToolSummary": "#6354de94d59b (290 characters)"
+                        "MCPToolSummary": "#8715e069acb1 (303 characters)"
                     },
                     "wire": {
                         "description": "#40b9a59a984b (847 characters)",
@@ -969,7 +976,8 @@
                             "runInMinutes": "#4112cd071b03 (163 characters)",
                             "doneCriteria": "#29ca1ce7d860 (176 characters)",
                             "reportChannel": "#b36137ac1825 (141 characters)",
-                            "timezoneIdentifier": "#9b9d4284bf5a (160 characters)"
+                            "timezoneIdentifier": "#9b9d4284bf5a (160 characters)",
+                            "purposeName": "#77a2ce72b828 (182 characters)"
                         },
                         "rest": "#0600a8ae6170 (331 characters)"
                     }

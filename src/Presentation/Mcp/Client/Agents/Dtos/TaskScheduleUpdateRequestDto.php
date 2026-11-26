@@ -49,4 +49,8 @@ class TaskScheduleUpdateRequestDto extends RequestDto
     /** @var string|null Optional IANA time zone (e.g. "Europe/Berlin") the times are meant in — ONLY when the user explicitly names a different zone */
     #[Parameter(in: Parameter::BODY, required: false)]
     public ?string $timezoneIdentifier = null;
+
+    /** @var string|null New purpose the FUTURE runs start with — ONLY when the owner or a loaded skill names one; "Schedule.Run" goes back to the default; omit to keep it */
+    #[Parameter(in: Parameter::BODY, required: false)]
+    public ?string $purposeName = null;
 }

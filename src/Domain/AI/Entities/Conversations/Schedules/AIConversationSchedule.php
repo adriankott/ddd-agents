@@ -6,6 +6,7 @@ namespace DDD\Domain\AI\Entities\Conversations\Schedules;
 
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Entities\Conversations\Messages\RunSettings;
+use DDD\Domain\AI\Entities\Conversations\Purposes\AIConversationPurpose;
 use DDD\Domain\AI\Repo\DB\Conversations\Schedules\DBAIConversationSchedule;
 use DDD\Domain\AI\Services\Conversations\AgentOwnerFacingTextTranslationService;
 use DDD\Domain\AI\Services\Conversations\AIConversationSchedulesService;
@@ -281,6 +282,35 @@ class AIConversationSchedule extends Entity
      * spawned run with the zone ({@see AIConversation::$timezoneUnverified}). NULL for a legacy schedule.
      */
     public ?bool $timezoneUnverified = null;
+
+    /**
+     * The purpose every run of this schedule starts with: the name stored in its settings
+     * ({@see RunSettings::$runPurposeName}), else `Schedule.Run`. Whether that purpose still loads and may still run
+     * for the schedule is checked when the schedule fires
+     * ({@see AIConversationSchedulesService::resolveRunPurposeNameOfSchedule()}).
+     */
+    public function getRunPurposeName(): string
+    {
+        $runPurposeName = isset($this->runSettings) ? trim((string)($this->runSettings->runPurposeName ?? '')) : '';
+        return $runPurposeName !== '' ? $runPurposeName : AIConversationPurpose::SCHEDULE_RUN;
+    }
+
+    /**
+     * Stores the purpose the runs start with; null, '' or `Schedule.Run` stores none (the default). Unchecked: callers
+     * go through {@see AIConversationSchedulesService::applyRunPurposeToSchedule()}, which checks it.
+     */
+    public function setRunPurposeName(?string $runPurposeName): void
+    {
+        $runPurposeName = trim((string)$runPurposeName);
+        $storedRunPurposeName = ($runPurposeName === '' || $runPurposeName === AIConversationPurpose::SCHEDULE_RUN) ? null : $runPurposeName;
+        if ($storedRunPurposeName === null && !isset($this->runSettings)) {
+            return;
+        }
+        if (!isset($this->runSettings)) {
+            $this->runSettings = RunSettings::newInstance();
+        }
+        $this->runSettings->runPurposeName = $storedRunPurposeName;
+    }
 
     /** The identifier the cron evaluator uses — the frozen zone, UTC for a legacy schedule. */
     public function getCronTimezoneIdentifier(): string

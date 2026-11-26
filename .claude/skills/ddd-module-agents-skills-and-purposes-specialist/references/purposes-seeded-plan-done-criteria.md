@@ -397,4 +397,7 @@ never administer a schedule; nobody is present); the delivery contract is chosen
 every tool that declares `MCPToolSendsMessageToOwner` is blocked (`ScheduleRunPurpose::getToolNamesBlockedByDeclaration()`),
 so the report has one delivery path; `Agent.TaskRunReports` is
 preloaded; `ScheduleRunPurpose::shouldCloseConversationAfterSettledTurn()` closes the run once the report reached its
-channel. How a schedule fires and delivers belongs to `ddd-module-agents-autonomy-specialist`.
+channel. A schedule may name another purpose for its runs (a pinned model, a seeded plan): its class must be
+`ScheduleRunPurpose` or extend it, usually with `inheritsFrom: Schedule.Run`. How a schedule fires, chooses that
+purpose and delivers belongs to `ddd-module-agents-autonomy-specialist` (schedules reference, "A purpose of the
+schedule's own").

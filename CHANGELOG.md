@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.10.2
+
+- **A schedule may start its runs with a purpose of its own** (a pinned model, preloaded skills, a seeded task plan)
+  instead of `Schedule.Run`. `AIConversationSchedule::getRunPurposeName()` / `setRunPurposeName()`; stored in the
+  schedule's `runSettings` JSON (`RunSettings::$runPurposeName`) — no new column, nothing to apply in the schema,
+  never copied onto a run. Allowed: a registered purpose whose class is `ScheduleRunPurpose` or extends it
+  (`AIConversationPurposesService::findScheduleRunPurposeNames()`, once per process), whose `requiredFeatureFlags` the
+  space has, and which the new hook `AIConversationSchedulesService::isPurposeAllowedForSchedule()` allows (default
+  yes). `applyRunPurposeToSchedule()` / `applyRunPurposeToStoredSchedule()` set it and refuse with the allowed names.
+  The fire path starts the run with that purpose and its `preferredModelName` as the run's model; a purpose that no
+  longer qualifies runs as `Schedule.Run` with a warning (`resolveRunPurposeNameOfSchedule()`).
+- The tools `startBackgroundTask`, `scheduleOneTimeTask`, `createRecurringTaskSchedule` and `updateTaskSchedule` take
+  the optional `purposeName`; `getTaskSchedules` shows `runs as <purpose>` for a schedule that does not run as
+  `Schedule.Run`. A host's admin endpoint calls the two service methods above.
+- The runs of such a purpose count as schedule runs in the day context and are left out of the search across
+  conversations like `Schedule.Run`.
+- Purpose file of a schedule's run: `purposeClass: …\ScheduleRunPurpose`, `inheritsFrom: Schedule.Run`, then
+  `preferredModelName`, `seedTaskPlanItems` and so on; an eval case runs it with `scheduledRun` and `purposeName`.
+
 ## 0.10.1
 
 - **eval-tools stops like eval-suite.** SIGINT / SIGTERM, a `STOP` file in the run folder and a passed

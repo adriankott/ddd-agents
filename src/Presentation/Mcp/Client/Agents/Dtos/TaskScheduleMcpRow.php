@@ -9,6 +9,7 @@ use DDD\Domain\AI\Entities\Conversations\Schedules\AIConversationSchedule;
 use DDD\Domain\AI\Entities\Conversations\Schedules\AIConversationScheduleStatus;
 use DDD\Domain\Base\Entities\ValueObject;
 use DDD\Infrastructure\Base\DateTime\DateTime;
+use DDD\Domain\AI\Entities\Conversations\Purposes\AIConversationPurpose;
 
 /**
  * One task schedule as `getTaskSchedules` shows it to the agent: the schedule's own facts and its newest run. Built
@@ -61,6 +62,9 @@ class TaskScheduleMcpRow extends ValueObject
     /** @var string Where the run report is delivered: EMAIL or CHAT. */
     public string $reportChannel = '';
 
+    /** @var string|null The purpose the runs start with when it is not the default `Schedule.Run`; null = the default. */
+    public ?string $runPurposeName = null;
+
     /** @var int How many consecutive runs failed (0 = healthy). */
     public int $failureStreak = 0;
 
@@ -103,6 +107,8 @@ class TaskScheduleMcpRow extends ValueObject
         $scheduleRow->iterationsUsed = (int)$schedule->iterationsUsed;
         $scheduleRow->maxIterations = $schedule->maxIterations ?? null;
         $scheduleRow->reportChannel = (string)$schedule->reportChannel;
+        $runPurposeName = $schedule->getRunPurposeName();
+        $scheduleRow->runPurposeName = $runPurposeName !== AIConversationPurpose::SCHEDULE_RUN ? $runPurposeName : null;
         $scheduleRow->failureStreak = (int)$schedule->failureStreak;
         $scheduleRow->lastFailedAt = $schedule->lastFailedAt ?? null;
         $scheduleRow->createdByConversationId = $schedule->createdByConversationId ?? null;
@@ -112,7 +118,7 @@ class TaskScheduleMcpRow extends ValueObject
     /**
      * The schedule as a compact Markdown block: id, kind, status, title, the timing (the one-time moment, or the cron
      * with the zone its digits mean), next and last firing, firings claimed, report channel, failure streak, done
-     * criteria, the creating conversation, the newest run (the `getTaskRunReport` handle) and the task text — in full
+     * criteria, the purpose of the runs when it is not the default, the creating conversation, the newest run (the `getTaskRunReport` handle) and the task text — in full
      * only while the schedule can still act (an update needs it verbatim).
      *
      * @return string
@@ -140,6 +146,9 @@ class TaskScheduleMcpRow extends ValueObject
         }
         $facts[] = 'firings claimed ' . $this->iterationsUsed . ($this->maxIterations !== null ? "/{$this->maxIterations}" : '');
         $facts[] = 'report via ' . $this->reportChannel;
+        if ($this->runPurposeName !== null) {
+            $facts[] = 'runs as ' . $this->runPurposeName;
+        }
         if ($this->failureStreak > 0) {
             $facts[] = "FAILED {$this->failureStreak}× in a row"
                 . ($this->lastFailedAt !== null ? ' (last ' . AgentClock::formatMoment($this->lastFailedAt) . ')' : '');

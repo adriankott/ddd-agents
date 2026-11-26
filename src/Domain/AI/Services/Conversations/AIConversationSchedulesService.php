@@ -15,6 +15,9 @@ use DDD\Domain\AI\Entities\Conversations\Agent\AgentApplicationWording;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessages;
 use DDD\Domain\AI\Entities\Conversations\Purposes\AIConversationPurpose;
+use DDD\Domain\AI\Entities\Conversations\Purposes\ScheduleRunPurpose;
+use DDD\Domain\AI\Services\Conversations\Purposes\AIConversationPurposesService;
+use DDD\Domain\AI\Services\Conversations\Entitlements\AIConversationEntitlementsService;
 use DDD\Domain\AI\Entities\Conversations\Schedules\AIConversationSchedule;
 use DDD\Domain\AI\Entities\Conversations\Schedules\AIConversationScheduleDueAgentSpace;
 use DDD\Domain\AI\Entities\Conversations\Scopes\AgentApplicationSqlFilter;
@@ -1208,6 +1211,11 @@ class AIConversationSchedulesService extends EntitiesService
             $previousRunOutcome,
             $previousRunConversation?->getCreatedTime()
         );
+        // a schedule may name its own purpose (a pinned model, a seeded plan) — checked again here, else Schedule.Run
+        $runPurposeName = $this->resolveRunPurposeNameOfSchedule($schedule, $agentSpace);
+        /** @var AIConversationPurposesService $aIConversationPurposesService */
+        $aIConversationPurposesService = DDDService::instance()->getService(AIConversationPurposesService::class);
+        $runPurpose = $aIConversationPurposesService->getPurposeByName($runPurposeName);
         /** @var AIConversationAgentService $aIConversationAgentService */
         $aIConversationAgentService = DDDService::instance()->getService(AIConversationAgentService::class);
         $runConversation = $aIConversationAgentService->driveConversation(
@@ -1228,12 +1236,114 @@ class AIConversationSchedulesService extends EntitiesService
             runSettings: $schedule->buildRunSettingsForRun($this->isScheduleCreatedByAnEvalRun($schedule)),
             // The run's purpose: the role statement (execute, never administer), the delivery contract per report
             // channel and the blocked owner-messaging send tools — one place for every instant, timed and recurring run.
-            purposeName: AIConversationPurpose::SCHEDULE_RUN,
+            purposeName: $runPurposeName,
+            // the purpose's pinned model, as a purposed start applies it (null = the agent's default)
+            aiModelName: $runPurpose?->preferredModelName,
             // snapshot the schedule's report channel onto the run at creation (+ owed-at-spawn
             // for EMAIL inside driveConversation) — a later schedule edit never changes this run.
             reportChannel: $schedule->reportChannel
         );
         return AIConversationScheduleOccurrenceSpawn::spawned($runConversation);
+    }
+
+    /**
+     * Sets the purpose the runs of `$schedule` start with, checked ({@see findPurposeAllowedForScheduleRuns()}); null,
+     * '' or `Schedule.Run` sets the default. The caller persists the schedule (a new one with
+     * {@see createSchedule()}, a stored one with {@see persistScheduleEdit()} and the column `runSettings`).
+     *
+     * @throws BadRequestException when the purpose may not run the schedule (the message lists the allowed ones)
+     */
+    public function applyRunPurposeToSchedule(AIConversationSchedule $schedule, ?string $purposeName, ?AgentSpace $agentSpace): void
+    {
+        $purposeName = trim((string)$purposeName);
+        if ($purposeName === '' || $purposeName === AIConversationPurpose::SCHEDULE_RUN) {
+            $schedule->setRunPurposeName(null);
+            return;
+        }
+        $this->findPurposeAllowedForScheduleRuns($schedule, $purposeName, $agentSpace);
+        $schedule->setRunPurposeName($purposeName);
+    }
+
+    /**
+     * {@see applyRunPurposeToSchedule()} for a STORED schedule: the space is the schedule's own, read with the rights
+     * lifted. Persist with {@see persistScheduleEdit()} and the column `runSettings`.
+     *
+     * @throws BadRequestException when the purpose may not run the schedule
+     */
+    public function applyRunPurposeToStoredSchedule(AIConversationSchedule $schedule, ?string $purposeName): void
+    {
+        $this->applyRunPurposeToSchedule($schedule, $purposeName, $this->findAgentSpaceOfSchedule($schedule));
+    }
+
+    /**
+     * The purpose `$purposeName` when the runs of `$schedule` may start with it: a registered purpose that loads, whose
+     * class is {@see ScheduleRunPurpose} or extends it ({@see AIConversationPurposesService::findScheduleRunPurposeNames()}),
+     * whose `requiredFeatureFlags` the space has (a schedule without a space, or a space whose flags cannot be read, is
+     * not gated on flags — as a purposed start) and which {@see isPurposeAllowedForSchedule()} allows.
+     *
+     * @throws BadRequestException otherwise, naming the purposes a schedule may use
+     */
+    public function findPurposeAllowedForScheduleRuns(AIConversationSchedule $schedule, string $purposeName, ?AgentSpace $agentSpace): AIConversationPurpose
+    {
+        /** @var AIConversationPurposesService $aIConversationPurposesService */
+        $aIConversationPurposesService = DDDService::instance()->getService(AIConversationPurposesService::class);
+        $scheduleRunPurposeNames = $aIConversationPurposesService->findScheduleRunPurposeNames();
+        $aIConversationPurpose = in_array($purposeName, $scheduleRunPurposeNames, true)
+            ? $aIConversationPurposesService->getPurposeByName($purposeName)
+            : null;
+        if (!$aIConversationPurpose instanceof AIConversationPurpose) {
+            throw new BadRequestException(
+                "The purpose '{$purposeName}' cannot run a task schedule. Purposes a schedule may use: "
+                . implode(', ', $scheduleRunPurposeNames) . '.'
+            );
+        }
+        if ($agentSpace !== null && $aIConversationPurpose->requiredFeatureFlags !== []) {
+            /** @var AIConversationEntitlementsService $aIConversationEntitlementsService */
+            $aIConversationEntitlementsService = DDDService::instance()->getService(AIConversationEntitlementsService::class);
+            $featureFlagsOfAgentSpace = $aIConversationEntitlementsService->findFeatureFlagsOfAgentSpace($agentSpace);
+            if ($featureFlagsOfAgentSpace !== null
+                && !$featureFlagsOfAgentSpace->hasAllAvailableFeatureFlags($aIConversationPurpose->requiredFeatureFlags)) {
+                throw new BadRequestException("The purpose '{$purposeName}' is not included in this customer's plan.");
+            }
+        }
+        if (!$this->isPurposeAllowedForSchedule($aIConversationPurpose, $schedule, $agentSpace)) {
+            throw new BadRequestException("The purpose '{$purposeName}' is not allowed for this task schedule.");
+        }
+        return $aIConversationPurpose;
+    }
+
+    /**
+     * Hook: whether the runs of `$schedule` may start with `$aIConversationPurpose`, after the package's checks (a
+     * schedule-run purpose, the space's flags). Default yes. An application with a right per purpose answers it from
+     * the schedule's account ({@see AIConversationSchedule::$accountId}; on a new schedule it may still be empty — then
+     * the account of the request).
+     */
+    protected function isPurposeAllowedForSchedule(AIConversationPurpose $aIConversationPurpose, AIConversationSchedule $schedule, ?AgentSpace $agentSpace): bool
+    {
+        return true;
+    }
+
+    /**
+     * The purpose a firing of `$schedule` starts its run with: the schedule's own ({@see AIConversationSchedule::getRunPurposeName()})
+     * while it still passes {@see findPurposeAllowedForScheduleRuns()}, else `Schedule.Run` with a warning in the log
+     * (a purpose removed from the registry, a plan without its flags): the task still runs.
+     */
+    public function resolveRunPurposeNameOfSchedule(AIConversationSchedule $schedule, ?AgentSpace $agentSpace): string
+    {
+        $runPurposeName = $schedule->getRunPurposeName();
+        if ($runPurposeName === AIConversationPurpose::SCHEDULE_RUN) {
+            return $runPurposeName;
+        }
+        try {
+            $this->findPurposeAllowedForScheduleRuns($schedule, $runPurposeName, $agentSpace);
+            return $runPurposeName;
+        } catch (BadRequestException $purposeRefusal) {
+            DDDService::instance()->getLogger()->warning(
+                'Schedule run falls back to ' . AIConversationPurpose::SCHEDULE_RUN . ': ' . $purposeRefusal->getMessage(),
+                ['scheduleId' => $schedule->id ?? null, 'runPurposeName' => $runPurposeName]
+            );
+            return AIConversationPurpose::SCHEDULE_RUN;
+        }
     }
 
     /**

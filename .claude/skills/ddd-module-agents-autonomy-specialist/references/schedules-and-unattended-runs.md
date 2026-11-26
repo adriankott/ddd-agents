@@ -85,8 +85,40 @@ listed in the entry skill `ddd-module-agents-specialist`.
 
 The run is started by `AIConversationAgentService::driveConversation()` with the drive scope
 `AIConversationDriveScope::ADMIN`, `initiatorType` `INITIATOR_TYPE_SCHEDULE`, the `scheduleId`, the schedule's account
-as the run's account, the run settings of the schedule (the per-run cost cap folded in) and the purpose `Schedule.Run`
-with the schedule's `reportChannel`.
+as the run's account, the run settings of the schedule (the per-run cost cap folded in) and the schedule's run purpose
+(default `Schedule.Run`) with the schedule's `reportChannel`.
+
+- **A purpose of the schedule's own.** A schedule may start its runs with another purpose — its pinned model
+  (`preferredModelName`, handed to the drive as the run's model), its preloads and its seeded task plan:
+  `AIConversationSchedule::getRunPurposeName()`, stored in the schedule's `runSettings` JSON
+  (`RunSettings::$runPurposeName`, no column of its own: works before any schema change, never copied onto the run).
+  Allowed is a registered purpose whose class is `ScheduleRunPurpose` or extends it
+  (`AIConversationPurposesService::findScheduleRunPurposeNames()`, read once per process), whose
+  `requiredFeatureFlags` the space has, and which the hook `AIConversationSchedulesService::isPurposeAllowedForSchedule()`
+  allows (default yes; a host with a right per purpose answers it from the schedule's account). Set it with
+  `applyRunPurposeToSchedule()` (new schedule) or `applyRunPurposeToStoredSchedule()` + `persistScheduleEdit($schedule,
+  ['runSettings'])` (stored one); a refusal is a `BadRequestException` that lists the allowed names. The package's
+  tools take `purposeName` on `startBackgroundTask`, `scheduleOneTimeTask`, `createRecurringTaskSchedule` and
+  `updateTaskSchedule`; a host's admin endpoint calls the same two methods. Each firing checks the purpose again
+  (`resolveRunPurposeNameOfSchedule()`): one that no longer qualifies (removed, plan downgraded, refused by the hook)
+  runs as `Schedule.Run` with a warning in the log. The purpose file:
+
+  ```markdown
+  ---
+  purposeClass: DDD\Domain\AI\Entities\Conversations\Purposes\ScheduleRunPurpose
+  inheritsFrom: Schedule.Run
+  description: The unattended support run.
+  startableViaApi: false
+  preferredModelName: <a model of the catalog>
+  seedTaskPlanItems: [Read the open requests, Answer each request, Report what was answered]
+  ---
+  ```
+
+  `inheritsFrom` brings the delivery sections, preloads and blocked-tool text of `Schedule.Run`; `purposeClass` is
+  never inherited, so the file names it (or a subclass). An empty body keeps the parent's directive. Register the name
+  in the host's purpose registry. Runs of such a purpose count as schedule runs in the day context
+  (`AIConversationsService::findScheduleRunsOfAgentSpaceSince()`) and are left out of the search across conversations
+  like `Schedule.Run`.
 
 - **The seed** is the owner's mission only: `AIConversationSchedule::composeSeedUserMessageText()` — the task text plus
   a "Last run (…) result:" line from the previous run's stored summary (never a model call to build one).

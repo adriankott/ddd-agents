@@ -61,6 +61,8 @@ use DDD\Domain\AI\Services\Conversations\Eligibility\AgentAutomationEligibilityS
 use DDD\Domain\AI\Services\Conversations\Situations\AgentSituationalContextService;
 use DDD\Domain\AI\Services\Conversations\Environments\AgentEnvironmentNamesService;
 use DDD\Infrastructure\Services\DDDService;
+use DDD\Domain\AI\Services\Conversations\Purposes\AIConversationPurposesService;
+use Doctrine\DBAL\ArrayParameterType;
 use DDD\Infrastructure\Services\AuthService;
 use DDD\Domain\Base\Repo\DB\Dialect\Json\JsonPath;
 use DDD\Domain\Base\Repo\DB\Dialect\Json\JsonValueKind;
@@ -1767,9 +1769,17 @@ class AIConversationsService extends EntitiesService
         return $queryBuilder;
     }
 
+    /** @return string[] The purposes a schedule run may carry ({@see AIConversationPurposesService::findScheduleRunPurposeNames()}). */
+    protected function findScheduleRunPurposeNames(): array
+    {
+        /** @var AIConversationPurposesService $aIConversationPurposesService */
+        $aIConversationPurposesService = DDDService::instance()->getService(AIConversationPurposesService::class);
+        return $aIConversationPurposesService->findScheduleRunPurposeNames();
+    }
+
     /**
-     * The runs of the scheduled tasks of a space created since $since, newest first — root conversations of the purpose
-     * {@see AIConversationPurpose::SCHEDULE_RUN} with their schedule. What the day context lists as the agent's work:
+     * The runs of the scheduled tasks of a space created since $since, newest first — root conversations of a
+     * schedule-run purpose ({@see AIConversationPurposesService::findScheduleRunPurposeNames()}) with their schedule. What the day context lists as the agent's work:
      * a run started by an administrator often carries no inbound message, so the read keys on the
      * creation time, not on `lastInboundMessageAt`. The read filters the space, which fixes the account.
      *
@@ -1788,11 +1798,11 @@ class AIConversationsService extends EntitiesService
         $alias = $entitySetRepo::getBaseModelAlias();
         $queryBuilder = $entitySetRepo::createQueryBuilder();
         $queryBuilder
-            ->andWhere("$alias.purposeName = :scheduleRunsPurposeName")
+            ->andWhere("$alias.purposeName IN (:scheduleRunsPurposeNames)")
             ->andWhere("$alias.delegatedFromMessageId IS NULL")
             ->andWhere("$alias.scheduleId IS NOT NULL")
             ->andWhere("$alias.created >= :scheduleRunsSince")
-            ->setParameter('scheduleRunsPurposeName', AIConversationPurpose::SCHEDULE_RUN)
+            ->setParameter('scheduleRunsPurposeNames', $this->findScheduleRunPurposeNames(), ArrayParameterType::STRING)
             ->setParameter('scheduleRunsSince', $since->format('Y-m-d H:i:s'))
             ->orderBy("$alias.created", 'DESC')
             ->setMaxResults(max(1, min(25, $limit)));

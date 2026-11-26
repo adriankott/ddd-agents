@@ -24,6 +24,10 @@ class BackgroundTaskStartRequestDto extends RequestDto
     #[Parameter(in: Parameter::BODY, required: false)]
     public ?string $reportChannel = null;
 
+    /** @var string|null The purpose every run starts with (its model, skills, seeded plan) — ONLY when the owner or a loaded skill names one; omit for the default */
+    #[Parameter(in: Parameter::BODY, required: false)]
+    public ?string $purposeName = null;
+
     /** @var int|null The space the task works for; omit it for the space this conversation works for */
     #[Parameter(in: Parameter::BODY, required: false)]
     public ?int $agentSpaceId = null;

@@ -95,6 +95,14 @@ class RunSettings extends ValueObject
      */
     public ?bool $evalSeededHistory = null;
 
+    /**
+     * @var string|null Read on the settings of a SCHEDULE only ({@see \DDD\Domain\AI\Entities\Conversations\Schedules\AIConversationSchedule::getRunPurposeName()}):
+     * the purpose every run of the schedule starts with — a registered purpose whose class is
+     * {@see \DDD\Domain\AI\Entities\Conversations\Purposes\ScheduleRunPurpose} or extends it. Null = `Schedule.Run`.
+     * Kept in the settings column so a schedule table without a new column carries it. Never copied onto a run.
+     */
+    public ?string $runPurposeName = null;
+
     public const string DECISION_MODEL_SKILL_PRELOAD_INHERIT = 'inherit';
     public const string DECISION_MODEL_SKILL_PRELOAD_ON = 'on';
     public const string DECISION_MODEL_SKILL_PRELOAD_OFF = 'off';

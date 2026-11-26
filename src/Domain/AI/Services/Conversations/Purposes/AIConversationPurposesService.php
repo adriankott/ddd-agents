@@ -8,6 +8,7 @@ use DDD\Domain\AI\Entities\Conversations\Agent\AgentRun;
 use DDD\Domain\AI\Entities\Conversations\Messages\ContextRetentionSettings;
 use DDD\Domain\AI\Entities\Conversations\Messages\RunSettings;
 use DDD\Domain\AI\Entities\Conversations\Purposes\AIConversationPurpose;
+use DDD\Domain\AI\Entities\Conversations\Purposes\ScheduleRunPurpose;
 use DDD\Domain\AI\Entities\Conversations\Agent\Wire\AgentWireConfiguration;
 use DDD\Domain\AI\Entities\Models\AIModel;
 use DDD\Domain\AI\Services\Skills\AISkillsService;
@@ -50,6 +51,9 @@ class AIConversationPurposesService extends Service
 
     /** @var array<string, array<string, mixed>>|null the purpose requirement overlay, read once per process */
     protected static ?array $purposeRequirementsByPurposeName = null;
+
+    /** @var string[]|null The registered purposes a schedule's runs may start with, read once per process */
+    protected static ?array $scheduleRunPurposeNames = null;
 
     public bool $throwErrors = false;
 
@@ -287,6 +291,45 @@ class AIConversationPurposesService extends Service
         $aIConversationPurpose->blockedToolNames = $aIConversationPurpose->buildBlockedToolNamesWithTheDeclaredOnes();
 
         return $aIConversationPurpose;
+    }
+
+    /**
+     * The registered purposes a schedule's runs may start with: `Schedule.Run` and every registered purpose whose class
+     * is {@see ScheduleRunPurpose} or extends it — the class carries what an unattended run needs (the report delivery,
+     * the blocked owner-messaging tools, the close after the report). Read once per process (each purpose file is
+     * parsed once); a purpose that does not load is left out.
+     *
+     * @return string[]
+     */
+    public function findScheduleRunPurposeNames(): array
+    {
+        if (static::$scheduleRunPurposeNames !== null) {
+            return static::$scheduleRunPurposeNames;
+        }
+        $scheduleRunPurposeNames = [AIConversationPurpose::SCHEDULE_RUN];
+        foreach (AIConversationPurpose::getAllPurposeNames() as $registeredPurposeName) {
+            if ($registeredPurposeName === AIConversationPurpose::SCHEDULE_RUN) {
+                continue;
+            }
+            $registeredPurpose = $this->getPurposeByName($registeredPurposeName);
+            if ($registeredPurpose instanceof ScheduleRunPurpose) {
+                $scheduleRunPurposeNames[] = $registeredPurposeName;
+            }
+        }
+        static::$scheduleRunPurposeNames = $scheduleRunPurposeNames;
+        return $scheduleRunPurposeNames;
+    }
+
+    /** Whether a schedule's runs may start with `$purposeName` ({@see findScheduleRunPurposeNames()}). */
+    public function isScheduleRunPurposeName(?string $purposeName): bool
+    {
+        return $purposeName !== null && in_array($purposeName, $this->findScheduleRunPurposeNames(), true);
+    }
+
+    /** Forgets the process memo of {@see findScheduleRunPurposeNames()} (tests). */
+    public static function forgetScheduleRunPurposeNames(): void
+    {
+        static::$scheduleRunPurposeNames = null;
     }
 
     /**

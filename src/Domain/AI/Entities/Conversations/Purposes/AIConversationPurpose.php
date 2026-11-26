@@ -1066,10 +1066,17 @@ class AIConversationPurpose extends Entity
      */
     public static function getPurposeNamesLeftOutOfTheSearchAcrossConversations(): array
     {
-        return array_values(array_unique(array_merge(
+        $leftOutPurposeNames = array_merge(
             (self::getPurposeClassOfTheApplication())::PURPOSE_NAMES_LEFT_OUT_OF_THE_SEARCH_ACROSS_CONVERSATIONS,
             self::getCustomerHiddenPurposeNames()
-        )));
+        );
+        // a schedule's own run purpose is left out like the default one it stands in for
+        if (in_array(self::SCHEDULE_RUN, $leftOutPurposeNames, true)) {
+            /** @var AIConversationPurposesService $aIConversationPurposesService */
+            $aIConversationPurposesService = DDDService::instance()->getService(AIConversationPurposesService::class);
+            $leftOutPurposeNames = array_merge($leftOutPurposeNames, $aIConversationPurposesService->findScheduleRunPurposeNames());
+        }
+        return array_values(array_unique($leftOutPurposeNames));
     }
 
     /** @return string[] The purposes whose reached goal the recovery closes without waiting for an owner turn. */

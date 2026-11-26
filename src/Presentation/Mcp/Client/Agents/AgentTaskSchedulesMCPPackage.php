@@ -168,7 +168,8 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
             (string)$requestDto->task,
             oneTimeAt: new DateTime(),
             reportChannel: $requestDto->reportChannel,
-            title: $requestDto->title
+            title: $requestDto->title,
+            purposeName: $requestDto->purposeName
         );
         $schedule = $aIConversationSchedulesService->createSchedule($schedule);
         $backgroundRunConversation = null;
@@ -262,7 +263,8 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
             (string)$requestDto->task,
             oneTimeAt: $oneTimeAt,
             reportChannel: $requestDto->reportChannel,
-            title: $requestDto->title
+            title: $requestDto->title,
+            purposeName: $requestDto->purposeName
         );
         if ($scheduleTimezoneIdentifier !== null) {
             $schedule->timezone = $scheduleTimezoneIdentifier;
@@ -321,7 +323,8 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
             (string)$requestDto->task,
             cronSchedule: trim((string)$requestDto->cronSchedule),
             reportChannel: $requestDto->reportChannel,
-            title: $requestDto->title
+            title: $requestDto->title,
+            purposeName: $requestDto->purposeName
         );
         // the zone first, so the frequency floor counts the cron in the zone it fires in
         $scheduleTimezoneIdentifier = $validatedOverride ?? $this->findTimezoneIdentifierOfCall($callProvenance, $agentSpace);
@@ -717,7 +720,7 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
     #[MCPTool]
     #[MCPToolEffect(MCPToolEffect::WRITE)]
     #[MCPHiddenQueryOptions('noCache')]
-    #[MCPToolSummary('Change an EXISTING task schedule in place (task text, title, timing, cron, report channel, done criteria) — NEVER delete + recreate for a change. An order for another report or rhythm is a NEW schedule. Moment: one-time tasks that have not run; cron: recurring only (max 4 firings/day).')]
+    #[MCPToolSummary('Change an EXISTING task schedule in place (task text, title, timing, cron, report channel, done criteria, run purpose) — NEVER delete + recreate for a change. An order for another report or rhythm is a NEW schedule. Moment: one-time tasks that have not run; cron: recurring only (max 4 firings/day).')]
     #[MCPRequiresAccountRights(AgentAccountRights::SCHEDULE_AGENT_TASKS)]
     public function updateTaskSchedule(
         TaskScheduleUpdateRequestDto $requestDto,
@@ -753,6 +756,10 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
         if ($requestDto->reportChannel !== null) {
             $schedule->reportChannel = AIConversationScheduleCreationLimits::normalizeReportChannel($requestDto->reportChannel);
             $editedColumnNames[] = 'reportChannel';
+        }
+        if ($requestDto->purposeName !== null) {
+            $aIConversationSchedulesService->applyRunPurposeToStoredSchedule($schedule, $requestDto->purposeName);
+            $editedColumnNames[] = 'runSettings';
         }
         $editedColumnNames = [...$editedColumnNames, ...$this->applyTimingEditsToSchedule($schedule, $requestDto, $now)];
 
@@ -1002,7 +1009,8 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
         ?string $cronSchedule = null,
         ?DateTime $oneTimeAt = null,
         ?string $reportChannel = null,
-        ?string $title = null
+        ?string $title = null,
+        ?string $purposeName = null
     ): AIConversationSchedule {
         $task = trim($task);
         if ($task === '') {
@@ -1049,6 +1057,7 @@ class AgentTaskSchedulesMCPPackage extends MCPPackage
             $schedule->schedule = $cronSchedule;
         }
         $schedule->reportChannel = $normalizedReportChannel;
+        $aIConversationSchedulesService->applyRunPurposeToSchedule($schedule, $purposeName, $agentSpace);
         return $schedule;
     }
 
