@@ -8,7 +8,8 @@ use DDD\Domain\Base\Entities\ValueObject;
 
 /**
  * The answer of one model call of the memory curation (extraction or reconciliation): its operations, whether the
- * answer had the expected shape, and the raw text for the logs.
+ * answer had the expected shape, the raw text for the logs, and the model calls behind it (every attempt, also one
+ * whose answer was thrown away).
  */
 class AgentMemoryCurationResult extends ValueObject
 {
@@ -21,10 +22,14 @@ class AgentMemoryCurationResult extends ValueObject
     /** @var string|null The model's raw answer */
     public ?string $rawResultText = null;
 
+    /** @var AgentMemoryCurationModelCalls The model calls behind this result, in call order */
+    public AgentMemoryCurationModelCalls $modelCalls;
+
     public function __construct()
     {
         parent::__construct();
         $this->operations = new AgentMemoryOperations();
+        $this->modelCalls = new AgentMemoryCurationModelCalls();
     }
 
     /**
@@ -57,7 +62,8 @@ class AgentMemoryCurationResult extends ValueObject
     }
 
     /**
-     * Adds the operations of `$agentMemoryCurationResult` to this result; the shape stays valid only if both were.
+     * Adds the operations and the model calls of `$agentMemoryCurationResult` to this result (after its own, in their
+     * order); the shape stays valid only if both were.
      *
      * @param AgentMemoryCurationResult $agentMemoryCurationResult
      * @return void
@@ -67,6 +73,7 @@ class AgentMemoryCurationResult extends ValueObject
         foreach ($agentMemoryCurationResult->operations->getElements() as $agentMemoryOperation) {
             $this->operations->add($agentMemoryOperation);
         }
+        $this->modelCalls->appendModelCalls($agentMemoryCurationResult->modelCalls);
         $this->schemaValid = $this->schemaValid && $agentMemoryCurationResult->schemaValid;
     }
 

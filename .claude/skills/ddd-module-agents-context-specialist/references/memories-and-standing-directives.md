@@ -146,6 +146,28 @@ costs are booked under `AI.MEMORY.EXTRACT.CANDIDATES` and `AI.MEMORY.RECONCILE.D
 `ENVELOPE.AI.MEMORY.CURATE`, billed to the space's billing entity. A model that gives no answer puts the harvest back
 (at most five times); a turn still running defers it.
 
+**The model calls of a curation** are on its results, so an application that evaluates its curator can read a failed
+check of what was stored against what the model received and answered. Every attempt is one
+`AgentMemoryCurationModelCall` (`Entities/Conversations/Memories/Curation/`): `stage` (`STAGE_EXTRACTION`,
+`STAGE_RECONCILIATION`, `STAGE_CONFLICT_RESOLUTION`), `aiModelName` (the model that ran), `requestBody` (the body as
+sent), `rawResultText`, `rawResponse` (the provider's whole answer, decoded), `inputTokens`, `outputTokens` and
+`attempt` (2 = the repetition after an answer of the wrong shape). Only the request body is kept: the headers carry the
+egress authentication and are never copied. The record is read from what the language-model trait of `mgamadeus/ddd-ai`
+keeps of the last call (the `body` of `lastRequestPayload`, `lastRawResponse`, `getLastInputTokens()`,
+`getLastOutputTokens()`, `getAIModel()`) by `ArgusAgentMemoryCurationCall::buildModelCallOfAttempt()`; each call class
+names its stage (`getCurationStage()`).
+
+| Result | Carries |
+|---|---|
+| `AgentMemoryCurationResult::$modelCalls` (of `extractCandidates()`, `reconcileCandidatesRoutingByResolution()`) | every attempt of `loadWithParseRetry()`, also the one whose answer was thrown away; `mergeResult()` appends the other side's calls, so the reconciliation's calls come before the conflict resolution's |
+| `AgentMemoryReconcileResult::$modelCalls` (of `curateAndApply()`, `curateConversation()`) | every call of the pass in call order: the extraction, then the reconciliation and the conflict resolution; the extraction alone when it found no candidate; none when the pass had no delta |
+
+`AgentMemoryCurationModelCalls` (an object set keyed by object: two attempts with identical content are both kept)
+gives `getModelCallsOfStage()`, `sumInputTokens()` and `sumOutputTokens()` for the tokens per stage. The calls are
+always recorded; they hold the request bodies of one pass in memory until the result is dropped. Not recorded: the
+conflict excerpt (`ArgusAgentMemoryConflictExcerpt`, made while the conflict signal is written), and the calls of a
+pass that throws `AgentMemoryCurationUnavailableException` (no answer after the repetition).
+
 **Tools** (`AgentMemoriesMCPPackage`, id `agent.memory`, skill `Agent.Memory`, bound in the package's default
 `skillPackages.php`): `listMemories`, `searchMemory`, `remember`, `updateMemory`, `forget`. The account is the one the
 call acts for; the space defaults to the conversation's. The three writes declare `MCPToolWritesAgentMemoryOnly`, so a

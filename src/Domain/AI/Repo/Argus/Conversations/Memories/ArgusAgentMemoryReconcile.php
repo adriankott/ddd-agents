@@ -6,6 +6,7 @@ namespace DDD\Domain\AI\Repo\Argus\Conversations\Memories;
 
 use DDD\Domain\AI\Entities\Conversations\Agent\Prompts\AgentAIPromptNames;
 use DDD\Domain\AI\Entities\Conversations\Memories\AgentMemories;
+use DDD\Domain\AI\Entities\Conversations\Memories\Curation\AgentMemoryCurationModelCall;
 use DDD\Domain\AI\Entities\Conversations\Memories\Curation\AgentMemoryCurationResult;
 use DDD\Domain\AI\Entities\Conversations\Memories\Curation\AgentMemoryOperations;
 use DDD\Domain\AI\Entities\Conversations\Usage\AgentAIUsageScope;
@@ -152,5 +153,13 @@ class ArgusAgentMemoryReconcile extends ArgusAgentMemoryCurationCall
     protected function applyLoadResult(string $resultText): void
     {
         $this->result = AgentMemoryCurationResult::fromModelJson($resultText);
+    }
+
+    /** The resolution prompt runs the conflict resolution, the default prompt the reconciliation. */
+    public function getCurationStage(): ?string
+    {
+        return $this->resolutionMode
+            ? AgentMemoryCurationModelCall::STAGE_CONFLICT_RESOLUTION
+            : AgentMemoryCurationModelCall::STAGE_RECONCILIATION;
     }
 }

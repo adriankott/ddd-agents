@@ -9,7 +9,9 @@ use DDD\Domain\Base\Entities\ValueObject;
 
 /**
  * What one curation of a conversation did: the memories it wrote, the contradictions it left for the owner, every
- * operation the reconciliation decided and the neighbours it decided against (in the order of their `REF_<n>` labels).
+ * operation the reconciliation decided, the neighbours it decided against (in the order of their `REF_<n>` labels) and
+ * every model call of the pass in call order (also when the pass ended early, e.g. after an extraction without a
+ * candidate).
  */
 class AgentMemoryReconcileResult extends ValueObject
 {
@@ -25,6 +27,9 @@ class AgentMemoryReconcileResult extends ValueObject
     /** @var AgentMemories The neighbours in the order of their `REF_<n>` labels */
     public AgentMemories $orderedNeighbours;
 
+    /** @var AgentMemoryCurationModelCalls Every model call of the pass, in call order (extraction, reconciliation, conflict resolution) */
+    public AgentMemoryCurationModelCalls $modelCalls;
+
     public function __construct()
     {
         parent::__construct();
@@ -32,5 +37,6 @@ class AgentMemoryReconcileResult extends ValueObject
         $this->conflicts = new AgentMemoryOperations();
         $this->operations = new AgentMemoryOperations();
         $this->orderedNeighbours = AgentMemories::newInstance();
+        $this->modelCalls = new AgentMemoryCurationModelCalls();
     }
 }

@@ -7,6 +7,7 @@ namespace DDD\Domain\AI\Repo\Argus\Conversations\Memories;
 use DDD\Domain\AI\Entities\Conversations\Agent\Prompts\AgentAIPromptNames;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessages;
+use DDD\Domain\AI\Entities\Conversations\Memories\Curation\AgentMemoryCurationModelCall;
 use DDD\Domain\AI\Entities\Conversations\Memories\Curation\AgentMemoryCurationResult;
 use DDD\Domain\AI\Entities\Conversations\Usage\AgentAIUsageScope;
 use DDD\Domain\AI\Entities\Models\Selection\ModelScope;
@@ -156,5 +157,10 @@ class ArgusAgentMemoryExtraction extends ArgusAgentMemoryCurationCall
     protected function applyLoadResult(string $resultText): void
     {
         $this->result = AgentMemoryCurationResult::fromModelJson($resultText);
+    }
+
+    public function getCurationStage(): ?string
+    {
+        return AgentMemoryCurationModelCall::STAGE_EXTRACTION;
     }
 }

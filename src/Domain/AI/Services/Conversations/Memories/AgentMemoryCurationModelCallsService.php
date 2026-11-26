@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DDD\Domain\AI\Services\Conversations\Memories;
 
 use DDD\Domain\AI\Entities\Conversations\Memories\AgentMemories;
+use DDD\Domain\AI\Entities\Conversations\Memories\Curation\AgentMemoryCurationModelCalls;
 use DDD\Domain\AI\Entities\Conversations\Memories\Curation\AgentMemoryCurationResult;
 use DDD\Domain\AI\Entities\Conversations\Memories\Curation\AgentMemoryOperations;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessages;
@@ -22,7 +23,8 @@ use DateTimeZone;
  * The model calls of the memory curation: the extraction of candidates and their reconciliation against the stored
  * neighbours. An answer of the wrong shape is asked once more; no answer at all after that throws
  * {@see AgentMemoryCurationUnavailableException} (the conversation stays unharvested and is curated again later), a
- * wrong shape after that is logged and treated as "nothing to store".
+ * wrong shape after that is logged and treated as "nothing to store". Every attempt is recorded on the result
+ * ({@see AgentMemoryCurationResult::$modelCalls}), also the one whose answer is thrown away.
  */
 class AgentMemoryCurationModelCallsService extends Service
 {
@@ -104,7 +106,8 @@ class AgentMemoryCurationModelCallsService extends Service
     }
 
     /**
-     * Loads `$preparedCall`, and a fresh copy of it once more per retry while the answer has the wrong shape.
+     * Loads `$preparedCall`, and a fresh copy of it once more per retry while the answer has the wrong shape. The
+     * result carries the record of every attempt in call order.
      *
      * @param ArgusAgentMemoryCurationCall $preparedCall A prepared call that has not been loaded
      * @return AgentMemoryCurationResult
@@ -112,16 +115,24 @@ class AgentMemoryCurationModelCallsService extends Service
      */
     protected function loadWithParseRetry(ArgusAgentMemoryCurationCall $preparedCall): AgentMemoryCurationResult
     {
+        $modelCalls = new AgentMemoryCurationModelCalls();
+        $attempt = 1;
         $loadedCall = clone $preparedCall;
         $this->loadCall($loadedCall);
+        $agentMemoryCurationModelCall = $loadedCall->buildModelCallOfAttempt($attempt);
+        $modelCalls->add($agentMemoryCurationModelCall);
         for ($retryIndex = 0; $retryIndex < static::MAX_PARSE_RETRIES; $retryIndex++) {
             if ($loadedCall->getResultOrInvalidEmptyResult()->schemaValid) {
                 break;
             }
+            $attempt++;
             $loadedCall = clone $preparedCall;
             $this->loadCall($loadedCall);
+            $agentMemoryCurationModelCall = $loadedCall->buildModelCallOfAttempt($attempt);
+            $modelCalls->add($agentMemoryCurationModelCall);
         }
         $result = $loadedCall->getResultOrInvalidEmptyResult();
+        $result->modelCalls = $modelCalls;
         if ($result->schemaValid) {
             return $result;
         }

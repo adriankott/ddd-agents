@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.7.3
+
+**Memory curation: the model calls behind its results.** No table change, no web change; npm `@mgamadeus/ddd-agents` 0.7.3 in lockstep.
+
+- **New: the model calls of a memory curation are on its results.** Every attempt of a curation model call is one
+  `AgentMemoryCurationModelCall` (`DDD\Domain\AI\Entities\Conversations\Memories\Curation`): the stage
+  (`STAGE_EXTRACTION`, `STAGE_RECONCILIATION`, `STAGE_CONFLICT_RESOLUTION`), the model that ran, the request body as
+  sent, the model's raw answer text, the provider's whole answer decoded, the input and output tokens and the attempt
+  (2 = the repetition after an answer of the wrong shape). Only the request body is kept: the request headers carry
+  the egress authentication and are never copied. The set `AgentMemoryCurationModelCalls` is keyed by object (two
+  attempts with identical content are both kept) and gives `getModelCallsOfStage()`, `sumInputTokens()` and
+  `sumOutputTokens()`.
+- **New: `AgentMemoryCurationResult::$modelCalls`** carries every attempt of `loadWithParseRetry()`, also the one whose
+  answer is thrown away; `mergeResult()` appends the other result's calls, so the reconciliation's calls come before
+  the conflict resolution's. **`AgentMemoryReconcileResult::$modelCalls`** (of `curateAndApply()` and
+  `curateConversation()`) carries every call of the pass in call order, also when the pass ends after an extraction
+  without a candidate.
+- **New: `ArgusAgentMemoryCurationCall::buildModelCallOfAttempt(int $attempt)` and `getCurationStage()`** (answered by
+  `ArgusAgentMemoryExtraction` and `ArgusAgentMemoryReconcile`). The record is read from what the language-model trait
+  of `mgamadeus/ddd-ai` keeps of the last call (the `body` of `lastRequestPayload`, `lastRawResponse`,
+  `getLastInputTokens()`, `getLastOutputTokens()`, `getAIModel()`); no second capture.
+- **Unchanged:** the curation's behaviour, its operations, its prompts and its config. The calls are always recorded
+  and hold the request bodies of one pass in memory until the result is dropped. Not recorded: the conflict excerpt
+  call made while the conflict signal is written, and the calls of a pass that ends with
+  `AgentMemoryCurationUnavailableException`.
+
 ## 0.7.2
 
 **Free conversations about one record, the list of a record's conversations, and what the model reads about the

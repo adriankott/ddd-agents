@@ -104,7 +104,8 @@ class AgentMemoryCurationService extends Service
     }
 
     /**
-     * Extraction, reconciliation and the writes for one delta.
+     * Extraction, reconciliation and the writes for one delta. The result carries every model call of the pass in
+     * call order, also when the pass ends after an extraction without a candidate.
      *
      * @param AIConversationMessages $delta The new messages
      * @param AIConversationMessages|null $recentContext The messages before them
@@ -146,6 +147,7 @@ class AgentMemoryCurationService extends Service
         $candidates = $extractionResult->operations->getOperationsWithContent();
         $this->aiTrace('memory.curate.extracted', ['candidates' => $this->describeOperations($candidates)]);
         $agentReconcileResult = new AgentMemoryReconcileResult();
+        $agentReconcileResult->modelCalls->appendModelCalls($extractionResult->modelCalls);
         if ($candidates->count() === 0) {
             return $agentReconcileResult;
         }
@@ -160,6 +162,7 @@ class AgentMemoryCurationService extends Service
             $billingEntity,
             $sourceTimezone
         );
+        $agentReconcileResult->modelCalls->appendModelCalls($reconciliationResult->modelCalls);
         $agentReconcileResult->operations = $reconciliationResult->operations;
         $agentReconcileResult->orderedNeighbours = $orderedNeighbours;
         $this->aiTrace('memory.curate.reconciled', ['operations' => $this->describeOperations($reconciliationResult->operations)]);
