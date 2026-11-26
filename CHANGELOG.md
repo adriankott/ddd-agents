@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.5
+
+- Tools skill: new reference `file-sources-in-the-drive-tools.md` (find per source, view/copy/show generic;
+  `AI.fileSources.findTools`; how an argument becomes a source file; `viewImages`, `AgentFilePicturesService`, picture
+  ids with fingerprint and the picture tiers). Documentation only; npm 0.7.5 in lockstep.
+
 ## 0.7.4
 
 - Fix: `AgentEvalArmOptionsTrait` reflects on its own. The keys of `PREVIOUS_REASONING_CUT_COUNT_ARMS_MINIMUM_VALUES`

@@ -158,7 +158,8 @@ durable only when the rule allows a durable copy). `agent.drive` is available as
 is installed. Config `config/app/AI/fileSources.php` (`AI.fileSources`): `findTools` (source name => the tool that
 finds its files, named when the model tries to list a source), `viewImages` (`maxPerCall` ≤ 4, `maxSourceBytes`,
 `maxSourcePixels`). A host tool that showed pictures of its own store through an own `ToolCallImageStore` drops it and
-names the reference instead.
+names the reference instead. Details (the find/view split, `findTools`, picture ids and tiers):
+[references/file-sources-in-the-drive-tools.md](references/file-sources-in-the-drive-tools.md).
 
 Documents: a store that also implements `DDD\Domain\AI\Services\Drives\AgentDriveFileContentReader` hands the bytes of
 a released version to `readDriveDocument` (the text page by page: PDF with OCR fallback, Word, Excel one page per sheet,
