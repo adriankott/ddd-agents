@@ -45,11 +45,7 @@ class ComposedViewNodeSchema
         $embeddableWidgets = [];
         $widgetTypes = array_map('strval', array_keys(ConversationWidgetClasses::getWidgetClassesByWidgetType()));
         sort($widgetTypes);
-        foreach (ConversationWidgetClasses::getWidgetClassesByWidgetType() as $widgetType => $widgetClass) {
-            if ($widgetClass::EMBEDDABLE) {
-                $embeddableWidgets[$widgetType] = ['sizeClass' => $widgetClass::EMBEDDED_SIZE_CLASS];
-            }
-        }
+        $embeddableWidgets = static::buildEmbeddableWidgetEntries(ConversationWidgetClasses::getWidgetClassesByWidgetType());
         return [
             'version' => self::SCHEMA_VERSION,
             'generatedBy' => 'ComposedViewNodeSchema::buildJson() — never edit by hand',
@@ -81,6 +77,23 @@ class ComposedViewNodeSchema
             'dataSources' => ($dataSources = ComposedViewDataSourceClasses::toSchemaArray()) !== [] ? $dataSources : new stdClass(),
             'entityTypes' => EntityReferenceResolverClasses::getEntityTypes(),
         ];
+    }
+
+    /**
+     * The `embeddableWidgets` entries of a set of widget classes: every EMBEDDABLE class with its size class.
+     *
+     * @param array<string, class-string<\DDD\Domain\AI\Entities\Conversations\Widgets\ConversationWidget>> $widgetClassesByWidgetType
+     * @return array<string, array{sizeClass: string}>
+     */
+    public static function buildEmbeddableWidgetEntries(array $widgetClassesByWidgetType): array
+    {
+        $embeddableWidgets = [];
+        foreach ($widgetClassesByWidgetType as $widgetType => $widgetClass) {
+            if ($widgetClass::EMBEDDABLE) {
+                $embeddableWidgets[$widgetType] = ['sizeClass' => $widgetClass::EMBEDDED_SIZE_CLASS];
+            }
+        }
+        return $embeddableWidgets;
     }
 
     /** The schema as the committed file holds it: pretty JSON, unescaped slashes and unicode, one trailing newline. */

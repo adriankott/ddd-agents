@@ -123,7 +123,13 @@ export interface ComposedNodeSchema {
 /** The sections of the schema an app adds for the types its own classes declare; every section is optional. */
 export type ComposedNodeSchemaApplicationPart = Partial<
   Pick<ComposedNodeSchema, "nodeTypes" | "embeddableWidgets" | "widgetTypes" | "dataSources" | "entityTypes">
->;
+> & {
+  /**
+   * The package widgets the app's own classes replace (PHP `REPLACES_PACKAGE_WIDGET`): the package's embeddable entry of
+   * each is dropped; the app's own entry, when its class is embeddable, stands in `embeddableWidgets`.
+   */
+  replacedPackageWidgets?: string[];
+};
 
 /**
  * The package's committed schema, typed: its budgets and rules and the types the package itself declares. A reader of
@@ -144,6 +150,14 @@ const mergeSortedByTypeName = <Entry>(
     ),
   );
 
+const withoutTypeNames = <Entry>(
+  entriesByTypeName: Record<string, Entry> | undefined,
+  typeNames: readonly string[] | undefined,
+): Record<string, Entry> | undefined =>
+  entriesByTypeName === undefined || !typeNames?.length
+    ? entriesByTypeName
+    : Object.fromEntries(Object.entries(entriesByTypeName).filter(([typeName]) => !typeNames.includes(typeName)));
+
 const mergeTypeNames = (packageTypeNames: string[] | undefined, applicationTypeNames: string[] | undefined): string[] =>
   [...new Set([...(packageTypeNames ?? []), ...(applicationTypeNames ?? [])])].sort(compareTypeNames);
 
@@ -154,7 +168,10 @@ export const addComposedNodeSchemaApplicationPart = (
 ): ComposedNodeSchema => ({
   ...schema,
   nodeTypes: mergeSortedByTypeName(schema.nodeTypes, applicationPart.nodeTypes),
-  embeddableWidgets: mergeSortedByTypeName(schema.embeddableWidgets, applicationPart.embeddableWidgets),
+  embeddableWidgets: mergeSortedByTypeName(
+    withoutTypeNames(schema.embeddableWidgets, applicationPart.replacedPackageWidgets),
+    applicationPart.embeddableWidgets,
+  ),
   widgetTypes: mergeTypeNames(schema.widgetTypes, applicationPart.widgetTypes),
   dataSources: mergeSortedByTypeName(schema.dataSources, applicationPart.dataSources),
   entityTypes: mergeTypeNames(schema.entityTypes, applicationPart.entityTypes),

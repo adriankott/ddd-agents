@@ -120,7 +120,10 @@ fields, answer rules and component this way. In PHP its class either extends the
 the registry keeps the app's class and drops the package's, in either order of discovery
 (`ConversationWidgetClasses::resolvePackageWidgetReplacingClassName()`; a package widget is a class in the namespace
 of `ConversationWidget`). Two application classes of one wire name stay a build error, flag or not. Its web entry sets
-`replacesPackageWidget`.
+`replacesPackageWidget`. The `ComposedView` schema keeps the module's half as the package ships it (built from the
+replaced package class, `ConversationWidgetClasses::getReplacedPackageWidgetClassesByWidgetType()`); the application's
+part names the type in `replacedPackageWidgets` and carries the app's own embeddable entry, and the frontend drops the
+package's embeddable entry of that type when it adds the part.
 
 ## The package's own widgets
 

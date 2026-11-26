@@ -33,6 +33,22 @@ describe("composed-node-schema — the app's part", () => {
     expect(schema.entityTypes).toEqual([...composedNodeSchema.entityTypes, "exampleRecord"].sort());
   });
 
+  it("drops the package's embeddable entry of a widget the app replaces and keeps the app's own entry", () => {
+    const replacedWidgetName = "CustomVisualization";
+    expect(composedNodeSchema.embeddableWidgets[replacedWidgetName]).toBeDefined();
+    const withoutOwnEntry = addComposedNodeSchemaApplicationPart(composedNodeSchema, {
+      replacedPackageWidgets: [replacedWidgetName],
+      widgetTypes: [replacedWidgetName],
+    });
+    expect(withoutOwnEntry.embeddableWidgets[replacedWidgetName]).toBeUndefined();
+    expect(withoutOwnEntry.widgetTypes).toContain(replacedWidgetName);
+    const withOwnEntry = addComposedNodeSchemaApplicationPart(composedNodeSchema, {
+      replacedPackageWidgets: [replacedWidgetName],
+      embeddableWidgets: { [replacedWidgetName]: { sizeClass: "compact" } },
+    });
+    expect(withOwnEntry.embeddableWidgets[replacedWidgetName]).toEqual({ sizeClass: "compact" });
+  });
+
   it("reads the part the app declares at call time, the same object while the part is the same", () => {
     setAgentsEnvironment({});
     expect(getComposedNodeSchema()).toBe(composedNodeSchema);

@@ -20,8 +20,10 @@ use stdClass;
  *   declare. The frontend adds it to the module's schema at start.
  *
  * A type is the module's when a class of the module namespace ({@see DDDService::FRAMEWORK_ROOT_NAMESPACE}) declares
- * it with the same type name — an application subclass that overrides a module class keeps the module's type. Reads
- * nothing but the class registries.
+ * it with the same type name — an application subclass that overrides a module class keeps the module's type. A
+ * package widget an application's class replaces ({@see \DDD\Domain\AI\Entities\Conversations\Widgets\ConversationWidget::REPLACES_PACKAGE_WIDGET})
+ * stays in the module's schema as the package declares it; the application's part names it in `replacedPackageWidgets`
+ * and carries the application's own entry. Reads nothing but the class registries.
  */
 class ComposedViewNodeSchemaParts
 {
@@ -37,8 +39,10 @@ class ComposedViewNodeSchemaParts
     {
         $schema = ComposedViewNodeSchema::build();
         $schema['nodeTypes'] = static::buildSchemaObject(static::filterEntriesByDeclaringSide((array)$schema['nodeTypes'], ComposedViewNodeClasses::getNodeClassesByNodeType(), 'NODE_TYPE', true));
-        $schema['embeddableWidgets'] = static::buildSchemaObject(static::filterEntriesByDeclaringSide((array)$schema['embeddableWidgets'], ConversationWidgetClasses::getWidgetClassesByWidgetType(), 'WIDGET_TYPE', true));
-        $schema['widgetTypes'] = static::filterTypesByDeclaringSide($schema['widgetTypes'], ConversationWidgetClasses::getWidgetClassesByWidgetType(), 'WIDGET_TYPE', true);
+        // a package widget an application replaced stays the module's as the package declares it
+        $moduleWidgetClassesByWidgetType = array_replace(ConversationWidgetClasses::getWidgetClassesByWidgetType(), ConversationWidgetClasses::getReplacedPackageWidgetClassesByWidgetType());
+        $schema['embeddableWidgets'] = static::buildSchemaObject(static::filterEntriesByDeclaringSide(ComposedViewNodeSchema::buildEmbeddableWidgetEntries($moduleWidgetClassesByWidgetType), $moduleWidgetClassesByWidgetType, 'WIDGET_TYPE', true));
+        $schema['widgetTypes'] = static::filterTypesByDeclaringSide($schema['widgetTypes'], $moduleWidgetClassesByWidgetType, 'WIDGET_TYPE', true);
         $schema['dataSources'] = static::buildSchemaObject(static::filterEntriesByDeclaringSide((array)$schema['dataSources'], ComposedViewDataSourceClasses::getDataSourceClassesByName(), 'NAME', true));
         $schema['entityTypes'] = static::filterTypesByDeclaringSide($schema['entityTypes'], EntityReferenceResolverClasses::getResolverClassesByEntityType(), 'ENTITY_TYPE', true);
         return $schema;
@@ -52,7 +56,7 @@ class ComposedViewNodeSchemaParts
     public static function buildApplicationSchemaPart(): array
     {
         $schema = ComposedViewNodeSchema::build();
-        return [
+        $applicationSchemaPart = [
             'version' => $schema['version'],
             'generatedBy' => self::APPLICATION_SCHEMA_PART_GENERATED_BY,
             'nodeTypes' => static::buildSchemaObject(static::filterEntriesByDeclaringSide((array)$schema['nodeTypes'], ComposedViewNodeClasses::getNodeClassesByNodeType(), 'NODE_TYPE', false)),
@@ -61,6 +65,12 @@ class ComposedViewNodeSchemaParts
             'dataSources' => static::buildSchemaObject(static::filterEntriesByDeclaringSide((array)$schema['dataSources'], ComposedViewDataSourceClasses::getDataSourceClassesByName(), 'NAME', false)),
             'entityTypes' => static::filterTypesByDeclaringSide($schema['entityTypes'], EntityReferenceResolverClasses::getResolverClassesByEntityType(), 'ENTITY_TYPE', false),
         ];
+        $replacedPackageWidgetTypes = array_map('strval', array_keys(ConversationWidgetClasses::getReplacedPackageWidgetClassesByWidgetType()));
+        if ($replacedPackageWidgetTypes !== []) {
+            // the frontend drops the module's embeddable entry of these; the application's own entry stands above
+            $applicationSchemaPart['replacedPackageWidgets'] = $replacedPackageWidgetTypes;
+        }
+        return $applicationSchemaPart;
     }
 
     /** @return string the module's schema as the committed file holds it */

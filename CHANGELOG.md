@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.5
+
+- **Fix: replacing a package widget no longer changes the module's `ComposedView` schema.** With
+  `REPLACES_PACKAGE_WIDGET` the module's half was built from the application's class, so in an application the
+  committed `composed-node-schema.json` (and the parity fixture's stub schema) read as stale: `widgetTypes` (and
+  `embeddableWidgets` for an embeddable package widget) lost the replaced type. The module's half is now built from the
+  replaced package class (`ConversationWidgetClasses::getReplacedPackageWidgetClassesByWidgetType()`,
+  `ComposedViewNodeSchema::buildEmbeddableWidgetEntries()`); the application's part names the replaced types in
+  `replacedPackageWidgets` (only when there are any) and carries the app's own embeddable entry; the web merge
+  (`addComposedNodeSchemaApplicationPart`) drops the package's embeddable entry of each replaced type.
+
 ## 0.8.4
 
 - **An app's widget replaces the package's widget of its wire name without extending it.**

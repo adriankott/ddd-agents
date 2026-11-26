@@ -215,6 +215,37 @@ class ConversationWidgetClasses
     }
 
     /**
+     * The package's widget classes an application's class replaced ({@see ConversationWidget::REPLACES_PACKAGE_WIDGET}),
+     * by wire name: the package class of the wire name whose registered class is neither it nor a subclass of it. The
+     * module's half of the `ComposedView` schema is built from these, so it stays the same in every application.
+     *
+     * @return array<string, class-string<ConversationWidget>>
+     */
+    public static function getReplacedPackageWidgetClassesByWidgetType(): array
+    {
+        $widgetClassesByWidgetType = static::getWidgetClassesByWidgetType();
+        $replacedPackageWidgetClassesByWidgetType = [];
+        foreach (static::findWidgetClassNamesInWidgetFolders() as $className) {
+            try {
+                if (!class_exists($className) || !is_subclass_of($className, ConversationWidget::class) || (new ReflectionClass($className))->isAbstract()) {
+                    continue;
+                }
+            } catch (Throwable) {
+                continue;
+            }
+            if (!static::isPackageWidgetClass($className)) {
+                continue;
+            }
+            $registeredClassName = $widgetClassesByWidgetType[$className::WIDGET_TYPE] ?? null;
+            if ($registeredClassName !== null && $registeredClassName !== $className && !is_subclass_of($registeredClassName, $className)) {
+                $replacedPackageWidgetClassesByWidgetType[$className::WIDGET_TYPE] = $className;
+            }
+        }
+        ksort($replacedPackageWidgetClassesByWidgetType);
+        return $replacedPackageWidgetClassesByWidgetType;
+    }
+
+    /**
      * The class names of every `*ConversationWidget.php` file in the two widget folder patterns, by PSR-4 — abstract
      * classes and the base included (the build skips them).
      *
