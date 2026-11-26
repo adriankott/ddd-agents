@@ -1,6 +1,6 @@
 // `@mgamadeus/ddd-agents/voice/admin` — the admin screens of the voice calls on the blocks of
 // `@mgamadeus/ddd-admin-ui`: the api of the admin call routes (`createAgentVoiceAdminApi`, `AdminAgentVoiceCallsTrait`),
-// the list of calls and one call. The one entry that loads the optional peers `@mgamadeus/ddd-admin-ui`,
+// the list of calls and one call, and the ▶ of the voice samples of a voice picker (`AdminAgentVoiceSamplesTrait`). The one entry that loads the optional peers `@mgamadeus/ddd-admin-ui`,
 // `@mgamadeus/ddd-web` and `lucide-react` (`boundary.json` names them, `scripts/check-package.mjs` holds every other
 // entry free of them): an application's chat installs none of the three.
 export {
@@ -61,3 +61,23 @@ export {
   AgentVoiceCallDetailScreen,
   type AgentVoiceCallDetailScreenProps,
 } from "../voice/admin/AgentVoiceCallDetailScreen/AgentVoiceCallDetailScreen";
+export {
+  AGENT_VOICE_SAMPLE_ERROR_TEXTS,
+  type AgentVoiceSampleButtonProps,
+  AgentVoiceSampleButton,
+  type AgentVoiceSamplePlayer,
+  useAgentVoiceSamplePlayer,
+  type UseAgentVoiceSamplePlayerOptions,
+} from "../voice/samples/AgentVoiceSampleButton/AgentVoiceSampleButton";
+export {
+  type AgentVoiceSampleErrorKind,
+  agentVoiceSampleKeyOf,
+  type AgentVoiceSamplePlayerState,
+  type FetchAgentVoiceSample,
+  isAgentVoiceSampleNotFound,
+  readAgentVoiceSamplePlayerState,
+  resetAgentVoiceSamplePlayer,
+  stopAgentVoiceSample,
+  subscribeAgentVoiceSamplePlayer,
+  toggleAgentVoiceSample,
+} from "../voice/samples/agent-voice-sample-player";

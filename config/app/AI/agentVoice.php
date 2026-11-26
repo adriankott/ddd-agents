@@ -55,4 +55,20 @@ return [
         'admissionRecheckSeconds' => 30,
         'usageBookingMinimumSeconds' => 30,
     ],
+    // the voice samples of a voice picker (DDD\Domain\AI\Services\Voice\Samples\AgentVoiceSamplesService): one
+    // sentence per voice and language, spoken by the live model of the calls, stored as WAV below `keyPrefix` in the
+    // object store `objectStorage` (Common.ObjectStorage, OBJECT_STORAGE_<NAME>_*) and served only through the backend
+    // (DDD\Presentation\Api\Admin\Voice\AdminAgentVoiceSamplesTrait). `app:agent:voice-samples:generate` makes the
+    // missing ones; a new model or sentence changes a sample's fingerprint, so the command makes it again
+    'samples' => [
+        'objectStorage' => 'agentVoiceSamples',
+        'keyPrefix' => 'agent-voice-samples/',
+        // null: the provider's selectable live voices (AgentVoiceSettings::SELECTABLE_LIVE_VOICE_IDS)
+        'voiceIds' => null,
+        // language => sentence; a language without a sentence has no sample. %agentName% = AI.agentPersona.agentName
+        'sentences' => [
+            'de' => 'Hey, ich bin %agentName%. So klinge ich, wenn wir telefonieren.',
+            'en' => 'Hey, I\'m %agentName%. This is how I sound when we talk on the phone.',
+        ],
+    ],
 ];

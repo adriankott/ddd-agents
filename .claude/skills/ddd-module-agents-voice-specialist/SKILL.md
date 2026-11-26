@@ -132,6 +132,7 @@ refusal's end reason (`LIMIT_REACHED` for every refusal the package ships).
 | Which config key does what; a limit or the language changes | [adopting voice](references/adopting-voice.md) |
 | Declare `open` and `ring`; a route answers 403, 409, 410 or 502; the ring does not arrive, `ring` answers `no_registered_devices`, a client that only polls is not rung or keeps ringing; build the client (entries, texts, styles, optional peers) | [routes, ring, tools and admin](references/routes-ring-tools-and-admin.md) |
 | The agent should call the owner; the tools and the skill; the admin list of calls and its costs | [routes, ring, tools and admin](references/routes-ring-tools-and-admin.md) |
+| Voice samples for a voice picker: `app:agent:voice-samples:generate`, the sample route, the ▶ button, a sample session answers 403 or stops early | [routes, ring, tools and admin](references/routes-ring-tools-and-admin.md) |
 | Size the worker pool; a deploy cuts calls; a call stays running after its worker died; seconds are not booked | [call life and the session worker](references/call-life-and-session-worker.md) |
 | Add a condition for a call start, another payer, a store of the application's own, a provider adapter, a further ring target or medium, a worker of the application's own | [override points](references/override-points.md) |
 

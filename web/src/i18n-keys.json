@@ -1331,6 +1331,17 @@
       ]
     },
     {
+      "key": "Play the sample of %voiceName%",
+      "defaultText": "Play the sample of %voiceName%",
+      "placeholders": [
+        "voiceName"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/samples/AgentVoiceSampleButton/AgentVoiceSampleButton.tsx"
+      ]
+    },
+    {
       "key": "Play the video %title%",
       "defaultText": "Play the video %title%",
       "placeholders": [
@@ -1798,6 +1809,17 @@
       ]
     },
     {
+      "key": "Stop the sample of %voiceName%",
+      "defaultText": "Stop the sample of %voiceName%",
+      "placeholders": [
+        "voiceName"
+      ],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/samples/AgentVoiceSampleButton/AgentVoiceSampleButton.tsx"
+      ]
+    },
+    {
       "key": "Subject",
       "defaultText": "Subject",
       "placeholders": [],
@@ -2003,6 +2025,24 @@
       ]
     },
     {
+      "key": "The sample could not be loaded.",
+      "defaultText": "The sample could not be loaded.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/samples/AgentVoiceSampleButton/AgentVoiceSampleButton.tsx"
+      ]
+    },
+    {
+      "key": "The sample could not be played.",
+      "defaultText": "The sample could not be played.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/samples/AgentVoiceSampleButton/AgentVoiceSampleButton.tsx"
+      ]
+    },
+    {
       "key": "The session ended on an error of the provider, the model or the worker",
       "defaultText": "The session ended on an error of the provider, the model or the worker",
       "placeholders": [],
@@ -2143,6 +2183,15 @@
       "contexts": [],
       "usedIn": [
         "src/voice/call/agent-voice-call-store.ts"
+      ]
+    },
+    {
+      "key": "There is no sample of this voice yet.",
+      "defaultText": "There is no sample of this voice yet.",
+      "placeholders": [],
+      "contexts": [],
+      "usedIn": [
+        "src/voice/samples/AgentVoiceSampleButton/AgentVoiceSampleButton.tsx"
       ]
     },
     {

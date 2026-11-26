@@ -1196,22 +1196,32 @@
       "AGENT_VOICE_CALL_END_REASON",
       "AGENT_VOICE_CALL_END_REASONS",
       "AGENT_VOICE_CALL_STATE",
+      "AGENT_VOICE_SAMPLE_ERROR_TEXTS",
       "AgentVoiceCallConversationLink",
       "AgentVoiceCallDetailScreen",
       "AgentVoiceCallStateBadges",
       "AgentVoiceCallsScreen",
+      "AgentVoiceSampleButton",
       "agentVoiceAdminCallDerivedValuesByCallIdOf",
       "agentVoiceAdminCallDurationInSecondsOf",
       "agentVoiceAdminCallStartTimeOf",
       "agentVoiceAdminEndpointDefinitions",
+      "agentVoiceSampleKeyOf",
       "buildAgentVoiceAdminCallsFilters",
       "buildAgentVoiceAdminRequests",
       "createAgentVoiceAdminApi",
       "createStaticAgentVoiceAdminApi",
       "formatAgentVoiceAdminCallCosts",
       "isAgentVoiceAdminError",
+      "isAgentVoiceSampleNotFound",
       "readAgentVoiceAdminWholeNumber",
-      "toAgentVoiceAdminDayBound"
+      "readAgentVoiceSamplePlayerState",
+      "resetAgentVoiceSamplePlayer",
+      "stopAgentVoiceSample",
+      "subscribeAgentVoiceSamplePlayer",
+      "toAgentVoiceAdminDayBound",
+      "toggleAgentVoiceSample",
+      "useAgentVoiceSamplePlayer"
     ],
     "types": [
       "AgentVoiceAdminApi",
@@ -1232,8 +1242,14 @@
       "AgentVoiceCallDetailScreenProps",
       "AgentVoiceCallStateBadgesProps",
       "AgentVoiceCallsScreenProps",
+      "AgentVoiceSampleButtonProps",
+      "AgentVoiceSampleErrorKind",
+      "AgentVoiceSamplePlayer",
+      "AgentVoiceSamplePlayerState",
       "CreateAgentVoiceAdminApiOptions",
-      "StaticAgentVoiceAdminData"
+      "FetchAgentVoiceSample",
+      "StaticAgentVoiceAdminData",
+      "UseAgentVoiceSamplePlayerOptions"
     ]
   }
 }

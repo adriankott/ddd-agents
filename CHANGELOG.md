@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.7.1
+
+**Voice: samples for a voice picker.** npm `@mgamadeus/ddd-agents` 0.7.1 in lockstep. No table change.
+
+- **Added: `app:agent:voice-samples:generate` and `AgentVoiceSamplesService`.** One short sentence per voice and
+  language (`AI.agentVoice.samples`), spoken by the live model of the calls in a GPT-Live server session
+  (`LiveVoiceSampleSynthesizer`, below the session worker's gated folder `Services\Voice\SessionWorker\Samples\`:
+  without ratchet/pawl and react/event-loop nothing loads it, `canGenerateSamplesHere()` is false and the command
+  answers that the library is missing), stored as WAV under a fingerprinted key (model, voice, language, sentence,
+  format) in the object store `agentVoiceSamples`. A current sample is kept, an outdated one replaced and removed. The
+  seconds of each session are booked under `AI.VOICE.SAMPLE` through ddd-ai's session usage (override point
+  `recordSessionSeconds()`).
+- **Added: `AdminAgentVoiceSamplesTrait`** (`GET …/samples/{voiceId}/{languageCode}`, `audio/wav` as untrusted content
+  through `UntrustedContentResponseDto` (the provider spoke the bytes), ETag, a private day of caching, `404
+  sample_not_found`, `403 feature_not_available` while switched off; access hook
+  `throwForbiddenUnlessVoiceSamplesAccessAllowed()`).
+- **Added (web, `./voice/admin`): `AgentVoiceSampleButton`, `useAgentVoiceSamplePlayer`** and the framework-free player
+  (`toggleAgentVoiceSample`, …): one audio element per page, the fetch injected by the application, usable inside a
+  select item. 5 new text keys.
+- Tests: service, session wire (start event, URL, events, quiet frames, no `Origin`, loop per sample, booking),
+  generation without the library, route trait (untrusted headers), player and button specs; the command is the 48th
+  visible one.
+
 ## 0.7.0
 
 **Files of any source in the drive tools; the model looks at pictures through the package.** Requires `mgamadeus/ddd`

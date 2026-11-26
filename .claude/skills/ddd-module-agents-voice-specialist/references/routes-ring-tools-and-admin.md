@@ -165,6 +165,42 @@ options) and one call.
   read them as UTC: an application whose processes do not run in UTC shows shifted times there.
 - A call's task text is written by the agent or the owner: a screen shows it as text only.
 
+## The voice samples
+
+The ▶ of a voice picker: one sentence per voice and language (`AI.agentVoice.samples`), spoken by the live model of
+the calls, stored as WAV in an object store of the application and served only through the backend.
+
+- **Configuration** (`samples` in `agentVoice.php`): `objectStorage` (the store name; default `agentVoiceSamples`,
+  `OBJECT_STORAGE_<NAME>_*`), `keyPrefix`, `voiceIds` (null = `AgentVoiceSettings::SELECTABLE_LIVE_VOICE_IDS`),
+  `sentences` (language => sentence; `%agentName%` = `AI.agentPersona.agentName`; a language without a sentence has
+  no sample).
+- **Generation:** `app:agent:voice-samples:generate` (`--voice`, `--language`, `--force`, `--list`, `-v` prints the
+  session's event counts) makes the missing samples. A sample's key holds the fingerprint of model, voice, language,
+  sentence and format: after a model or sentence change the command makes every sample again and removes the outdated
+  ones. Run it once after such a deploy. One failing sample never stops the others.
+- **The session** (`LiveVoiceSampleSynthesizer`, below the session worker's folder
+  `DDD\Domain\AI\Services\Voice\SessionWorker\Samples\`: it needs the WebSocket library ratchet/pawl and
+  react/event-loop; without it nothing loads the class, `canGenerateSamplesHere()` is false and the command answers that
+  the library is missing, while `--list` and the route still work): a GPT-Live server WebSocket
+  (wss://{apiHost}/v1/live/sessions) with silent input paced in real time, closed after 1.5 s without SPEECH (the
+  provider keeps sending quiet frames after the speech). The handshake carries no `Origin`
+  (`OriginlessWebSocketConnector`; OpenAI answers 403 to a server session with one). Each sample runs on an event loop
+  of its own: on the global loop, the late close of an earlier sample's socket stops the next one. A recording without a
+  transcript or under 1 s is refused, nothing is stored. The seconds of every opened session are booked under
+  `AI.VOICE.SAMPLE` through ddd-ai's session usage (`recordSessionSeconds()`, the override point of an application with
+  a cost ledger of its own).
+- **The route:** `AdminAgentVoiceSamplesTrait`, `GET …/samples/{voiceId}/{languageCode}`: `audio/wav` as untrusted
+  content (`UntrustedContentResponseDto`: the provider spoke the bytes; `nosniff`, `CSP: sandbox`, attachment), ETag =
+  the fingerprint, `Cache-Control: private, max-age=86400`; `404 sample_not_found`; switched off `403
+  feature_not_available`. `throwForbiddenUnlessVoiceSamplesAccessAllowed()` decides who may listen. Classify it as a
+  read.
+- **The web half:** `useAgentVoiceSamplePlayer({ fetchSample, onError })` and `AgentVoiceSampleButton` of
+  `@mgamadeus/ddd-agents/voice/admin`. The application injects `fetchSample` (its SDK's call of the route, unwrapped to
+  the Blob; a rejection with `status: 404` reads as "no sample yet") and shows `onError`'s translated message in its
+  own toast. One audio element per page: a new sample stops the one playing. The button works inside a select item (a
+  press neither chooses the item nor closes the list); give the select's value its own children so the button is not
+  mirrored into the trigger.
+
 ## The web half
 
 Two entries of the package's npm half; `web/public-api.json` lists every name they export:

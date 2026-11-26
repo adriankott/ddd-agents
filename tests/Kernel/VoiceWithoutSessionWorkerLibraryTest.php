@@ -32,7 +32,8 @@ use Symfony\Component\Process\Process;
  * voice channel can run; in an installation without it (a child process whose class loader refuses the library, the
  * voice channel switched on) the container still compiles, the worker and its attach handler are no services, the one
  * place answers that voice cannot run and each of its askers follows it, the provider adapter and the control request
- * of a hang-up stay usable, and `app:agent:check-installation` names the installation without failing.
+ * of a hang-up stay usable, `app:agent:check-installation` names the installation without failing, and
+ * `app:agent:voice-samples:generate` answers that the library is missing.
  */
 class VoiceWithoutSessionWorkerLibraryTest extends UnitTestCase
 {
@@ -95,7 +96,13 @@ class VoiceWithoutSessionWorkerLibraryTest extends UnitTestCase
         }
         // the module names the class it gates on; nothing loads the library through a class name
         self::assertSame(['Modules/Agents/AgentsModule.php'], $filesNamingTheLibrary, 'a file that imports the library sits below a gated namespace');
-        self::assertSame(['Domain/AI/Services/Voice/SessionWorker/AgentLiveVoiceSessionsService.php'], $gatedFilesNamingTheLibrary);
+        sort($gatedFilesNamingTheLibrary);
+        self::assertSame([
+            'Domain/AI/Services/Voice/SessionWorker/AgentLiveVoiceSessionsService.php',
+            'Domain/AI/Services/Voice/SessionWorker/Samples/LiveVoiceSampleSession.php',
+            'Domain/AI/Services/Voice/SessionWorker/Samples/LiveVoiceSampleSynthesizer.php',
+            'Domain/AI/Services/Voice/SessionWorker/Samples/OriginlessWebSocketConnector.php',
+        ], $gatedFilesNamingTheLibrary);
     }
 
     public function testWithTheLibraryTheSessionWorkerIsAServiceAndASwitchedOnVoiceChannelCanRun(): void
@@ -169,6 +176,14 @@ class VoiceWithoutSessionWorkerLibraryTest extends UnitTestCase
         self::assertStringStartsWith('Voice is switched on but the WebSocket library is not installed', $voiceChannelFindings[0]['message']);
         self::assertStringContainsString('composer require ratchet/pawl react/event-loop', $voiceChannelFindings[0]['hint']);
         self::assertSame(0, $installationCheck['blocking']);
+    }
+
+    public function testWithoutTheLibraryTheVoiceSamplesCommandAnswersThatTheLibraryIsMissing(): void
+    {
+        $samplesProcess = $this->runScriptWithoutTheLibrary('console.php', 'app:agent:voice-samples:generate', '--voice=flitz', '--language=de', '--no-ansi');
+
+        self::assertSame(1, $samplesProcess->getExitCode(), $samplesProcess->getOutput() . $samplesProcess->getErrorOutput());
+        self::assertStringContainsString('composer require ratchet/pawl react/event-loop', $samplesProcess->getOutput());
     }
 
     protected function runScriptWithoutTheLibrary(string $scriptName, string ...$scriptArguments): Process
