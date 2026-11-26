@@ -21,6 +21,7 @@ use DDD\Infrastructure\Libs\Config;
 use DDD\Presentation\Mcp\Client\Agents\AgentTaskSchedulesMCPPackage;
 use DDD\Presentation\Mcp\Client\Agents\WebSearchMCPPackage;
 use DDD\Symfony\Commands\Agents\AgentCheckInstallationCommand;
+use DDD\Tests\Agents\Domain\AI\Services\Conversations\Goals\AgentGoalsSwitch;
 use DDD\Tests\Agents\Support\UnitTestCase;
 use DDD\Tests\Agents\Voice\Support\AgentVoiceTestConfiguration;
 use ReflectionProperty;
@@ -103,14 +104,14 @@ class AgentInstallationCheckServiceTest extends UnitTestCase
         $this->setAIConfigValue('accountRights', [
             AgentAccountRights::OPERATE_PLATFORM => [Role::SUPERADMIN],
             AgentAccountRights::USE_WEB => [AgentRoleMappedAccountRights::DELEGATED_RIGHT_KEY => 'researchTheWeb'],
-            AgentAccountRights::USE_AGENT_MEMORY => [],
+            AgentAccountRights::SCHEDULE_AGENT_TASKS => [],
         ]);
 
         $findings = $this->runOnlyCheck(AgentInstallationCheckService::CHECK_RIGHTS_HELD_BY_NOBODY, null, ['acceptedUnmappedRights' => [AgentAccountRights::USE_UI]]);
         $reportedRightNames = $findings->getSubjects();
 
-        self::assertContains(AgentAccountRights::USE_AGENT_MEMORY, $reportedRightNames, 'a right mapped to no role is held by nobody');
-        self::assertContains(AgentAccountRights::SCHEDULE_AGENT_TASKS, $reportedRightNames, 'a right the mapping does not name is held by nobody');
+        self::assertContains(AgentAccountRights::SCHEDULE_AGENT_TASKS, $reportedRightNames, 'a right mapped to no role is held by nobody');
+        self::assertNotContains(AgentAccountRights::USE_AGENT_MEMORY, $reportedRightNames, 'the right of the memory store, switched off by default, needs no holder although the mapping does not name it');
         self::assertNotContains(AgentAccountRights::OPERATE_PLATFORM, $reportedRightNames);
         self::assertNotContains(AgentAccountRights::USE_WEB, $reportedRightNames, 'a delegation holds the right through the application');
         self::assertNotContains(AgentAccountRights::USE_UI, $reportedRightNames, 'an accepted right is not reported');
@@ -129,6 +130,24 @@ class AgentInstallationCheckServiceTest extends UnitTestCase
 
         self::assertSame([AgentVoiceAccountRights::USE_VOICE], $findingsWhileVoiceIsOn->getSubjects(), 'the default mapping names every other right; nobody holds the voice right until the application maps it');
         self::assertSame(0, $findingsWhileVoiceIsOn->countBlockingFindings());
+    }
+
+    public function testTheGoalRightIsReportedOnlyWhileTheGoalRegisterIsOn(): void
+    {
+        $this->setAIConfigValue('accountRights', [AgentAccountRights::OPERATE_PLATFORM => [Role::SUPERADMIN]]);
+        $agentGoalsSwitch = new AgentGoalsSwitch();
+        try {
+            $agentGoalsSwitch->switchGoals(false);
+            self::assertNotContains(
+                AgentAccountRights::USE_AGENT_GOALS,
+                $this->runOnlyCheck(AgentInstallationCheckService::CHECK_RIGHTS_HELD_BY_NOBODY)->getSubjects(),
+                'the rights catalogue lists it, but no tool of the switched-off register is offered'
+            );
+            $agentGoalsSwitch->switchGoals(true);
+            self::assertContains(AgentAccountRights::USE_AGENT_GOALS, $this->runOnlyCheck(AgentInstallationCheckService::CHECK_RIGHTS_HELD_BY_NOBODY)->getSubjects());
+        } finally {
+            $agentGoalsSwitch->restore();
+        }
     }
 
     public function testAnApplicationRightsObjectWithoutAMappingOfItsOwnNamesThePackageRightsHeldByNobody(): void

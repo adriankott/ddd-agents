@@ -418,18 +418,22 @@ class AgentInstallationCheckService extends Service
     /**
      * Whether only MCP packages that are not available declare the right ({@see MCPPackage::isAvailable()}: their
      * feature is switched off, so none of their tools is offered or callable and the right needs no holder yet). The
-     * right is reported once the feature is switched on. A right a rights constant class lists is never left out,
-     * and neither is one whose package cannot say whether it is available.
+     * right is reported once the feature is switched on. A rights constant class that lists the right too (the
+     * catalogue of every right, `AgentAccountRights::RIGHTS`) does not keep it in; a right only a rights constant class
+     * lists is never left out, and neither is one whose package cannot say whether it is available.
      */
     protected function isRightOfUnavailablePackagesOnly(AgentDeclaredAccountRight $agentDeclaredAccountRight): bool
     {
-        if ($agentDeclaredAccountRight->declaringClassNames === []) {
+        $declaringPackageClassNames = [];
+        foreach ($agentDeclaredAccountRight->declaringClassNames as $declaringClassName) {
+            if (is_a($declaringClassName, MCPPackage::class, true)) {
+                $declaringPackageClassNames[] = $declaringClassName;
+            }
+        }
+        if ($declaringPackageClassNames === []) {
             return false;
         }
-        foreach ($agentDeclaredAccountRight->declaringClassNames as $declaringClassName) {
-            if (!is_a($declaringClassName, MCPPackage::class, true)) {
-                return false;
-            }
+        foreach ($declaringPackageClassNames as $declaringClassName) {
             try {
                 if ($declaringClassName::isAvailable()) {
                     return false;

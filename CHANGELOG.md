@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.6
+
+- **`rightsHeldByNobody` no longer asks a host to map the right of a switched-off feature that the rights catalogue
+  lists.** A right that every declaring MCP package leaves unavailable is left out even when a rights constant class
+  lists it too (`AgentAccountRights::RIGHTS`): `useAgentGoals` while the goal register is off, `useAgentMemory` while
+  the memory store is off. It is reported once the feature is switched on. A right only a constant class lists is
+  reported as before.
+
 ## 0.8.5
 
 - **Fix: replacing a package widget no longer changes the module's `ComposedView` schema.** With
