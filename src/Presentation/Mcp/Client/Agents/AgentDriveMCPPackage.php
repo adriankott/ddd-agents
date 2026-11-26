@@ -164,10 +164,26 @@ class AgentDriveMCPPackage extends MCPPackage implements ToolCallImageStore
         $agentDriveStore = $agentDriveStoresService->requireDriveStoreOfPath($targetPath);
 
         $ownerConsentReservation = null;
+        $precheckRefusedLines = [];
         if ($targetWriteMode === AgentDriveMount::MODE_WRITE_WITH_CONSENT) {
+            // what would be refused anyway (not readable, kept out by the flow rule) is never put to the owner
+            $agentDriveSaveRefusals = $agentDriveStoresService->findSaveRefusals($callProvenance, $sourcePaths, $targetMount, $targetPath->pathInMount);
+            $precheckRefusedLines = $agentDriveSaveRefusals->buildRefusedLines();
+            $sourcePaths = array_values(array_filter(
+                $sourcePaths,
+                static fn (AgentDrivePath $sourcePath): bool => !$agentDriveSaveRefusals->isSourceArgumentRefused($sourcePath->argument)
+            ));
+            if ($sourcePaths === []) {
+                $agentDriveFilesMcpResponseDto = new AgentDriveFilesMcpResponseDto();
+                $agentDriveFilesMcpResponseDto->files = new AgentDriveFiles();
+                $agentDriveFilesMcpResponseDto->refusedLines = $precheckRefusedLines;
+                $agentDriveFilesMcpResponseDto->note = 'Nothing was copied.';
+                return $agentDriveFilesMcpResponseDto;
+            }
             $ownerConsentReservation = $ownerConsentsService->requireOwnerConsentForStep($callProvenance, $this->buildConsentRequest($sourcePaths, $targetPath));
         }
         $agentDriveSaveResult = $agentDriveStore->saveDriveFiles($callProvenance, $sourcePaths, $targetMount, $targetPath->pathInMount);
+        $agentDriveSaveResult->refusedLines = [...$precheckRefusedLines, ...$agentDriveSaveResult->refusedLines];
         if ($ownerConsentReservation !== null) {
             if ($agentDriveSaveResult->hasSavedFiles()) {
                 $ownerConsentsService->markConsentUsed($callProvenance, $ownerConsentReservation);

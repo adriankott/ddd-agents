@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.7.9
+
+- **`saveDriveFile` never asks the owner for a copy that is refused anyway.** New optional port
+  `AgentDriveSavePrecheck` (tag `ai.agent_drive_save_precheck`, one per store name) with
+  `findSaveRefusals(): AgentDriveSaveRefusals` (`AgentDriveSaveRefusal`: source argument and reason). On a
+  `WRITE_WITH_CONSENT` mount the tool asks the target store's precheck first: the sources it refuses (not readable,
+  kept out by the flow rule) become refused lines and are not put to the owner, the consent request names only the
+  rest, and when nothing remains the answer is "Nothing was copied." without a question. A store without a precheck
+  behaves as before. `AgentDriveStoresService::findSaveRefusals()`. ddd-clouddrive 0.5.4 ships the drive's precheck.
+- Tools skill and its file-sources reference corrected: the picture goes to the model in the format of the tool picture
+  store's wire profile (e.g. WebP); the mode constant is `MODE_READ_WRITE`; the tiers keep the sent bytes by their
+  sha256, the conversation keeps the picture id; a decision's `requiresOwnerConsent` is met only by a consent mount
+  (the agent cannot pass a consent itself).
+- No config or schema change; npm 0.7.9 in lockstep.
+
 ## 0.7.8
 
 - **Memory curation: the model of a call can be chosen.** `ArgusAgentMemoryCurationCall::useAIModel(AIModel $aiModel)`

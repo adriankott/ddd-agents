@@ -9,6 +9,7 @@ use DDD\Domain\AI\Entities\Drives\AgentDriveFiles;
 use DDD\Domain\AI\Entities\Drives\AgentDriveMount;
 use DDD\Domain\AI\Entities\Drives\AgentDriveMounts;
 use DDD\Domain\AI\Entities\Drives\AgentDrivePath;
+use DDD\Domain\AI\Entities\Drives\AgentDriveSaveRefusals;
 use DDD\Domain\Common\Entities\Files\Sources\FileReference;
 use DDD\Domain\Common\Services\Files\FileSourcesService;
 use DDD\Infrastructure\Exceptions\BadRequestException;
@@ -40,6 +41,38 @@ class AgentDriveStoresService extends Service
         iterable $agentDriveStores
     ): void {
         $this->agentDriveStores = $agentDriveStores;
+    }
+
+    /** @var iterable<AgentDriveSavePrecheck> */
+    protected iterable $agentDriveSavePrechecks = [];
+
+    /** @param iterable<AgentDriveSavePrecheck> $agentDriveSavePrechecks */
+    #[Required]
+    public function setAgentDriveSavePrechecks(
+        #[AutowireIterator(AgentDriveSavePrecheck::TAG)]
+        iterable $agentDriveSavePrechecks
+    ): void {
+        $this->agentDriveSavePrechecks = $agentDriveSavePrechecks;
+    }
+
+    /**
+     * The sources a save into the target would refuse anyway, from the target store's precheck
+     * ({@see AgentDriveSavePrecheck}); empty when the store has none.
+     *
+     * @param AgentDrivePath[] $sourcePaths
+     */
+    public function findSaveRefusals(
+        AgentToolCallProvenance $callProvenance,
+        array $sourcePaths,
+        AgentDriveMount $targetMount,
+        string $targetFolderPath
+    ): AgentDriveSaveRefusals {
+        foreach ($this->agentDriveSavePrechecks as $agentDriveSavePrecheck) {
+            if ($agentDriveSavePrecheck->getStoreName() === $targetMount->storeName) {
+                return $agentDriveSavePrecheck->findSaveRefusals($callProvenance, $sourcePaths, $targetMount, $targetFolderPath);
+            }
+        }
+        return new AgentDriveSaveRefusals();
     }
 
     /** True when at least one drive store with spaces is installed (the adapter of the file sources mounts nothing) */

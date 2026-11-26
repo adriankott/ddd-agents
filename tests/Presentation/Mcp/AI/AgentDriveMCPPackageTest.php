@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DDD\Tests\Agents\Presentation\Mcp\AI;
 
 use DDD\Domain\AI\Entities\Conversations\Agent\AgentToolCallProvenance;
+use DDD\Domain\AI\Entities\Conversations\Agent\Decisions\OwnerConsent\OwnerConsentRequest;
 use DDD\Domain\AI\Entities\Drives\AgentDriveMount;
 use DDD\Domain\AI\Entities\MCPPackages\MCPPackageDocumentation;
 use DDD\Domain\AI\Services\Conversations\Agent\OwnerConsentsService;
@@ -20,6 +21,7 @@ use DDD\Domain\AI\Entities\Conversations\Widgets\DriveFilesConversationWidget;
 use DDD\Domain\AI\Services\Conversations\AIConversationMessagesService;
 use DDD\Presentation\Mcp\Client\Agents\Dtos\AgentDriveFilesListRequestDto;
 use DDD\Tests\Agents\Domain\AI\Services\Drives\Fixtures\InMemoryAgentDriveStore;
+use DDD\Tests\Agents\Domain\AI\Services\Drives\Fixtures\RefusingAgentDriveSavePrecheck;
 use DDD\Tests\Agents\Support\UnitTestCase;
 
 /** The drive tools: schema, listing without download, the mounts, and the write modes of saveDriveFile */
@@ -135,5 +137,45 @@ class AgentDriveMCPPackageTest extends UnitTestCase
         } catch (ForbiddenException) {
         }
         self::assertSame([], $this->inMemoryAgentDriveStore->savedLines);
+    }
+
+    public function testASourceTheStoreRefusesAnywayIsNeverPutToTheOwner(): void
+    {
+        $this->inMemoryAgentDriveStore->libraryMode = AgentDriveMount::MODE_READ_WRITE;
+        $this->inMemoryAgentDriveStore->libraryIsOutwardVisible = true;
+        $refusingAgentDriveSavePrecheck = new RefusingAgentDriveSavePrecheck();
+        $refusingAgentDriveSavePrecheck->reasonsBySourceArgument = ['reports/Plan.md' => 'a person\'s own file stays where it is'];
+        $this->agentDriveStoresService->setAgentDriveSavePrechecks([$refusingAgentDriveSavePrecheck]);
+        $ownerConsentsService = $this->createMock(OwnerConsentsService::class);
+        $ownerConsentsService->expects(self::never())->method('requireOwnerConsentForStep');
+        $saveRequestDto = new AgentDriveFileSaveRequestDto();
+        $saveRequestDto->paths = ['reports/Plan.md'];
+        $saveRequestDto->to = 'drivespaces/library/Plans';
+
+        $saveResponse = (new AgentDriveMCPPackage())->saveDriveFile($saveRequestDto, $this->agentDriveStoresService, $ownerConsentsService, AgentToolCallProvenance::forEvalHarness(null));
+
+        self::assertSame(['reports/Plan.md: a person\'s own file stays where it is'], $saveResponse->refusedLines);
+        self::assertSame('Nothing was copied.', $saveResponse->note);
+        self::assertSame([], $this->inMemoryAgentDriveStore->savedLines);
+    }
+
+    public function testTheConsentNamesOnlyTheSourcesThatCanBeCopied(): void
+    {
+        $this->inMemoryAgentDriveStore->libraryMode = AgentDriveMount::MODE_READ_WRITE;
+        $this->inMemoryAgentDriveStore->libraryIsOutwardVisible = true;
+        $this->inMemoryAgentDriveStore->referencesByPath['reports/Notes.md'] = 'drive/notes';
+        $refusingAgentDriveSavePrecheck = new RefusingAgentDriveSavePrecheck();
+        $refusingAgentDriveSavePrecheck->reasonsBySourceArgument = ['reports/Notes.md' => 'kept out by the flow rule'];
+        $this->agentDriveStoresService->setAgentDriveSavePrechecks([$refusingAgentDriveSavePrecheck]);
+        $ownerConsentsService = $this->createMock(OwnerConsentsService::class);
+        $ownerConsentsService->expects(self::once())->method('requireOwnerConsentForStep')
+            ->with(self::anything(), self::callback(static fn (OwnerConsentRequest $request): bool => !str_contains($request->targetLine, 'Notes.md') && str_contains($request->targetLine, 'Plan.md')))
+            ->willThrowException(new ForbiddenException('not confirmed'));
+        $saveRequestDto = new AgentDriveFileSaveRequestDto();
+        $saveRequestDto->paths = ['reports/Plan.md', 'reports/Notes.md'];
+        $saveRequestDto->to = 'drivespaces/library/Plans';
+
+        $this->expectException(ForbiddenException::class);
+        (new AgentDriveMCPPackage())->saveDriveFile($saveRequestDto, $this->agentDriveStoresService, $ownerConsentsService, AgentToolCallProvenance::forEvalHarness(null));
     }
 }

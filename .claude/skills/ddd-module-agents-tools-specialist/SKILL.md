@@ -142,7 +142,11 @@ A file store module (e.g. a cloud drive) implements `DDD\Domain\AI\Services\Driv
 `agent.drive` tools (`listDriveFiles`, `saveDriveFile`, `showDriveFiles`, `viewImages`) and the file card `DriveFiles` reach it
 through `AgentDriveStoresService`, which also resolves file arguments (a path of the own drive, `drivespaces/<name>/…`,
 `drive/<id>`). The store answers under the caller's rights, hands out facts only (no content URL; at most `AgentDriveFile::$openLink`, the host screen showing the
-file, set through `setOpenLinkIfSafe()`) and copies on the server; the tool checks the mount's mode and asks the owner for a `WRITE_WITH_CONSENT` mount.
+file, set through `setOpenLinkIfSafe()`) and copies on the server; the tool checks the mount's mode and asks the owner for a `WRITE_WITH_CONSENT` mount. A store may
+add `DDD\Domain\AI\Services\Drives\AgentDriveSavePrecheck` (tag `ai.agent_drive_save_precheck`, same store name): before
+the consent question `saveDriveFile` asks it for the sources the save would refuse anyway (not readable, kept out by
+the flow rule; `AgentDriveSaveRefusals`) — those are refused lines and never put to the owner, and the consent names
+only the rest.
 
 File sources: every `DDD\Domain\Common\Services\Files\FileSource` of the application (Core port, tag
 `ddd.file_source`: a media library, the attachments of a ticket) is reachable by its reference `<source>/<id>`
