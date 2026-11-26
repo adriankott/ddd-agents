@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DDD\Domain\AI\Repo\Argus\Conversations;
 
+use DDD\Domain\Base\Entities\Entity;
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationMessage;
 use DDD\Domain\AI\Entities\Models\AIModel;
@@ -347,5 +348,14 @@ class ArgusAIConversation extends AIConversation
         $reply->generationDurationInSeconds = $reply->getChangeHistory()->createdTime->getTimestamp() - $this->aiGenerationStartTime->getTimestamp();
         $reply->message = $cleaned;
         $this->messages->add($reply);
+    }
+
+    /**
+     * The conversation itself is the record of its model calls, for the usage record (a cost ledger files the call
+     * under this conversation). None before the conversation is stored.
+     */
+    protected function getSubjectEntityForUsageRecording(): ?Entity
+    {
+        return isset($this->id) ? $this : null;
     }
 }

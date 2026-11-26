@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DDD\Domain\AI\Repo\Argus\Conversations;
 
+use DDD\Domain\Base\Entities\Entity;
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Entities\Conversations\Compaction\AIConversationCompactionSummary;
 use DDD\Domain\AI\Entities\Models\Selection\ModelScope;
@@ -113,5 +114,14 @@ class ArgusAIConversationCompaction extends AIConversationCompactionSummary
             return;
         }
         $this->summaryText = trim($resultText);
+    }
+
+    /**
+     * The conversation this compaction is made for, for the usage record (a cost ledger files the call under it).
+     */
+    protected function getSubjectEntityForUsageRecording(): ?Entity
+    {
+        $conversation = $this->getParent();
+        return $conversation instanceof AIConversation && isset($conversation->id) ? $conversation : null;
     }
 }

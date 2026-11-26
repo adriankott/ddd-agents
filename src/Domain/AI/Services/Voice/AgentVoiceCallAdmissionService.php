@@ -238,7 +238,10 @@ class AgentVoiceCallAdmissionService extends Service
             return null;
         }
 
-        return $this->buildSessionModelCall($billedAccount, $this->findBilledEntity(null, $conversation), $agentVoiceCall->voiceProvider);
+        $sessionModelCall = $this->buildSessionModelCall($billedAccount, $this->findBilledEntity(null, $conversation), $agentVoiceCall->voiceProvider);
+        // the call itself is the record its seconds are booked for (a cost ledger files them under the voice call)
+        $sessionModelCall->subjectEntity = $agentVoiceCall;
+        return $sessionModelCall;
     }
 
     /**

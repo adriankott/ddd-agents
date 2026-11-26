@@ -521,6 +521,14 @@ class AgentVoiceCallAdmissionServiceTest extends AgentVoiceIntegrationTestCase
         static::assertSame([30], $this->agentSpacesService->askedConversationIds);
     }
 
+    public function testTheModelCallOfARunningCallNamesTheVoiceCallAsItsSubject(): void
+    {
+        $agentVoiceCall = $this->buildRunningCall(5, null);
+
+        static::assertSame($agentVoiceCall, $this->admissionService->buildSessionModelCallOfRunningCall($agentVoiceCall)->subjectEntity);
+        static::assertNull($this->admissionService->buildSessionModelCall($this->buildAccount(5), null)->subjectEntity, 'a start check names no subject');
+    }
+
     public function testTheModelCallOfARunningCallFallsBackToTheCallsAccount(): void
     {
         static::assertSame(5, $this->admissionService->buildSessionModelCallOfRunningCall($this->buildRunningCall(5, null))->accountBilledForAICosts->id);

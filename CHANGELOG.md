@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.6.13
+
+**The usage record names the conversation or voice call a cost was made for.** No web change; npm
+`@mgamadeus/ddd-agents` 0.6.13 in lockstep. Requires `mgamadeus/ddd-ai` ^3.9.0 (the AI cost ledger).
+
+- **New: the subject of a model call for the usage record** (`AIModelCall::$subjectEntity` of ddd-ai 3.9.0). The
+  conversation's own calls, its compactions and its summaries name the conversation
+  (`getSubjectEntityForUsageRecording()` of `ArgusAIConversation`, `ArgusAIConversationCompaction`,
+  `ArgusAIConversationSummary`; none before the conversation is stored); the session seconds of a voice call name the
+  call (`AgentVoiceCallAdmissionService::buildSessionModelCallOfRunningCall()`). Only a cost ledger reads it
+  (`AI.usageLog.enabled` of ddd-ai, default off); the gate and the budget never do. An application with a ledger of
+  its own reads it in its recorder.
+- Tests: the session model call of a running voice call names the call, a start check names none.
+
 ## 0.6.12
 
 **Voice: GPT-Live 1.1 is the default voice model.** npm `@mgamadeus/ddd-agents` 0.6.12 in lockstep. Requires

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DDD\Domain\AI\Repo\Argus\Conversations;
 
+use DDD\Domain\Base\Entities\Entity;
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Entities\Conversations\AIConversationSummary;
 use DDD\Domain\AI\Entities\Conversations\Compaction\AIConversationCompactionNodes;
@@ -167,5 +168,14 @@ class ArgusAIConversationSummary extends AIConversationSummary
                 ? max(1, min(5, (int)$resultObject->importance))
                 : null;
         }
+    }
+
+    /**
+     * The conversation this summary is made for, for the usage record (a cost ledger files the call under it).
+     */
+    protected function getSubjectEntityForUsageRecording(): ?Entity
+    {
+        $conversation = $this->getParent();
+        return $conversation instanceof AIConversation && isset($conversation->id) ? $conversation : null;
     }
 }
