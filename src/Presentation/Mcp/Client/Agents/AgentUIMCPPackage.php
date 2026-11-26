@@ -93,6 +93,15 @@ class AgentUIMCPPackage extends MCPPackage
 
     public const string NOT_OPENED = 'Not opened: %s';
 
+    /**
+     * @var string The line of an opened screen with a filter value its filter does not take (the client left it out and
+     * names the filter and its values): the client's text, so it stays inside the untrusted mark
+     */
+    public const string FILTERS_NOT_SET = 'Filter not set: %s';
+
+    /** @var string The server's closing line of such an answer */
+    public const string FILTERS_NOT_SET_NOTE = 'A filter value its filter does not take was left out (named above). The screen is open without it; say so, or set a value the filter takes.';
+
     public const string NOT_DONE = 'Not done: %s';
 
     public const string MISSING_TARGET = 'Not opened: target is missing. Take a key from listScreens.';
@@ -110,6 +119,7 @@ class AgentUIMCPPackage extends MCPPackage
         'MISSING_PARAMETER' => 'the screen needs a record id. Pass recordId.',
         'UNKNOWN_TAB' => 'the screen has no such tab. listScreens names its tabs.',
         'UNKNOWN_FILTER' => 'the screen has no such filter. listScreens names its filters.',
+        'UNKNOWN_FILTER_VALUE' => 'the filter does not take this value. Its values follow.',
         'NOT_ON_SCREEN' => 'none of the references is on the screen. Read the screen again with getCurrentScreen and take its references.',
         'EXPIRED_BEFORE_START' => 'the client received the request too late. Nothing was done.',
         'READ_FAILED' => 'the client could not read the screen. Answer from the data tools.',
@@ -301,18 +311,32 @@ class AgentUIMCPPackage extends MCPPackage
             return static::buildUnansweredResponse($answer, static::OPEN_WAIT_SECONDS, true);
         }
         static::countOpenedScreenOfUserTurn($agentToolCallProvenance);
+        return static::buildOpenedResponse($answer, $target);
+    }
+
+    /**
+     * The result of an opened screen: everything the client wrote (the title, which can be a record name, the route,
+     * a filter value it left out, the screen text) stays inside the untrusted mark; the lines around it are the
+     * server's own.
+     */
+    public static function buildOpenedResponse(AgentClientToolAnswer $answer, string $target): AgentUIToolResponseDto
+    {
         $responseDto = new AgentUIToolResponseDto();
         $responseDto->outcome = $answer->outcome;
         $title = (string)($answer->getDetailValue('title') ?? $target);
         $route = (string)($answer->getDetailValue('route') ?? '');
-        $titleLine = sprintf(static::OPENED, $title, $route);
+        $openedLines = sprintf(static::OPENED, $title, $route);
+        $filtersNotSet = trim((string)($answer->getDetailValue('filtersNotSet') ?? ''));
+        if ($filtersNotSet !== '') {
+            $openedLines .= "\n" . sprintf(static::FILTERS_NOT_SET, $filtersNotSet);
+            $responseDto->closingLines[] = static::FILTERS_NOT_SET_NOTE;
+        }
         if (trim((string)$answer->text) === '') {
-            // the title can be a record name: it stays inside the untrusted mark
-            $responseDto->screenText = $titleLine;
+            $responseDto->screenText = $openedLines;
             return $responseDto;
         }
         $responseDto->lines[] = sprintf(static::SCREEN_FRAME, '');
-        $responseDto->screenText = $titleLine . "\n" . $answer->text;
+        $responseDto->screenText = $openedLines . "\n" . $answer->text;
         return $responseDto;
     }
 

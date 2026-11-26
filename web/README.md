@@ -117,6 +117,15 @@ const uiClient = useAgentUIClient({
 });
 ```
 
+- **Filter values**: a `ScreenTargetFilter` may say what its value is: `values` (the stored values of an enumeration
+  or a sort), `multiple` (a comma list of them), `hint` (`date YYYY-MM-DD`, `id`) and `tabs` (the tabs of a record
+  screen whose list the filter belongs to; `screenTargetFiltersOfTab(target, tab)`). `listScreens` names them when the
+  search is narrowed to at most `MAX_TARGETS_WITH_FILTER_VALUES` screens, and always for the screen whose key is the
+  search text (`formatScreenTargetFilterValues`); a catalogue too long for full lines lists every screen in a short
+  line (`formatScreenTargetShortLine`) instead of leaving screens out; an
+  opened screen leaves out a value its filter does not take and says so (`details.filtersNotSet`); `setFilters`
+  refuses one with `UNKNOWN_FILTER_VALUE`. A navigator that answers `currentTarget()` returns the target with the
+  filters of the open tab only, and `describeFilters` names their values in the read.
 - **Screen actions** (`actOnScreen`, off on the server unless `AI.agentUI.screenActionRequests`): with the `actions`
   adapter the agent can sort a table, open a row, switch a tab and press a button, and with a navigator that answers
   `currentTarget()` and `applyFilters(target, filters)` set the URL filters the open screen's target declares.

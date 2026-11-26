@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, it } from "vitest";
 
 import { ClientToolRequestRunner, MAX_SCREEN_CHARS } from "./ClientToolRequestRunner";
+import { formatScreenTargetList, MAX_TARGET_LIST_CHARS } from "./client-tools";
 import type { ClientToolAnswer, ScreenAdapters, ScreenNavigationBlocker, ScreenTarget } from "./client-tools";
 
 const ORDER_TARGET: ScreenTarget = {
@@ -262,6 +263,23 @@ describe('ClientToolRequestRunner: actOnScreen', () => {
     assert.deepEqual(applied, ['orders {"customerId":"3"}', 'orders {"customerId":""}']);
   });
 
+  it('refuses a filter value the open screen\'s filter does not take, and names its values', async () => {
+    const { adapters, applied } = withActions();
+    const valued: ScreenTarget = { ...ORDERS_TARGET, filters: [{ key: 'status', values: ['OPEN', 'SOLVED'] }] };
+    adapters.navigator.currentTarget = () => valued;
+    const runner = new ClientToolRequestRunner(adapters);
+
+    const refused = await runner.run(delivery('ACT_ON_SCREEN', { action: 'setFilters', filters: ['status=DONE'] }));
+    const taken = await runner.run(delivery('ACT_ON_SCREEN', { action: 'setFilters', filters: ['status=SOLVED'] }));
+    const cleared = await runner.run(delivery('ACT_ON_SCREEN', { action: 'setFilters', filters: ['status='] }));
+
+    assert.equal(refused.outcome, 'UNKNOWN_FILTER_VALUE');
+    assert.equal(refused.text, 'Not a value of this filter: status=DONE (status one of OPEN|SOLVED).');
+    assert.equal(taken.outcome, 'OK');
+    assert.equal(cleared.outcome, 'OK');
+    assert.deepEqual(applied, ['orders {"status":"SOLVED"}', 'orders {"status":""}']);
+  });
+
   it('refuses setFilters on a screen without filters, with unsaved changes, and without a navigator that can', async () => {
     const withoutFilters = withActions();
     withoutFilters.adapters.navigator.currentTarget = () => ORDER_TARGET;
@@ -311,5 +329,90 @@ describe('MAX_SCREEN_CHARS', () => {
     const dtoFile = resolve(dirname(fileURLToPath(import.meta.url)), '../../../src/Presentation/Mcp/Client/Agents/Dtos/AgentUIToolResponseDto.php');
     const serverCut = Number(/MAX_CONTENT_CHARS = (\d+);/.exec(readFileSync(dtoFile, 'utf8'))?.[1]);
     assert.equal(MAX_SCREEN_CHARS, serverCut);
+  });
+
+  it('names the values of the filters in a narrowed list and only the keys in the whole catalogue', async () => {
+    const valued: ScreenTarget = {
+      ...ORDERS_TARGET,
+      filters: [
+        { key: 'customerId', hint: 'id' },
+        { key: 'status', values: ['OPEN', 'SOLVED'], multiple: true },
+        { key: 'sort', values: ['id:asc', 'id:desc'] },
+      ],
+    };
+    const others: ScreenTarget[] = [1, 2, 3, 4].map(index => ({ ...ORDERS_TARGET, key: `other${index}`, label: `Other ${index}`, routePattern: `/other${index}`, filters: [] }));
+    const created = createAdapters();
+    created.adapters.targets = { listTargets: () => [valued, ...others] };
+    const runner = new ClientToolRequestRunner(created.adapters);
+    const narrowed = await runner.run(delivery('LIST_TARGETS', { searchText: 'orders' }));
+    assert.match(narrowed.text, /- orders · .*filters customerId, status, sort\n {2}filter values: customerId id · status one or more of OPEN\|SOLVED, comma-separated · sort one of id, each with :asc or :desc/);
+    const whole = await runner.run(delivery('LIST_TARGETS', {}));
+    assert.doesNotMatch(whole.text, /filter values:/);
+    assert.match(whole.text, /Filter values of a screen: listScreens with its key as searchText\./);
+  });
+
+  it('names the filter values of the screen whose key is the search text, first, however many screens match', () => {
+    const valued: ScreenTarget = { ...ORDERS_TARGET, key: 'order', label: 'Order', filters: [{ key: 'status', values: ['OPEN', 'SOLVED'] }] };
+    const others: ScreenTarget[] = [1, 2, 3, 4, 5].map(index => ({ ...ORDERS_TARGET, key: `order-list${index}`, label: `Order list ${index}`, filters: [{ key: 'state', values: ['A', 'B'] }] }));
+    const lines = formatScreenTargetList([...others, valued], 'order').split('\n');
+    assert.match(lines[0] ?? '', /^Screens this user can open \(6\)\./);
+    assert.match(lines[1] ?? '', /^- order · Order · /);
+    assert.equal(lines[2], '  filter values: status one of OPEN|SOLVED');
+    assert.equal(lines.filter(line => line.startsWith('  filter values:')).length, 1, 'the other five name their keys only');
+    assert.equal(lines.filter(line => line.startsWith('- order-list')).length, 5);
+  });
+
+  it('lists every screen of a catalogue too long for full lines in a short line', () => {
+    const tabs = ['details', 'items', 'invoices', 'shipments', 'returns', 'notes'];
+    const filters = ['customerId', 'status', 'createdFrom', 'createdTo', 'country', 'channel', 'sort'].map(key => ({ key }));
+    const many: ScreenTarget[] = Array.from({ length: 60 }, (_, index) => ({ ...ORDER_TARGET, key: `area${index}`, label: `Area ${index}`, tabs, filters }));
+    const whole = formatScreenTargetList(many, '');
+    assert.ok(whole.length <= MAX_TARGET_LIST_CHARS);
+    assert.doesNotMatch(whole, /more; narrow with searchText/, 'no screen is left out');
+    assert.match(whole, /Short lines, the list is long\. Tabs, filters and filter values of a screen: listScreens with its key as searchText\./);
+    assert.match(whole, /\n- area59 · Area 59 \(orderId\) · 6 tabs · filters$/);
+    const one = formatScreenTargetList(many, 'area7');
+    assert.match(one, /^Screens this user can open \(1\)\. Pass the key to openScreen\.\n- area7 · Sales › Area 7 \(orderId\) · tabs details, items, invoices, shipments, returns, notes · filters customerId, status, createdFrom, createdTo, country, channel, sort$/);
+    const tooMany = formatScreenTargetList(Array.from({ length: 400 }, (_, index) => ({ ...ORDER_TARGET, key: `area${index}`, label: `Area ${index}`, tabs, filters })), '');
+    assert.match(tooMany, /… \d+ more; narrow with searchText\.$/, 'short lines are capped as well');
+  });
+
+  it('opens a screen without a filter value its filter does not take, and names it', async () => {
+    const valued: ScreenTarget = { ...ORDERS_TARGET, filters: [{ key: 'status', values: ['OPEN', 'SOLVED'], multiple: true }, { key: 'customerId' }] };
+    const created = createAdapters();
+    created.adapters.targets = { listTargets: () => [valued] };
+    const runner = new ClientToolRequestRunner(created.adapters);
+    const answer = await runner.run(delivery('OPEN_TARGET', { target: 'orders', filters: ['status=OPEN,DONE', 'customerId=3'] }));
+    assert.equal(answer.outcome, 'OK');
+    assert.deepEqual(created.opened, ['orders   {"customerId":"3"}']);
+    assert.equal(answer.details.filtersNotSet, 'status=OPEN,DONE (status one or more of OPEN|SOLVED, comma-separated)');
+    const fine = await runner.run(delivery('OPEN_TARGET', { target: 'orders', filters: ['status=OPEN,SOLVED'] }));
+    assert.equal(fine.details.filtersNotSet, undefined);
+    assert.deepEqual(created.opened[1], 'orders   {"status":"OPEN,SOLVED"}');
+  });
+
+  it('takes a filter of a tab with that tab only and names the filters of each tab in a narrowed list', async () => {
+    const record: ScreenTarget = {
+      ...ORDER_TARGET,
+      filters: [
+        { key: 'status', values: ['OPEN', 'SOLVED'], tabs: ['items'] },
+        { key: 'sort', values: ['id:asc', 'id:desc'], tabs: ['items'] },
+        { key: 'sort', values: ['name:asc'], tabs: ['details'] },
+      ],
+    };
+    const created = createAdapters();
+    created.adapters.targets = { listTargets: () => [record] };
+    const runner = new ClientToolRequestRunner(created.adapters);
+
+    const listed = await runner.run(delivery('LIST_TARGETS', { searchText: 'order' }));
+    assert.match(listed.text, /tabs with filters items, details\n {2}filters of tab items: status one of OPEN\|SOLVED · sort one of id, each with :asc or :desc\n {2}filters of tab details: sort one of name:asc/);
+
+    const onTab = await runner.run(delivery('OPEN_TARGET', { target: 'order', recordId: 7, tab: 'items', filters: ['status=OPEN', 'sort=id:desc'] }));
+    assert.equal(onTab.outcome, 'OK');
+    assert.deepEqual(created.opened, ['order 7 items {"status":"OPEN","sort":"id:desc"}']);
+    const otherTab = await runner.run(delivery('OPEN_TARGET', { target: 'order', recordId: 7, tab: 'details', filters: ['status=OPEN'] }));
+    assert.equal(otherTab.outcome, 'UNKNOWN_FILTER');
+    const noTab = await runner.run(delivery('OPEN_TARGET', { target: 'order', recordId: 7, filters: ['status=OPEN'] }));
+    assert.equal(noTab.outcome, 'UNKNOWN_FILTER');
   });
 });

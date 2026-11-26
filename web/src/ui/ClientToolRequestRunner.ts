@@ -4,7 +4,10 @@ import {
   type ClientToolAnswer,
   type ClientToolRequestDelivery,
   capAnswerText,
+  describeUnknownScreenFilterValue,
+  findUnknownScreenFilterValue,
   formatScreenTargetList,
+  screenTargetFiltersOfTab,
   isClientToolToken,
   MAX_ANSWER_TEXT_CHARS,
   MIN_SECONDS_LEFT_TO_START,
@@ -202,12 +205,23 @@ export class ClientToolRequestRunner {
     const tab = isClientToolToken(parameters.tab) ? parameters.tab : null;
     if (tab !== null && !target.tabs.includes(tab)) return refusal(CLIENT_TOOL_OUTCOMES.unknownTab);
     const filters: Record<string, string> = {};
+    // a value its filter does not take is left out and named in the answer: the screen opens without that filter,
+    // never with a list that is silently empty
+    const filtersNotSet: string[] = [];
+    // a filter of a tab is taken with that tab only
+    const filtersOfTab = screenTargetFiltersOfTab(target, tab);
     for (const filter of Array.isArray(parameters.filters) ? parameters.filters : []) {
       const [key, ...valueParts] = String(filter).split('=');
-      if (!target.filters.some(targetFilter => targetFilter.key === key) || valueParts.length === 0) {
+      const targetFilter = filtersOfTab.find(candidate => candidate.key === key);
+      if (!targetFilter || valueParts.length === 0) {
         return refusal(CLIENT_TOOL_OUTCOMES.unknownFilter);
       }
-      filters[key] = valueParts.join('=');
+      const value = valueParts.join('=');
+      if (findUnknownScreenFilterValue(targetFilter, value) !== null) {
+        filtersNotSet.push(describeUnknownScreenFilterValue(targetFilter, value));
+        continue;
+      }
+      filters[key] = value;
     }
     const recordIds = typeof parameters.recordId === 'number' ? [parameters.recordId] : [];
     if (buildTargetRoute(target, recordIds, tab) === null) return refusal(CLIENT_TOOL_OUTCOMES.missingParameter);
@@ -221,7 +235,8 @@ export class ClientToolRequestRunner {
       // a guide is decoration: the navigation goes on without it
     }
     const location = await this.adapters.navigator.open(target, openRequest);
-    const details = { route: location.route, title: location.title };
+    const details: Record<string, string | number | boolean | null> = { route: location.route, title: location.title };
+    if (filtersNotSet.length > 0) details.filtersNotSet = filtersNotSet.join('; ');
     if (parameters.includeScreen !== true) return { outcome: CLIENT_TOOL_OUTCOMES.ok, text: '', details };
     const snapshot = this.adapters.reader.read({ maxChars: MAX_SCREEN_CHARS });
     return { outcome: CLIENT_TOOL_OUTCOMES.ok, text: snapshot.markdown, details };
@@ -261,10 +276,15 @@ export class ClientToolRequestRunner {
     const filters: Record<string, string> = {};
     for (const entry of entries) {
       const [key, ...valueParts] = String(entry).split('=');
-      if (!target.filters.some(targetFilter => targetFilter.key === key) || valueParts.length === 0) {
+      const targetFilter = target.filters.find(candidate => candidate.key === key);
+      if (!targetFilter || valueParts.length === 0) {
         return { outcome: CLIENT_TOOL_OUTCOMES.unknownFilter, text: `Filters of this screen: ${target.filters.map(filter => filter.key).join(', ')}.`, details: {} };
       }
-      filters[key] = valueParts.join('=').slice(0, MAX_FILTER_VALUE_CHARS);
+      const value = valueParts.join('=').slice(0, MAX_FILTER_VALUE_CHARS);
+      if (findUnknownScreenFilterValue(targetFilter, value) !== null) {
+        return { outcome: CLIENT_TOOL_OUTCOMES.unknownFilterValue, text: `Not a value of this filter: ${describeUnknownScreenFilterValue(targetFilter, value)}.`, details: {} };
+      }
+      filters[key] = value;
     }
     const blocker = navigator.describeBlockers();
     if (blocker) return { outcome: blocker.outcome, text: blocker.reason, details: {} };

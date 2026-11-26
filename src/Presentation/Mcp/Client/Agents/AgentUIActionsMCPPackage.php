@@ -114,6 +114,17 @@ class AgentUIActionsMCPPackage extends MCPPackage
         'NO_EFFECT' => 'the screen did not change. Read it again with getCurrentScreen before you try anything else.',
     ];
 
+    /**
+     * @var string[] The next move per action when the screen does not declare the element of an action that only
+     * navigates: `openScreen` opens the same record or tab without it (a list or a tab bar the application built
+     * without the declaring components)
+     */
+    public const array NOT_DECLARED_NAVIGATION_REFUSALS = [
+        self::ACTION_OPEN_ROW => 'the screen does not offer this row to you. Open its record with openScreen instead (the record\'s target from listScreens and the row\'s record id). Do not try another reference for it.',
+        self::ACTION_SWITCH_TAB => 'the screen does not offer this tab to you. Open the tab with openScreen instead (the open screen\'s target, its record id and the tab). Do not try another reference for it.',
+        self::ACTION_SORT => 'the screen does not offer this column to you for sorting. If its Filters line names a filter sort, set that with setFilters; otherwise tell the user. Do not try another reference for it.',
+    ];
+
     /** Offered only while the host switched on the typed actions */
     public static function isAvailable(): bool
     {
@@ -157,7 +168,7 @@ class AgentUIActionsMCPPackage extends MCPPackage
         }
         $answer = AgentUIMCPPackage::sendClientToolRequest($agentClientToolRequestsService, $agentToolCallProvenance, AgentClientToolRequest::TYPE_ACT_ON_SCREEN, $arguments, static::ACT_WAIT_SECONDS);
         if ($answer->kind === AgentClientToolAnswer::KIND_REFUSED) {
-            return static::buildRefusedResponse($answer);
+            return static::buildRefusedResponse($answer, (string)$requestDto->action);
         }
         if ($answer->kind !== AgentClientToolAnswer::KIND_ANSWERED) {
             return AgentUIMCPPackage::buildUnansweredResponse($answer, static::ACT_WAIT_SECONDS, true);
@@ -231,20 +242,26 @@ class AgentUIActionsMCPPackage extends MCPPackage
     }
 
     /** The result of an action the client refused: the sentence of its code, and what the client said about it (labels: untrusted) */
-    public static function buildRefusedResponse(AgentClientToolAnswer $answer): AgentUIToolResponseDto
+    public static function buildRefusedResponse(AgentClientToolAnswer $answer, ?string $action = null): AgentUIToolResponseDto
     {
         $responseDto = new AgentUIToolResponseDto();
         $responseDto->outcome = $answer->outcome;
-        $responseDto->lines[] = sprintf(AgentUIMCPPackage::NOT_DONE, static::describeRefusal((string)$answer->outcome));
+        $responseDto->lines[] = sprintf(AgentUIMCPPackage::NOT_DONE, static::describeRefusal((string)$answer->outcome, $action));
         if (trim((string)$answer->text) !== '') {
             $responseDto->screenText = $answer->text;
         }
         return $responseDto;
     }
 
-    /** @return string The sentence and next move of a refusal code of an action */
-    public static function describeRefusal(string $outcome): string
+    /**
+     * @return string The sentence and next move of a refusal code of an action; an element the screen does not declare
+     * for an action that only navigates points at `openScreen` ({@see self::NOT_DECLARED_NAVIGATION_REFUSALS})
+     */
+    public static function describeRefusal(string $outcome, ?string $action = null): string
     {
+        if ($outcome === 'NOT_DECLARED' && $action !== null && isset(static::NOT_DECLARED_NAVIGATION_REFUSALS[$action])) {
+            return static::NOT_DECLARED_NAVIGATION_REFUSALS[$action];
+        }
         return static::ACTION_REFUSALS[$outcome] ?? AgentUIMCPPackage::describeRefusal($outcome);
     }
 

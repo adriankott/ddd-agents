@@ -1,7 +1,52 @@
 import { useRef } from "react";
 import type { AgentUIStateSource } from "./agent-ui-state";
 import { AgentUIClient } from "./AgentUIClient";
-import type { ScreenAdapters } from "./client-tools";
+import type { ScreenAdapters, ScreenTarget } from "./client-tools";
+
+/**
+ * Adapters that always answer from the newest set an application passed (`readAdapters`): the runner keeps one object
+ * while the application may build a new one on every render. The optional adapters, and the navigator's optional
+ * methods of the screen actions (`currentTarget`, `applyFilters`), are present exactly when the newest set has them,
+ * so the runner's "this client cannot do that" answers stay true.
+ */
+export const createLatestScreenAdapters = (readAdapters: () => ScreenAdapters): ScreenAdapters => {
+  const latestAdapters: ScreenAdapters = {
+    targets: { listTargets: () => readAdapters().targets.listTargets() },
+    navigator: {
+      describeBlockers: () => readAdapters().navigator.describeBlockers(),
+      open: (target, request) => readAdapters().navigator.open(target, request),
+      currentLocation: () => readAdapters().navigator.currentLocation(),
+    },
+    reader: { read: options => readAdapters().reader.read(options) },
+    highlighter: {
+      mark: (references, note) => readAdapters().highlighter.mark(references, note),
+      clear: () => readAdapters().highlighter.clear(),
+    },
+    isVisible: () => readAdapters().isVisible(),
+  };
+  Object.defineProperties(latestAdapters.navigator, {
+    currentTarget: {
+      enumerable: true,
+      get: () => (readAdapters().navigator.currentTarget ? () => readAdapters().navigator.currentTarget?.() ?? null : undefined),
+    },
+    applyFilters: {
+      enumerable: true,
+      get: () => {
+        const applyFilters = readAdapters().navigator.applyFilters;
+        if (!applyFilters) return undefined;
+        return (target: ScreenTarget, filters: Record<string, string>) => readAdapters().navigator.applyFilters?.(target, filters);
+      },
+    },
+  });
+  Object.defineProperties(latestAdapters, {
+    picture: { enumerable: true, get: () => readAdapters().picture },
+    agentWindow: { enumerable: true, get: () => readAdapters().agentWindow },
+    pathGuide: { enumerable: true, get: () => readAdapters().pathGuide },
+    actions: { enumerable: true, get: () => readAdapters().actions },
+    requestHandlers: { enumerable: true, get: () => readAdapters().requestHandlers },
+  });
+  return latestAdapters;
+};
 
 /**
  * One `AgentUIClient` per mount of the agent window: a stable client id and the runner of the delivered requests. The
@@ -15,27 +60,7 @@ export const useAgentUIClient = (adapters: ScreenAdapters, uiStateSource: AgentU
   uiStateSourceRef.current = uiStateSource;
   const clientRef = useRef<AgentUIClient | null>(null);
   if (clientRef.current === null) {
-    const latestAdapters: ScreenAdapters = {
-      targets: { listTargets: () => adaptersRef.current.targets.listTargets() },
-      navigator: {
-        describeBlockers: () => adaptersRef.current.navigator.describeBlockers(),
-        open: (target, request) => adaptersRef.current.navigator.open(target, request),
-        currentLocation: () => adaptersRef.current.navigator.currentLocation(),
-      },
-      reader: { read: options => adaptersRef.current.reader.read(options) },
-      highlighter: {
-        mark: (references, note) => adaptersRef.current.highlighter.mark(references, note),
-        clear: () => adaptersRef.current.highlighter.clear(),
-      },
-      isVisible: () => adaptersRef.current.isVisible(),
-    };
-    // the optional adapters: present on the object when the latest render has them
-    Object.defineProperties(latestAdapters, {
-      picture: { enumerable: true, get: () => adaptersRef.current.picture },
-      agentWindow: { enumerable: true, get: () => adaptersRef.current.agentWindow },
-      pathGuide: { enumerable: true, get: () => adaptersRef.current.pathGuide },
-      requestHandlers: { enumerable: true, get: () => adaptersRef.current.requestHandlers },
-    });
+    const latestAdapters = createLatestScreenAdapters(() => adaptersRef.current);
     clientRef.current = new AgentUIClient(latestAdapters, { readUIState: () => uiStateSourceRef.current?.readUIState() ?? null });
   }
   return clientRef.current;

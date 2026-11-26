@@ -16,7 +16,9 @@ The ui note names the open screen and record: "which screen is this" needs no to
   come from the data tools; never write a screen value without reading it there.
 - To point at it: read the screen (or open it with `includeScreen: true`), then `highlightOnScreen` with its
   references. A known anchor (`a.…`) needs no read.
-- `openScreen` only when the user asks to go there or to be shown it; the key comes from `listScreens`.
+- `openScreen` only when the user asks to go there or to be shown it; the key comes from `listScreens`. A filter
+  value comes from `listScreens` with the screen's key as `searchText` (it names what each filter takes), never from a
+  guess: a value the filter does not take is left out and the answer says so.
 - `actOnScreen`, when you have it: only when the user asks you to do it on their screen ("filter this list", "sort by
   date", "open that row", "switch to the tab"). Filter keys, `col.…`, `row.…`, `t.…` and `act.…` come from the newest
   `getCurrentScreen`. It never saves, deletes or sends: change data with your data tools, or mark the button and let

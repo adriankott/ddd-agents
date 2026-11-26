@@ -98,6 +98,23 @@ class AgentUIActionsMCPPackageTest extends UnitTestCase
         self::assertStringContainsString('unsaved changes', AgentUIActionsMCPPackage::describeRefusal('UNSAVED_CHANGES'), 'the other codes read as for openScreen');
     }
 
+    public function testAnUndeclaredRowTabOrColumnPointsAtOpenScreenAndAButtonAtTheUser(): void
+    {
+        $answer = AgentClientToolAnswer::ofKind(AgentClientToolAnswer::KIND_REFUSED);
+        $answer->outcome = 'NOT_DECLARED';
+        $answer->text = 'row.4711 "Order 4711"';
+
+        $rowResponse = AgentUIActionsMCPPackage::buildRefusedResponse($answer, AgentUIActionsMCPPackage::ACTION_OPEN_ROW);
+
+        self::assertStringContainsString('Open its record with openScreen', $rowResponse->lines[0]);
+        self::assertSame('row.4711 "Order 4711"', $rowResponse->screenText, 'the label stays inside the untrusted mark');
+        self::assertStringContainsString('Open the tab with openScreen', AgentUIActionsMCPPackage::describeRefusal('NOT_DECLARED', AgentUIActionsMCPPackage::ACTION_SWITCH_TAB));
+        self::assertStringContainsString('filter sort', AgentUIActionsMCPPackage::describeRefusal('NOT_DECLARED', AgentUIActionsMCPPackage::ACTION_SORT));
+        self::assertStringContainsString('highlightOnScreen', AgentUIActionsMCPPackage::describeRefusal('NOT_DECLARED', AgentUIActionsMCPPackage::ACTION_PRESS));
+        self::assertSame(AgentUIActionsMCPPackage::describeRefusal('NOT_DECLARED'), AgentUIActionsMCPPackage::describeRefusal('NOT_DECLARED', AgentUIActionsMCPPackage::ACTION_PRESS));
+        self::assertStringContainsString('disabled', AgentUIActionsMCPPackage::describeRefusal('DISABLED', AgentUIActionsMCPPackage::ACTION_OPEN_ROW), 'every other code reads the same for every action');
+    }
+
     /** @param string[]|null $filters */
     protected static function buildRequest(string $action, ?string $reference = null, ?array $filters = null, ?string $direction = null, ?bool $includeScreen = null): ActOnScreenRequestDto
     {

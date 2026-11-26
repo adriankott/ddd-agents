@@ -30,7 +30,9 @@ use DDD\Infrastructure\Services\Service;
  * Refused in the `prod` environment ({@see isScriptedClientAllowed()}). A fixture is one JSON object: `markdown` (the
  * screen as `getCurrentScreen` reads it), `route`, `title`, `unsavedChanges`, `dialogOpen`, `references` (reference =>
  * label), `screensByTarget` (`<target>[.<tab>]` => fixture name); the fixture `catalog` holds `lines` (the
- * `listScreens` lines) and `targetKeys`. For `actOnScreen`: `filters` (the filter keys the screen declares), `actions`
+ * `listScreens` lines), `targetKeys` and optionally `filterValues` (target key => what its filters take, e.g.
+ * `status one of OPEN|SOLVED · sort one of id:asc|id:desc`: named below the target's line in a narrowed list, as the
+ * real client does). For `actOnScreen`: `filters` (the filter keys the screen declares), `actions`
  * (reference => `sort`, `open`, `tab`, `press` or `press:write`: what the element declares; a reference of
  * `references` without an entry declares nothing) and `screensByAction` (`<action> <reference>`, or `setFilters` =>
  * the fixture the screen becomes).
@@ -160,6 +162,9 @@ class AgentScriptedUIClientService extends Service
         return ['OK', (string)($screen['markdown'] ?? ''), $this->buildDetails($screen), 'read ' . $screen['name'], null];
     }
 
+    /** @var int The most matching targets a listScreens answer names the filter values of (the web client's `MAX_TARGETS_WITH_FILTER_VALUES`) */
+    public const int MAX_TARGETS_WITH_FILTER_VALUES = 4;
+
     /**
      * @return mixed[] outcome, text, details, log line, next screen
      * @throws BadRequestException
@@ -182,9 +187,34 @@ class AgentScriptedUIClientService extends Service
                 $lines[] = (string)$line;
             }
         }
+        // as the real client: a narrowed answer names the values of the filters (the fixture's `filterValues`, per
+        // target key), and so does the screen whose key is the search text (it comes first); the whole catalogue
+        // names their keys only and says how to get the values
+        $filterValuesByTargetKey = (array)($catalog['filterValues'] ?? []);
+        $header = 'Screens this user can open (' . count($lines) . '). Pass the key to openScreen.';
+        $isNarrowed = count($lines) <= static::MAX_TARGETS_WITH_FILTER_VALUES;
+        $searchedKey = count($searchWords) === 1 ? $searchWords[0] : null;
+        $searchedKeyLines = [];
+        $otherLines = [];
+        foreach ($lines as $line) {
+            $targetKey = preg_match('/^- (\S+)/', $line, $keyMatch) === 1 ? $keyMatch[1] : '';
+            $isSearchedKey = $searchedKey !== null && mb_strtolower($targetKey) === $searchedKey;
+            if (($isNarrowed || $isSearchedKey) && isset($filterValuesByTargetKey[$targetKey])) {
+                $line .= "\n  filter values: " . $filterValuesByTargetKey[$targetKey];
+            }
+            if ($isSearchedKey) {
+                $searchedKeyLines[] = $line;
+                continue;
+            }
+            $otherLines[] = $line;
+        }
+        $lines = [...$searchedKeyLines, ...$otherLines];
+        if ($filterValuesByTargetKey !== [] && !$isNarrowed) {
+            $header .= ' Filter values of a screen: listScreens with its key as searchText.';
+        }
         $text = $lines === []
             ? 'No screen matches. Call listScreens without searchText for all of them.'
-            : 'Screens this user can open (' . count($lines) . '). Pass the key to openScreen.' . "\n" . implode("\n", $lines);
+            : $header . "\n" . implode("\n", $lines);
         return ['OK', $text, ['targets' => count($lines)], 'listed ' . ($searchWords === [] ? 'all' : implode(' ', $searchWords)), null];
     }
 

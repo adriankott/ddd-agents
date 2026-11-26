@@ -73,6 +73,31 @@ class AgentUIMCPPackageNavigationCapTest extends UnitTestCase
         self::assertStringNotContainsString($agentScreenPicture->base64Data, (string)json_encode($responseDto->toObject()), 'never in the text or the structured result');
     }
 
+    public function testAnOpenedScreenKeepsTheClientsLeftOutFilterValueInsideTheUntrustedMark(): void
+    {
+        $answer = AgentClientToolAnswer::ofKind(AgentClientToolAnswer::KIND_ANSWERED);
+        $answer->outcome = 'OK';
+        $answer->text = '';
+        $answer->detailsJson = (string)json_encode([
+            'title' => 'Orders',
+            'route' => '/orders',
+            'filtersNotSet' => 'status=DONE (status one of OPEN|SOLVED)',
+        ]);
+
+        $response = AgentUIMCPPackage::buildOpenedResponse($answer, 'orders');
+
+        self::assertSame(sprintf(AgentUIMCPPackage::OPENED, 'Orders', '/orders') . "\nFilter not set: status=DONE (status one of OPEN|SOLVED)", $response->screenText);
+        self::assertTrue($response->contentIsUntrusted, 'what the client wrote is never the server\'s own line');
+        self::assertSame([AgentUIMCPPackage::FILTERS_NOT_SET_NOTE], $response->closingLines);
+        self::assertStringNotContainsString('DONE', implode("\n", [...$response->lines, ...$response->closingLines]));
+
+        $answer->detailsJson = (string)json_encode(['title' => 'Orders', 'route' => '/orders']);
+        $plainResponse = AgentUIMCPPackage::buildOpenedResponse($answer, 'orders');
+
+        self::assertSame([], $plainResponse->closingLines);
+        self::assertSame(sprintf(AgentUIMCPPackage::OPENED, 'Orders', '/orders'), $plainResponse->screenText);
+    }
+
     protected static function buildMessage(int $index, string $messageType, ?string $toolName = null, ?string $toolCallId = null, string $status = AIConversationMessage::STATUS_COMPLETED): AIConversationMessage
     {
         $conversationMessage = new AIConversationMessage();

@@ -85,7 +85,7 @@
             "isLoadable": true,
             "decisionCriteria": "#6ef0bf6a3875 (186 characters)",
             "description": "#3c28ad3e3177 (456 characters)",
-            "instruction": "#a901a599a14f (1179 characters)",
+            "instruction": "#1b167ad548ff (1385 characters)",
             "name": "Agent.UI",
             "requiredAccountRights": [
                 "useUI"

@@ -19,7 +19,7 @@ shared cache of the realtime channel (`AI.agentRealtimeChannel.sharedCacheGroup`
 | Request types | open: the package's `READ_SCREEN`, `LIST_TARGETS`, `OPEN_TARGET`, `HIGHLIGHT`, `SET_WINDOW_MODE` (off unless `AI.agentUI.windowModeRequests`), `ACT_ON_SCREEN` (off unless `AI.agentUI.screenActionRequests`); a package or host adds its own through the tagged `AgentClientToolRequestTypeProvider`. A switched-off or unknown type answers `NOT_ENABLED` | `AgentUIClientToolRequestTypeProviderService` |
 | Tools | `getCurrentScreen` (`format` text or picture, `pictureSize` small/medium/large, `renderMode` colour/greyscale/machine), `listScreens`, `openScreen` (at most `AI.agentUI.maxOpenScreenPerUserTurn` per message of the user, default 1), `highlightOnScreen`, `setAgentWindowMode` (only with the view mode requests on), `actOnScreen` (only with the screen actions on; below): effect READ, never reused within a turn, never parallel, the client's text wrapped as untrusted | `AgentUIMCPPackage`, `AgentUIWindowMCPPackage`, `AgentUIActionsMCPPackage`, skill `Agent/UI.md` |
 | Screen picture | untrusted client bytes: base64 of at most 600 KB, the type from the magic bytes (WebP, JPEG, PNG), the size from Core's pinned `RasterImageDecoder`, at most 4 MP; it rides as an image part of the result (`MCPToolResponseImageProvider`) and the tool picture store keeps it. The result states the fixed limits (`PICTURE_LIMITATIONS`) | `AgentClientToolRequestsService::checkScreenPicture()`, `AgentScreenPicture` |
-| Evaluations | `AgentScriptedUIClientService` answers the requests of an evaluation account from fixtures in the folder `AI/Evals/Agent/Screens` below a config root (`setScreen()`, `readLog()` from the host's harness tools) into the same cache keys; never in `APP_ENV=prod`. For `ACT_ON_SCREEN` a fixture declares `filters` (the filter keys of the screen), `actions` (reference => `sort`, `open`, `tab`, `press`, or press:write for a button declared with a writing effect) and `screensByAction` (`"setFilters"` or `"<action> <reference>"` => the fixture shown afterwards); the log reads `set filters status=OPEN`, `sorted col.created desc`, `opened row row.10669`, `switched tab t.crashes`, `pressed act.load-more`, `refused press b.2: not declared` | |
+| Evaluations | `AgentScriptedUIClientService` answers the requests of an evaluation account from fixtures in the folder `AI/Evals/Agent/Screens` below a config root (`setScreen()`, `readLog()` from the host's harness tools) into the same cache keys; never in `APP_ENV=prod`. For `ACT_ON_SCREEN` a fixture declares `filters` (the filter keys of the screen), `actions` (reference => `sort`, `open`, `tab`, `press`, or press:write for a button declared with a writing effect) and `screensByAction` (`"setFilters"` or `"<action> <reference>"` => the fixture shown afterwards); the log reads `set filters status=OPEN`, `sorted col.created desc`, `opened row row.10669`, `switched tab t.crashes`, `pressed act.load-more`, `refused press b.2: not declared`. The fixture `catalog` may hold `filterValues` (target key => what its filters take): a `listScreens` answer narrowed to at most 4 screens names them below the screen's line, as the real client does | |
 
 The host provides:
 
@@ -93,11 +93,28 @@ One tool, a closed list of typed actions; the model never writes a selector and 
 - **Untrusted.** The client's sentence (labels of the screen) and the route after the action stay inside the
   untrusted block of the result, as for `openScreen`.
 - Refusal codes of the client: `ACTIONS_UNAVAILABLE` (no `actions` adapter, or a navigator without
-  `applyFilters`), `UNKNOWN_ACTION`, `NO_FILTERS`, `UNKNOWN_FILTER` (with the screen's filter keys), `NOT_ON_SCREEN`,
+  `applyFilters`), `UNKNOWN_ACTION`, `NO_FILTERS`, `UNKNOWN_FILTER` (with the screen's filter keys),
+  `UNKNOWN_FILTER_VALUE` (a value the filter does not take, with its values), `NOT_ON_SCREEN`,
   `NOT_DECLARED`, `WRITE_ACTION`, `DISABLED`, `NO_EFFECT` (a sort control that never showed the direction), plus the
   blockers above; sentences in `AgentUIActionsMCPPackage::ACTION_REFUSALS`.
 - A host that keeps the UI tools to staff repeats its gate in a same-path subclass of `AgentUIActionsMCPPackage`, as
   for the other two packages.
+
+#### Filter values
+
+A client's screen target may say what each filter takes (`ScreenTargetFilter`: `values`, `multiple`, `hint`, and
+`tabs` for the list of one tab of a record screen). The model then learns the values from the application, not from a
+skill text:
+
+- `listScreens` narrowed to at most 4 screens adds `filter values: …` and `filters of tab <tab>: …` below a screen's
+  line, and always below the screen whose key is the search text (it comes first); the whole catalogue names keys only
+  and says how to get the values. A catalogue too long for full lines (`MAX_TARGET_LIST_CHARS`) lists every screen in a
+  short line (`formatScreenTargetShortLine`) instead of leaving screens out.
+- The screen read's `Filters` line names the filters of the open tab with their values.
+- `openScreen` opens the screen without a value its filter does not take: the client's detail `filtersNotSet` rides
+  inside the untrusted mark as `Filter not set: …` (`AgentUIMCPPackage::FILTERS_NOT_SET`), the server closes with
+  `AgentUIMCPPackage::FILTERS_NOT_SET_NOTE` (`AgentUIMCPPackage::buildOpenedResponse()`); `actOnScreen` `setFilters`
+  refuses it with `UNKNOWN_FILTER_VALUE`.
 
 ### The realtime port
 

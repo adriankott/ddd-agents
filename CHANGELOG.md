@@ -77,6 +77,52 @@ the subject read on the client port).
   and to the entry-point start); the list route's checks; the routes only with their trait; the drive binds between
   the purpose stamp and the dispatch; the HTTP binding's body, query and answers.
 
+**Agent.UI: a screen filter names the values it takes.** Follow-up to the screen actions of 0.6.14, from the first host
+that declares every list and ran them in a real client. Part of 0.7.2.
+
+- **Fix: `useAgentUIClient` hands the screen actions to the runner.** Since 0.6.14 the hook's stable adapter object left
+  out `actions` and the navigator's `currentTarget` / `applyFilters`, so every `actOnScreen` of a client built with the
+  hook answered `ACTIONS_UNAVAILABLE` (the runner's own tests passed adapters directly). The object is now built by
+  `createLatestScreenAdapters`, covered by `_useAgentUIClient.spec.ts`: an optional adapter or method is present
+  exactly when the application's newest set has it.
+- **`ScreenTargetFilter` gains `values`, `multiple`, `hint` and `tabs`** (all optional; a filter with a key alone
+  behaves as before). `values`: the stored values of an enumeration or a sort; `multiple`: a comma list of them;
+  `hint`: what a free value is (`date YYYY-MM-DD`, `id`); `tabs`: the tabs of a record screen whose list the filter
+  belongs to (a filter declared for a tab replaces the one of every page with the same key).
+- **`listScreens`** keeps one line per screen with the filter keys of every page and `tabs with filters …`. When the
+  search is narrowed to at most `MAX_TARGETS_WITH_FILTER_VALUES` (4) screens, each line is followed by
+  `filter values: status one of OPEN|SOLVED · from date YYYY-MM-DD · sort one of id|created, each with :asc or :desc`
+  and one `filters of tab <tab>: …` line per tab; otherwise the header says how to get them. The screen whose key
+  is the search text always names its values and comes first, however many screens match (`account` also matches
+  `accounts` and every screen with a tab of that name).
+- **`listScreens` leaves no screen out of a long catalogue.** A catalogue whose full lines exceed
+  `MAX_TARGET_LIST_CHARS` (4500) used to end with `… N more; narrow with searchText.`: a host with 67 screens
+  lost 18 of them from the whole list. Such an answer now lists every screen in a short line
+  (`formatScreenTargetShortLine`: key, label, record parameter, `6 tabs`, `filters`, `views`) and says so in its
+  header; tabs, filter keys and values come with the screen's key as search text. Short lines are capped as before.
+- **`openScreen`** takes a filter of a tab with that tab only (`UNKNOWN_FILTER` otherwise) and opens the screen
+  without a value its filter does not take: the answer's detail `filtersNotSet` names the filter and its values. The
+  tool result carries it as `Filter not set: …` inside the untrusted mark (the client wrote it) and closes with the
+  server's own `AgentUIMCPPackage::FILTERS_NOT_SET_NOTE`; the result of an opened screen is built by
+  `AgentUIMCPPackage::buildOpenedResponse()`. The screen never opens with a list that is silently empty.
+- **`actOnScreen` `setFilters`** refuses such a value with the new outcome `UNKNOWN_FILTER_VALUE` and the filter's
+  values (`AgentUIMCPPackage::REFUSALS`).
+- **`actOnScreen`: an undeclared row, tab or column points at `openScreen`.** The refusal `NOT_DECLARED` read "mark the
+  element and let the user press it" for every action, so on a list or a tab bar an application built without the
+  declaring components the model marked the row instead of opening it (measured: 0 of 3 and 1 of 3 runs opened the
+  screen). `openRow`, `switchTab` and `sort` now get their own next move
+  (`AgentUIActionsMCPPackage::NOT_DECLARED_NAVIGATION_REFUSALS`: `openScreen` with the record id or the tab, the
+  filter `sort`); a button keeps the old sentence. `describeRefusal()` and `buildRefusedResponse()` take the action.
+- **Client helpers (`./ui`)**: `screenTargetFiltersOfTab`, `describeScreenTargetFilter`,
+  `describeScreenFilterValues`, `formatScreenTargetFilterValues`, `findUnknownScreenFilterValue`,
+  `describeUnknownScreenFilterValue`, `isDescribedScreenTargetFilter`, `formatScreenTargetShortLine`,
+  `MAX_DESCRIBED_FILTER_VALUES`.
+- **Evaluations**: the fixture `catalog` takes `filterValues` (target key => what its filters take);
+  `AgentScriptedUIClientService` names them in a narrowed `listScreens` answer, and for the screen whose key is the
+  search text, as the real client does (`MAX_TARGETS_WITH_FILTER_VALUES`).
+- **Skill `Agent.UI`**: a filter value comes from the `Filters` line or from `listScreens` narrowed to the screen.
+
+
 ## 0.7.1
 
 **Voice: samples for a voice picker.** npm `@mgamadeus/ddd-agents` 0.7.1 in lockstep. No table change.
