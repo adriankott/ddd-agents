@@ -11,6 +11,7 @@ use DDD\Domain\AI\Entities\Conversations\Entitlements\AgentAccountRights;
 use DDD\Domain\AI\Entities\MCPPackages\MCPPackage;
 use DDD\Domain\AI\Entities\MCPPackages\MCPRequiresAccountRights;
 use DDD\Domain\AI\Entities\MCPPackages\MCPTool;
+use DDD\Domain\AI\Entities\MCPPackages\MCPToolAlwaysLoad;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolEffect;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolParallelSafe;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolShowsNoActivityLine;
@@ -45,6 +46,7 @@ use DDD\Domain\AI\Entities\MCPPackages\MCPToolReturnsTrustedContent;
  */
 #[MCPToolReturnsTrustedContent('the agent\'s own memory rows as the platform stores them')]
 #[MCPRequiresAccountRights(AgentAccountRights::USE_AGENT_MEMORY)]
+#[MCPToolAlwaysLoad('the memory tools are small and central to a conversation')]
 class AgentMemoriesMCPPackage extends MCPPackage
 {
     public static ?string $name = 'agent.memory';

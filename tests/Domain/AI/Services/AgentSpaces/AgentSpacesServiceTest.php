@@ -86,6 +86,11 @@ class AgentSpacesServiceTest extends UnitTestCase
         self::assertNull($agentSpacesService->findProductOperatorNameOfConversation($conversation));
     }
 
+    public function testATextForTheModelNamesTheSpaceAsSpaceAndItsIdByDefault(): void
+    {
+        self::assertSame('space:8', (new AgentSpacesService())->buildAgentSpaceLabelForTheModel(8));
+    }
+
     public function testTheConfirmedLanguageOfAConversationWinsOverTheDefault(): void
     {
         $conversation = new AIConversation();

@@ -68,6 +68,7 @@ question to the space or answers "not known".
 | `findUnversionedPromptInputsOfConversation()` | none | the service: facts of the space another system writes, so the prompt cache key changes with them (asked on every turn, keep it cheap) |
 | `attachAgentSpaceRelations()` | nothing | the service: load the relations the space's facts read before a run |
 | `findDefaultModelNameOfConversation()`, `findProductNameOfConversation()`, `findProductOperatorNameOfConversation()`, `findPromptExtensionAliasOfConversation()` | the base model; none | the service |
+| `buildAgentSpaceLabelForTheModel($agentSpaceId)` | `space:<id>` | the service: how a text for the model names the space (today the scope of a memory line, `AgentMemory::toLlmMarkdown()`); answer the term and the id the application's tools take, asked once per line (keep it cheap) |
 | `isCrossConversationRecallEnabled()` | true | the service |
 | `findChannelConnectionState()` | null (unknown, never "connected") | the service |
 | `findWidgetSelfHydrationKeyOfConversation()` | `AgentSpace::getWidgetSelfHydrationKey()`: the space id | the space |

@@ -7,6 +7,7 @@ namespace DDD\Domain\AI\Services\Conversations\Memories;
 use DDD\Domain\AI\Entities\AgentSpaces\AgentSpace;
 use DDD\Domain\AI\Entities\Conversations\AIConversation;
 use DDD\Domain\AI\Entities\Conversations\Memories\AgentEmbeddingRepairTargets;
+use DDD\Domain\AI\Entities\Conversations\Memories\AgentMemories;
 use DDD\Domain\AI\Entities\Conversations\Memories\AgentMemory;
 use DDD\Domain\AI\Entities\Conversations\Memories\AgentMemoryHit;
 use DDD\Domain\AI\Entities\Conversations\Memories\AgentMemoryHits;
@@ -66,7 +67,7 @@ class AgentMemoriesService extends Service
             return null;
         }
         $currentDirectives = $this->getAgentMemoryStoreService()->findCurrentDirectivesForScope($accountId, $this->findAgentSpaceId($agentSpace));
-        $directivesBlock = $currentDirectives->toDirectivesBlock();
+        $directivesBlock = $currentDirectives->toDirectivesBlockUnderHeader($this->getDirectivesBlockHeader());
         if ($directivesBlock === '') {
             return null;
         }
@@ -74,6 +75,18 @@ class AgentMemoriesService extends Service
         $agentStandingDirectives->directivesBlock = $directivesBlock;
         $agentStandingDirectives->newestValidFrom = $currentDirectives->findNewestValidFromOfCurrentDirectives();
         return $agentStandingDirectives;
+    }
+
+    /**
+     * Override point: the header line of the standing-directives block the model reads (the block's leading separator
+     * and its lines stay {@see AgentMemories::toDirectivesBlock()}'s). An application with its own word for the owner
+     * answers its own line. The line is part of the cached prefix: keep it the same for every conversation.
+     *
+     * @return string
+     */
+    protected function getDirectivesBlockHeader(): string
+    {
+        return AgentMemories::DIRECTIVES_BLOCK_HEADER;
     }
 
     /**

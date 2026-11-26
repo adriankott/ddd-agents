@@ -102,7 +102,7 @@ database and makes no model call. It does not simulate the skill granularity.
 | Declaration | Effect |
 |---|---|
 | `#[MCPToolNoEviction]` on a tool method or package; `nonEvictable: true` in a skill file (`AISkill::$nonEvictable`) | the item is never unloaded, not even by the hard cap |
-| `#[MCPToolAlwaysLoad]` on a tool | the tool's schema enters on the skill load even when lazy; no eviction effect |
+| `#[MCPToolAlwaysLoad]` on a tool method or package (the package's memory tools carry it) | the tool's schema enters on the skill load even when lazy; no eviction effect |
 
 A pin is fixed overhead in every call of the conversation: keep pins few and small.
 

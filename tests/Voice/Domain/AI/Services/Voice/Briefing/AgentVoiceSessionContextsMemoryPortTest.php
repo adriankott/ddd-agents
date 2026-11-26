@@ -64,6 +64,19 @@ class AgentVoiceSessionContextsMemoryPortTest extends AgentVoiceIntegrationTestC
         static::assertSame([[42, null]], $this->briefingAgentMemoryStoreService->readScopes);
     }
 
+    public function testTheHeaderAnApplicationNamesOnThePortIsTheHeaderOfTheBriefingsBlock(): void
+    {
+        $this->replaceService(AgentMemoriesService::class, new OwnHeaderAgentMemoriesService());
+
+        $voiceSessionContext = (new FixedCallLanguageAgentVoiceSessionContextsService())->buildVoiceSessionContext(static::buildConversation(), new AgentVoiceCall());
+
+        static::assertSame(
+            "\n\n# Standing rules the shop owner set\n- Never call before nine.\n- Always confirm the date twice.\n- Use the first name.",
+            $voiceSessionContext->memoryDirectivesBlock
+        );
+        static::assertSame([[42, 9]], $this->briefingAgentMemoryStoreService->readScopes, 'the package\'s store is read');
+    }
+
     public function testABoundPortGivesTheBlockAndTheStoreIsNotRead(): void
     {
         // an application that replaced the port wholesale leaves the package's memory switch off

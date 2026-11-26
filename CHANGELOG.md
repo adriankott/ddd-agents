@@ -1,5 +1,44 @@
 # Changelog
 
+## 0.6.15
+
+**Memory: the model sees the application's name for a space, the memory tools load with their skill, the directives
+header is an override point.** No web change; npm `@mgamadeus/ddd-agents` 0.6.15 in lockstep.
+
+- **New: how a text for the model names a space** (`AgentSpacesService::buildAgentSpaceLabelForTheModel(int
+  $agentSpaceId): string`, default `space:<id>`). The memory line (`AgentMemory::toLlmMarkdown()`, through the new
+  protected `buildAgentSpaceLabel()`) asks it for a memory of a space, once per line; a memory of the account still
+  reads `account` and asks nothing. The lines reach the model in the results of all five memory tools
+  (`AgentMemoriesMcpResponseDto::toLlmMarkdown()`). An application that knows the space under its own term answers
+  its term and the id its tools take (`shop:4711`), so the memory line shows the id the model passes to the tools. The
+  base prompt's `{%AGENT_SPACE_ID%}` (`applyAgentSpacePromptParameters()`), the mandate line
+  (`AgentMandate::buildCoverageText()`), the curation's scope (`AgentMemoryCurationService::buildScopeLabel()`) and the
+  operator run lists keep their own override points and do not ask the new method.
+- **New: the header of the standing-directives block is an override point** (protected
+  `AgentMemoriesService::getDirectivesBlockHeader(): string`, default `AgentMemories::DIRECTIVES_BLOCK_HEADER`).
+  The service builds the block with the new `AgentMemories::toDirectivesBlockUnderHeader(string $header)`;
+  `toDirectivesBlock()` keeps its signature and the constant header. Only the header line changes, the leading
+  separator and the `- <directive>` lines stay. The chat's model input and the voice
+  briefing read the same block. The line is part of the cached prefix: answer the same line for every conversation.
+- **Changed, cost: the memory tools load with their skill** (`#[MCPToolAlwaysLoad]` on `AgentMemoriesMCPPackage`).
+  Under lazy tool loading (`loadToolsOnSkillLoad: false`, which acts only under `skillLoadingStrategy:
+  systemPromptSwap`) loading `Agent.Memory` now puts all five tool schemas into the model input at once instead of
+  one `load_tool` call per tool: 1,155 tokens (4,626 characters / 4, the package's estimate
+  `ToolDefinition::$residentSchemaTokens`; 1,125 by the GPT-3 tokenizer of `app:agent:skill-token-map`) in every call
+  while the skill is loaded and the tools are not evicted, 1,238 tokens in a conversation with a space (the schemas then
+  carry the note on the space argument). Per tool (chars / 4, without / with a space): `searchMemory` 269 / 297,
+  `listMemories` 212 / 239, `remember` 355 / 383, `updateMemory` 195 / 195, `forget` 124 / 124. The tools stay
+  evictable. No change under eager loading (the default) or under append-only loading (`conversationAppend`, the
+  package's default strategy, which always loads eagerly whatever the tool delivery), where a loaded skill brings all
+  its tools anyway; none while the memory store is off (`AI.agentMemory.enabled` false): the package is then not available
+  and the skill `Agent.Memory` is not offered.
+- Tests: the default label `space:<id>`; an application's label in the memory line, in the set's lines and in the
+  results of `listMemories` and `searchMemory`, and a memory of the account that asks nothing; every memory tool reports
+  always-load, a tool of another package does not, a lazy skill load provisions the memory tools and leaves other tools
+  to `load_tool`, and the memory package is the only bound package with the attribute on its class; the default
+  directives block pinned byte for byte, an application's header that changes only the header line in the chat and in
+  the voice briefing, and `toDirectivesBlock()` / `toDirectivesBlockUnderHeader()`.
+
 ## 0.6.14
 
 **Agent.UI: typed actions on the user's open screen (`actOnScreen`), off by default.** npm `@mgamadeus/ddd-agents` 0.6.14 in

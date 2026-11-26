@@ -36,7 +36,7 @@ class AgentMemories extends EntitySet implements LlmMarkdownRenderable
     /** @var int The longest directive injected; a longer one is cut */
     public const int MAX_DIRECTIVE_CHARS_IN_CONTEXT = 1000;
 
-    /** @var string The header of the standing-directives block the model reads */
+    /** @var string The header of the standing-directives block the model reads, unless the application names its own */
     public const string DIRECTIVES_BLOCK_HEADER = '# Standing instructions of the owner — always follow them';
 
     /**
@@ -80,6 +80,19 @@ class AgentMemories extends EntitySet implements LlmMarkdownRenderable
      */
     public function toDirectivesBlock(): string
     {
+        return $this->toDirectivesBlockUnderHeader(self::DIRECTIVES_BLOCK_HEADER);
+    }
+
+    /**
+     * {@see toDirectivesBlock()} under another header line: what
+     * {@see \DDD\Domain\AI\Services\Conversations\Memories\AgentMemoriesService::getDirectivesBlockHeader()}
+     * answers. A method of its own, so an application's override of toDirectivesBlock() keeps its signature.
+     *
+     * @param string $directivesBlockHeader the header line of the block
+     * @return string
+     */
+    public function toDirectivesBlockUnderHeader(string $directivesBlockHeader): string
+    {
         $directiveLines = [];
         foreach ($this->getCurrentlyValidDirectives()->getElements() as $directive) {
             $directiveContent = trim($directive->content);
@@ -97,7 +110,7 @@ class AgentMemories extends EntitySet implements LlmMarkdownRenderable
         if ($directiveLines === []) {
             return '';
         }
-        return "\n\n" . self::DIRECTIVES_BLOCK_HEADER . "\n" . implode("\n", $directiveLines);
+        return "\n\n" . $directivesBlockHeader . "\n" . implode("\n", $directiveLines);
     }
 
     public function toLlmMarkdown(): string

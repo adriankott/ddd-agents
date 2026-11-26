@@ -231,7 +231,7 @@ The default output is byte-identical with every switch at its default; `AgentMod
 
 | Need | Hook |
 |---|---|
-| Standing directives | `AgentMemoriesService::findStandingDirectivesForAgentSpace()` ([memories-and-standing-directives.md](memories-and-standing-directives.md)) |
+| Standing directives | `AgentMemoriesService::findStandingDirectivesForAgentSpace()`; with the memory store only the header line: `getDirectivesBlockHeader()` ([memories-and-standing-directives.md](memories-and-standing-directives.md)) |
 | Day context, local situation | `AgentSituationalContextService::composeDayContextTextForNewConversation()`, `composeLocalSituationText()` |
 | How their segments are introduced; a part repeated at the tail | a same-path subclass of `AgentModelInput`: `getDayContextSegmentLead()`, `getLocalSituationSegmentLead()`, `getLocalSituationTailHint()` |
 | What the owner's client shows (route, record, tab) | `AgentClientContextService` same-path subclass: `describeRecordOfClientContext()`, `getClientContextKeyLabel()`, `buildClientContextTailText()` (section 4, "The client context") |

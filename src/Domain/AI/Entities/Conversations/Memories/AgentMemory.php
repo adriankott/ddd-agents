@@ -9,6 +9,7 @@ use DDD\Domain\AI\Entities\Conversations\Agent\AgentClock;
 use DDD\Domain\AI\Entities\Conversations\Agent\AgentToolCallProvenance;
 use DDD\Domain\AI\Entities\Texts\Embeddings\TextEmbedding;
 use DDD\Domain\AI\Repo\DB\Conversations\Memories\DBAgentMemory;
+use DDD\Domain\AI\Services\AgentSpaces\AgentSpacesService;
 use DDD\Domain\AI\Services\Conversations\Memories\AgentMemoryStoreService;
 use DDD\Domain\Base\Entities\ChangeHistory\ChangeHistoryTrait;
 use DDD\Domain\Base\Entities\Entity;
@@ -23,6 +24,7 @@ use DDD\Domain\Base\Repo\DB\Database\DatabaseVirtualColumn;
 use DDD\Domain\Common\Entities\Accounts\Account;
 use DDD\Domain\Common\Entities\MathEntities\Vector;
 use DDD\Infrastructure\Base\DateTime\DateTime;
+use DDD\Infrastructure\Services\DDDService;
 use DDD\Infrastructure\Traits\Serializer\Attributes\HideProperty;
 use DDD\Infrastructure\Validation\Constraints\Choice;
 use DateTimeZone;
@@ -328,10 +330,23 @@ class AgentMemory extends Entity implements LlmMarkdownRenderable
     public function toLlmMarkdown(): string
     {
         $idLabel = isset($this->id) ? '#' . $this->id : '#?';
-        $scope = $this->isAgentSpaceBound() ? 'space:' . $this->agentSpaceId : 'account';
+        $scope = $this->isAgentSpaceBound() ? $this->buildAgentSpaceLabel() : 'account';
         $ageDescription = $this->getValidFromAgeDescription();
         $meta = $this->source . ($ageDescription !== null ? '; ' . $ageDescription : '');
         return sprintf('- %s [%s/%s] "%s" (%s)', $idLabel, $this->memoryType, $scope, $this->content, $meta);
+    }
+
+    /**
+     * How the line names the space of a space-bound memory: the application's label of the space
+     * ({@see AgentSpacesService::buildAgentSpaceLabelForTheModel()}, default `space:<id>`).
+     *
+     * @return string
+     */
+    protected function buildAgentSpaceLabel(): string
+    {
+        /** @var AgentSpacesService $agentSpacesService */
+        $agentSpacesService = DDDService::instance()->getService(AgentSpacesService::class);
+        return $agentSpacesService->buildAgentSpaceLabelForTheModel((int)$this->agentSpaceId);
     }
 
     /**

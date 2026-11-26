@@ -768,6 +768,23 @@ class AgentSpacesService extends EntitiesService
     }
 
     /**
+     * Override point: how a text for the model names the space `$agentSpaceId` — the scope of a memory line
+     * ({@see \DDD\Domain\AI\Entities\Conversations\Memories\AgentMemory::toLlmMarkdown()}). An application that
+     * knows the space under its own term and its own id answers with those (the id its tools take). The other texts
+     * that carry the id of a space keep their own override points: the id in the base prompt
+     * ({@see applyAgentSpacePromptParameters()}), the coverage of a mandate line, the scope sentence of the memory
+     * curation, the space column of the operator run lists. Asked once per line: answer from what is loaded, or from
+     * one indexed read the entity registry keeps. The default: `space:<id>`.
+     *
+     * @param int $agentSpaceId the id of the space
+     * @return string
+     */
+    public function buildAgentSpaceLabelForTheModel(int $agentSpaceId): string
+    {
+        return 'space:' . $agentSpaceId;
+    }
+
+    /**
      * The key the widget blocks of `$conversation` hydrate themselves from
      * ({@see AgentSpace::getWidgetSelfHydrationKey()}).
      *

@@ -45,6 +45,13 @@ searched on demand.
 - `AgentStandingDirectives::$directivesBlock` is appended as the MEMORY_DIRECTIVES segment exactly as returned, after
   the time rule and the owner presence, before the episodic history: the block carries its own leading separator and
   header.
+- With the memory store the block is `AgentMemories::toDirectivesBlock()`: `"\n\n"`, the header line, then one
+  `- <directive>` line each. The header line is an override point of the port: the protected
+  `AgentMemoriesService::getDirectivesBlockHeader()` answers `AgentMemories::DIRECTIVES_BLOCK_HEADER`
+  (`# Standing instructions of the owner — always follow them`); a same-path subclass with its own word for the owner
+  answers its own line, and only that line changes. The voice briefing reads the same block. The line sits in the
+  cached prefix: answer the same line for every conversation. A host that overrides
+  `findStandingDirectivesForAgentSpace()` itself writes its own header and never reaches this method.
 - `AIConversation::findMemoryDirectivesBlock()` memoizes the block on the conversation object under a key of account,
   space and the number of completed calls of the tools declaring `MCPToolWritesAgentMemoryOnly`. **Trap:** a host
   memory tool without the attribute never refreshes the block within one conversation object; its change reaches the
@@ -142,7 +149,19 @@ costs are booked under `AI.MEMORY.EXTRACT.CANDIDATES` and `AI.MEMORY.RECONCILE.D
 **Tools** (`AgentMemoriesMCPPackage`, id `agent.memory`, skill `Agent.Memory`, bound in the package's default
 `skillPackages.php`): `listMemories`, `searchMemory`, `remember`, `updateMemory`, `forget`. The account is the one the
 call acts for; the space defaults to the conversation's. The three writes declare `MCPToolWritesAgentMemoryOnly`, so a
-new directive reaches the running conversation. While the store is off the package reports itself unavailable
+new directive reaches the running conversation. The package class carries `MCPToolAlwaysLoad`: the five tools load
+with the skill `Agent.Memory` also when a conversation loads tools lazily (`loadToolsOnSkillLoad: false`), and stay
+evictable. Under eager loading (the default) and under append-only loading a skill brings all its tools anyway, so the
+attribute changes nothing there; under lazy loading the five schemas cost about 1,155 tokens (chars / 4 of their
+wire schemas, as `ToolDefinition::$residentSchemaTokens` counts; about 1,240 in a conversation with a space, whose
+schemas carry the note on the space argument) in every call while the skill is loaded.
+
+Every tool answers with memory lines (`AgentMemoriesMcpResponseDto::toLlmMarkdown()` → `AgentMemory::toLlmMarkdown()`):
+`- #<id> [<type>/<scope>] "<content>" (<source>; <age>)`. The scope is `account` for a memory of the account; for a
+memory of a space it is what `AgentSpacesService::buildAgentSpaceLabelForTheModel($agentSpaceId)` answers (default
+`space:<id>`), asked once per line. An application that knows the space under its own term and id answers those (the
+id its tools take). The directives block, the curation's neighbour lines and the memory hits of the search carry no
+space. While the store is off the package reports itself unavailable
 (`MCPPackage::isAvailable()`): the binding leaves it out, the skill disappears, and a direct call is refused. A host
 whose `skillPackages.php` replaces the package's file lists `AISkill::AGENT_MEMORY => [AgentMemoriesMCPPackage::class]` itself.
 

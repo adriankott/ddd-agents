@@ -52,6 +52,16 @@ class AgentMemoriesDirectivesBlockTest extends UnitTestCase
         self::assertNull($agentMemories->findNewestValidFromOfCurrentDirectives());
     }
 
+    public function testWithoutAHeaderTheBlockReadsThePackagesHeaderAndAGivenHeaderReplacesIt(): void
+    {
+        $agentMemories = AgentMemories::newInstance();
+        $builtMemory = $this->buildMemory(1, 'answer briefly', AgentMemory::MEMORY_TYPE_DIRECTIVE, '2026-01-01');
+        $agentMemories->add($builtMemory);
+
+        self::assertSame("\n\n# Standing instructions of the owner — always follow them\n- answer briefly", $agentMemories->toDirectivesBlock());
+        self::assertSame("\n\n# Rules of the shop owner\n- answer briefly", $agentMemories->toDirectivesBlockUnderHeader('# Rules of the shop owner'));
+    }
+
     protected function buildMemory(int $id, string $content, string $memoryType, string $validFromDay): AgentMemory
     {
         $agentMemory = AgentMemory::buildStated($content, $memoryType, null);
