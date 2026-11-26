@@ -173,6 +173,16 @@ those cases.
 `decideDialogue()` is the decision alone over a built dialogue, without the site gate or the event: what a host's
 replay command uses to test the question on recorded conversations (it must open a usage envelope itself).
 
+## Covered by a mandate
+
+`MCPToolRequiresOwnerConfirmation(coveredByMandateActionClass: …)` lets a STANDING mandate (TIME_WINDOW or UNLIMITED)
+of that class cover the step: `reserveOwnerConsentForStep()` looks it up live before any question and answers
+`OUTCOME_COVERED_BY_MANDATE` (the write runs; nothing to mark used or release). The host's hook
+`decideMandateCoverage()` narrows it per call (not applicable → the consent step as usual) or refuses a case (nothing
+runs, the host's reason as the model's text). A ONE_INSTRUCTION mandate never covers. The turn event records
+`decidedBy` `mandate` / `mandate:refused` with the mandate's id and class. The rules, the hook and unattended runs:
+`ddd-module-agents-autonomy-specialist` › mandates, "Covered consent steps".
+
 ## The use record
 
 One owner row authorises **one** successful execution of one tool. The state lives in the conversation's working

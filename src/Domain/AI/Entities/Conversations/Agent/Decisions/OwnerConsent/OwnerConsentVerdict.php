@@ -20,6 +20,10 @@ class OwnerConsentVerdict extends ValueObject
     public const string DECIDED_BY_DECISION_MODEL = 'jev';
     public const string DECIDED_BY_SHADOW = 'shadow';
     public const string DECIDED_BY_UNGATED = 'ungated';
+    public const string DECIDED_BY_MANDATE = 'mandate';
+
+    /** The decision stamp of a step the host refused under a standing mandate */
+    public const string STAMP_REFUSED_UNDER_MANDATE = 'mandate:refused';
 
     public const string FAILURE_SITE_OFF = 'siteOff';
     public const string FAILURE_NO_OWNER_ROW = 'noOwnerRow';
@@ -30,6 +34,8 @@ class OwnerConsentVerdict extends ValueObject
     public const string FAILURE_REFUSED = 'refused';
     public const string FAILURE_UNPARSABLE = 'unparsable';
     public const string FAILURE_ERROR = 'error';
+    /** A standing mandate covered the step and the host refused it for this call (unsure, a trigger): nothing runs */
+    public const string FAILURE_REFUSED_UNDER_MANDATE = 'refusedUnderMandate';
 
     /** @var string[] The failures that mean "the confirmation could not be checked" — not "the owner did not agree". */
     public const array UNCHECKABLE_FAILURES = [self::FAILURE_SITE_OFF, self::FAILURE_BREAKER, self::FAILURE_TRANSPORT, self::FAILURE_REFUSED, self::FAILURE_UNPARSABLE, self::FAILURE_ERROR];
@@ -52,6 +58,37 @@ class OwnerConsentVerdict extends ValueObject
 
     /** One of the DECIDED_BY_* constants, null when nothing decided (a failure). */
     public ?string $decidedBy = null;
+
+    /** The standing mandate that covered the step (DECIDED_BY_MANDATE) or under which the host refused it; null otherwise */
+    public ?int $coveringMandateId = null;
+
+    /** The action class of {@see $coveringMandateId} */
+    public ?string $coveringMandateActionClass = null;
+
+    /** The host's reason for the model when it refused the step under a mandate ({@see FAILURE_REFUSED_UNDER_MANDATE}) */
+    public ?string $refusalReasonUnderMandate = null;
+
+    /** The step runs under a standing mandate: no consent question was asked. */
+    public static function coveredByMandate(int $mandateId, string $actionClass): static
+    {
+        $verdict = new static();
+        $verdict->coveringMandateActionClass = $actionClass;
+        $verdict->consented = true;
+        $verdict->wouldConsent = true;
+        $verdict->decidedBy = self::DECIDED_BY_MANDATE;
+        $verdict->coveringMandateId = $mandateId;
+        return $verdict;
+    }
+
+    /** A standing mandate covered the step and the host refused it for this call: nothing runs, the model reads the reason. */
+    public static function refusedUnderMandate(int $mandateId, string $actionClass, string $refusalReason): static
+    {
+        $verdict = static::failed(self::FAILURE_REFUSED_UNDER_MANDATE);
+        $verdict->coveringMandateActionClass = $actionClass;
+        $verdict->coveringMandateId = $mandateId;
+        $verdict->refusalReasonUnderMandate = $refusalReason;
+        return $verdict;
+    }
 
     /** Passes without a check: no agent provenance (HTTP MCP, the harness's direct calls). */
     public static function ungated(): static
@@ -105,6 +142,7 @@ class OwnerConsentVerdict extends ValueObject
             self::FAILURE_TRANSPORT => AgentDecision::FALLBACK_TRANSPORT,
             self::FAILURE_UNPARSABLE => AgentDecision::FALLBACK_UNPARSABLE,
             self::FAILURE_ERROR => AgentDecision::FALLBACK_ERROR,
+            self::FAILURE_REFUSED_UNDER_MANDATE => self::STAMP_REFUSED_UNDER_MANDATE,
             default => null,
         };
     }
@@ -120,6 +158,10 @@ class OwnerConsentVerdict extends ValueObject
     {
         if ($this->consented) {
             return '';
+        }
+        if ($this->failure === self::FAILURE_REFUSED_UNDER_MANDATE) {
+            return 'NOT DONE — nothing was changed. ' . ($this->refusalReasonUnderMandate ?? 'This application does not take this step on its own here.')
+                . ' Do not retry this step in this run.';
         }
         if ($this->failure === self::FAILURE_DELEGATION_CHILD) {
             return 'NOT DONE — this step needs the owner\'s explicit confirmation, which only the main conversation can obtain. '

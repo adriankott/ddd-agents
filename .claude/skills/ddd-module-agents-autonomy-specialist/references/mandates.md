@@ -2,7 +2,7 @@
 
 **Reader:** host developer and package maintainer
 
-Contents: what a mandate is · the entity · declaring a gated tool · the gate chain · one instruction · unattended runs · the grant path · the tools · revocation · what a host provides · traps
+Contents: what a mandate is · the entity · declaring a gated tool · the gate chain · one instruction · covered consent steps · unattended runs · the grant path · the tools · revocation · what a host provides · traps
 
 ## What a mandate is
 
@@ -11,7 +11,9 @@ request of the owner, for a period, or until revoked. The package gates a tool b
 it decides nothing from the tool's effect. Owner consent for one irreversible step in an attended
 turn (the tool body calls `OwnerConsentsService`, which reads the owner's own words in the conversation) is a different
 gate, owned by the decisions-and-guards skill `ddd-module-agents-decisions-and-guards-specialist`. The two compose — a
-tool may need both — and a mandate never replaces a consent step.
+tool may need both. A mandate replaces a consent step only where the tool says so:
+`MCPToolRequiresOwnerConfirmation(coveredByMandateActionClass: …)` lets a STANDING mandate of that class cover the step
+(see [Covered consent steps](#covered-consent-steps)).
 
 ## The entity
 
@@ -104,6 +106,42 @@ The unit of a ONE_INSTRUCTION grant is **the owner's request, never the tool cal
   message that reaches the run's message set changes it, and the next gated call checks consent against it.
 - Before every gate lookup `findActiveMandateFor()` runs `markExpiredMandates()`: passed time windows become EXPIRED and
   one-instruction grants older than a day CONSUMED. A request that runs longer than a day loses its grant.
+
+## Covered consent steps
+
+A tool whose owner-consent step a standing permission may replace (a support reply the owner lets the agent send on its
+own) declares the class on its confirmation attribute:
+
+```php
+#[MCPTool, MCPToolRequiresOwnerConfirmation(coveredByMandateActionClass: AgentMandate::ACTION_SUPPORT_REPLY)]
+public function replyToSupportTicket(..., OwnerConsentsService $ownerConsentsService, AgentToolCallProvenance $callProvenance): ... {}
+```
+
+The tool body still calls `reserveOwnerConsentForStep()` / `requireOwnerConsentForStep()`. Before any consent question
+the service looks up a mandate of the class, live on every call (`findActiveMandateFor()` for the conversation's
+account and space, after the expiry):
+
+| Found | Result |
+|---|---|
+| an active TIME_WINDOW or UNLIMITED mandate, the host's hook answers covered | `OUTCOME_COVERED_BY_MANDATE`: the write runs, no question; turn event `decidedBy` `mandate` with `coveringMandateId` and `coveringMandateActionClass` |
+| the same, the hook answers not applicable | the consent step as without a mandate |
+| the same, the hook refuses the case | `NOT_RESERVED`: nothing runs; the model reads `NOT DONE — nothing was changed. <the host's reason> Do not retry this step in this run.`; the call is not marked as held for a confirmation; turn event `decidedBy` `mandate:refused` |
+| a ONE_INSTRUCTION mandate, none, revoked, expired | the consent step as without a mandate (an unattended run: NOT DONE, no live owner) |
+
+- **A ONE_INSTRUCTION mandate never covers**: the platform grants it from the same dialogue the consent step reads, so
+  it would replace the owner's yes to THIS step by a yes to the request.
+- **The host's hook** is `OwnerConsentsService::decideMandateCoverage(AgentMandate, AgentToolCallProvenance,
+  OwnerConsentRequest): OwnerConsentMandateCoverage` on a same-path subclass. The default covers every call. Narrow it to
+  a context with `OwnerConsentMandateCoverage::notApplicable()` (a purpose, a scheduled run, the tool's arguments in
+  `$callProvenance->toolArguments`), refuse a case with `OwnerConsentMandateCoverage::refused('<what to do instead>')`
+  (unsure, a trigger: "mark the ticket for a person").
+- **Unattended runs**: a scheduled run and a sub-agent are covered like an attended turn — the mandate of the
+  conversation's account. Every covered call reads the mandate live, so a revoke stops the next covered step of a
+  running schedule; nothing is checked when the schedule fires.
+- **After an untrusted read**: while `AI.untrustedContent.writeAfterUntrustedRead` is not `off` and the turn read
+  third-party content, the executor does not hand the class on, and the owner confirms the step themselves. With `off`
+  (the default) the host's hook is the place to refuse a step the third-party text asks for.
+- **Visible** in `app:agent:decision-stats --site=ownerConsent` ("Steps decided by a standing mandate").
 
 ## Unattended runs
 

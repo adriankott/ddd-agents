@@ -178,7 +178,8 @@ return [
 - `ddd-module-agents-tools-specialist` — the tool attributes (`MCPToolRequiresOwnerConfirmation`,
   `MCPToolReturnsUntrustedContent`, `MCPToolProposesIdentityOrClass`) and the gate-refusal answer.
 - `ddd-module-agents-autonomy-specialist` — mandates: a standing permission for a class of outward actions, checked by
-  the executor; a mandate never replaces an owner-consent step — a tool that calls the consent service still asks.
+  the executor; a STANDING mandate replaces a tool's owner-consent step only when the tool declares
+  `MCPToolRequiresOwnerConfirmation(coveredByMandateActionClass: …)` (reference owner-consent, "Covered by a mandate").
 - `ddd-module-agents-skills-and-purposes-specialist` — the skill fields the preload reads and the purpose flags the
   sites check.
 - `ddd-module-agents-observability-specialist` — the decision log in a control panel, trace events, record and replay.

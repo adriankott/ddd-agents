@@ -307,12 +307,28 @@ class AgentDecisionStatisticsServiceDatabaseTest extends DatabaseTestCase
             'consented' => false, 'stepExplainedProbability' => 0.2, 'ownerAgreedProbability' => 0.3,
         ], []);
 
+        // two steps executed under mandate #7, one refused by the host under it
+        foreach ([6, 8] as $initiatorMessageIndex) {
+            $this->insertDecisionEvent(500, AgentDecisionModelSettings::SITE_OWNER_CONSENT, 'x', $initiatorMessageIndex, $thresholds + [
+                'decidedBy' => 'mandate', 'consented' => true, 'coveringMandateId' => 7, 'coveringMandateActionClass' => 'SUPPORT_REPLY',
+            ], []);
+        }
+        $this->insertDecisionEvent(500, AgentDecisionModelSettings::SITE_OWNER_CONSENT, 'x', 10, $thresholds + [
+            'decidedBy' => 'mandate:refused', 'consented' => false, 'coveringMandateId' => 7, 'coveringMandateActionClass' => 'SUPPORT_REPLY',
+        ], []);
+
         $statistics = $this->statisticsService->buildStatistics($this->buildRequest(AgentDecisionModelSettings::SITE_OWNER_CONSENT));
 
-        $passRows = $this->findTableRowsOfSection($statistics, 'Owner-consent decisions per cut dialogue × second-pass reason × consent');
-        usort($passRows, static fn (array $left, array $right): int => strcmp($left['secondPassReason'], $right['secondPassReason']));
         self::assertSame([
-            ['dialogueWasCut' => 'false', 'secondPassReason' => '(none)', 'consented' => 'false', 'n' => '1'],
+            ['decidedBy' => 'mandate', 'actionClass' => 'SUPPORT_REPLY', 'n' => '2', 'mandates' => '1'],
+            ['decidedBy' => 'mandate:refused', 'actionClass' => 'SUPPORT_REPLY', 'n' => '1', 'mandates' => '1'],
+        ], $this->findTableRowsOfSection($statistics, 'Steps decided by a standing mandate (mandate = executed under it, mandate:refused = the host refused it)'));
+
+        $passRows = $this->findTableRowsOfSection($statistics, 'Owner-consent decisions per cut dialogue × second-pass reason × consent');
+        usort($passRows, static fn (array $left, array $right): int => strcmp($left['secondPassReason'] . $left['consented'], $right['secondPassReason'] . $right['consented']));
+        self::assertSame([
+            ['dialogueWasCut' => 'false', 'secondPassReason' => '(none)', 'consented' => 'false', 'n' => '2'],
+            ['dialogueWasCut' => 'false', 'secondPassReason' => '(none)', 'consented' => 'true', 'n' => '2'],
             ['dialogueWasCut' => 'true', 'secondPassReason' => 'contextInsufficient', 'consented' => 'false', 'n' => '1'],
             ['dialogueWasCut' => 'true', 'secondPassReason' => 'nearMiss', 'consented' => 'true', 'n' => '1'],
         ], $passRows);

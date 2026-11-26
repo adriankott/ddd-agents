@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.10.0
+
+A standing mandate can replace the per-step owner consent of a tool that says so — the agent can take a class of
+steps on its own (in unattended runs too) and leave single cases to a person.
+
+- **`MCPToolRequiresOwnerConfirmation(coveredByMandateActionClass: '…')`.** An active TIME_WINDOW or UNLIMITED mandate
+  of that class for the conversation's account and space covers the tool's consent step: `reserveOwnerConsentForStep()`
+  answers `OwnerConsentReservation::OUTCOME_COVERED_BY_MANDATE` without a consent question; the write runs. The mandate
+  is read live on every call: without one, after a revoke or an expiry the step asks the owner as before. A
+  ONE_INSTRUCTION mandate never covers (it is granted from the same dialogue the consent step reads). The attribute
+  without the argument behaves as before.
+- **The host decides per call:** `OwnerConsentsService::decideMandateCoverage(AgentMandate, AgentToolCallProvenance,
+  OwnerConsentRequest): OwnerConsentMandateCoverage` (same-path subclass; default covered). `notApplicable()` leaves the
+  consent step (another context); `refused('<what to do instead>')` runs nothing, the model reads
+  `NOT DONE — nothing was changed. <reason> Do not retry this step in this run.`, and the call is not marked as held for
+  a confirmation.
+- **Unattended runs** (a scheduled run, a sub-agent) are covered like an attended turn by the mandate of the
+  conversation's account; a revoke stops the next covered step of a running schedule.
+- **After an untrusted read** with `AI.untrustedContent.writeAfterUntrustedRead` not `off`, the executor does not hand
+  the class on: the owner confirms the step themselves.
+- **Record:** the `ownerConsent` turn event of a covered step has `decidedBy` `mandate` (refused by the host:
+  `mandate:refused`), `coveringMandateId` and `coveringMandateActionClass`; `OwnerConsentVerdict::coveredByMandate()` /
+  `refusedUnderMandate()`. `app:agent:decision-stats --site=ownerConsent` adds "Steps decided by a standing mandate".
+
 ## 0.9.0
 
 Decision models read cut texts as cut, and the owner-consent decision gets more context where a cut kept a clear yes

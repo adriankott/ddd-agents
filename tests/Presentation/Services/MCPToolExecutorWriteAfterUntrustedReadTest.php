@@ -101,6 +101,27 @@ class MCPToolExecutorWriteAfterUntrustedReadTest extends UnitTestCase
         }
     }
 
+    public function testTheMandateClassReachesTheConsentStepUnlessWritesAfterAnUntrustedReadAreHeld(): void
+    {
+        $packageReflectionClass = new ReflectionClass(ProbeUntrustedReadGateMCPPackage::class);
+        $offExecutor = new UntrustedReadGateToolExecutor();
+        $offExecutor->writeAfterUntrustedReadMode = MCPToolContentTrust::WRITE_AFTER_UNTRUSTED_READ_OFF;
+        $provenance = $this->provenanceAfterReading('probeReadForeignText');
+        self::invokeMethod($offExecutor, 'passOwnerConsentCoveringMandateActionClass', [$packageReflectionClass->getMethod('probeSendReplyCoveredByMandate'), $provenance]);
+        self::assertSame('EXAMPLE_REPLY', $provenance->ownerConsentCoveringMandateActionClass);
+
+        self::invokeMethod($offExecutor, 'passOwnerConsentCoveringMandateActionClass', [$packageReflectionClass->getMethod('probeDeleteRecordWithOwnConsentStep'), $provenance]);
+        self::assertNull($provenance->ownerConsentCoveringMandateActionClass, 'a tool without a covering class resets it');
+
+        $heldExecutor = new UntrustedReadGateToolExecutor();
+        self::invokeMethod($heldExecutor, 'passOwnerConsentCoveringMandateActionClass', [$packageReflectionClass->getMethod('probeSendReplyCoveredByMandate'), $provenance]);
+        self::assertNull($provenance->ownerConsentCoveringMandateActionClass, 'after an untrusted read the owner confirms themselves');
+
+        $cleanProvenance = $this->provenanceAfterReading('probeReadPlatformRecord');
+        self::invokeMethod($heldExecutor, 'passOwnerConsentCoveringMandateActionClass', [$packageReflectionClass->getMethod('probeSendReplyCoveredByMandate'), $cleanProvenance]);
+        self::assertSame('EXAMPLE_REPLY', $cleanProvenance->ownerConsentCoveringMandateActionClass);
+    }
+
     public function testNothingIsHeldWithoutAnUntrustedReadInTheTurnOrOutsideAnAgentCall(): void
     {
         self::assertNull($this->holdCall('probeWriteRecord', [], $this->provenanceAfterReading('probeReadPlatformRecord')));

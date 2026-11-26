@@ -197,6 +197,13 @@ class AgentToolCallProvenance extends ValueObject implements MCPServerProvidedIn
     #[HideProperty]
     public bool $isWriteHeldForOwnerConsent = false;
 
+    /**
+     * Set by the executor from the tool's {@see \DDD\Domain\AI\Entities\MCPPackages\MCPToolRequiresOwnerConfirmation::$coveredByMandateActionClass}:
+     * the action class whose standing mandate covers this call's owner-consent step; null = none.
+     */
+    #[HideProperty]
+    public ?string $ownerConsentCoveringMandateActionClass = null;
+
     public function getSourceUserMessageId(): ?int
     {
         $id = $this->sourceUserMessage->id ?? null;

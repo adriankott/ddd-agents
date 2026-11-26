@@ -916,6 +916,8 @@ class MCPToolExecutorService extends Service
                 // THE OWNER'S CONSENT for a #[MCPToolRequiresOwnerConfirmation] tool: checked inside the tool
                 // body, after its own refusals and before its write ({@see OwnerConsentsService::requireOwnerConsentForStep()});
                 // a missing consent comes back as OwnerConsentMissingException → the gate refusal in the catch below.
+                // A standing mandate of the attribute's `coveredByMandateActionClass` covers that step.
+                $this->passOwnerConsentCoveringMandateActionClass($method, $serverProvidedInput);
 
                 // Prefer Symfony DI to create the package (so constructor DI works), fallback to plain instantiation.
                 $package = $this->resolveFromContainer($packageClass) ?? $reflection->newInstance();
@@ -1656,6 +1658,35 @@ class MCPToolExecutorService extends Service
 
     /** The provenance of the call {@see $untrustedReadConsentReservation} was reserved for. */
     protected ?AgentToolCallProvenance $untrustedReadConsentCallProvenance = null;
+
+    /**
+     * Hands the tool's {@see MCPToolRequiresOwnerConfirmation::$coveredByMandateActionClass} to the call's provenance,
+     * where the consent step reads it ({@see OwnerConsentsService::reserveOwnerConsentForStep()}). Not handed on while
+     * the application holds writes after an untrusted read (`AI.untrustedContent.writeAfterUntrustedRead` not `off`) and
+     * this turn read such content: then the owner confirms the step themselves.
+     */
+    protected function passOwnerConsentCoveringMandateActionClass(ReflectionMethod $method, ?MCPServerProvidedInput $serverProvidedInput): void
+    {
+        if (!$serverProvidedInput instanceof AgentToolCallProvenance) {
+            return;
+        }
+        $serverProvidedInput->ownerConsentCoveringMandateActionClass = null;
+        $ownerConfirmationAttributes = $method->getAttributes(MCPToolRequiresOwnerConfirmation::class);
+        if ($ownerConfirmationAttributes === []) {
+            return;
+        }
+        $coveredByMandateActionClass = $ownerConfirmationAttributes[0]->newInstance()->coveredByMandateActionClass;
+        if ($coveredByMandateActionClass === null) {
+            return;
+        }
+        if ($this->getWriteAfterUntrustedReadMode() !== MCPToolContentTrust::WRITE_AFTER_UNTRUSTED_READ_OFF
+            && $serverProvidedInput->conversation instanceof AIConversation
+            && $this->findUntrustedReadToolNamesOfCurrentTurn($serverProvidedInput) !== []
+        ) {
+            return;
+        }
+        $serverProvidedInput->ownerConsentCoveringMandateActionClass = $coveredByMandateActionClass;
+    }
 
     /** @var int Characters of the arguments the consent request names */
     public const int UNTRUSTED_READ_CONSENT_ARGUMENTS_CHARS = 400;

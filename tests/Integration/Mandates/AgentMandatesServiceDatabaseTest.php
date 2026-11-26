@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace DDD\Tests\Agents\Integration\Mandates;
 
 use DDD\Domain\AI\Entities\AgentSpaces\AgentSpace;
+use DDD\Domain\AI\Entities\Conversations\AIConversation;
+use DDD\Domain\AI\Entities\Conversations\Agent\AgentToolCallProvenance;
+use DDD\Domain\AI\Services\Conversations\Agent\OwnerConsentsService;
 use DDD\Domain\AI\Entities\Mandates\AgentMandate;
 use DDD\Domain\AI\Repo\DB\Mandates\DBAgentMandateModel;
 use DDD\Domain\AI\Services\Mandates\AgentMandatesService;
@@ -12,6 +15,8 @@ use DDD\Domain\Common\Repo\DB\Accounts\DBAccountModel;
 use DDD\Infrastructure\Base\DateTime\DateTime;
 use DDD\Infrastructure\Services\DDDService;
 use DDD\Tests\Agents\Support\DatabaseTestCase;
+use ReflectionClass;
+use ReflectionMethod;
 
 /**
  * The raw statements of {@see AgentMandatesService} against the database, on both engines: the expiry of a time window
@@ -126,6 +131,35 @@ class AgentMandatesServiceDatabaseTest extends DatabaseTestCase
         self::assertFalse($this->agentMandatesService->releaseOneInstructionMandateBinding($agentMandate, 'publishPost'), 'a mandate that is no longer active keeps its binding');
         self::assertTrue($this->agentMandatesService->bindOneInstructionMandateToTool($agentMandate, 'publishPost'), 'the read after the write answers for the bound tool');
         self::assertFalse($this->agentMandatesService->bindOneInstructionMandateToTool($agentMandate, 'deletePost'));
+    }
+
+    public function testOnlyAnActiveStandingMandateCoversAnOwnerConsentStep(): void
+    {
+        $conversation = (new ReflectionClass(AIConversation::class))->newInstanceWithoutConstructor();
+        $conversation->id = 100;
+        $conversation->accountId = self::ACCOUNT_ID;
+        $callProvenance = new AgentToolCallProvenance(conversationId: 100, rootConversationId: 100, conversation: $conversation);
+        /** @var OwnerConsentsService $ownerConsentsService */
+        $ownerConsentsService = DDDService::instance()->getService(OwnerConsentsService::class);
+        $findStandingMandateCoveringStep = new ReflectionMethod($ownerConsentsService, 'findStandingMandateCoveringStep');
+        $actionClass = AgentMandate::ACTION_CLASSES[0];
+
+        $this->insertMandate(1, AgentMandate::SCOPE_ONE_INSTRUCTION);
+        self::assertNull($findStandingMandateCoveringStep->invoke($ownerConsentsService, $callProvenance, $actionClass), 'a one-instruction mandate never covers');
+
+        $this->insertMandate(2, AgentMandate::SCOPE_UNLIMITED);
+        self::assertSame(2, $findStandingMandateCoveringStep->invoke($ownerConsentsService, $callProvenance, $actionClass)?->id);
+
+        $sqlDialect = $this->getSqlDialect();
+        $this->getDatabaseConnection()->executeStatement(
+            'UPDATE ' . $sqlDialect->quote(DBAgentMandateModel::getTableName()) . ' SET ' . $sqlDialect->quote('status') . ' = ? WHERE ' . $sqlDialect->quote('id') . ' = 2',
+            [AgentMandate::STATUS_REVOKED]
+        );
+        $this->insertMandate(3, AgentMandate::SCOPE_TIME_WINDOW, ['validUntil' => $this->formatMomentSecondsAgo(60)]);
+        self::assertNull($findStandingMandateCoveringStep->invoke($ownerConsentsService, $callProvenance, $actionClass), 'revoked, and a passed window');
+
+        $this->insertMandate(4, AgentMandate::SCOPE_TIME_WINDOW, ['validUntil' => $this->formatMomentSecondsAgo(-3600), 'accountId' => self::OTHER_ACCOUNT_ID]);
+        self::assertNull($findStandingMandateCoveringStep->invoke($ownerConsentsService, $callProvenance, $actionClass), 'another account\'s mandate');
     }
 
     /** @param array<string, mixed> $columnValues */

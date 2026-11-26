@@ -17,7 +17,8 @@ use Attribute;
  * Relationship to {@see MCPToolRequiresOwnerConfirmation}: the owner's consent authorizes ONE irreversible
  * instance from the owner's own explicit agreement; the mandate gate authorizes a CLASS of recurring outward actions via the customer's
  * statement — once, for a time window, or until revoked. A tool may carry both (the mandate says "you may reply to
- * reviews", the confirmation still guards a specifically destructive instance).
+ * reviews", the confirmation still guards a specifically destructive instance). A confirmation declared with
+ * `coveredByMandateActionClass` is covered by a STANDING mandate of that class instead.
  *
  * Enforcement lives in {@see \DDD\Presentation\Mcp\Services\MCPToolExecutorService::refuseActionLackingMandate()}:
  * in the AGENT LOOP (a call carrying provenance) the executor looks up the newest ACTIVE, time-valid mandate for

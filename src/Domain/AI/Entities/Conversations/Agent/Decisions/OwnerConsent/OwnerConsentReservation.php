@@ -9,7 +9,8 @@ use DDD\Domain\Base\Entities\ValueObject;
 /**
  * What {@see \DDD\Domain\AI\Services\Conversations\Agent\OwnerConsentsService::reserveOwnerConsentForStep()} gave
  * the tool for its write: UNGATED — no owner consent applies (an HTTP MCP or harness call), write;
- * RESERVED — this call holds the owner's consent, write, then mark it used or release it; NOT_RESERVED — no consent this
+ * RESERVED — this call holds the owner's consent, write, then mark it used or release it; COVERED_BY_MANDATE — a standing
+ * mandate covers the step, write (nothing to mark or release); NOT_RESERVED — no consent this
  * call may use: write nothing and answer {@see buildModelFacingText()}.
  *
  * @phpstan-consistent-constructor
@@ -19,6 +20,7 @@ class OwnerConsentReservation extends ValueObject
     public const string OUTCOME_UNGATED = 'UNGATED';
     public const string OUTCOME_RESERVED = 'RESERVED';
     public const string OUTCOME_NOT_RESERVED = 'NOT_RESERVED';
+    public const string OUTCOME_COVERED_BY_MANDATE = 'COVERED_BY_MANDATE';
 
     public string $outcome = self::OUTCOME_NOT_RESERVED;
 
@@ -41,6 +43,11 @@ class OwnerConsentReservation extends ValueObject
         $ownerConsentReservation = self::withOutcome(self::OUTCOME_RESERVED, $request, $verdict);
         $ownerConsentReservation->reservedUse = $reservedUse;
         return $ownerConsentReservation;
+    }
+
+    public static function coveredByMandate(OwnerConsentRequest $request, OwnerConsentVerdict $verdict): self
+    {
+        return self::withOutcome(self::OUTCOME_COVERED_BY_MANDATE, $request, $verdict);
     }
 
     public static function notReserved(OwnerConsentRequest $request, OwnerConsentVerdict $verdict): self

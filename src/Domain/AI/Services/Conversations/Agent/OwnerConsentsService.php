@@ -13,6 +13,9 @@ use DDD\Domain\AI\Entities\Conversations\Agent\Decisions\OwnerConsent\OwnerConse
 use DDD\Domain\AI\Entities\Conversations\Agent\Decisions\OwnerConsent\OwnerConsentUse;
 use DDD\Domain\AI\Entities\Conversations\Agent\Decisions\OwnerConsent\OwnerConsentReservation;
 use DDD\Domain\AI\Entities\Conversations\Agent\Decisions\OwnerConsent\OwnerConsentVerdict;
+use DDD\Domain\AI\Entities\Conversations\Agent\Decisions\OwnerConsent\OwnerConsentMandateCoverage;
+use DDD\Domain\AI\Entities\Mandates\AgentMandate;
+use DDD\Domain\AI\Services\Mandates\AgentMandatesService;
 use DDD\Domain\AI\Entities\Conversations\Agent\AgentWorkingState;
 use DDD\Domain\AI\Entities\Conversations\Agent\Decisions\OwnerConsent\OwnerConsentDialogueLine;
 use DDD\Domain\AI\Entities\Conversations\Agent\Tools\AskOwnerTool;
@@ -79,7 +82,9 @@ class OwnerConsentsService extends Service
     public function reserveOwnerConsentForStep(?AgentToolCallProvenance $callProvenance, OwnerConsentRequest $request): OwnerConsentReservation
     {
         $reservation = $this->findOwnerConsentReservationForStep($callProvenance, $request);
-        if (!$reservation->isWriteAllowed() && $callProvenance !== null) {
+        if (!$reservation->isWriteAllowed() && $callProvenance !== null
+            && $reservation->verdict->failure !== OwnerConsentVerdict::FAILURE_REFUSED_UNDER_MANDATE
+        ) {
             // the call's write was held: the answer contract asks for the confirmation, never reports it as done
             $callProvenance->isWriteHeldForOwnerConsent = true;
         }
@@ -95,6 +100,12 @@ class OwnerConsentsService extends Service
     {
         $verdict = OwnerConsentVerdict::failed(OwnerConsentVerdict::FAILURE_ERROR);
         try {
+            $mandateVerdict = $this->findMandateVerdictForStep($callProvenance, $request);
+            if ($mandateVerdict !== null) {
+                return $mandateVerdict->consented
+                    ? OwnerConsentReservation::coveredByMandate($request, $mandateVerdict)
+                    : OwnerConsentReservation::notReserved($request, $mandateVerdict);
+            }
             $conversation = $callProvenance?->conversation;
             $windowStart = $conversation instanceof AIConversation ? $this->findOwnerConsentWindowStart($conversation, $request->toolName) : -1;
             $refusedThrough = $conversation instanceof AIConversation ? $this->findOwnerConsentRefusedThrough($conversation, $request->toolName) : -1;
@@ -126,6 +137,72 @@ class OwnerConsentsService extends Service
             DDDService::instance()->getLogger()->warning('[OwnerConsent] reservation failed', ['tool' => $request->toolName, 'reason' => $reservationError::class . ': ' . mb_substr($reservationError->getMessage(), 0, 200)]);
             return OwnerConsentReservation::notReserved($request, $verdict->consented ? OwnerConsentVerdict::failed(OwnerConsentVerdict::FAILURE_ERROR) : $verdict);
         }
+    }
+
+    /**
+     * The verdict of a standing mandate over the step, or null when no mandate decides it (the tool declares no covering
+     * action class, no standing mandate is active, or the host says it does not apply to this call): then the consent
+     * step runs as without a mandate. A covered step and a step the host refused under the mandate write one turn event
+     * of site `ownerConsent` (`decidedBy` `mandate` / `mandate:refused`, the mandate's id and class).
+     *
+     * @throws AgentRunClaimLostException
+     */
+    protected function findMandateVerdictForStep(?AgentToolCallProvenance $callProvenance, OwnerConsentRequest $request): ?OwnerConsentVerdict
+    {
+        $actionClass = $callProvenance?->ownerConsentCoveringMandateActionClass;
+        $conversation = $callProvenance?->conversation;
+        if ($actionClass === null || $callProvenance->isEvalHarnessCall || !$conversation instanceof AIConversation || !isset($conversation->id)) {
+            return null;
+        }
+        $startedAt = hrtime(true);
+        $agentMandate = $this->findStandingMandateCoveringStep($callProvenance, $actionClass);
+        if ($agentMandate === null || !isset($agentMandate->id)) {
+            return null;
+        }
+        $ownerConsentMandateCoverage = $this->decideMandateCoverage($agentMandate, $callProvenance, $request);
+        if ($ownerConsentMandateCoverage->outcome === OwnerConsentMandateCoverage::OUTCOME_NOT_APPLICABLE) {
+            return null;
+        }
+        $verdict = $ownerConsentMandateCoverage->outcome === OwnerConsentMandateCoverage::OUTCOME_REFUSED
+            ? OwnerConsentVerdict::refusedUnderMandate((int)$agentMandate->id, $actionClass, (string)$ownerConsentMandateCoverage->reasonForTheModel)
+            : OwnerConsentVerdict::coveredByMandate((int)$agentMandate->id, $actionClass);
+        $this->recordTurnEvent($conversation, $request, $verdict, null, null, (int)round((hrtime(true) - $startedAt) / 1e6));
+        return $verdict;
+    }
+
+    /**
+     * The STANDING mandate (TIME_WINDOW or UNLIMITED, active and currently valid) of the action class for the
+     * conversation's account and its space (or account-wide), null when none. A ONE_INSTRUCTION mandate never covers a
+     * consent step: it is granted from the same dialogue the consent step reads, so it would replace the owner's yes to
+     * THIS step by a yes to the request. Read live on every call: a revoked or expired mandate no longer covers — also in
+     * a scheduled run that started under it.
+     */
+    protected function findStandingMandateCoveringStep(AgentToolCallProvenance $callProvenance, string $actionClass): ?AgentMandate
+    {
+        $accountId = $callProvenance->getConversationOwnerAccountIdOrAuthAccountId(null);
+        if ($accountId === null) {
+            return null;
+        }
+        /** @var AgentMandatesService $agentMandatesService */
+        $agentMandatesService = DDDService::instance()->getService(AgentMandatesService::class);
+        $agentMandate = $agentMandatesService->findActiveMandateFor($accountId, $callProvenance->agentSpace, $actionClass);
+        return $agentMandate !== null && !$agentMandate->hasOneInstructionScope() ? $agentMandate : null;
+    }
+
+    /**
+     * Whether the standing mandate covers THIS call — the host's hook (a same-path subclass of this service). The
+     * default covers every call of the tool. A host narrows it to a context (a purpose, a scheduled run, an argument
+     * such as a ticket id: {@see AgentToolCallProvenance::$toolArguments}) with
+     * {@see OwnerConsentMandateCoverage::notApplicable()} — the step then asks the owner as without a mandate — and refuses
+     * a single case (unsure, a trigger) with {@see OwnerConsentMandateCoverage::refused()}: nothing runs and the model
+     * reads the reason (say what to do instead, for example mark the case for a person).
+     */
+    protected function decideMandateCoverage(
+        AgentMandate $agentMandate,
+        AgentToolCallProvenance $callProvenance,
+        OwnerConsentRequest $request
+    ): OwnerConsentMandateCoverage {
+        return OwnerConsentMandateCoverage::covered();
     }
 
     /**
@@ -810,6 +887,8 @@ class OwnerConsentsService extends Service
                 'targetLine' => mb_substr($request->targetLine, 0, 200),
                 'dialogueLines' => $dialogue !== null ? $dialogue->count() : 0,
                 'transportFailureReason' => $outcome?->failureReason,
+                'coveringMandateId' => $verdict->coveringMandateId,
+                'coveringMandateActionClass' => $verdict->coveringMandateActionClass,
                 'dialogueWasCut' => $ownerConsentDecisionResult?->dialogueWasCut ?? false,
                 'contextSufficientProbability' => $ownerConsentDecisionResult?->contextSufficientProbability,
                 'secondPassReason' => $ownerConsentDecisionResult?->secondPassReason,

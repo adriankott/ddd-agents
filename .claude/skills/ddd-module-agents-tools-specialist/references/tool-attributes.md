@@ -29,8 +29,8 @@ All live in `DDD\Domain\AI\Entities\MCPPackages`. They are read by reflection, n
 - A reader that holds only a STORED call (a name) asks `MCPToolAttributeCatalog` or `MCPToolEffectCatalog`. Both are
   built once per process from the packages of every skill (`AISkill::getPackageClassesBySkillName()`): a tool bound to
   no skill is unknown to them.
-- Two attributes have **no effect in the package**: `MCPToolRequiresOwnerConfirmation` and
-  `MCPDeliversProductCapability` (rows below). `WithAIEnvelope` of `ddd-ai` is read by nothing on a tool method either —
+- `MCPToolRequiresOwnerConfirmation` gates nothing by itself (the tool body calls the consent step), and
+  `MCPDeliversProductCapability` has **no effect in the package** (rows below). `WithAIEnvelope` of `ddd-ai` is read by nothing on a tool method either —
   the executor invokes the method by reflection (call-context-and-agent-space-defaults.md).
 
 ## What the tool is and does
@@ -121,7 +121,7 @@ workspace store.
 | `MCPRequiresAnyFeatureFlag(...names)` | method or class | At least one of the named flags; composes as all(required) and any(any-of). |
 | `MCPRequiresAccountRights(...names)` | method or class | Every named right must be true on the acting account (`AgentAccountRightsInterface`). Name the package's constant (`AgentAccountRights::USE_WEB`, a module's own rights class), never a host string; the host maps it to roles (`AI.accountRights`). Offer side `ToolDefinitions::filterByAccountRights()`; execution refusal names the right and says it is no plan upgrade. Flags are checked before rights. |
 | `MCPRequiresAdminWithAccessToAllResources` | class only | See package-bundle-and-controller.md, "The admin audience". |
-| `MCPToolRequiresOwnerConfirmation` | method | **No effect in the package** — a marker for reviewers and host tests; no package code reads it. The gate exists only when the tool body calls `OwnerConsentsService::requireOwnerConsentForStep()` after its own refusals and before its write; the consent flow is the decisions-and-guards skill's (`ddd-module-agents-decisions-and-guards-specialist`). |
+| `MCPToolRequiresOwnerConfirmation` | method | **Gates nothing by itself** — the gate exists only when the tool body calls `OwnerConsentsService::requireOwnerConsentForStep()` after its own refusals and before its write; the consent flow is the decisions-and-guards skill's (`ddd-module-agents-decisions-and-guards-specialist`). The executor reads it twice: the write-after-untrusted-read gate leaves such a tool to its own step, and `coveredByMandateActionClass` (optional) is handed to the call so a STANDING mandate of that class covers the step (`ddd-module-agents-autonomy-specialist` › mandates, "Covered consent steps"). |
 | `MCPToolRequiresMandate(actionClass, bindingKey)` | method | The executor runs the tool in the agent loop only under an active mandate for the action class (refusal `REFUSAL_MANDATE_REQUIRED`); the tool's ceiling grows by `CONSENT_CHECK_SECONDS` (100) unless it is at least `LONG_CEILING_SECONDS` (200). The mandate mechanism is the autonomy skill's (`ddd-module-agents-autonomy-specialist`). |
 
 ## Readers that hold only a tool name

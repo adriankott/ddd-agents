@@ -564,6 +564,23 @@ class AgentDecisionStatisticsService extends Service
             $passRows
         ));
 
+        $decidedBySql = $this->buildPayloadTextSql('decidedBy');
+        $mandateActionClassSql = $this->buildPayloadTextSql('coveringMandateActionClass');
+        $mandateRows = $connection->fetchAllAssociative(
+            "SELECT {$decidedBySql} AS `decidedBy`, {$mandateActionClassSql} AS `actionClass`, COUNT(*) AS `n`,
+                    COUNT(DISTINCT {$this->buildPayloadTextSql('coveringMandateId')}) AS `mandates`
+             FROM `$eventsTable` `e` JOIN `$conversationsTable` `c` ON `c`.`id` = `e`.`aiConversationId`
+             WHERE `e`.`kind` = :kind AND `e`.`site` = :site AND `e`.`created` >= :from AND `e`.`created` < :to{$evalClause}
+               AND {$mandateActionClassSql} IS NOT NULL
+             GROUP BY 1, 2 ORDER BY `n` DESC",
+            ['kind' => AIConversationTurnEvent::KIND_DECISION, 'site' => AgentDecisionModelSettings::SITE_OWNER_CONSENT, 'from' => $from, 'to' => $to]
+        );
+        $statistics->addSection(AgentDecisionStatisticsSection::withTable(
+            'Steps decided by a standing mandate (mandate = executed under it, mandate:refused = the host refused it)',
+            ['decidedBy', 'actionClass', 'n', 'mandates'],
+            $mandateRows
+        ));
+
         $stepExplainedSql = 'CAST(' . $this->buildPayloadTextSql('stepExplainedProbability') . ' AS DECIMAL(6,4))';
         $ownerAgreedSql = 'CAST(' . $this->buildPayloadTextSql('ownerAgreedProbability') . ' AS DECIMAL(6,4))';
         $minimumStepExplainedSql = 'CAST(' . $this->buildPayloadTextSql('minimumStepExplainedProbability') . ' AS DECIMAL(6,4))';

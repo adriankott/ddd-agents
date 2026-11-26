@@ -64,4 +64,13 @@ class ProbeUntrustedReadGateMCPPackage extends MCPPackage
     {
         return 'deleted';
     }
+
+    /** Sends a reply after its own consent step, which a standing mandate of its class covers. */
+    #[MCPTool]
+    #[MCPToolEffect(MCPToolEffect::WRITE)]
+    #[MCPToolRequiresOwnerConfirmation(coveredByMandateActionClass: 'EXAMPLE_REPLY')]
+    public function probeSendReplyCoveredByMandate(): string
+    {
+        return 'sent';
+    }
 }
