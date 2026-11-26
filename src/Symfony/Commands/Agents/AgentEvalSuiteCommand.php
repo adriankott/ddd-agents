@@ -178,6 +178,7 @@ class AgentEvalSuiteCommand extends AgentEvalConsoleCommand
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Print the plan (tasks, lanes, waves, the estimated wall time) and start nothing.')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Print the suite record as JSON at the end instead of the report.');
         $this->configureBudgetOption();
+        $this->configureMaxDurationOption();
         $this->configureEvalScopeOptions();
         $this->addEvalArmOptions();
         $this->configureApplicationOptions();
@@ -554,6 +555,11 @@ class AgentEvalSuiteCommand extends AgentEvalConsoleCommand
             $output->writeln($baselineChoiceText);
         }
         $startedAtMicrotime = microtime(true);
+        $this->startMaxDurationClock($input);
+        $hostWideStopFileWarning = $this->buildHostWideStopFileWarning();
+        if ($hostWideStopFileWarning !== null && !$asJson) {
+            $output->writeln('<comment>' . $hostWideStopFileWarning . '</comment>');
+        }
         $agentEvalSuiteRunState = AgentEvalSuiteRunState::forQueue(
             $agentEvalSuiteSchedule->orderTasksForStart($agentEvalSuiteTasks),
             $agentEvalSuiteSchedule,
@@ -599,15 +605,13 @@ class AgentEvalSuiteCommand extends AgentEvalConsoleCommand
     }
 
     /**
-     * A `STOP` file counts as the first stop signal. On a stop while cases are still queued, the queue is dropped and
+     * A `STOP` file (the run folder's or the results folder's) and a passed `--max-duration` count as the first stop signal. On a stop while cases are still queued, the queue is dropped and
      * every running case that changes no live state is ended (writes finish and restore); a stop that finds the queue
      * empty ends nothing and the running cases finish. On a second signal every running case is ended.
      */
     protected function applyStopRequests(InputInterface $input, OutputInterface $output, AgentEvalSuiteRunState $agentEvalSuiteRunState): void
     {
-        if (!$this->isStopRequested() && $this->getResultFilesService()->isStopRequestedForSuiteRun($agentEvalSuiteRunState->suiteDirectory)) {
-            $this->requestStop();
-        }
+        $this->requestStopForStopFilesOrDeadline($agentEvalSuiteRunState->suiteDirectory);
         if ($this->isStopRequested() && $agentEvalSuiteRunState->queue->count() > 0) {
             if (!(bool)$input->getOption('json')) {
                 $output->writeln('<comment>' . $this->describeStopRequest($agentEvalSuiteRunState->queue->count()) . '</comment>');
@@ -624,17 +628,6 @@ class AgentEvalSuiteCommand extends AgentEvalConsoleCommand
                 $agentEvalSuiteRunningCase->process->stop(static::STOP_TIMEOUT_SECONDS);
             }
         }
-    }
-
-    /**
-     * Override point: the line printed when a stop drops `$droppedCaseCount` queued cases.
-     *
-     * @param int $droppedCaseCount
-     * @return string
-     */
-    protected function describeStopRequest(int $droppedCaseCount): string
-    {
-        return sprintf('Stop requested — %d queued case(s) dropped; every case that changes no live state is ended, running writes finish and restore (a second signal ends them too).', $droppedCaseCount);
     }
 
     /** Collects every case whose child process ended or ran out of time: a retry, or a row of its run. */

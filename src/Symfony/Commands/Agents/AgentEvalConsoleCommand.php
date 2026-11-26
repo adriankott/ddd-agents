@@ -10,6 +10,7 @@ use DDD\Domain\AI\Repo\Argus\Attributes\ArgusLanguageModel;
 use DDD\Domain\AI\Repo\Argus\Conversations\ArgusAIAgentConversation;
 use DDD\Domain\AI\Services\AIModelsService;
 use DDD\Domain\AI\Services\Eval\AgentEvalJudgedRunService;
+use DDD\Domain\AI\Services\Eval\AgentEvalResultFilesService;
 use DDD\Infrastructure\Exceptions\BadRequestException;
 use DDD\Infrastructure\Exceptions\InternalErrorException;
 use DDD\Infrastructure\Services\DDDService;
@@ -40,7 +41,9 @@ use Symfony\Component\Console\Output\StreamOutput;
  *   ({@see buildProgressReporter()}, every line indented by two spaces);
  * - stop signals: a command that stops gracefully says so ({@see handlesStopSignals()}) and gets SIGINT and SIGTERM
  *   through {@see handleSignal()}: the first asks for a stop, the second for the end of everything still running
- *   ({@see isStopRequested()}, {@see isKillRequested()}, the override point {@see onStopSignal()});
+ *   ({@see isStopRequested()}, {@see isKillRequested()}, the override point {@see onStopSignal()}); a `STOP` file in the
+ *   run folder or in the results folder and a passed `--max-duration` count as the first signal
+ *   ({@see requestStopForStopFilesOrDeadline()}, {@see configureMaxDurationOption()});
  * - the command line of a child process ({@see buildChildConsoleCommandLine()}, the child's name from
  *   {@see getChildCommandName()});
  * - the judge and driver models: a `--judge-model` / `--driver-model` the model catalog does not know is refused
@@ -385,6 +388,94 @@ abstract class AgentEvalConsoleCommand extends AgentConsoleCommand implements Si
         if ($this->stopSignalCount === 0) {
             $this->stopSignalCount = 1;
         }
+    }
+
+    /** @var string The option that ends a run gracefully after so many seconds */
+    public const string OPTION_MAX_DURATION = 'max-duration';
+
+    /** @var float|null The moment (microtime) the run stops as on a stop signal; null = no limit */
+    protected ?float $maxDurationDeadline = null;
+
+    /** @var bool Whether the stop of the run came from its `--max-duration` */
+    protected bool $stoppedAtMaxDuration = false;
+
+    /** `--max-duration=<seconds>`: past it the run stops as on a first stop signal. Default: no limit. */
+    protected function configureMaxDurationOption(): void
+    {
+        $this->addOption(
+            static::OPTION_MAX_DURATION,
+            null,
+            InputOption::VALUE_REQUIRED,
+            'Stop gracefully after this many seconds, as on a first stop signal: the queue is dropped, cases that change no live state are ended, writes finish and restore. Default: no limit.'
+        );
+    }
+
+    /** Starts the clock of `--max-duration` (call it when the cases start); a missing or non-positive value sets no limit. */
+    protected function startMaxDurationClock(InputInterface $input): void
+    {
+        $maxDurationOption = $input->hasOption(static::OPTION_MAX_DURATION) ? $input->getOption(static::OPTION_MAX_DURATION) : null;
+        $maxDurationSeconds = is_numeric($maxDurationOption) ? (float)$maxDurationOption : 0.0;
+        $this->maxDurationDeadline = $maxDurationSeconds > 0 ? microtime(true) + $maxDurationSeconds : null;
+        $this->stoppedAtMaxDuration = false;
+    }
+
+    /**
+     * Asks for a stop (as a first stop signal) when the operator created a `STOP` file in `$runDirectory` or in the
+     * results folder, or the run passed its `--max-duration`. Call it in every pass of the run loop.
+     */
+    protected function requestStopForStopFilesOrDeadline(?string $runDirectory): void
+    {
+        if ($this->isStopRequested()) {
+            return;
+        }
+        $agentEvalResultFilesService = $this->getResultFilesService();
+        if (($runDirectory !== null && $agentEvalResultFilesService->isStopRequestedForSuiteRun($runDirectory))
+            || $agentEvalResultFilesService->isStopRequestedForEveryRun()
+        ) {
+            $this->requestStop();
+            return;
+        }
+        if ($this->maxDurationDeadline !== null && microtime(true) >= $this->maxDurationDeadline) {
+            $this->stoppedAtMaxDuration = true;
+            $this->requestStop();
+        }
+    }
+
+    /** Whether the stop of the run came from its `--max-duration`. */
+    public function isStoppedAtMaxDuration(): bool
+    {
+        return $this->stoppedAtMaxDuration;
+    }
+
+    /**
+     * The line of a stop that drops `$droppedCaseCount` queued cases (override point).
+     *
+     * @param int $droppedCaseCount
+     * @return string
+     */
+    protected function describeStopRequest(int $droppedCaseCount): string
+    {
+        if ($this->stoppedAtMaxDuration) {
+            return sprintf('Stopped at max duration — %d case(s) not run; every case that changes no live state is ended, running writes finish and restore.', $droppedCaseCount);
+        }
+        return sprintf('Stop requested — %d queued case(s) dropped; every case that changes no live state is ended, running writes finish and restore (a second signal ends them too).', $droppedCaseCount);
+    }
+
+    /** The warning a run prints at its start while the host-wide `STOP` file exists (it would stop at once); null otherwise. */
+    protected function buildHostWideStopFileWarning(): ?string
+    {
+        $agentEvalResultFilesService = $this->getResultFilesService();
+        return $agentEvalResultFilesService->isStopRequestedForEveryRun()
+            ? 'A STOP file in the results folder stops every eval run of this host (' . $agentEvalResultFilesService->getHostWideStopFile() . '); delete it to run.'
+            : null;
+    }
+
+    /** The result files service (the application's class, when it replaces it). */
+    protected function getResultFilesService(): AgentEvalResultFilesService
+    {
+        /** @var AgentEvalResultFilesService $agentEvalResultFilesService */
+        $agentEvalResultFilesService = DDDService::instance()->getService(AgentEvalResultFilesService::class);
+        return $agentEvalResultFilesService;
     }
 
     /** Whether a stop was asked for: a stop signal arrived. */

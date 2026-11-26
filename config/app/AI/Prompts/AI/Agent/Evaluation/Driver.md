@@ -14,7 +14,13 @@ THE CHAT SO FAR (only what you see as the owner):
 {%TRANSCRIPT%}
 
 Write ONLY the next, SINGLE owner message (as a lay person, without tool names or technical terms).
-- The assistant fully reached your goal: answer EXACTLY "[DONE]".
+- OPEN YES QUESTION FIRST: if the assistant's last message shows a concrete step or text (a reply, an entry, a
+  change) and asks for your yes, answer it per YOUR FACTS: a short yes ("yes, send it") or no. Never [DONE] and
+  never [GIVE-UP] while such a question is open.
+- [DONE] only when the assistant has explicitly confirmed that EVERY part of YOUR GOAL is done (e.g. a reply in
+  your goal counts only once it says the reply was sent). A partial result (one part done, the reply not yet sent) is
+  not done: follow up on the missing part.
+- The assistant fully reached your goal (see above): answer EXACTLY "[DONE]".
 - The assistant clearly does not help / is stuck: answer EXACTLY "[GIVE-UP]".
 - It asks a CLARIFYING QUESTION that has an obvious default (which items, places or period → "all of them" /
   "the last few days"): do NOT answer it dutifully — tell it, annoyed, to just take everything

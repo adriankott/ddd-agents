@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.10.1
+
+- **eval-tools stops like eval-suite.** SIGINT / SIGTERM, a `STOP` file in the run folder and a passed
+  `--max-duration` stop the run gracefully: the queue is dropped, cases that change no live state are ended, writes
+  finish and restore; a second signal ends every running case. A run in this process starts no further case. Before,
+  eval-tools read neither signals nor the file, and a run whose shell was gone kept its parent and children running.
+- **A host-wide `STOP` file**: `STOP` in the results folder (`AgentEvalResultFilesService::getHostWideStopFile()`) stops
+  every eval-suite and eval-tools run of the host; a run started while it exists says so at its start.
+- **`--max-duration=<seconds>`** for eval-tools and eval-suite (default: no limit): past it the run stops as on a first
+  signal and prints `Stopped at max duration — N case(s) not run`. Shared in `AgentEvalConsoleCommand`
+  (`configureMaxDurationOption()`, `requestStopForStopFilesOrDeadline()`, `describeStopRequest()`).
+- **`--case` of eval-tools takes a comma list** like eval-suite's; a list runs in child processes like a whole fixture.
+- **Driver prompt: an open yes question is answered.** The simulated owner answers a shown step that asks for a yes
+  from its facts and never says `[DONE]` or `[GIVE-UP]` while it is open; `[DONE]` only when every part of the goal is
+  confirmed (a reply counts once it is reported sent). Before, a partial result read as the goal and the case failed as
+  "reply never sent".
+
 ## 0.10.0
 
 A standing mandate can replace the per-step owner consent of a tool that says so — the agent can take a class of

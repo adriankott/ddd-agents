@@ -73,7 +73,10 @@ class AgentEvalResultFilesService extends Service
     /** @var string The progress of a suite run, rewritten while it runs and removed at its end */
     public const string PROGRESS_FILE_NAME = '_progress.json';
 
-    /** @var string The file an operator creates in a suite folder to stop the run gracefully */
+    /**
+     * @var string The file an operator creates to stop a run gracefully: in a run folder (that run), or in the results
+     * folder itself (every eval-suite and eval-tools run of the host, until the file is deleted)
+     */
     public const string STOP_FILE_NAME = 'STOP';
 
     /** @var string The prefix of the result file a child process of a suite run writes */
@@ -402,6 +405,18 @@ class AgentEvalResultFilesService extends Service
     public function isStopRequestedForSuiteRun(string $suiteDirectory): bool
     {
         return is_file($suiteDirectory . '/' . static::STOP_FILE_NAME);
+    }
+
+    /** Whether the operator asked every run of this host to stop gracefully by a `STOP` file in the results folder. */
+    public function isStopRequestedForEveryRun(): bool
+    {
+        return is_file($this->getHostWideStopFile());
+    }
+
+    /** The `STOP` file in the results folder that stops every eval-suite and eval-tools run of the host. */
+    public function getHostWideStopFile(): string
+    {
+        return $this->getResultsDirectory() . '/' . static::STOP_FILE_NAME;
     }
 
     // ------------------------------------------------------------------ the baseline

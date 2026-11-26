@@ -117,12 +117,12 @@ class AgentEvalToolsRunSettings extends ValueObject
     }
 
     /**
-     * Whether every case runs in a child process of its own: the cases repeat, or more than one runs at a time and no
-     * case filter makes the run a single case's.
+     * Whether every case runs in a child process of its own: the cases repeat, or more than one runs at a time and the
+     * case filter does not make the run a single case's (no filter, or a comma-separated list of ids).
      */
     public function runsInChildProcesses(): bool
     {
-        return $this->repeat > 1 || ($this->parallel > 1 && $this->caseFilter === null);
+        return $this->repeat > 1 || ($this->parallel > 1 && ($this->caseFilter === null || str_contains($this->caseFilter, ',')));
     }
 
     /** Whether the run keeps a record in the database: it writes its own files and no parent reads its result. */

@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace DDD\Tests\Agents\Symfony\Commands\Agents\Eval;
 
+use Symfony\Component\Console\Output\BufferedOutput;
+use DDD\Domain\AI\Entities\Evals\AgentEvalSuiteTasks;
+use DDD\Symfony\Commands\Agents\Eval\AgentEvalSuiteRunningCases;
 use DDD\Symfony\Commands\Agents\AgentEvalToolsCommand;
 use DDD\Domain\AI\Entities\Skills\AISkill;
 use DDD\Domain\AI\Services\AIModelsService;
@@ -124,6 +127,59 @@ class AgentEvalToolsCommandTest extends AgentEvalResultFilesTestCase
         self::assertNull($runningRow);
         self::assertSame(1, $runningChild->ceilingChecks);
         self::assertSame(AgentEvalCaseRow::CHILD_PROCESS_TIMED_OUT_ERROR, $overdueRow?->getError());
+    }
+
+    /**
+     * A stop of a run in child processes, as in eval-suite: the queue is dropped and the line says so, a reading case is
+     * ended, a writing case finishes and restores; a second signal ends the writing case too.
+     */
+    public function testAStopDropsTheQueueEndsReadingCasesAndLetsWritesFinishUntilASecondSignal(): void
+    {
+        $probeCommand = new AgentEvalToolsProbeCommand();
+        $runSettings = AgentEvalToolsRunSettings::newInstance();
+        $readingChild = new ScriptedChildProcessDouble();
+        $readingChild->running = true;
+        $writingChild = new ScriptedChildProcessDouble();
+        $writingChild->running = true;
+        $runningCases = AgentEvalSuiteRunningCases::newInstance();
+        $readingCase = AgentEvalSuiteRunningCase::forStartedProcess($this->buildTaskWithAccess('catalog.read', AgentEvalSuiteTask::ACCESS_READ), $readingChild, 0.0, '');
+        $writingCase = AgentEvalSuiteRunningCase::forStartedProcess($this->buildTaskWithAccess('catalog.write', AgentEvalSuiteTask::ACCESS_WRITE), $writingChild, 0.0, '');
+        $runningCases->add($readingCase);
+        $runningCases->add($writingCase);
+        $queuedTasks = AgentEvalSuiteTasks::newInstance();
+        $firstQueuedTask = $this->buildTaskWithAccess('catalog.queued-1', AgentEvalSuiteTask::ACCESS_READ);
+        $secondQueuedTask = $this->buildTaskWithAccess('catalog.queued-2', AgentEvalSuiteTask::ACCESS_READ);
+        $queuedTasks->add($firstQueuedTask);
+        $queuedTasks->add($secondQueuedTask);
+        $applyStopRequests = new ReflectionMethod($probeCommand, 'applyStopRequestsToChildProcesses');
+        $output = new BufferedOutput();
+
+        $applyStopRequests->invoke($probeCommand, $runSettings, $output, $this->resultsDirectory . '/no-run', $queuedTasks, $runningCases);
+        self::assertSame(2, $queuedTasks->count(), 'nothing without a stop');
+        self::assertSame(0, $readingChild->stopCalls);
+
+        $probeCommand->requestStop();
+        $applyStopRequests->invoke($probeCommand, $runSettings, $output, $this->resultsDirectory . '/no-run', $queuedTasks, $runningCases);
+        self::assertSame(0, $queuedTasks->count());
+        self::assertStringContainsString('Stop requested — 2 queued case(s) dropped', $output->fetch());
+        self::assertSame(1, $readingChild->stopCalls);
+        self::assertSame(0, $writingChild->stopCalls, 'a write finishes and restores');
+
+        $probeCommand->handleSignal(15);
+        $applyStopRequests->invoke($probeCommand, $runSettings, $output, $this->resultsDirectory . '/no-run', $queuedTasks, $runningCases);
+        self::assertSame(1, $writingChild->stopCalls, 'a second signal ends the write too');
+        if (defined('SIGINT') && defined('SIGTERM')) {
+            self::assertSame([constant('SIGINT'), constant('SIGTERM')], $probeCommand->getSubscribedSignals(), 'eval-tools stops gracefully on signals');
+        }
+    }
+
+    protected function buildTaskWithAccess(string $caseId, string $access): AgentEvalSuiteTask
+    {
+        $agentEvalSuiteTask = AgentEvalSuiteTask::newInstance();
+        $agentEvalSuiteTask->caseId = $caseId;
+        $agentEvalSuiteTask->taskId = 'default|call|tools|' . $caseId;
+        $agentEvalSuiteTask->access = $access;
+        return $agentEvalSuiteTask;
     }
 
     public function testAChildThatRunsIntoItsCeilingOrPrintsNothingIsAFailedRowAndTheRunGoesOn(): void
@@ -315,6 +371,9 @@ class AgentEvalToolsCommandTest extends AgentEvalResultFilesTestCase
         self::assertTrue($runSettings->runsInChildProcesses(), 'the default: every case in a child of its own');
         $runSettings->caseFilter = 'a';
         self::assertFalse($runSettings->runsInChildProcesses(), 'a child process itself runs one case in its process');
+        $runSettings->caseFilter = 'a,b';
+        self::assertTrue($runSettings->runsInChildProcesses(), 'a list of cases runs in children like a whole fixture');
+        $runSettings->caseFilter = 'a';
         $runSettings->repeat = 3;
         self::assertTrue($runSettings->runsInChildProcesses(), 'each repetition is a child of its own, also for one case');
         $runSettings->repeat = 1;

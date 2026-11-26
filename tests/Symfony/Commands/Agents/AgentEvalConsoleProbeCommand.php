@@ -50,6 +50,7 @@ class AgentEvalConsoleProbeCommand extends AgentEvalConsoleCommand
     {
         $this->configureBudgetOption();
         $this->configureEvalScopeOptions();
+        $this->configureMaxDurationOption();
     }
 
     protected function executeConsoleWork(InputInterface $input, OutputInterface $output): int

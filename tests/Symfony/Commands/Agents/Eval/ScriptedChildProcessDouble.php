@@ -26,6 +26,9 @@ class ScriptedChildProcessDouble extends Process
     /** @var int How often the ceiling was checked */
     public int $ceilingChecks = 0;
 
+    /** @var int How often the parent asked the child to stop */
+    public int $stopCalls = 0;
+
     public function __construct()
     {
         parent::__construct(['php', '-v']);
@@ -47,6 +50,7 @@ class ScriptedChildProcessDouble extends Process
     /** Nothing was started: nothing to stop (also when the object is destroyed). */
     public function stop(float $timeout = 10, ?int $signal = null): ?int
     {
+        $this->stopCalls++;
         return null;
     }
 

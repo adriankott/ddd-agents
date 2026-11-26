@@ -128,7 +128,7 @@ class AgentEvalToolsCommand extends AgentEvalConsoleCommand
         $this
             ->addOption('fixture', null, InputOption::VALUE_OPTIONAL, 'A single fixture JSON path (default: every fixture of the configured tools fixture folder)')
             ->addOption('skill', null, InputOption::VALUE_OPTIONAL, 'Only run the fixture whose "skill" matches this id')
-            ->addOption('case', null, InputOption::VALUE_OPTIONAL, 'Only run the case with this id')
+            ->addOption('case', null, InputOption::VALUE_OPTIONAL, 'Only the case with this id, or the cases of a comma-separated list of ids')
             ->addOption('full', null, InputOption::VALUE_NONE, 'Show tool arguments/results even for passing cases')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Emit machine-readable JSON results instead of the report')
             ->addOption('model', null, InputOption::VALUE_OPTIONAL, 'Override the agent model by catalog name; default = the conversation default')
@@ -147,6 +147,7 @@ class AgentEvalToolsCommand extends AgentEvalConsoleCommand
             ->addOption('persist-conversations', null, InputOption::VALUE_NONE, 'Store the eval conversations (marked as eval runs; the default). The decision layer runs only in a stored conversation. Handed to every child process.')
             ->addOption('result-file', null, InputOption::VALUE_OPTIONAL, 'Also write the result JSON to this file (what a parent process reads instead of parsing the output).');
         $this->configureBudgetOption();
+        $this->configureMaxDurationOption();
         $this->addModelTierOptions();
         $this->addEvalArmOptions();
     }
@@ -179,6 +180,11 @@ class AgentEvalToolsCommand extends AgentEvalConsoleCommand
         }
         $agentEvalResultFilesService = $this->getResultFilesService();
         $runSettings->startedAtTimestamp = time();
+        $this->startMaxDurationClock($input);
+        $hostWideStopFileWarning = $this->buildHostWideStopFileWarning();
+        if ($hostWideStopFileWarning !== null && !$runSettings->jsonOutput) {
+            $output->writeln('<comment>' . $hostWideStopFileWarning . '</comment>');
+        }
         $runSettings->runName = $agentEvalResultFilesService->getToolsRunName($runSettings->startedAtTimestamp, $runSettings->modelName, $runSettings->scopeTag);
 
         $agentEvalCaseRows = $runSettings->runsInChildProcesses()
@@ -419,6 +425,10 @@ class AgentEvalToolsCommand extends AgentEvalConsoleCommand
     {
         $agentEvalCaseRows = AgentEvalCaseRows::newInstance();
         $agentEvalSuitePlanOptions = $this->buildPlanOptionsOfRun($runSettings);
+        $runDirectory = $runSettings->runName !== ''
+            ? $this->getResultFilesService()->getToolsRunDirectory($runSettings->runName)
+            : null;
+        $notRunCaseCount = 0;
         foreach ($agentEvalFixtures->getElements() as $agentEvalFixture) {
             if (!$this->matchesSkillFilter($runSettings, $agentEvalFixture)) {
                 continue;
@@ -427,7 +437,12 @@ class AgentEvalToolsCommand extends AgentEvalConsoleCommand
                 $output->writeln("\n<info>{$agentEvalFixture->getSkillName()}</info>");
             }
             foreach ($agentEvalFixture->getCases()->getElements() as $agentEvalCase) {
-                if ($runSettings->caseFilter !== null && $agentEvalCase->getId() !== $runSettings->caseFilter) {
+                if (!$agentEvalSuitePlanOptions->matchesCaseFilter($agentEvalCase->getId())) {
+                    continue;
+                }
+                $this->requestStopForStopFilesOrDeadline($runDirectory);
+                if ($this->isStopRequested()) {
+                    $notRunCaseCount++;
                     continue;
                 }
                 $agentEvalToolsCaseRun = $this->prepareCaseRun($runSettings, $agentEvalFixture, $agentEvalCase, $agentEvalSuitePlanOptions, $output);
@@ -447,6 +462,9 @@ class AgentEvalToolsCommand extends AgentEvalConsoleCommand
                     $agentEvalCaseRows->add($agentEvalCaseRow);
                 }
             }
+        }
+        if ($this->isStopRequested() && !$runSettings->jsonOutput) {
+            $output->writeln('<comment>' . $this->describeStopRequest($notRunCaseCount) . '</comment>');
         }
         return $agentEvalCaseRows;
     }
@@ -923,6 +941,7 @@ class AgentEvalToolsCommand extends AgentEvalConsoleCommand
         $agentEvalCaseRows = AgentEvalCaseRows::newInstance();
         $retriedCases = AgentEvalSuiteRetriedCases::newInstance();
         while ($queuedTasks->count() > 0 || $runningCases->count() > 0) {
+            $this->applyStopRequestsToChildProcesses($runSettings, $output, $runDirectory, $queuedTasks, $runningCases);
             foreach ($agentEvalSuiteSchedule->selectRunnableTasks($queuedTasks, $runningCases->buildTasks())->getElements() as $startingTask) {
                 $runningCase = $this->startChildProcessOfTask($startingTask, $input, $runSettings);
                 $runningCases->add($runningCase);
@@ -960,6 +979,43 @@ class AgentEvalToolsCommand extends AgentEvalConsoleCommand
             }
         }
         return $agentEvalCaseRows;
+    }
+
+    /**
+     * A stop (a signal, a `STOP` file in the run folder or the results folder, a passed `--max-duration`) as in
+     * eval-suite: the queue is dropped and every running case that changes no live state is ended (writes finish and
+     * restore); a second signal ends every running case. Ended cases leave no row; the line says how many were not run.
+     */
+    protected function applyStopRequestsToChildProcesses(
+        AgentEvalToolsRunSettings $runSettings,
+        OutputInterface $output,
+        string $runDirectory,
+        AgentEvalSuiteTasks $queuedTasks,
+        AgentEvalSuiteRunningCases $runningCases
+    ): void {
+        $this->requestStopForStopFilesOrDeadline($runDirectory);
+        if ($this->isStopRequested() && $queuedTasks->count() > 0) {
+            if (!$runSettings->jsonOutput) {
+                $output->writeln('<comment>' . $this->describeStopRequest($queuedTasks->count()) . '</comment>');
+            }
+            $queuedTasks->clear();
+            foreach ($runningCases->getElements() as $runningCase) {
+                if (!$runningCase->task->writesLiveState()) {
+                    $runningCase->process->stop(AgentEvalSuiteCommand::STOP_TIMEOUT_SECONDS);
+                }
+            }
+        }
+        if ($this->isKillRequested()) {
+            foreach ($runningCases->getElements() as $runningCase) {
+                $runningCase->process->stop(AgentEvalSuiteCommand::STOP_TIMEOUT_SECONDS);
+            }
+        }
+    }
+
+    /** Stops gracefully on SIGINT / SIGTERM (a second one ends every running case), like eval-suite. */
+    protected function handlesStopSignals(): bool
+    {
+        return true;
     }
 
     /**
@@ -1322,13 +1378,6 @@ class AgentEvalToolsCommand extends AgentEvalConsoleCommand
         /** @var AgentEvalRunHooksService $agentEvalRunHooksService */
         $agentEvalRunHooksService = DDDService::instance()->getService(AgentEvalRunHooksService::class);
         return $agentEvalRunHooksService;
-    }
-
-    protected function getResultFilesService(): AgentEvalResultFilesService
-    {
-        /** @var AgentEvalResultFilesService $agentEvalResultFilesService */
-        $agentEvalResultFilesService = DDDService::instance()->getService(AgentEvalResultFilesService::class);
-        return $agentEvalResultFilesService;
     }
 
     protected function getSuitePlanService(): AgentEvalSuitePlanService

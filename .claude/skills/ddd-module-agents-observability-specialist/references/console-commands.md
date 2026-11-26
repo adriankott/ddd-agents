@@ -512,7 +512,8 @@ and a judge model). Reports per case and overall, writes the run into the result
 | `--accountId` | none | the account of the cases that name no space (and no `--agentSpaceId`): they run at account level for it instead of being skipped; also the account of a space without an owner |
 | `--fixture` | none | one fixture file; default every fixture of `AI.evalSuite.fixturePaths.tools` |
 | `--skill` | none | only the fixture whose `skill` matches |
-| `--case` | none | only this case id (runs in this process) |
+| `--case` | none | only this case id (runs in this process), or a comma list (runs in child processes like a whole fixture) |
+| `--max-duration` | none | stop gracefully after this many seconds ([stop signals](#stop-signals-and-the-stop-file)); the line says how many cases were not run |
 | `--full` | flag | tool arguments and results also for passing cases |
 | `--json` | flag | the result document instead of the report |
 | `--model` | none | the agent model; `--tier` / `--vendor` too ([model and tier options](#model-and-tier-options)) |
@@ -545,7 +546,9 @@ and a judge model). Reports per case and overall, writes the run into the result
 - **Exit codes:** `0` when every case that counts passed; `1` otherwise or when no fixture is found; `2` for a
   `--judge-model` / `--driver-model` the model catalog does not know ([the harness models](#the-harness-models)).
 - **Budget:** `--ignore-budget`, handed to every child.
-- **Child processes:** when `--repeat` > 1, or `--parallel` > 1 without `--case`; each child is this command with
+- **Stop:** SIGINT / SIGTERM, a `STOP` file in the run folder or in the results folder, `--max-duration`
+  ([stop signals](#stop-signals-and-the-stop-file)); a run in this process starts no further case.
+- **Child processes:** when `--repeat` > 1, or `--parallel` > 1 without `--case` or with a list; each child is this command with
   `--case`, `--json`, `--no-save`, `--fixture`; ceiling = the case's `timeoutSeconds` (default 600, at least 60).
 - **Skipped cases:** SKIP lines for a case whose flow exists only on the job queue, that needs vision the model
   lacks, that has no scope, or whose fixture names a `skill` the application does not register
@@ -568,6 +571,7 @@ against a baseline. LIVE.
 | `--flavors` | `'call,judge'` | `call` (deterministic) and `judge` |
 | `--skill` | none | only tools-style fixtures whose skill or file name matches |
 | `--case` | none | one case id or a comma list |
+| `--max-duration` | none | stop gracefully after this many seconds; the line says how many cases were not run |
 | `--max-processes` | `'24'` (`DEFAULT_MAX_PROCESSES`) | process slots |
 | `--head-start-seconds` | `'45'` (`DEFAULT_HEAD_START_SECONDS`) | the first case runs alone this long or until it ends |
 | `--stagger-ms` | `'500'` (`DEFAULT_STAGGER_MILLISECONDS`) | between two starts after the head start |
@@ -592,7 +596,8 @@ against a baseline. LIVE.
   `--judge-model` / `--driver-model` (refused before the plan); a stop signal before the first case started ends the
   process with `128 + signal`.
 - **Budget:** inverted: lifted unless `--enforce-budget`.
-- **Stop:** a `STOP` file in the run folder or SIGINT / SIGTERM ([stop signals](#stop-signals-and-the-stop-file)).
+- **Stop:** SIGINT / SIGTERM, a `STOP` file in the run folder or in the results folder, `--max-duration`
+  ([stop signals](#stop-signals-and-the-stop-file)).
 - **Child processes:** `app:agent:eval-tools` (kind `toolsCase`), `app:agent:eval-selection` (`selectionCase`),
   `app:agent:eval-recall` (`recallCase`); ceiling = the case's `timeoutSeconds` (default 600, at least 60); a case
   that ended on an infrastructure error (`RETRIED_INFRASTRUCTURE_ERRORS`: deadlock, lock wait timeout, cURL 28 / 35 /
@@ -1154,14 +1159,25 @@ of the two traits for them.
 
 ### Stop signals and the STOP file
 
-An evaluation command stops gracefully only when `handlesStopSignals()` answers true (default no; the package's only such
-command is `app:agent:eval-suite`). Then SIGINT and SIGTERM are counted by `handleSignal()`: the first asks for a stop
-(`isStopRequested()`), the second for the end of everything still running (`isKillRequested()`); `onStopSignal()` is the
-hook. `requestStop()` asks for a stop without a signal. The suite reads a file named `STOP` in its run folder as the first
-signal (`AgentEvalResultFilesService::isStopRequestedForSuiteRun()`): no new case starts; while cases are queued the queue
-is dropped and every running case that changes no live state is ended (a stopped process gets 3 s,
-`STOP_TIMEOUT_SECONDS`); running writes finish and restore. Before the first case started, a signal ends the suite with
-`128 + signal`.
+An evaluation command stops gracefully only when `handlesStopSignals()` answers true (default no; in the package
+`app:agent:eval-suite` and `app:agent:eval-tools`). Then SIGINT and SIGTERM are counted by `handleSignal()`: the first asks
+for a stop (`isStopRequested()`), the second for the end of everything still running (`isKillRequested()`);
+`onStopSignal()` is the hook. `requestStop()` asks for a stop without a signal.
+
+Without a signal (a run in a pod whose shell is gone), three things count as the first signal, read in every pass of the
+run loop (`requestStopForStopFilesOrDeadline()`):
+
+- a file named `STOP` in the run folder (`AgentEvalResultFilesService::isStopRequestedForSuiteRun()`) — that run;
+- a file named `STOP` in the results folder itself (`isStopRequestedForEveryRun()`, `getHostWideStopFile()`) — every
+  eval-suite and eval-tools run of the host, also the ones started while it exists (they announce it at the start);
+  delete it to run again;
+- `--max-duration=<seconds>` passed (`configureMaxDurationOption()`, `startMaxDurationClock()`); the line says
+  `Stopped at max duration — N case(s) not run` (`isStoppedAtMaxDuration()`, `describeStopRequest()`).
+
+On a stop no new case starts; while cases are queued the queue is dropped and every running case that changes no live
+state is ended (a stopped process gets 3 s, `STOP_TIMEOUT_SECONDS`); running writes finish and restore. Before the first
+case of a suite started, a signal ends it with `128 + signal`. A child process of eval-tools runs its one case to the end
+on a signal (its restore included); its parent ends it.
 
 ### Child processes and their ceilings
 
