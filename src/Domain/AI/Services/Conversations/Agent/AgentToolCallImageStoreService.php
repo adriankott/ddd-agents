@@ -60,6 +60,9 @@ class AgentToolCallImageStoreService extends Service
 
     public const string WARNING_OBJECT_STORE_MISSING = 'objectStoreMissing';
 
+    /** @var string The folder of L3 for pictures a package store rendered from its own source: `sources/<store>/<sha256>` */
+    public const string SOURCE_PICTURE_KEY_FOLDER = 'sources/';
+
     /** @var string[] The warnings this process already wrote (each once per process) */
     protected static array $reportedWarnings = [];
 
@@ -253,6 +256,113 @@ class AgentToolCallImageStoreService extends Service
     }
 
     /**
+     * Keeps a picture a package's own store ({@see \DDD\Domain\AI\Entities\MCPPackages\ToolCallImageStore}) rendered
+     * from its source (a file's picture for the model), so the next model call does not render it again: L1, L2, and
+     * L3 under `sources/<store>/<sha256>` unless `$isDurableCopyAllowed` is false (a picture that must not lie in a
+     * durable store beside its source). The picture is brought to the wire profile first; it must name its store.
+     * Sets and answers whether L3 acknowledged the bytes. Never throws; with the store off nothing is kept.
+     */
+    public function writeSourcePicture(ToolResultImage $toolResultImage, bool $isDurableCopyAllowed = true): bool
+    {
+        $toolResultImage->isDurable = false;
+        $settings = $this->getSettings();
+        if (!$settings->enabled || !$this->isSourceStoreName($toolResultImage->sourceStore)) {
+            return false;
+        }
+        try {
+            if (!$this->normalizeToWireProfile($toolResultImage, $settings)) {
+                return false;
+            }
+        } catch (Throwable) {
+            return false;
+        }
+        $base64TextsByCacheKey = [$this->buildCacheKey($toolResultImage->sha256) => $toolResultImage->base64Data];
+        $this->writeToProcessCache($base64TextsByCacheKey, $settings);
+        $this->writeToSharedCache($base64TextsByCacheKey, $settings);
+        $objectStorage = $isDurableCopyAllowed ? $this->findObjectStorage($settings) : null;
+        if ($objectStorage === null) {
+            return false;
+        }
+        $objectKey = $settings->objectKeyPrefix . $this->buildSourcePictureStoreId($toolResultImage->sourceStore, $toolResultImage->sha256);
+        try {
+            $objectStorage->putObject($objectKey, (string)base64_decode($toolResultImage->base64Data, true), $toolResultImage->mimeType);
+            $toolResultImage->isDurable = true;
+        } catch (Throwable $objectStoreFailure) {
+            $this->logStoreFailure($objectStoreFailure, 'write', $objectKey);
+        }
+        return $toolResultImage->isDurable;
+    }
+
+    /**
+     * The kept picture of a package store's reference ({@see writeSourcePicture()}): L1, then L2, then — for a
+     * picture L3 acknowledged, and unless `$isDurableCopyAllowed` is false — L3; what L2 or L3 delivered is written
+     * back to the tiers above. Null on a miss: the store then renders the picture from its source again. The caller
+     * checks the rights on the source BEFORE it asks: the tiers are keyed by the bytes and know no caller.
+     */
+    public function readSourcePicture(ToolCallImageReference $toolCallImageReference, bool $isDurableCopyAllowed = true): ?ToolResultImage
+    {
+        $settings = $this->getSettings();
+        $sha256 = $toolCallImageReference->sha256;
+        if (!$settings->enabled || $sha256 === '' || !$this->isSourceStoreName($toolCallImageReference->sourceStore)) {
+            return null;
+        }
+        $cacheKey = $this->buildCacheKey($sha256);
+        $toolResultImage = $this->buildSourceImageFromStoredBase64($toolCallImageReference, $this->readFromCache($this->getProcessCache($settings), [$sha256])[$sha256] ?? null);
+        if ($toolResultImage !== null) {
+            return $toolResultImage;
+        }
+        $sharedCache = $this->getSharedCache($settings);
+        $toolResultImage = $this->buildSourceImageFromStoredBase64($toolCallImageReference, $this->readFromCache($sharedCache, [$sha256])[$sha256] ?? null);
+        if ($toolResultImage !== null) {
+            if ($sharedCache !== null && $settings->sharedCacheExtendsTtlOnRead) {
+                try {
+                    $sharedCache->extendTtlOfKeys([$cacheKey], $settings->sharedCacheTtlSeconds);
+                } catch (Throwable) {
+                    // the entry keeps its TTL; the source still holds the picture
+                }
+            }
+            $this->writeToProcessCache([$cacheKey => $toolResultImage->base64Data], $settings);
+            return $toolResultImage;
+        }
+        $objectStorage = $isDurableCopyAllowed && $toolCallImageReference->isDurable ? $this->findObjectStorage($settings) : null;
+        if ($objectStorage === null) {
+            return null;
+        }
+        $objectKey = $settings->objectKeyPrefix . $this->buildSourcePictureStoreId($toolCallImageReference->sourceStore, $sha256);
+        $objectContent = $this->readFromObjectStorage($objectStorage, [$objectKey])[$objectKey] ?? null;
+        $toolResultImage = is_string($objectContent)
+            ? $this->buildSourceImageFromStoredBase64($toolCallImageReference, static::convertStoredObjectToBase64($objectContent, $sha256))
+            : null;
+        if ($toolResultImage !== null) {
+            $this->writeToSharedCache([$cacheKey => $toolResultImage->base64Data], $settings);
+            $this->writeToProcessCache([$cacheKey => $toolResultImage->base64Data], $settings);
+        }
+        return $toolResultImage;
+    }
+
+    /** The id of a package store's picture in L3, below the object key prefix: `sources/<store>/<sha256>` */
+    public function buildSourcePictureStoreId(string $storeName, string $sha256): string
+    {
+        return self::SOURCE_PICTURE_KEY_FOLDER . preg_replace('/[^A-Za-z0-9._-]/', '_', $storeName) . '/' . $sha256;
+    }
+
+    /** True for the name of a package's own picture store (neither inline nor the spool) */
+    protected function isSourceStoreName(string $storeName): bool
+    {
+        return $storeName !== '' && $storeName !== ToolCallImageReference::SOURCE_STORE_INLINE && $storeName !== ToolCallImageReference::SOURCE_STORE_SPOOL;
+    }
+
+    /** A stored picture as the image of a package store's reference ({@see buildImageFromStoredBase64()}), naming that store */
+    protected function buildSourceImageFromStoredBase64(ToolCallImageReference $toolCallImageReference, mixed $base64Data): ?ToolResultImage
+    {
+        $toolResultImage = $this->buildImageFromStoredBase64($toolCallImageReference, $base64Data);
+        if ($toolResultImage !== null) {
+            $toolResultImage->sourceStore = $toolCallImageReference->sourceStore;
+        }
+        return $toolResultImage;
+    }
+
+    /**
      * Brings a picture to the wire profile in place (bytes, type, size, sha256 of the wire form): a picture already
      * in a wire format (WebP, JPEG) within the limits keeps its bytes; any other is decoded through the pinned decoder,
      * scaled to the long edge and the megapixels, stripped and encoded. False when the decoder refuses it or the
@@ -422,10 +532,18 @@ class AgentToolCallImageStoreService extends Service
         $storeImageIds = [];
         $cacheKeys = [];
         foreach ($toolCallImageReferences as $toolCallImageReference) {
-            if (!$toolCallImageReference instanceof ToolCallImageReference
-                || $toolCallImageReference->sourceStore !== ToolCallImageReference::SOURCE_STORE_SPOOL
-                || $toolCallImageReference->sourceImageId === ''
-            ) {
+            if (!$toolCallImageReference instanceof ToolCallImageReference || $toolCallImageReference->sourceImageId === '') {
+                continue;
+            }
+            if ($this->isSourceStoreName($toolCallImageReference->sourceStore)) {
+                // a picture a package store rendered from its source and kept here (writeSourcePicture)
+                if ($toolCallImageReference->isDurable && $toolCallImageReference->sha256 !== '') {
+                    $storeImageIds[$this->buildSourcePictureStoreId($toolCallImageReference->sourceStore, $toolCallImageReference->sha256)] = true;
+                    $cacheKeys[$this->buildCacheKey($toolCallImageReference->sha256)] = true;
+                }
+                continue;
+            }
+            if ($toolCallImageReference->sourceStore !== ToolCallImageReference::SOURCE_STORE_SPOOL) {
                 continue;
             }
             $storeImageIds[$toolCallImageReference->sourceImageId] = true;

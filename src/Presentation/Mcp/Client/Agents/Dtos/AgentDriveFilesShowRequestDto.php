@@ -10,7 +10,7 @@ use DDD\Presentation\Base\OpenApi\Attributes\Parameter;
 /** Input of `showDriveFiles`: files shown to the owner as cards in the chat. */
 class AgentDriveFilesShowRequestDto extends RequestDto
 {
-    /** @var string[] The files: workspace paths or references `drive/<id>`; at most 20, committed files only */
+    /** @var string[] The files: workspace paths or references (`drive/<id>`, or `<source>/<id>` of another file source); at most 20, committed files only */
     #[Parameter(in: Parameter::BODY, required: true)]
     public array $paths = [];
 

@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.7.0
+
+**Files of any source in the drive tools; the model looks at pictures through the package.** Requires `mgamadeus/ddd`
+^3.48.0 (the `FileSource` port). No table change, no web change; npm `@mgamadeus/ddd-agents` 0.7.0 in lockstep.
+
+- **A file argument of the `agent.drive` tools may be a reference `<source>/<id>`** of any registered `FileSource`
+  (`media/901`): `showDriveFiles`, `readDriveDocument`, `viewDriveDocumentPages` and the source side of
+  `saveDriveFile`. `AgentDriveStoresService::resolveDrivePath()` answers such an argument with the read-only mount of
+  the new adapter store `files` (`FileSourcesAgentDriveStoreService`, an `AgentDriveStore` and
+  `AgentDriveFileContentReader` over `FileSourcesService`); only the exact form of a registered source other than
+  `drive` counts (`findFileSourceReference()`), so a folder of the own drive named like a source stays a path. A source
+  has no folders: `listDriveFiles` on it is refused and names the source's find tool (`AI.fileSources.findTools`).
+- **`saveDriveFile` copies across stores**: with a reference as source the target's drive store does the copy
+  (ddd-clouddrive ≥ 0.5.0: `DriveImportsService`, under the application's flow rule); nothing is saved INTO a source.
+- **New tool `viewImages`** (`agent.drive`; `files[]` of references or drive paths, `size` SMALL 512 / MEDIUM 1024 /
+  LARGE 2048): shows up to four pictures to the model, one line per picture. `AgentFilePicturesService` asks the
+  flow rule (`FileFlowTarget::forModel()`) before a byte is read, renders through
+  `FileSourcesService::renderImagePreview()` and names the picture `<source>/<id>:<edge>:<fingerprint>` in the store
+  `files`; `AgentDriveMCPPackage` is the `ToolCallImageStore` that resolves it again under the rights of the running
+  account (a changed file has another fingerprint and is dropped, not shown as the old picture).
+- **The tool picture store keeps source pictures by tier**: `AgentToolCallImageStoreService::writeSourcePicture()` /
+  `readSourcePicture()` (process cache, shared cache with its TTL, object store under `sources/<store>/<sha256>`); a
+  picture whose flow decision forbids a durable copy stops at the shared cache. The conversation row holds the
+  reference only, as before.
+- **`agent.drive` is available with a file source alone** (`AgentDriveStoresService::hasFileSources()`), also without
+  a drive store.
+- **New config `config/app/AI/fileSources.php`** (`AI.fileSources`, `AgentFileSourceSettings`): `findTools`,
+  `viewImages` (`maxPerCall`, `maxSourceBytes`, `maxSourcePixels`).
+- An application that showed pictures of its own store through an own `ToolCallImageStore` can drop tool and store and
+  bind `agent.drive` to the skill instead.
+- Tests: reference resolution (exact form, registered source, paths that only look like one), the adapter store, the
+  picture tiers and the durable-copy switch, `viewImages` and the save refusals; the surface lists six drive tools.
+
 ## 0.6.15
 
 **Memory: the model sees the application's name for a space, the memory tools load with their skill, the directives

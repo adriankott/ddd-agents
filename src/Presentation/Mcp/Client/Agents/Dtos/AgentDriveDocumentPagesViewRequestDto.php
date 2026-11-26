@@ -10,7 +10,7 @@ use DDD\Presentation\Base\OpenApi\Attributes\Parameter;
 /** Input of `viewDriveDocumentPages`: pages of a PDF of a drive as images. */
 class AgentDriveDocumentPagesViewRequestDto extends RequestDto
 {
-    /** @var string The PDF: a path of the own drive, `drivespaces/<space>/…` or a reference `drive/<id>` (required) */
+    /** @var string The PDF: a path of the own drive, `drivespaces/<space>/…` or a reference (`drive/<id>`, or `<source>/<id>` of another file source) (required) */
     #[Parameter(in: Parameter::BODY, required: true)]
     public string $path = '';
 

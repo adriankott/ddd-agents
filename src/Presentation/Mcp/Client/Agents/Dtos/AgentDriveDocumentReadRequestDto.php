@@ -10,7 +10,7 @@ use DDD\Presentation\Base\OpenApi\Attributes\Parameter;
 /** Input of `readDriveDocument`: the text of a document of a drive, page by page. */
 class AgentDriveDocumentReadRequestDto extends RequestDto
 {
-    /** @var string The document: a path of the own drive, `drivespaces/<space>/…` or a reference `drive/<id>` (required) */
+    /** @var string The document: a path of the own drive, `drivespaces/<space>/…` or a reference (`drive/<id>`, or `<source>/<id>` of another file source) (required) */
     #[Parameter(in: Parameter::BODY, required: true)]
     public string $path = '';
 

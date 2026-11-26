@@ -40,7 +40,7 @@ class AgentDriveMCPPackageTest extends UnitTestCase
         $this->agentDriveStoresService->setAgentDriveStores([$this->inMemoryAgentDriveStore]);
     }
 
-    public function testTheSchemaBuildsAndExposesTheFiveTools(): void
+    public function testTheSchemaBuildsAndExposesTheSixTools(): void
     {
         $packageDocumentation = MCPPackageDocumentation::createFromClassName(AgentDriveMCPPackage::class);
         $toolNames = [];
@@ -48,7 +48,7 @@ class AgentDriveMCPPackageTest extends UnitTestCase
             $toolNames[] = $toolDocumentation->name;
         }
         sort($toolNames);
-        self::assertSame(['listDriveFiles', 'readDriveDocument', 'saveDriveFile', 'showDriveFiles', 'viewDriveDocumentPages'], $toolNames);
+        self::assertSame(['listDriveFiles', 'readDriveDocument', 'saveDriveFile', 'showDriveFiles', 'viewDriveDocumentPages', 'viewImages'], $toolNames);
         self::assertSame('agent.drive', $packageDocumentation->name);
         self::assertStringNotContainsString('array<', (string)json_encode($packageDocumentation->toObject(forPersistence: false)));
     }

@@ -9,6 +9,8 @@ use DDD\Domain\AI\Entities\Drives\AgentDriveFiles;
 use DDD\Domain\AI\Entities\Drives\AgentDriveMount;
 use DDD\Domain\AI\Entities\Drives\AgentDriveMounts;
 use DDD\Domain\AI\Entities\Drives\AgentDrivePath;
+use DDD\Domain\Common\Entities\Files\Sources\FileReference;
+use DDD\Domain\Common\Services\Files\FileSourcesService;
 use DDD\Infrastructure\Exceptions\BadRequestException;
 use DDD\Infrastructure\Exceptions\NotFoundException;
 use DDD\Infrastructure\Services\DDDService;
@@ -20,7 +22,8 @@ use Throwable;
 /**
  * The registry of the drive stores ({@see AgentDriveStore}, every service carrying the tag) and the resolution of a
  * file argument against the mounts of a call: `drivespaces/<name>/…` is that mount, `drive/<id>` a reference of the
- * own drive's store, any other path a path in the own drive.
+ * own drive's store, `<source>/<id>` a file of a registered file source of the application (`media/901`; read
+ * through {@see FileSourcesAgentDriveStoreService}), any other path a path in the own drive.
  */
 class AgentDriveStoresService extends Service
 {
@@ -39,13 +42,40 @@ class AgentDriveStoresService extends Service
         $this->agentDriveStores = $agentDriveStores;
     }
 
-    /** True when at least one drive store is installed */
+    /** True when at least one drive store with spaces is installed (the adapter of the file sources mounts nothing) */
     public function hasDriveStores(): bool
     {
         foreach ($this->agentDriveStores as $agentDriveStore) {
-            return true;
+            if ($agentDriveStore->getStoreName() !== FileSourcesAgentDriveStoreService::STORE_NAME) {
+                return true;
+            }
         }
         return false;
+    }
+
+    /** True when the application registered a file source besides the drive's own (`drive/<id>` is a drive store's) */
+    public function hasFileSources(): bool
+    {
+        foreach ($this->getFileSourcesService()->getSourceNames() as $sourceName) {
+            if ($sourceName . '/' !== AgentDrivePath::REFERENCE_PREFIX) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The file reference an argument names when it is `<source>/<id>` of a registered file source other than the
+     * drive: exactly that form, so `media/901` is the media item and `/workspace/media/901` or `./media/901` the
+     * file of the own drive at that path.
+     */
+    public function findFileSourceReference(string $argument): ?FileReference
+    {
+        $fileReference = $this->getFileSourcesService()->findFileReference(trim(str_replace('\\', '/', $argument)));
+        if ($fileReference === null || $fileReference->sourceName . '/' === AgentDrivePath::REFERENCE_PREFIX) {
+            return null;
+        }
+        return $fileReference;
     }
 
     public function findDriveStoreByName(string $storeName): ?AgentDriveStore
@@ -55,7 +85,8 @@ class AgentDriveStoresService extends Service
                 return $agentDriveStore;
             }
         }
-        return null;
+        // the adapter of the file sources is the package's own store: it answers even where no tag registered it
+        return $storeName === FileSourcesAgentDriveStoreService::STORE_NAME ? $this->getFileSourcesAgentDriveStoreService() : null;
     }
 
     /** The mounts of every store for the call, the own drive first; a store that fails is left out (and logged) */
@@ -92,6 +123,12 @@ class AgentDriveStoresService extends Service
     {
         $agentDrivePath = new AgentDrivePath();
         $agentDrivePath->argument = $argument;
+        $fileSourceReference = $this->findFileSourceReference($argument);
+        if ($fileSourceReference !== null) {
+            $agentDrivePath->reference = $fileSourceReference->toString();
+            $agentDrivePath->agentDriveMount = $this->getFileSourcesAgentDriveStoreService()->buildReferenceMount($fileSourceReference);
+            return $agentDrivePath;
+        }
         $normalizedArgument = trim(str_replace('\\', '/', trim($argument)), '/');
         if ($normalizedArgument === self::WORKSPACE_ROOT_FOLDER || str_starts_with($normalizedArgument, self::WORKSPACE_ROOT_FOLDER . '/')) {
             $normalizedArgument = trim(substr($normalizedArgument, strlen(self::WORKSPACE_ROOT_FOLDER)), '/');
@@ -168,6 +205,20 @@ class AgentDriveStoresService extends Service
             DDDService::instance()->getLogger()->warning('[AgentDrive] file cards failed', ['store' => $storeName, 'reason' => $throwable->getMessage()]);
             return new AgentDriveFiles();
         }
+    }
+
+    protected function getFileSourcesService(): FileSourcesService
+    {
+        /** @var FileSourcesService $fileSourcesService */
+        $fileSourcesService = DDDService::instance()->getService(FileSourcesService::class);
+        return $fileSourcesService;
+    }
+
+    protected function getFileSourcesAgentDriveStoreService(): FileSourcesAgentDriveStoreService
+    {
+        /** @var FileSourcesAgentDriveStoreService $fileSourcesAgentDriveStoreService */
+        $fileSourcesAgentDriveStoreService = DDDService::instance()->getService(FileSourcesAgentDriveStoreService::class);
+        return $fileSourcesAgentDriveStoreService;
     }
 
     protected function buildMountNameList(AgentDriveMounts $agentDriveMounts): string

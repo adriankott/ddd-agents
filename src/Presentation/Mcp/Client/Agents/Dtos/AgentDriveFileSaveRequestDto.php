@@ -10,7 +10,7 @@ use DDD\Presentation\Base\OpenApi\Attributes\Parameter;
 /** Input of `saveDriveFile`: files copied into a folder of another drive space (or of the own drive), on the server. */
 class AgentDriveFileSaveRequestDto extends RequestDto
 {
-    /** @var string[] The files to copy: workspace paths (`reports/Zuordnung.xlsx`, `drivespaces/library/Brand/Logo.svg`) or references `drive/<id>`; at most 50 */
+    /** @var string[] The files to copy: workspace paths (`reports/Zuordnung.xlsx`, `drivespaces/library/Brand/Logo.svg`) or references (`drive/<id>`, or `<source>/<id>` of another file source such as `media/901`); at most 50 */
     #[Parameter(in: Parameter::BODY, required: true)]
     public array $paths = [];
 

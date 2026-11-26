@@ -139,10 +139,26 @@ whole), e.g. `'Demo.Notes' => [DemoNotesMCPPackage::class]`, and write the skill
 ## Drive mounts
 
 A file store module (e.g. a cloud drive) implements `DDD\Domain\AI\Services\Drives\AgentDriveStore`; the package's
-`agent.drive` tools (`listDriveFiles`, `saveDriveFile`, `showDriveFiles`) and the file card `DriveFiles` reach it
+`agent.drive` tools (`listDriveFiles`, `saveDriveFile`, `showDriveFiles`, `viewImages`) and the file card `DriveFiles` reach it
 through `AgentDriveStoresService`, which also resolves file arguments (a path of the own drive, `drivespaces/<name>/…`,
 `drive/<id>`). The store answers under the caller's rights, hands out facts only (no content URL; at most `AgentDriveFile::$openLink`, the host screen showing the
 file, set through `setOpenLinkIfSafe()`) and copies on the server; the tool checks the mount's mode and asks the owner for a `WRITE_WITH_CONSENT` mount.
+
+File sources: every `DDD\Domain\Common\Services\Files\FileSource` of the application (Core port, tag
+`ddd.file_source`: a media library, the attachments of a ticket) is reachable by its reference `<source>/<id>`
+(`media/901`) in the same tools, through the adapter store `files` (`FileSourcesAgentDriveStoreService`; no mounts, no
+folders, read-only). `AgentDriveStoresService::findFileSourceReference()` takes only the exact form of a registered
+source other than `drive`; `/workspace/media/901` and `./media/901` stay paths. `saveDriveFile` with a reference as
+source copies across stores: the drive store of the target hands the reference to its own import (ddd-clouddrive:
+`DriveImportsService`), which asks the application's `FileFlowPolicyService` (same-path override of the Core class)
+before it reads a byte. `viewImages` shows up to four pictures (references or drive paths) to the model:
+`AgentFilePicturesService` asks the flow rule (target MODEL), renders through `FileSourcesService::renderImagePreview()`
+and keeps the picture in the tool picture store under the store `files` (id `<source>/<id>:<edge>:<fingerprint>`;
+durable only when the rule allows a durable copy). `agent.drive` is available as soon as a drive store OR a file source
+is installed. Config `config/app/AI/fileSources.php` (`AI.fileSources`): `findTools` (source name => the tool that
+finds its files, named when the model tries to list a source), `viewImages` (`maxPerCall` ≤ 4, `maxSourceBytes`,
+`maxSourcePixels`). A host tool that showed pictures of its own store through an own `ToolCallImageStore` drops it and
+names the reference instead.
 
 Documents: a store that also implements `DDD\Domain\AI\Services\Drives\AgentDriveFileContentReader` hands the bytes of
 a released version to `readDriveDocument` (the text page by page: PDF with OCR fallback, Word, Excel one page per sheet,
