@@ -18,6 +18,7 @@ use DDD\Domain\Common\Entities\Accounts\Account;
  *
  * @property object|null $lastRawResponse The provider's raw answer of the last call (from the language-model trait)
  * @property array|null $lastRequestPayload The request of the last call with its `body` and `headers` (from the language-model trait)
+ * @property AIModel|null $aiModel The model of the call once resolved or chosen (from the language-model trait)
  * @method AIModel|null getAIModel()
  * @method int|null getLastInputTokens()
  * @method int|null getLastOutputTokens()
@@ -35,6 +36,21 @@ class ArgusAgentMemoryCurationCall extends ValueObject
 
     /** @var Entity|null The entity within the account the AI costs are billed to (the billing entity of the space) */
     public ?Entity $billingEntity = null;
+
+    /**
+     * Runs this call on `$aiModel` instead of the model its attributes select (model scope, tier, default name): the
+     * language-model trait answers a model already set on the call first. For an application that measures its
+     * curation on several models: it sets the model in an override of
+     * {@see \DDD\Domain\AI\Services\Conversations\Memories\AgentMemoryCurationModelCallsService::loadCall()} before
+     * the call is sent. The curation itself never chooses a model here.
+     *
+     * @param AIModel $aiModel
+     * @return void
+     */
+    public function useAIModel(AIModel $aiModel): void
+    {
+        $this->aiModel = $aiModel;
+    }
 
     /**
      * The parsed answer, or an invalid empty result when the call returned none.

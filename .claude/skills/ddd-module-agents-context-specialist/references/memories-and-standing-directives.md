@@ -139,7 +139,9 @@ of a conversation where the owner was present (never a scheduled, background, de
 3. **Apply**: ADD stores unless the scope holds the same content; UPDATE / INVALIDATE store the successor and close the
    target (a target whose label or first words do not match falls back to an ADD); CONFLICT stores nothing and appends a
    `MEMORY_CONFLICT` signal (with where and when the old value was said, `AI.Memory.ConflictExcerpt`) so the agent asks
-   the owner, and resumes the conversation.
+   the owner, and resumes the conversation. The where and when is an `AgentMemoryConflictProvenance`, built with
+   `newInstance()`: an application that words the age of the old value its own way (`describeStatedAgo()`) puts a
+   subclass at the same path.
 
 Every content is written in the owner's interface language (`AgentSpacesService::resolveUserLanguageCode()`); the
 costs are booked under `AI.MEMORY.EXTRACT.CANDIDATES` and `AI.MEMORY.RECONCILE.DECIDE` inside the envelope
@@ -155,7 +157,9 @@ sent), `rawResultText`, `rawResponse` (the provider's whole answer, decoded), `i
 egress authentication and are never copied. The record is read from what the language-model trait of `mgamadeus/ddd-ai`
 keeps of the last call (the `body` of `lastRequestPayload`, `lastRawResponse`, `getLastInputTokens()`,
 `getLastOutputTokens()`, `getAIModel()`) by `ArgusAgentMemoryCurationCall::buildModelCallOfAttempt()`; each call class
-names its stage (`getCurationStage()`).
+names its stage (`getCurationStage()`). An application that measures its curation on several models chooses the
+model of each call with `ArgusAgentMemoryCurationCall::useAIModel()` in an override of
+`AgentMemoryCurationModelCallsService::loadCall()`; the record then names that model.
 
 | Result | Carries |
 |---|---|

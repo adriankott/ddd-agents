@@ -502,7 +502,8 @@ class AgentMemoryCurationService extends Service
      */
     protected function buildConflictProvenance(AgentMemoryOperation $conflict, AgentMemory $target, AIConversation $conversation): AgentMemoryConflictProvenance
     {
-        $agentMemoryConflictProvenance = new AgentMemoryConflictProvenance();
+        // newInstance(): an application's provenance at the same path (its own wording of the age) is built directly
+        $agentMemoryConflictProvenance = AgentMemoryConflictProvenance::newInstance();
         $agentMemoryConflictProvenance->contradictedMemoryContent = $target->content ?? null;
         $agentMemoryConflictProvenance->originalStatedAt = $target->validFrom ?? null;
         if (!isset($target->sourceMessageId)) {

@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.7.8
+
+- **Memory curation: the model of a call can be chosen.** `ArgusAgentMemoryCurationCall::useAIModel(AIModel $aiModel)`
+  sets the model a curation call runs on; it wins over the model scope, the tier and the default name, and the call's
+  attempt record (`AgentMemoryCurationModelCall::$aiModelName`) names it. The curation itself never calls it; an
+  application that measures its curation on several models calls it in an override of
+  `AgentMemoryCurationModelCallsService::loadCall()`.
+- **Memory curation: the conflict provenance is built for the application.**
+  `AgentMemoryCurationService::buildConflictProvenance()` builds with `AgentMemoryConflictProvenance::newInstance()`, so
+  an application's subclass at the same path (its own wording of `describeStatedAgo()`) is the object the
+  `MEMORY_CONFLICT` signal carries. An override that converted the package's object can drop the conversion.
+- Tools skill, reference `file-sources-in-the-drive-tools.md`: why find tools live with the source and viewing in
+  `agent.drive`, and a worked flow (find → `viewImages` → `saveDriveFile` → `showDriveFiles`) with requests, server
+  call chains, answers, refusal and consent variants, and where each check sits.
+- No config or schema change; npm 0.7.8 in lockstep.
+
 ## 0.7.7
 
 - **New: the owner-consent thresholds are configurable** — `config/app/AI/ownerConsent.php` (`AI.ownerConsent`,
