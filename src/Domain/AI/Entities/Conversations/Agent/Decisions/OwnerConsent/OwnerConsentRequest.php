@@ -9,9 +9,10 @@ use DDD\Domain\Base\Entities\ValueObject;
 /**
  * What a tool asks the owner-consent check: the step it is about to take, named by its TARGET and its
  * CONSEQUENCE. Both lines are built by the tool from what it LOADED (English, never the model's prose), so a yes to
- * another target, another value or two records instead of one is no consent to this step. One threshold, 0.90, for
- * every kind (set after a probe of recorded dialogues: it lies above every trap and below every genuine consent — a
- * higher one for deletions refused part of the owners' clear yeses).
+ * another target, another value or two records instead of one is no consent to this step. The thresholds come from
+ * `AI.ownerConsent` ({@see OwnerConsentSettings}), one for each probability, the same for every kind of step; the
+ * default 0.90 was set after a probe of recorded dialogues: it lies above every trap and below every genuine consent
+ * (a higher one for deletions refused part of the owners' clear yeses).
  *
  * @phpstan-consistent-constructor
  */
@@ -31,7 +32,18 @@ class OwnerConsentRequest extends ValueObject
     /** What the step means for the owner, e.g. "Google verifies the Business Profile again; until then the listing can lose visibility". */
     public string $consequenceLine = '';
 
-    /** Both probabilities must reach this. */
+    /** The probability that the agent explained the step must reach this ({@see OwnerConsentSettings::$minimumStepExplainedProbability}). */
+    public float $minimumStepExplainedProbability = self::MINIMUM_PROBABILITY;
+
+    /** The probability that the owner agreed to the step must reach this ({@see OwnerConsentSettings::$minimumOwnerAgreedProbability}). */
+    public float $minimumOwnerAgreedProbability = self::MINIMUM_PROBABILITY;
+
+    /**
+     * The higher of the two thresholds — for display and telemetry only; the verdict reads
+     * {@see $minimumStepExplainedProbability} and {@see $minimumOwnerAgreedProbability}.
+     *
+     * @deprecated since 0.7.7: read the two thresholds
+     */
     public float $minimumProbability = self::MINIMUM_PROBABILITY;
 
     /**
@@ -53,7 +65,16 @@ class OwnerConsentRequest extends ValueObject
         $request->targetLine = $targetLine;
         $request->consequenceLine = $consequenceLine;
         $request->targetKey = $targetKey;
-        $request->minimumProbability = self::MINIMUM_PROBABILITY;
+        $request->applyOwnerConsentSettings(OwnerConsentSettings::current());
         return $request;
+    }
+
+    /** Takes the thresholds of the settings. */
+    public function applyOwnerConsentSettings(OwnerConsentSettings $ownerConsentSettings): static
+    {
+        $this->minimumStepExplainedProbability = $ownerConsentSettings->minimumStepExplainedProbability;
+        $this->minimumOwnerAgreedProbability = $ownerConsentSettings->minimumOwnerAgreedProbability;
+        $this->minimumProbability = max($this->minimumStepExplainedProbability, $this->minimumOwnerAgreedProbability);
+        return $this;
     }
 }

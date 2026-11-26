@@ -136,10 +136,16 @@ class AIConversationFreeSubjectsDatabaseTest extends DatabaseTestCase
             . 'These lines were written when the conversation started. Read the record with your tools before you state its current state.';
         self::assertSame($expectedText, $conversation->findConversationSubjectBlock(), 'the conversation object of the drive reads it at once');
         self::assertSame($expectedText, $this->findConversation(206)->findConversationSubjectBlock(), 'and so does every later load (a worker, a reopen)');
+        // the decision sites read the record as the first of the conversation's stored facts
+        $expectedFactLines = ['record of this conversation: agent space 21'];
+        self::assertSame($expectedFactLines, $conversation->buildStoredFactLinesForDecisions());
+        self::assertSame($expectedFactLines, $this->findConversation(206)->buildStoredFactLinesForDecisions());
+        self::assertSame([], $this->findConversation(200)->buildStoredFactLinesForDecisions(), 'bound before a describer existed: no line');
 
         // a second description never replaces the stored one: the model's text stays byte-stable
         $this->getConversationsService()->persistSubjectDescriptionSlice($conversation, AIConversationSubjectDescription::of('agent space 21, renamed', 'Bakery & Café'));
         self::assertSame($expectedText, $this->findConversation(206)->findConversationSubjectBlock());
+        self::assertSame($expectedFactLines, $this->findConversation(206)->buildStoredFactLinesForDecisions());
     }
 
     public function testAConversationAtAccountLevelIsBoundWithoutASpaceAndWithoutADescriberItHasNoRecordSegment(): void

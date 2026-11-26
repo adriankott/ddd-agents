@@ -15,10 +15,15 @@ use DDD\Domain\AI\Entities\Conversations\Subjects\AIConversationBoundSubjects;
 use DDD\Domain\AI\Entities\Conversations\Subjects\AIConversationSubject;
 use DDD\Domain\AI\Entities\Conversations\Subjects\AIConversationSubjectBinding;
 use DDD\Domain\AI\Entities\Conversations\Subjects\AIConversationSubjectDescription;
+use DDD\Domain\AI\Repo\Argus\Conversations\Decisions\ArgusAgentTurnStartDecision;
+use DDD\Domain\AI\Services\AgentSpaces\AgentSpacesService;
+use DDD\Domain\AI\Services\Conversations\Agent\AgentReasoningEffortDecisionsService;
+use DDD\Domain\AI\Services\Conversations\Agent\AgentSkillPreloadDecisionsService;
 use DDD\Domain\AI\Services\Conversations\AIConversationAgentService;
 use DDD\Domain\AI\Services\Conversations\AIConversationSubjectBindingsService;
 use DDD\Presentation\Api\Agents\Conversations\Dtos\AIConversationBoundSubjectsGetResponseDto;
 use DDD\Tests\Agents\Support\IntegrationTestCase;
+use ReflectionClass;
 use ReflectionMethod;
 
 /**
@@ -222,6 +227,57 @@ class AIConversationSubjectContextTest extends IntegrationTestCase
         self::assertSame('Spring order 2026', $answer['subjects']['elements'][0]['name']);
     }
 
+    public function testTheStoredFactsOfADecisionLeadWithTheRecordLineExactlyOnceAndTheLineIsStable(): void
+    {
+        $factLinesOfTheSpace = ['opening hours on file', 'menu on file'];
+        $agentSpacesService = new AgentSpacesServiceWithStoredFacts();
+        $agentSpacesService->storedFactLines = $factLinesOfTheSpace;
+        $this->replaceService(AgentSpacesService::class, $agentSpacesService);
+        $description = AIConversationSubjectDescription::of('order 10683 of shop 12.', 'Spring order 2026', '/orders/10683');
+        $boundConversation = new AIConversation();
+        $boundConversation->agentWorkingState = new AgentWorkingState();
+        $boundConversation->agentWorkingState->subjectDescription = $description;
+        $conversationWithoutAState = new AIConversation();
+        $unboundConversation = new AIConversation();
+        $unboundConversation->agentWorkingState = new AgentWorkingState();
+
+        $factLines = $boundConversation->buildStoredFactLinesForDecisions();
+        $recordLine = 'record of this conversation: order 10683 of shop 12';
+
+        self::assertSame([$recordLine, ...$factLinesOfTheSpace], $factLines, 'the record leads, the facts of the space follow unchanged');
+        self::assertSame(1, substr_count(implode("\n", $factLines), AIConversationSubjectDescription::DECISION_FACT_PREFIX), 'exactly once');
+        self::assertSame($factLines, $boundConversation->buildStoredFactLinesForDecisions(), 'the same lines at every call');
+        self::assertStringNotContainsString('Spring order 2026', implode("\n", $factLines), 'the name is text of third parties and stays out of a decision');
+        self::assertStringNotContainsString('/orders/10683', implode("\n", $factLines));
+        self::assertSame($factLinesOfTheSpace, $conversationWithoutAState->buildStoredFactLinesForDecisions());
+        self::assertSame($factLinesOfTheSpace, $unboundConversation->buildStoredFactLinesForDecisions(), 'a conversation about no record reads what it read before');
+
+        // a later request: the description comes back from the working state's stored shape
+        $reloadedConversation = new AIConversation();
+        $reloadedConversation->agentWorkingState = new AgentWorkingState();
+        $reloadedConversation->agentWorkingState->subjectDescription = AIConversationSubjectDescription::fromRepositoryArray($description->toRepositoryArray());
+        self::assertSame($factLines, $reloadedConversation->buildStoredFactLinesForDecisions(), 'byte-stable for the conversation\'s life');
+
+        // the decision states are cut: the record survives long facts of the space because it is first, and it is capped
+        $agentSpacesService->storedFactLines = [str_repeat('a long fact of the space. ', 40)];
+        $cutState = mb_substr(implode("\n", $boundConversation->buildStoredFactLinesForDecisions()), 0, ArgusAgentTurnStartDecision::MAX_STORED_FACTS_CHARS);
+        self::assertStringStartsWith($recordLine . "\n", $cutState);
+        $longDescription = AIConversationSubjectDescription::of(str_repeat('x', AIConversationSubjectDescription::MAX_DESCRIPTION_CHARS));
+        self::assertSame(
+            AIConversationSubjectDescription::DECISION_FACT_PREFIX . str_repeat('x', AIConversationSubjectDescription::MAX_DECISION_FACT_CHARS),
+            $longDescription->renderDecisionFactLine()
+        );
+        self::assertNull((new AIConversationSubjectDescription())->renderDecisionFactLine(), 'no line without a description');
+    }
+
+    public function testBothDecisionSitesReadTheStoredFactLinesOfTheConversation(): void
+    {
+        foreach ([AgentSkillPreloadDecisionsService::class, AgentReasoningEffortDecisionsService::class] as $decisionSiteClassName) {
+            $source = (string)file_get_contents((string)(new ReflectionClass($decisionSiteClassName))->getFileName());
+            self::assertSame(1, substr_count($source, '->buildStoredFactLinesForDecisions()'), $decisionSiteClassName . ' reads the lines once, through the conversation');
+        }
+    }
+
     public function testTheDriveBindsANewConversationBeforeItsFirstTurnIsDispatched(): void
     {
         $driveMethod = new ReflectionMethod(AIConversationAgentService::class, 'driveConversation');
@@ -258,4 +314,16 @@ class AgentSpaceOfAnApplication extends AgentSpace
 /** An application's class of a bound subject. */
 class AIConversationBoundSubjectOfAnApplication extends AIConversationBoundSubject
 {
+}
+
+/** An application's space service that holds facts about the space. */
+class AgentSpacesServiceWithStoredFacts extends AgentSpacesService
+{
+    /** @var string[] */
+    public array $storedFactLines = [];
+
+    public function buildStoredFactLines(AIConversation $conversation): array
+    {
+        return $this->storedFactLines;
+    }
 }

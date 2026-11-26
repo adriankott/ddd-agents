@@ -92,6 +92,7 @@ src/Domain/AI/**/Drives/**	tools
 src/Domain/AI/**/Documents/**	tools
 config/app/AI/documents.php	tools
 config/app/AI/fileSources.php	tools
+config/app/AI/ownerConsent.php	decisions-and-guards
 src/Presentation/Mcp/Client/Agents/AgentDriveMCPPackage.php	tools
 src/Presentation/Mcp/Client/Agents/Dtos/AgentDrive*	tools
 src/Presentation/Mcp/Client/Agents/ToolBatchAdoptionNote.php	tools

@@ -36,6 +36,12 @@ class AIConversationSubjectDescription extends ValueObject
     /** @var string What the marked record name is called in the model's context */
     public const string NAME_SOURCE = 'record name';
 
+    /** @var int The characters of {@see $description} a decision reads ({@see self::renderDecisionFactLine()}) */
+    public const int MAX_DECISION_FACT_CHARS = 200;
+
+    /** @var string What the line of a decision starts with */
+    public const string DECISION_FACT_PREFIX = 'record of this conversation: ';
+
     /** @var string|null The record's display name, e.g. `Spring order 2026`; the client shows it */
     public ?string $name = null;
 
@@ -100,6 +106,25 @@ class AIConversationSubjectDescription extends ValueObject
         }
         $lines[] = 'These lines were written when the conversation started. Read the record with your tools before you state its current state.';
         return implode("\n", $lines);
+    }
+
+    /**
+     * The one line a decision model reads about the record, among the stored facts of the conversation
+     * ({@see \DDD\Domain\AI\Entities\Conversations\AIConversation::buildStoredFactLinesForDecisions()}): what the
+     * record is in the application's words, cut to {@see self::MAX_DECISION_FACT_CHARS}. The record's name and link
+     * are left out: the name is text of third parties, and a decision needs the kind of record, not its title. Pure,
+     * so the same description renders the same line in every call.
+     *
+     * Example: `record of this conversation: support ticket 13082 of shop 12`
+     *
+     * @return string|null null without a line for the model
+     */
+    public function renderDecisionFactLine(): ?string
+    {
+        if (!$this->hasDescription()) {
+            return null;
+        }
+        return static::DECISION_FACT_PREFIX . rtrim(mb_substr((string)$this->description, 0, static::MAX_DECISION_FACT_CHARS), '. ');
     }
 
     /** @return array<string, string|null> the stored shape on the conversation's working state */

@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.7.7
+
+- **New: the owner-consent thresholds are configurable** — `config/app/AI/ownerConsent.php` (`AI.ownerConsent`,
+  `OwnerConsentSettings`): `minimumProbability.stepExplained` and `minimumProbability.ownerAgreed`, 0.90 each by
+  default (unchanged behaviour). `OwnerConsentRequest::forAction()` copies them onto the request
+  (`minimumStepExplainedProbability`, `minimumOwnerAgreedProbability`); `OwnerConsentVerdict::decided()` compares each
+  probability with its own threshold. `OwnerConsentRequest::$minimumProbability` holds the higher of the two for
+  display and is deprecated (no longer read). The consent turn event also records both thresholds. Host steps: none;
+  an application that wants other values adds its own `config/app/AI/ownerConsent.php`.
+- **Changed: the decision sites read the record of a bound conversation.**
+  `AIConversation::buildStoredFactLinesForDecisions()` leads with one line `record of this conversation: <what the
+  record is>`, from the description the working state stores since the conversation was bound
+  (`AIConversationSubjectDescription::renderDecisionFactLine()`, constants `DECISION_FACT_PREFIX` and
+  `MAX_DECISION_FACT_CHARS` = 200; without the record's name and link, which are third-party text). The skill-preload
+  and reasoning-effort sites read it, so a sentence that names no record ("what is this about?") no longer leaves the
+  preload decision without anything to choose by. It is the first line (the decision states are cut) and the same text
+  in every call. A conversation without a record, or bound before a describer existed, reads what it read before. An
+  application that overrides `buildStoredFactLinesForDecisions()` or counts the lines of
+  `AgentSpacesService::buildStoredFactLines()` in a test sees one more line for bound conversations. No table change.
+
 ## 0.7.6
 
 - **A decision answer that is unusable keeps its reason.** An answer without an `answers` object and with a

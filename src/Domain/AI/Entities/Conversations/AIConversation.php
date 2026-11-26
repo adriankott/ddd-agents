@@ -1125,13 +1125,25 @@ class AIConversation extends Entity
      * space only ({@see AgentSpacesService::buildStoredFactLines()}, never a lazy load). Shared by the effort site and the preload site (the decision model must
      * see what the chat model sees — the context text of the space is part of it).
      *
+     * A conversation bound to a record leads with one line about it
+     * ({@see \DDD\Domain\AI\Entities\Conversations\Subjects\AIConversationSubjectDescription::renderDecisionFactLine()}),
+     * from the description its working state stores since it was bound — what the chat model reads in its
+     * `CONVERSATION_SUBJECT` segment. Without it a sentence that names no record ("what is this about?") gives a
+     * decision nothing to tell the skills apart by. It is the first line, because the decision states are cut to a
+     * length, and it is the same text in every call of the conversation.
+     *
      * @return string[]
      */
     public function buildStoredFactLinesForDecisions(): array
     {
         /** @var AgentSpacesService $agentSpacesService */
         $agentSpacesService = DDDService::instance()->getService(AgentSpacesService::class);
-        return $agentSpacesService->buildStoredFactLines($this);
+        $storedFactLines = $agentSpacesService->buildStoredFactLines($this);
+        $subjectFactLine = isset($this->agentWorkingState) ? $this->agentWorkingState->subjectDescription?->renderDecisionFactLine() : null;
+        if ($subjectFactLine !== null) {
+            array_unshift($storedFactLines, $subjectFactLine);
+        }
+        return $storedFactLines;
     }
 
     /** Whether the plan's `← next` node belongs to this conversation's purpose's CLOSING act ({@see AIConversationPurpose::getClosingProgressStepKey()}). */

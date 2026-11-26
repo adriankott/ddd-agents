@@ -73,7 +73,8 @@ class OwnerConsentVerdict extends ValueObject
     }
 
     /**
-     * The decision model's answer: it reaches the threshold only when BOTH probabilities do; it CONSENTS only when it is
+     * The decision model's answer: it reaches the thresholds only when BOTH probabilities reach theirs
+     * ({@see OwnerConsentRequest::$minimumStepExplainedProbability}, {@see OwnerConsentRequest::$minimumOwnerAgreedProbability}); it CONSENTS only when it is
      * binding (`jev`) — a `shadow` verdict is recorded as {@see $wouldConsent} and never lets the step run.
      */
     public static function decided(OwnerConsentRequest $request, float $stepExplainedProbability, float $ownerAgreedProbability, ?int $ownerMessageIndex, string $decidedBy): static
@@ -83,8 +84,8 @@ class OwnerConsentVerdict extends ValueObject
         $verdict->ownerAgreedProbability = $ownerAgreedProbability;
         $verdict->consentingOwnerMessageIndex = $ownerMessageIndex;
         $verdict->decidedBy = $decidedBy;
-        $verdict->wouldConsent = $stepExplainedProbability >= $request->minimumProbability
-            && $ownerAgreedProbability >= $request->minimumProbability;
+        $verdict->wouldConsent = $stepExplainedProbability >= $request->minimumStepExplainedProbability
+            && $ownerAgreedProbability >= $request->minimumOwnerAgreedProbability;
         $verdict->consented = $verdict->wouldConsent && $decidedBy === self::DECIDED_BY_DECISION_MODEL;
         return $verdict;
     }

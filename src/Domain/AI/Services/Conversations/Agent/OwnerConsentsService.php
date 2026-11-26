@@ -725,6 +725,8 @@ class OwnerConsentsService extends Service
                 'stepExplainedProbability' => $verdict->stepExplainedProbability,
                 'ownerAgreedProbability' => $verdict->ownerAgreedProbability,
                 'minimumProbability' => $request->minimumProbability,
+                'minimumStepExplainedProbability' => $request->minimumStepExplainedProbability,
+                'minimumOwnerAgreedProbability' => $request->minimumOwnerAgreedProbability,
                 'consentingOwnerMessageIndex' => $verdict->consentingOwnerMessageIndex,
                 'failure' => $verdict->failure,
                 'actionKind' => $request->actionKind,

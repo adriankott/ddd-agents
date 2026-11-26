@@ -128,6 +128,11 @@ answer or switched off. The constant is on `AgentDecisionModelSettings`.
 - **Sees:** the offered roots (or the sub-skills a root unlocks) with each skill's decision catalog entry, the loaded
   skills with their catalog entries and tool summaries, the recent turns, the task plan, the stored facts of the agent
   space, the meta tools, and the host's facts from `DDD\Domain\AI\Services\Conversations\Agent\AgentDecisionFactsService::collectSkillPreloadFacts()`.
+  The stored facts (`AIConversation::buildStoredFactLinesForDecisions()`, read by this site and by `reasoningEffort`)
+  lead with the record of a bound conversation: one line `record of this conversation: <what the record is>`
+  (`AIConversationSubjectDescription::renderDecisionFactLine()`, at most 200 characters of the describer's line,
+  without the record's name and link). It is first because the state is cut to 400 characters, and it is the same
+  text in every call of the conversation.
   In a sub-skill pass also the unlocking root's `description` and its resident sub-skills (each by its
   `shortDescription`, else its name).
 - **The catalog entry** (`AISkill::getDecisionCatalogEntry()`): the skill's `description` — the same text the chat

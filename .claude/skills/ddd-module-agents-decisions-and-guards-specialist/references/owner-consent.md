@@ -106,7 +106,13 @@ class HostNotesMCPPackage extends MCPPackage // the host's tool package
 with its target), the **consequence line** (what it means for the owner) and a **target key** (a stable key of the
 bound fields: the ids, the new value). Both lines are English and built from the loaded entities, never from the
 model's arguments as prose — a yes to another target, another value or two records instead of one is then no yes to
-this step. The threshold is `OwnerConsentRequest::MINIMUM_PROBABILITY` for every kind of step.
+this step. The thresholds come from `config/app/AI/ownerConsent.php` (`AI.ownerConsent`, `OwnerConsentSettings`), the
+same for every kind of step: `minimumProbability.stepExplained` (the agent explained target and consequence) and
+`minimumProbability.ownerAgreed` (the owner agreed to that step), 0.90 each by default
+(`OwnerConsentRequest::MINIMUM_PROBABILITY`). The step is consented only when both reach theirs. `forAction()` copies
+them onto the request (`minimumStepExplainedProbability`, `minimumOwnerAgreedProbability`); `minimumProbability`
+holds the higher one for display and is no longer read. Change a value only after measuring it on the host's own
+recorded dialogues: higher refuses genuine yeses, lower lets traps through.
 
 A tool package that must rebuild requests for historical calls (for a replay command of the host) implements
 `DDD\Domain\AI\Entities\Conversations\Agent\Decisions\OwnerConsent\OwnerConsentRequestProvider::buildOwnerConsentRequest()`.
