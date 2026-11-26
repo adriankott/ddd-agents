@@ -103,13 +103,14 @@ booked (`fallback:error`, the spend unbooked).
   the floors over the recorded probabilities, and a "Preload outcomes" section (were the preloaded skills' tools used)
   that appears only when the host writes `preloadOutcome` turn events (`AIConversationTurnEvent::KIND_PRELOAD_OUTCOME`)
   — the package declares that kind and reads it, but writes none, so without the host's events the section never
-  appears.
+  appears; for `ownerConsent` the decisions per cut dialogue, second-pass reason and consent, and the newest 50
+  refusals whose owner answer was clear while the step was not recognised ("Answer clear, step not recognised").
 
 The skill-preload agreement carries a 95 % interval (`AgentDecisionWilsonInterval`).
 
 **What it can measure.** Only sites that write a `decision` turn event. Per-site sections exist for `turnClosing`,
-`reasoningEffort`, `stallRecovery` and `skillPreload`; the other event-writing sites (plan-item preload, plan dynamics,
-direct widget, turn-start line, owner consent, and a host site that writes its own event) get the generic sections.
+`reasoningEffort`, `stallRecovery`, `skillPreload` and `ownerConsent`; the other event-writing sites (plan-item
+preload, plan dynamics, direct widget, turn-start line, and a host site that writes its own event) get the generic sections.
 Reply language, the owner-message screen and the tool-result screen write no event: the service shows nothing for
 them.
 

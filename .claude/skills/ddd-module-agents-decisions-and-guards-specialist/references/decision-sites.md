@@ -77,6 +77,12 @@ batch. The batch is classified once (`AgentTurnStartBatchResult`) and every site
 - Nothing asked (every site ineligible) = no request at all. An open breaker = no request; every site gets
   `fallback:breaker`.
 
+**What the turn-start sites read of the texts.** The owner message keeps its START (600 characters), the assistant
+text before it its END (300 characters: its question and offer stand there, and a short "ja" refers to exactly that) —
+on every turn-start site; stall recovery the same. Every cut is marked (`[… 412 characters cut at the start]`,
+`AgentDecisionTextCuts`); the limits are `config/app/AI/decisionContext.php` (`turnStart`, `stallRecovery`). A site of
+the host that shows the model a text cuts it the same way.
+
 ## Which site goes through what
 
 "Runner" = the call goes through `DDD\Domain\AI\Services\Decisions\AgentDecisionCallsService`: breaker check, outcome classification, the shared

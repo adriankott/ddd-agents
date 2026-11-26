@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace DDD\Domain\AI\Repo\Argus\Conversations\Decisions;
 
 use DDD\Domain\AI\Entities\Conversations\Agent\AgentApplicationWording;
+use DDD\Domain\AI\Entities\Conversations\Agent\Decisions\AgentDecisionContextSettings;
+use DDD\Domain\AI\Entities\Conversations\Agent\Decisions\AgentDecisionTextCuts;
 use DDD\Domain\AI\Entities\Conversations\Agent\Decisions\OwnerConsent\OwnerConsentDialogue;
 use DDD\Domain\AI\Entities\Conversations\Agent\Decisions\OwnerConsent\OwnerConsentDialogueLine;
 use DDD\Domain\AI\Entities\Conversations\Agent\Decisions\OwnerConsent\OwnerConsentRequest;
@@ -56,6 +58,9 @@ class ArgusAgentOwnerConsentDecision extends ValueObject
     public const string QUESTION_STEP_EXPLAINED = 'assistant_named_this_step_and_its_consequence';
     public const string QUESTION_OWNER_AGREED = 'owner_explicitly_agreed_afterwards';
 
+    /** Asked only when a dialogue line was cut: is what is left enough to see what the owner's answer refers to? */
+    public const string QUESTION_CONTEXT_SUFFICIENT = 'excerpt_shows_what_the_answer_refers_to';
+
     public const string STATE_STEP = 'step';
     public const string STATE_CONSEQUENCE = 'consequence';
     public const string STATE_DIALOGUE = 'dialogue';
@@ -64,12 +69,16 @@ class ArgusAgentOwnerConsentDecision extends ValueObject
     public const string CHANNEL_CHAT = 'chat';
     public const string CHANNEL_PHONE = 'phone';
 
-    /** A dialogue line is cut to this many characters (an assistant explanation keeps its END, where the question stands). */
+    /**
+     * The package default of a dialogue line's cut (an assistant explanation keeps its END, where the question stands);
+     * the limit in force is `AI.decisionContext` ({@see AgentDecisionContextSettings::$ownerConsentLineCharacters}).
+     */
     public const int MAX_LINE_CHARS = 700;
 
     /**
-     * The most an assistant explanation keeps: it must hold the whole step (a reply step names its exact text) and its
-     * question, so it keeps {@see MAX_LINE_CHARS} plus the length of the step and of the consequence, up to this.
+     * The package default of the most an assistant explanation keeps: it must hold the whole step (a reply step names
+     * its exact text) and its question, so it keeps the line limit plus the length of the step and of the consequence,
+     * up to this ({@see AgentDecisionContextSettings::$ownerConsentAssistantLineMaxCharacters}).
      */
     public const int MAX_ASSISTANT_LINE_CHARS = 4000;
 
@@ -89,15 +98,16 @@ class ArgusAgentOwnerConsentDecision extends ValueObject
 
     public ?float $ownerAgreedProbability = null;
 
+    /** @var float|null The answer to {@see QUESTION_CONTEXT_SUFFICIENT}; null when no line was cut (not asked) */
+    public ?float $contextSufficientProbability = null;
+
+    /** @var bool The second pass: every line keeps up to the expanded limit ({@see AgentDecisionContextSettings::$ownerConsentExpandedLineCharacters}) */
+    public bool $readsExpandedLines = false;
+
     /** The decision for one request over one dialogue. */
     public static function forRequest(OwnerConsentRequest $request, OwnerConsentDialogue $dialogue, string $channel): static
     {
-        $decision = new static();
-        $decision->step = $request->targetLine;
-        $decision->consequence = $request->consequenceLine;
-        $decision->dialogue = $dialogue;
-        $decision->channel = $channel;
-        return $decision;
+        return static::forRequestLines($request->targetLine, $request->consequenceLine, $dialogue, $channel);
     }
 
     /**
@@ -164,6 +174,29 @@ class ArgusAgentOwnerConsentDecision extends ValueObject
         ];
     }
 
+    /**
+     * The question asked only when a line was cut ({@see isDialogueCut()}). Public so the unit test pins it.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public static function buildContextSufficientQuestion(): array
+    {
+        return [
+            self::QUESTION_CONTEXT_SUFFICIENT => [
+                'type' => 'noul',
+                'instructions' => 'Some lines of `' . self::STATE_DIALOGUE . '` are cut; a cut line begins or ends with a marker like '
+                    . '"[… 804 characters cut at the start]". Is what is left of the dialogue enough to see which step and target '
+                    . 'the owner\'s answer refers to?',
+                'criteria' => [
+                    'true' => 'the lines before the owner\'s answer still show the step the assistant asked about (its target, a draft '
+                        . 'or text it would send) — or the dialogue plainly never named one; the cut parts only repeat or add detail',
+                    'false' => 'the assistant asked about something whose content was cut away: the answer refers to a draft, a list '
+                        . 'or a target that the cut parts held, so the step cannot be recognised from what is left',
+                ],
+            ],
+        ];
+    }
+
     /** @return array<string, mixed> */
     public function buildState(): array
     {
@@ -172,10 +205,10 @@ class ArgusAgentOwnerConsentDecision extends ValueObject
             $dialogueState[] = [
                 'speaker' => $dialogueLine->speaker,
                 // an assistant explanation ends with its question; an owner line starts with its answer; a widget
-                // line starts with the question that names the step and its target
+                // line starts with the question that names the step and its target. A cut is marked.
                 'text' => $dialogueLine->speaker === OwnerConsentDialogueLine::SPEAKER_ASSISTANT
-                    ? mb_substr($dialogueLine->text, -$this->getAssistantLineLimit())
-                    : mb_substr($dialogueLine->text, 0, self::MAX_LINE_CHARS),
+                    ? AgentDecisionTextCuts::keepEnd($dialogueLine->text, $this->getAssistantLineLimit())
+                    : AgentDecisionTextCuts::keepStart($dialogueLine->text, $this->getOtherLineLimit()),
             ];
         }
         return [
@@ -187,25 +220,93 @@ class ArgusAgentOwnerConsentDecision extends ValueObject
     }
 
     /**
-     * How many characters of an assistant explanation the decision reads (its END): {@see MAX_LINE_CHARS} plus the
-     * step and the consequence, at most {@see MAX_ASSISTANT_LINE_CHARS}. A fixed 700 cut the start of every explanation
-     * whose step is long — a support reply shown in full before its question lost its first lines, and an explanation
-     * of two steps lost the first one, so a clear yes could never pass.
+     * How many characters of an assistant explanation the decision reads (its END): the line limit plus the step and
+     * the consequence, at most the assistant-line maximum; in the second pass the expanded limit. A fixed 700 cut the
+     * start of every explanation whose step is long — a support reply shown in full before its question lost its first
+     * lines, and an explanation of two steps lost the first one, so a clear yes could never pass.
      */
     public function getAssistantLineLimit(): int
     {
-        return min(self::MAX_ASSISTANT_LINE_CHARS, self::MAX_LINE_CHARS + mb_strlen($this->step) + mb_strlen($this->consequence));
+        $agentDecisionContextSettings = AgentDecisionContextSettings::current();
+        if ($this->readsExpandedLines) {
+            return $agentDecisionContextSettings->ownerConsentExpandedLineCharacters;
+        }
+        return min(
+            $agentDecisionContextSettings->ownerConsentAssistantLineMaxCharacters,
+            $agentDecisionContextSettings->ownerConsentLineCharacters + mb_strlen($this->step) + mb_strlen($this->consequence)
+        );
+    }
+
+    /** How many characters of an owner or widget line the decision reads (its START); in the second pass the expanded limit. */
+    public function getOtherLineLimit(): int
+    {
+        $agentDecisionContextSettings = AgentDecisionContextSettings::current();
+        return $this->readsExpandedLines
+            ? $agentDecisionContextSettings->ownerConsentExpandedLineCharacters
+            : $agentDecisionContextSettings->ownerConsentLineCharacters;
+    }
+
+    /** Whether a line of the dialogue is longer than the decision reads of it (its cut is marked in the state). */
+    public function isDialogueCut(): bool
+    {
+        foreach ($this->dialogue?->getElements() ?? [] as $dialogueLine) {
+            $lineLimit = $dialogueLine->speaker === OwnerConsentDialogueLine::SPEAKER_ASSISTANT ? $this->getAssistantLineLimit() : $this->getOtherLineLimit();
+            if (AgentDecisionTextCuts::countCutCharacters($dialogueLine->text, $lineLimit) > 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The same decision reading every line up to the expanded limit, its answers not yet asked: the second pass.
+     *
+     * @return static
+     */
+    public function buildExpandedPass(): static
+    {
+        $expandedDecision = static::forRequestLines($this->step, $this->consequence, $this->dialogue, $this->channel);
+        $expandedDecision->readsExpandedLines = true;
+        $expandedDecision->billingEntity = $this->billingEntity;
+        $expandedDecision->budgetAccount = $this->budgetAccount;
+        return $expandedDecision;
+    }
+
+    /** Whether this decision reads more of some dialogue line than `$otherDecision` does (the second pass is worth a call). */
+    public function readsMoreThan(ArgusAgentOwnerConsentDecision $otherDecision): bool
+    {
+        foreach ($this->dialogue?->getElements() ?? [] as $dialogueLine) {
+            $isAssistantLine = $dialogueLine->speaker === OwnerConsentDialogueLine::SPEAKER_ASSISTANT;
+            $ownCut = AgentDecisionTextCuts::countCutCharacters($dialogueLine->text, $isAssistantLine ? $this->getAssistantLineLimit() : $this->getOtherLineLimit());
+            $otherCut = AgentDecisionTextCuts::countCutCharacters($dialogueLine->text, $isAssistantLine ? $otherDecision->getAssistantLineLimit() : $otherDecision->getOtherLineLimit());
+            if ($ownCut < $otherCut) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** A decision over a step, a consequence and a dialogue (the fields {@see forRequest()} reads from a request). */
+    protected static function forRequestLines(string $step, string $consequence, ?OwnerConsentDialogue $dialogue, string $channel): static
+    {
+        $decision = new static();
+        $decision->step = $step;
+        $decision->consequence = $consequence;
+        $decision->dialogue = $dialogue;
+        $decision->channel = $channel;
+        return $decision;
     }
 
     protected function buildQuestionsForRequest(): array
     {
-        return self::buildQuestions();
+        return $this->isDialogueCut() ? self::buildQuestions() + self::buildContextSufficientQuestion() : self::buildQuestions();
     }
 
     protected function applyAnswers(object $answers): bool
     {
         $this->stepExplainedProbability = $this->readNoulProbability($answers, self::QUESTION_STEP_EXPLAINED);
         $this->ownerAgreedProbability = $this->readNoulProbability($answers, self::QUESTION_OWNER_AGREED);
+        $this->contextSufficientProbability = $this->isDialogueCut() ? $this->readNoulProbability($answers, self::QUESTION_CONTEXT_SUFFICIENT) : null;
         return $this->stepExplainedProbability !== null && $this->ownerAgreedProbability !== null;
     }
 }

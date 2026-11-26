@@ -24,6 +24,7 @@ use DDD\Domain\AI\Exceptions\Conversations\AgentRunClaimLostException;
 use DDD\Domain\AI\Exceptions\Conversations\OwnerConsentMissingException;
 use DDD\Domain\AI\Repo\Argus\Conversations\Decisions\ArgusAgentDecisions;
 use DDD\Domain\AI\Repo\Argus\Conversations\Decisions\ArgusAgentOwnerConsentDecision;
+use DDD\Domain\AI\Entities\Conversations\Agent\Decisions\AgentDecisionContextSettings;
 use DDD\Domain\AI\Repo\DB\Conversations\DBAIConversationModel;
 use DDD\Domain\AI\Services\Conversations\AIConversationRunClaimsService;
 use DDD\Domain\AI\Services\Conversations\TurnEvents\AIConversationTurnEventsService;
@@ -491,7 +492,8 @@ class OwnerConsentsService extends Service
             $ownerConsentDecisionResult->verdict,
             $ownerConsentDecisionResult->dialogue,
             $ownerConsentDecisionResult->callOutcome,
-            (int)round((hrtime(true) - $startedAt) / 1e6)
+            (int)round((hrtime(true) - $startedAt) / 1e6),
+            $ownerConsentDecisionResult
         );
         return $ownerConsentDecisionResult->verdict;
     }
@@ -663,27 +665,15 @@ class OwnerConsentsService extends Service
         if ($ownerMessageIndex === null) {
             return OwnerConsentDecisionResult::create(OwnerConsentVerdict::failed(OwnerConsentVerdict::FAILURE_NO_OWNER_ROW), $dialogue);
         }
-        $decisionModelSettings = AgentDecisionModelSettings::current();
         $argusDecision = ArgusAgentOwnerConsentDecision::forRequest($request, $dialogue, $channel);
         $argusDecision->billingEntity = $billingEntity;
         $argusDecision->budgetAccount = $budgetAccount;
-        $outcome = $this->decisionCallsService()->runDecisionBatch(
-            ArgusAgentDecisions::forChild($argusDecision, AgentDecisionModelSettings::SITE_OWNER_CONSENT),
-            $argusDecision,
-            $timeoutSeconds ?? $decisionModelSettings->timeoutSeconds,
-            $decisionModelSettings->breakerSeconds,
-            AgentDecisionModelSettings::SITE_OWNER_CONSENT
-        );
-        $failure = match ($outcome->outcome) {
-            AgentDecisionCallOutcome::OUTCOME_BREAKER_OPEN => OwnerConsentVerdict::FAILURE_BREAKER,
-            AgentDecisionCallOutcome::OUTCOME_TRANSPORT_FAILED => OwnerConsentVerdict::FAILURE_TRANSPORT,
-            AgentDecisionCallOutcome::OUTCOME_REFUSED => OwnerConsentVerdict::FAILURE_REFUSED,
-            AgentDecisionCallOutcome::OUTCOME_ERROR => OwnerConsentVerdict::FAILURE_ERROR,
-            default => $argusDecision->decided ? null : OwnerConsentVerdict::FAILURE_UNPARSABLE,
-        };
-        $this->decisionCallsService()->closeCircuitBreakerAfter($outcome, $argusDecision->decided);
+        $outcome = $this->runOwnerConsentDecisionPass($argusDecision, $timeoutSeconds);
+        $failure = $this->findOwnerConsentPassFailure($outcome, $argusDecision);
         if ($failure !== null) {
-            return OwnerConsentDecisionResult::create(OwnerConsentVerdict::failed($failure, $ownerMessageIndex), $dialogue, $outcome);
+            $failedResult = OwnerConsentDecisionResult::create(OwnerConsentVerdict::failed($failure, $ownerMessageIndex), $dialogue, $outcome);
+            $failedResult->dialogueWasCut = $argusDecision->isDialogueCut();
+            return $failedResult;
         }
         $verdict = OwnerConsentVerdict::decided(
             $request,
@@ -692,7 +682,93 @@ class OwnerConsentsService extends Service
             $ownerMessageIndex,
             $decidedBy
         );
-        return OwnerConsentDecisionResult::create($verdict, $dialogue, $outcome);
+        $result = OwnerConsentDecisionResult::create($verdict, $dialogue, $outcome);
+        $result->dialogueWasCut = $argusDecision->isDialogueCut();
+        $result->contextSufficientProbability = $argusDecision->contextSufficientProbability;
+        $secondPassReason = $this->findSecondPassReason($request, $argusDecision, $verdict);
+        if ($secondPassReason === null) {
+            return $result;
+        }
+        // ONE second pass over the same dialogue with every line up to the expanded limit; the thresholds stay
+        $expandedDecision = $argusDecision->buildExpandedPass();
+        $expandedOutcome = $this->runOwnerConsentDecisionPass($expandedDecision, $timeoutSeconds);
+        $expandedFailure = $this->findOwnerConsentPassFailure($expandedOutcome, $expandedDecision);
+        $result->secondPassReason = $secondPassReason;
+        $result->firstStepExplainedProbability = $argusDecision->stepExplainedProbability;
+        $result->firstOwnerAgreedProbability = $argusDecision->ownerAgreedProbability;
+        $result->callOutcome = $expandedOutcome;
+        if ($expandedFailure !== null) {
+            // the second pass brought no answer: the first pass's verdict (no consent) stands
+            return $result;
+        }
+        $result->verdict = OwnerConsentVerdict::decided(
+            $request,
+            (float)$expandedDecision->stepExplainedProbability,
+            (float)$expandedDecision->ownerAgreedProbability,
+            $ownerMessageIndex,
+            $decidedBy
+        );
+        return $result;
+    }
+
+    /**
+     * One pass of the owner-consent decision through the runner (the breaker is closed after it): how the call went.
+     *
+     * @throws AgentRunClaimLostException
+     */
+    protected function runOwnerConsentDecisionPass(ArgusAgentOwnerConsentDecision $argusDecision, ?float $timeoutSeconds): AgentDecisionCallOutcome
+    {
+        $decisionModelSettings = AgentDecisionModelSettings::current();
+        $outcome = $this->decisionCallsService()->runDecisionBatch(
+            ArgusAgentDecisions::forChild($argusDecision, AgentDecisionModelSettings::SITE_OWNER_CONSENT),
+            $argusDecision,
+            $timeoutSeconds ?? $decisionModelSettings->timeoutSeconds,
+            $decisionModelSettings->breakerSeconds,
+            AgentDecisionModelSettings::SITE_OWNER_CONSENT
+        );
+        $this->decisionCallsService()->closeCircuitBreakerAfter($outcome, $argusDecision->decided);
+        return $outcome;
+    }
+
+    /** The verdict's failure of one pass ({@see OwnerConsentVerdict}::FAILURE_*), null when the decision answered. */
+    protected function findOwnerConsentPassFailure(AgentDecisionCallOutcome $outcome, ArgusAgentOwnerConsentDecision $argusDecision): ?string
+    {
+        return match ($outcome->outcome) {
+            AgentDecisionCallOutcome::OUTCOME_BREAKER_OPEN => OwnerConsentVerdict::FAILURE_BREAKER,
+            AgentDecisionCallOutcome::OUTCOME_TRANSPORT_FAILED => OwnerConsentVerdict::FAILURE_TRANSPORT,
+            AgentDecisionCallOutcome::OUTCOME_REFUSED => OwnerConsentVerdict::FAILURE_REFUSED,
+            AgentDecisionCallOutcome::OUTCOME_ERROR => OwnerConsentVerdict::FAILURE_ERROR,
+            default => $argusDecision->decided ? null : OwnerConsentVerdict::FAILURE_UNPARSABLE,
+        };
+    }
+
+    /**
+     * Why the first pass is followed by a second one over the expanded lines, or null: only when the first pass read a
+     * cut dialogue, did not consent, the second pass is switched on and reads more than the first; then when the model
+     * says the excerpt does not show what the answer refers to, or when the owner's yes reached its threshold and the
+     * step-explained probability lies between the near-miss floor and its threshold.
+     */
+    protected function findSecondPassReason(OwnerConsentRequest $request, ArgusAgentOwnerConsentDecision $argusDecision, OwnerConsentVerdict $verdict): ?string
+    {
+        $agentDecisionContextSettings = AgentDecisionContextSettings::current();
+        if ($verdict->wouldConsent || !$agentDecisionContextSettings->ownerConsentSecondPass || !$argusDecision->isDialogueCut()
+            || !$argusDecision->buildExpandedPass()->readsMoreThan($argusDecision)
+        ) {
+            return null;
+        }
+        if ($argusDecision->contextSufficientProbability !== null
+            && $argusDecision->contextSufficientProbability < $agentDecisionContextSettings->ownerConsentContextSufficientMinimum
+        ) {
+            return OwnerConsentDecisionResult::SECOND_PASS_REASON_CONTEXT_INSUFFICIENT;
+        }
+        $stepExplainedProbability = (float)$argusDecision->stepExplainedProbability;
+        if ((float)$argusDecision->ownerAgreedProbability >= $request->minimumOwnerAgreedProbability
+            && $stepExplainedProbability >= $agentDecisionContextSettings->ownerConsentNearMissFloor
+            && $stepExplainedProbability < $request->minimumStepExplainedProbability
+        ) {
+            return OwnerConsentDecisionResult::SECOND_PASS_REASON_NEAR_MISS;
+        }
+        return null;
     }
 
     /**
@@ -706,7 +782,8 @@ class OwnerConsentsService extends Service
         OwnerConsentVerdict $verdict,
         ?OwnerConsentDialogue $dialogue,
         ?AgentDecisionCallOutcome $outcome,
-        int $elapsedMs
+        int $elapsedMs,
+        ?OwnerConsentDecisionResult $ownerConsentDecisionResult = null
     ): void {
         try {
             $event = AIConversationTurnEvent::newInstance();
@@ -733,6 +810,11 @@ class OwnerConsentsService extends Service
                 'targetLine' => mb_substr($request->targetLine, 0, 200),
                 'dialogueLines' => $dialogue !== null ? $dialogue->count() : 0,
                 'transportFailureReason' => $outcome?->failureReason,
+                'dialogueWasCut' => $ownerConsentDecisionResult?->dialogueWasCut ?? false,
+                'contextSufficientProbability' => $ownerConsentDecisionResult?->contextSufficientProbability,
+                'secondPassReason' => $ownerConsentDecisionResult?->secondPassReason,
+                'firstStepExplainedProbability' => $ownerConsentDecisionResult?->firstStepExplainedProbability,
+                'firstOwnerAgreedProbability' => $ownerConsentDecisionResult?->firstOwnerAgreedProbability,
             ]);
             /** @var AIConversationTurnEventsService $aIConversationTurnEventsService */
             $aIConversationTurnEventsService = DDDService::instance()->getService(AIConversationTurnEventsService::class);

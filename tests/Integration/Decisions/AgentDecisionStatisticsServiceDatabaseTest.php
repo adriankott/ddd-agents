@@ -288,6 +288,42 @@ class AgentDecisionStatisticsServiceDatabaseTest extends DatabaseTestCase
         ], $this->findTableRowsOfSection($statistics, 'Stall nudges per arm (per run)'));
     }
 
+    public function testTheOwnerConsentSiteCountsSecondPassesAndListsClearAnswersWhoseStepWasNotRecognised(): void
+    {
+        $this->insertConversation(500, []);
+        $thresholds = ['minimumStepExplainedProbability' => 0.9, 'minimumOwnerAgreedProbability' => 0.9];
+        // a clear yes, the step not recognised even after the second pass: listed
+        $this->insertDecisionEvent(500, AgentDecisionModelSettings::SITE_OWNER_CONSENT, 'x', 0, $thresholds + [
+            'consented' => false, 'stepExplainedProbability' => 0.4, 'ownerAgreedProbability' => 0.97, 'dialogueWasCut' => true,
+            'secondPassReason' => 'contextInsufficient', 'firstStepExplainedProbability' => 0.3,
+        ], ['subject' => 'replyToSupportTicket supportReply:1']);
+        // consented after the second pass: counted, not listed
+        $this->insertDecisionEvent(500, AgentDecisionModelSettings::SITE_OWNER_CONSENT, 'x', 2, $thresholds + [
+            'consented' => true, 'stepExplainedProbability' => 0.95, 'ownerAgreedProbability' => 0.97, 'dialogueWasCut' => true,
+            'secondPassReason' => 'nearMiss', 'firstStepExplainedProbability' => 0.85,
+        ], []);
+        // an event written before the fields existed, the owner unclear: counted as not cut, not listed
+        $this->insertDecisionEvent(500, AgentDecisionModelSettings::SITE_OWNER_CONSENT, 'x', 4, $thresholds + [
+            'consented' => false, 'stepExplainedProbability' => 0.2, 'ownerAgreedProbability' => 0.3,
+        ], []);
+
+        $statistics = $this->statisticsService->buildStatistics($this->buildRequest(AgentDecisionModelSettings::SITE_OWNER_CONSENT));
+
+        $passRows = $this->findTableRowsOfSection($statistics, 'Owner-consent decisions per cut dialogue × second-pass reason × consent');
+        usort($passRows, static fn (array $left, array $right): int => strcmp($left['secondPassReason'], $right['secondPassReason']));
+        self::assertSame([
+            ['dialogueWasCut' => 'false', 'secondPassReason' => '(none)', 'consented' => 'false', 'n' => '1'],
+            ['dialogueWasCut' => 'true', 'secondPassReason' => 'contextInsufficient', 'consented' => 'false', 'n' => '1'],
+            ['dialogueWasCut' => 'true', 'secondPassReason' => 'nearMiss', 'consented' => 'true', 'n' => '1'],
+        ], $passRows);
+        $clearAnswerRows = $this->findTableRowsOfSection($statistics, 'Answer clear, step not recognised (refused; newest 50)');
+        self::assertCount(1, $clearAnswerRows);
+        self::assertSame('replyToSupportTicket supportReply:1', $clearAnswerRows[0]['subject']);
+        self::assertSame('contextInsufficient', $clearAnswerRows[0]['secondPassReason']);
+        self::assertSame(0.4, (float)$clearAnswerRows[0]['stepExplained']);
+        self::assertSame(0.3, (float)$clearAnswerRows[0]['firstStepExplained']);
+    }
+
     protected function buildRequest(string $site): AgentDecisionStatisticsRequest
     {
         $request = new AgentDecisionStatisticsRequest();

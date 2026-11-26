@@ -136,7 +136,8 @@ a completed write — it names it as held for the owner's confirmation, and the 
 `requireOwnerConsentForStep()` returns the same reservation when the write is allowed and throws otherwise.
 
 What it stores, on a checked call (not ungated): one turn event of site `ownerConsent` with the verdict, both
-probabilities, the threshold, the consenting owner row and the failure; on a decided no, a raised refusal floor and a
+probabilities, the threshold, the consenting owner row, the failure and the cut / second-pass fields of
+[the decision](#the-decision); on a decided no, a raised refusal floor and a
 `REFUSED` use; on a consent, a `RESERVED` use and the moved window ([the use record](#the-use-record)). It writes no
 entry into the decision log.
 
@@ -152,6 +153,22 @@ owner's name, or a row the injection screen filtered.
 and the channel (`CHANNEL_CHAT` or `CHANNEL_PHONE`): did the assistant name exactly this step and its consequence
 before the owner's answer, and did the owner explicitly agree afterwards. Both must reach the threshold. The call runs
 through `AgentDecisionCallsService::runDecisionBatch()` (the breaker applies) inside the turn's usage envelope.
+
+**What the model reads of the dialogue, and the second pass.** An assistant line keeps its END (where its question
+stands): the line limit plus the length of the step and its consequence, at most the assistant-line maximum; an owner
+or widget line keeps its START. Every cut is marked in the text (`[… 804 characters cut at the start]`,
+`AgentDecisionTextCuts`). The limits are `config/app/AI/decisionContext.php` (`AI.decisionContext.ownerConsent`,
+`AgentDecisionContextSettings`; package defaults 700 / 4000 / 12000). When a line was cut, the request asks a third
+question, `excerpt_shows_what_the_answer_refers_to`. ONE second pass over the same dialogue with every line up to
+`expandedLineCharacters` runs when the first pass did not consent and either that answer stays below
+`contextSufficientMinimum` (reason `contextInsufficient`), or the owner's yes reached its threshold while the
+step-explained probability lies from `nearMissFloor` up to its threshold (reason `nearMiss`). The second pass decides;
+the thresholds never change; a second pass without an answer leaves the first verdict (no consent). `secondPass: false`
+switches it off. The turn event stores `dialogueWasCut`, `contextSufficientProbability`, `secondPassReason` and the
+first pass's `firstStepExplainedProbability` / `firstOwnerAgreedProbability`; `app:agent:decision-stats
+--site=ownerConsent` counts the passes and lists the refusals whose answer was clear while the step was not recognised
+(the cases to read before raising a limit). Raise a limit only for a host whose explanations are long and after reading
+those cases.
 
 `decideDialogue()` is the decision alone over a built dialogue, without the site gate or the event: what a host's
 replay command uses to test the question on recorded conversations (it must open a usage envelope itself).

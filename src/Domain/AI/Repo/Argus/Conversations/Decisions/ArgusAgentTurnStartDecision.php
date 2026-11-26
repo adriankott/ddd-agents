@@ -7,6 +7,8 @@ namespace DDD\Domain\AI\Repo\Argus\Conversations\Decisions;
 use DDD\Domain\AI\Entities\Conversations\Languages\AgentLanguageNames;
 use DDD\Domain\AI\Entities\Conversations\Agent\AgentApplicationWording;
 use DDD\Domain\AI\Entities\Conversations\Agent\Decisions\AgentDecisionChoiceAnswer;
+use DDD\Domain\AI\Entities\Conversations\Agent\Decisions\AgentDecisionContextSettings;
+use DDD\Domain\AI\Entities\Conversations\Agent\Decisions\AgentDecisionTextCuts;
 use DDD\Domain\AI\Entities\Conversations\Agent\Decisions\AgentDecisionModelSettings;
 use DDD\Domain\AI\Entities\Conversations\Messages\AIConversationRecentTurnTexts;
 use DDD\Domain\AI\Entities\Conversations\Agent\Decisions\AgentDirectWidgetDecision;
@@ -106,7 +108,9 @@ class ArgusAgentTurnStartDecision extends ValueObject
     public const string STATE_META_TOOLS = 'metaTools';
 
     /** The owner message the preload questions read, capped (the language questions read {@see $ownerWordsThisTurn}). */
+    /** The package default of the owner message's cut (its START); in force: `AI.decisionContext.turnStart.ownerMessageCharacters` */
     public const int MAX_OWNER_MESSAGE_CHARS = 600;
+    /** The package default of the assistant text's cut (its END); in force: `AI.decisionContext.turnStart.assistantTextCharacters` */
     public const int MAX_ASSISTANT_TEXT_CHARS = 300;
 
     // --- the REASONING-EFFORT site, FOLDED into this request when the PHP precondition admits it ---
@@ -924,7 +928,7 @@ class ArgusAgentTurnStartDecision extends ValueObject
             $state[self::STATE_CONVERSATION_LANGUAGE] = $this->languageConversationLanguageCode === null
                 ? 'none yet (first owner message)'
                 : self::languageName($this->languageConversationLanguageCode) . ' (' . $this->languageConversationLanguageCode . ')';
-            $state[self::STATE_ASSISTANT_TEXT] = mb_substr($this->languageAssistantTextBefore, -self::MAX_ASSISTANT_TEXT_CHARS);
+            $state[self::STATE_ASSISTANT_TEXT] = AgentDecisionTextCuts::keepEnd($this->languageAssistantTextBefore, AgentDecisionContextSettings::current()->turnStartAssistantTextCharacters);
             $state[self::STATE_RECENT_TURNS] = array_values($this->languageRecentTurns);
         }
         if ($this->carriesPreloadSite() && $this->preloadLoadedRootSkillName !== null) {
@@ -932,10 +936,10 @@ class ArgusAgentTurnStartDecision extends ValueObject
             if (!$this->carriesLanguageSite()) {
                 unset($state[self::STATE_OWNER_WORDS]);
             }
-            $state[self::STATE_OWNER_MESSAGE] = mb_substr($this->preloadOwnerMessage, 0, self::MAX_OWNER_MESSAGE_CHARS);
+            $state[self::STATE_OWNER_MESSAGE] = AgentDecisionTextCuts::keepStart($this->preloadOwnerMessage, AgentDecisionContextSettings::current()->turnStartOwnerMessageCharacters);
             // the END of the assistant's text: what it offered or asked stands in its last sentences, and a short
             // reply ("ja") refers to exactly that
-            $state[self::STATE_ASSISTANT_TEXT] = mb_substr($this->preloadAssistantTextBefore, -self::MAX_ASSISTANT_TEXT_CHARS);
+            $state[self::STATE_ASSISTANT_TEXT] = AgentDecisionTextCuts::keepEnd($this->preloadAssistantTextBefore, AgentDecisionContextSettings::current()->turnStartAssistantTextCharacters);
             $state[self::STATE_RECENT_TURNS] = array_values($this->preloadRecentTurns);
             $state[self::agentSpaceFactsStateName()] = mb_substr($this->preloadAgentSpaceFacts, 0, self::MAX_STORED_FACTS_CHARS);
             $state[self::STATE_OPEN_WORK_ITEM] = $this->preloadOpenWorkItem;
@@ -950,8 +954,8 @@ class ArgusAgentTurnStartDecision extends ValueObject
             $state[self::STATE_NEXT_ACT] = $this->preloadActsAhead === [] ? null : (string)reset($this->preloadActsAhead);
             $state[self::STATE_SUB_SKILLS] = $this->preloadCatalog;
         } elseif ($this->carriesPreloadSite()) {
-            $state[self::STATE_OWNER_MESSAGE] = mb_substr($this->preloadOwnerMessage, 0, self::MAX_OWNER_MESSAGE_CHARS);
-            $state[self::STATE_ASSISTANT_TEXT] = mb_substr($this->preloadAssistantTextBefore, 0, self::MAX_ASSISTANT_TEXT_CHARS);
+            $state[self::STATE_OWNER_MESSAGE] = AgentDecisionTextCuts::keepStart($this->preloadOwnerMessage, AgentDecisionContextSettings::current()->turnStartOwnerMessageCharacters);
+            $state[self::STATE_ASSISTANT_TEXT] = AgentDecisionTextCuts::keepEnd($this->preloadAssistantTextBefore, AgentDecisionContextSettings::current()->turnStartAssistantTextCharacters);
             $state[self::STATE_RECENT_TURNS] = array_values($this->preloadRecentTurns);
             $state[self::agentSpaceFactsStateName()] = mb_substr($this->preloadAgentSpaceFacts, 0, self::MAX_STORED_FACTS_CHARS);
             $state[self::STATE_META_TOOLS] = $this->preloadMetaTools === [] ? (object) [] : $this->preloadMetaTools;
@@ -964,8 +968,8 @@ class ArgusAgentTurnStartDecision extends ValueObject
         }
         if ($this->carriesEffortSite()) {
             // the same owner-message / assistant-text keys as the preload site (one state, one meaning)
-            $state[self::STATE_OWNER_MESSAGE] ??= mb_substr($this->effortOwnerMessage, 0, self::MAX_OWNER_MESSAGE_CHARS);
-            $state[self::STATE_ASSISTANT_TEXT] ??= mb_substr($this->effortAssistantTextBefore, 0, self::MAX_ASSISTANT_TEXT_CHARS);
+            $state[self::STATE_OWNER_MESSAGE] ??= AgentDecisionTextCuts::keepStart($this->effortOwnerMessage, AgentDecisionContextSettings::current()->turnStartOwnerMessageCharacters);
+            $state[self::STATE_ASSISTANT_TEXT] ??= AgentDecisionTextCuts::keepEnd($this->effortAssistantTextBefore, AgentDecisionContextSettings::current()->turnStartAssistantTextCharacters);
             $state[self::STATE_STORED_FACTS] = mb_substr($this->effortStoredFacts, 0, self::MAX_STORED_FACTS_CHARS);
             $state[self::STATE_NEXT_PLAN_ITEM] = $this->effortNextPlanItem;
             $state[self::STATE_ACTIVE_EFFORT] = $this->effortActiveEffort;
@@ -976,21 +980,21 @@ class ArgusAgentTurnStartDecision extends ValueObject
         }
         if ($this->carriesPlanDynamicsSite()) {
             // the same owner-message / assistant-text / recent-turns keys (one state, one meaning) + the finished plans
-            $state[self::STATE_OWNER_MESSAGE] ??= mb_substr($this->planOwnerMessage, 0, self::MAX_OWNER_MESSAGE_CHARS);
-            $state[self::STATE_ASSISTANT_TEXT] ??= mb_substr($this->planAssistantTextBefore, 0, self::MAX_ASSISTANT_TEXT_CHARS);
+            $state[self::STATE_OWNER_MESSAGE] ??= AgentDecisionTextCuts::keepStart($this->planOwnerMessage, AgentDecisionContextSettings::current()->turnStartOwnerMessageCharacters);
+            $state[self::STATE_ASSISTANT_TEXT] ??= AgentDecisionTextCuts::keepEnd($this->planAssistantTextBefore, AgentDecisionContextSettings::current()->turnStartAssistantTextCharacters);
             $state[self::STATE_RECENT_TURNS] ??= array_values($this->planRecentTurns);
             $state[self::STATE_FINISHED_PLANS] = array_values(array_slice($this->planFinishedPlans, 0, self::MAX_FINISHED_PLANS_IN_STATE));
         }
         if ($this->carriesDirectWidgetSite()) {
             // the same owner-message / assistant-text / recent-turns keys (one state, one meaning); the answer set is the criteria
-            $state[self::STATE_OWNER_MESSAGE] ??= mb_substr($this->directWidgetOwnerMessage, 0, self::MAX_OWNER_MESSAGE_CHARS);
-            $state[self::STATE_ASSISTANT_TEXT] ??= mb_substr($this->directWidgetAssistantTextBefore, 0, self::MAX_ASSISTANT_TEXT_CHARS);
+            $state[self::STATE_OWNER_MESSAGE] ??= AgentDecisionTextCuts::keepStart($this->directWidgetOwnerMessage, AgentDecisionContextSettings::current()->turnStartOwnerMessageCharacters);
+            $state[self::STATE_ASSISTANT_TEXT] ??= AgentDecisionTextCuts::keepEnd($this->directWidgetAssistantTextBefore, AgentDecisionContextSettings::current()->turnStartAssistantTextCharacters);
             $state[self::STATE_RECENT_TURNS] ??= array_values($this->directWidgetRecentTurns);
         }
         if ($this->carriesTurnStartLineSite()) {
             // the same owner-message / assistant-text / recent-turns keys (one state, one meaning)
-            $state[self::STATE_OWNER_MESSAGE] ??= mb_substr($this->turnStartLineOwnerMessage, 0, self::MAX_OWNER_MESSAGE_CHARS);
-            $state[self::STATE_ASSISTANT_TEXT] ??= mb_substr($this->turnStartLineAssistantTextBefore, 0, self::MAX_ASSISTANT_TEXT_CHARS);
+            $state[self::STATE_OWNER_MESSAGE] ??= AgentDecisionTextCuts::keepStart($this->turnStartLineOwnerMessage, AgentDecisionContextSettings::current()->turnStartOwnerMessageCharacters);
+            $state[self::STATE_ASSISTANT_TEXT] ??= AgentDecisionTextCuts::keepEnd($this->turnStartLineAssistantTextBefore, AgentDecisionContextSettings::current()->turnStartAssistantTextCharacters);
             $state[self::STATE_RECENT_TURNS] ??= array_values($this->turnStartLineRecentTurns);
         }
         return $state;

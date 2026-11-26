@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.9.0
+
+Decision models read cut texts as cut, and the owner-consent decision gets more context where a cut kept a clear yes
+from passing. The thresholds are unchanged; the normal path reads as much as before.
+
+- **Every cut is marked.** A text a decision model reads is cut with a marker that says where and how much
+  (`[… 804 characters cut at the start]`, `AgentDecisionTextCuts::keepEnd()` / `keepStart()`): owner consent, every
+  turn-start site, stall recovery. An assistant text keeps its END (its question and offer), an owner message its START.
+- **Fix: four turn-start sites read the start of the assistant text.** Reasoning effort, plan dynamics, direct widget
+  and turn-start line cut the assistant text before the owner message to its FIRST 300 characters, so the question at
+  the end of a long reply was missing and a short "ja" referred to nothing. They now read its end, like reply language
+  and skill preload. Stall recovery reads the end of the stalled step's text.
+- **Limits per decision in config.** `config/app/AI/decisionContext.php` (`AI.decisionContext`,
+  `AgentDecisionContextSettings`): owner consent `lineCharacters` 700, `assistantLineMaxCharacters` 4000,
+  `expandedLineCharacters` 12000; turn start and stall recovery 600 (owner message) and 300 (assistant text). An
+  application replaces the file whole; a missing or invalid key keeps its default. The constants
+  `MAX_LINE_CHARS`, `MAX_ASSISTANT_LINE_CHARS`, `MAX_OWNER_MESSAGE_CHARS`, `MAX_ASSISTANT_TEXT_CHARS` and
+  `MAX_TEXT_CHARS` stay as the package defaults.
+- **Owner consent: a context question and at most one second pass.** When a dialogue line was cut, the request asks a
+  third question, `excerpt_shows_what_the_answer_refers_to`. When the first pass did not consent and the model says the
+  excerpt does not show what the answer refers to (below `contextSufficientMinimum`, 0.5), or the owner's yes reached
+  its threshold while the step-explained probability lies from `nearMissFloor` (0.5) up to its threshold, ONE second
+  pass reads every line up to `expandedLineCharacters` and decides. A second pass without an answer leaves the first
+  verdict (no consent). `secondPass: false` switches it off. A dialogue without a cut is asked exactly as before.
+- **Visibility.** `OwnerConsentDecisionResult` and the `ownerConsent` turn event carry `dialogueWasCut`,
+  `contextSufficientProbability`, `secondPassReason` (`contextInsufficient`, `nearMiss`) and the first pass's
+  probabilities. `app:agent:decision-stats --site=ownerConsent` counts the passes and lists the newest refusals whose
+  answer was clear while the step was not recognised.
+
 ## 0.8.7
 
 - **Fix: a clear yes to a step with a long target was refused.** `ArgusAgentOwnerConsentDecision::buildState()` cut

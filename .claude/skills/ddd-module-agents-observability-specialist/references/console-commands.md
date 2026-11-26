@@ -920,6 +920,9 @@ Works as the default account for console work.
 | `--power` | flag | print the accrual arithmetic |
 | `--includeEval` | flag | do not exclude evaluation traffic |
 
+- **`--site=ownerConsent`:** also the decisions per cut dialogue × second-pass reason × consent and the newest 50
+  refusals whose owner answer was clear while the step was not recognised ("Answer clear, step not recognised":
+  conversation, subject, both probabilities, the first pass's step-explained probability, cut, second-pass reason).
 - **Writes:** nothing. **Exit codes:** `0`. **Budget:** no option.
 - **Override points:** `buildStatisticsRequest()` (the request the options describe), `renderSection()` (how one
   section prints).

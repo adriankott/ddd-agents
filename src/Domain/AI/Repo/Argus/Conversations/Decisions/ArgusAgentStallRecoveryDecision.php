@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace DDD\Domain\AI\Repo\Argus\Conversations\Decisions;
 
+use DDD\Domain\AI\Entities\Conversations\Agent\Decisions\AgentDecisionContextSettings;
+use DDD\Domain\AI\Entities\Conversations\Agent\Decisions\AgentDecisionTextCuts;
 use DDD\Domain\AI\Entities\Conversations\Agent\Decisions\AgentStallRecoveryDecision;
 use DDD\Domain\AI\Entities\Models\AIModel;
 use DDD\Domain\AI\Entities\Conversations\Agent\Prompts\AgentAIPromptNames;
@@ -55,7 +57,9 @@ class ArgusAgentStallRecoveryDecision extends ValueObject
     public const string STATE_RESIDENT_TOOL_NAMES = 'residentToolNames';
     public const string STATE_LOADABLE_CAPABILITY_NAMES = 'loadableCapabilityNames';
 
+    /** The package default of the stalled text's cut (its END); in force: `AI.decisionContext.stallRecovery.assistantTextCharacters` */
     public const int MAX_TEXT_CHARS = 300;
+    /** The package default of the owner message's cut (its START); in force: `AI.decisionContext.stallRecovery.ownerMessageCharacters` */
     public const int MAX_OWNER_MESSAGE_CHARS = 600;
     public const int MAX_NAMES_IN_STATE = 30;
 
@@ -132,8 +136,9 @@ class ArgusAgentStallRecoveryDecision extends ValueObject
         return [
             self::STATE_STALL_SHAPE => $this->stallShape,
             self::STATE_NO_SKILL_LOADED => $this->noSkillLoaded,
-            self::STATE_LAST_ASSISTANT_TEXT => mb_substr($this->lastAssistantText, 0, self::MAX_TEXT_CHARS),
-            self::STATE_OWNER_MESSAGE => mb_substr($this->ownerMessage, 0, self::MAX_OWNER_MESSAGE_CHARS),
+            // the stalled step's text ends with what it announced; the owner message starts with its request. A cut is marked.
+            self::STATE_LAST_ASSISTANT_TEXT => AgentDecisionTextCuts::keepEnd($this->lastAssistantText, AgentDecisionContextSettings::current()->stallRecoveryAssistantTextCharacters),
+            self::STATE_OWNER_MESSAGE => AgentDecisionTextCuts::keepStart($this->ownerMessage, AgentDecisionContextSettings::current()->stallRecoveryOwnerMessageCharacters),
             self::STATE_NEXT_PLAN_ITEM => $this->nextPlanItem,
             self::STATE_RESIDENT_TOOL_NAMES => array_values(array_slice($this->residentToolNames, 0, self::MAX_NAMES_IN_STATE)),
             self::STATE_LOADABLE_CAPABILITY_NAMES => array_values(array_slice($this->loadableCapabilityNames, 0, self::MAX_NAMES_IN_STATE)),

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DDD\Tests\Agents\Domain\AI\Repo\Argus\Conversations\Decisions;
 
+use DDD\Domain\AI\Entities\Conversations\Agent\Decisions\AgentDecisionTextCuts;
 use DDD\Domain\AI\Entities\Conversations\Agent\Decisions\AgentDecisionModelSettings;
 use DDD\Domain\AI\Entities\Conversations\Agent\Decisions\OwnerConsent\OwnerConsentDialogue;
 use DDD\Domain\AI\Entities\Conversations\Agent\Decisions\OwnerConsent\OwnerConsentDialogueLine;
@@ -38,11 +39,13 @@ class ArgusAgentOwnerConsentDecisionTest extends UnitTestCase
         self::assertSame('phone', $state['channel']);
         self::assertSame(['ASSISTANT', 'OWNER'], array_column($state['dialogue'], 'speaker'));
         self::assertStringEndsWith('Soll ich ändern?', $state['dialogue'][0]['text'], 'an explanation keeps its end, where the question stands');
+        $assistantLineLimit = ArgusAgentOwnerConsentDecision::MAX_LINE_CHARS + mb_strlen($request->targetLine) + mb_strlen($request->consequenceLine);
         self::assertSame(
-            ArgusAgentOwnerConsentDecision::MAX_LINE_CHARS + mb_strlen($request->targetLine) + mb_strlen($request->consequenceLine),
-            mb_strlen($state['dialogue'][0]['text']),
-            'an explanation keeps room for the whole step and its consequence on top of the line limit'
+            AgentDecisionTextCuts::keepEnd($assistantLine->text, $assistantLineLimit),
+            $state['dialogue'][0]['text'],
+            'an explanation keeps room for the whole step and its consequence on top of the line limit, the cut marked'
         );
+        self::assertStringStartsWith('[… ' . (mb_strlen($assistantLine->text) - $assistantLineLimit) . ' characters cut at the start] ', $state['dialogue'][0]['text']);
     }
 
     public function testALongStepKeepsTheWholeExplanationUpToTheCap(): void
@@ -70,7 +73,7 @@ class ArgusAgentOwnerConsentDecisionTest extends UnitTestCase
         $longDialogue->add(OwnerConsentDialogueLine::create(OwnerConsentDialogueLine::SPEAKER_OWNER, 11, 'Ja.'));
         $hugeRequest = OwnerConsentRequest::forAction('replyToSupportTicket', 'SUPPORT_REPLY', str_repeat('z', 6000), 'cannot be taken back', 'supportReply:1');
         $longState = ArgusAgentOwnerConsentDecision::forRequest($hugeRequest, $longDialogue, ArgusAgentOwnerConsentDecision::CHANNEL_CHAT)->buildState();
-        self::assertSame(ArgusAgentOwnerConsentDecision::MAX_ASSISTANT_LINE_CHARS, mb_strlen($longState['dialogue'][0]['text']), 'the cap holds');
+        self::assertSame(AgentDecisionTextCuts::keepEnd($endlessExplanation, ArgusAgentOwnerConsentDecision::MAX_ASSISTANT_LINE_CHARS), $longState['dialogue'][0]['text'], 'the cap holds');
         self::assertStringEndsWith('Soll ich senden?', $longState['dialogue'][0]['text']);
     }
 

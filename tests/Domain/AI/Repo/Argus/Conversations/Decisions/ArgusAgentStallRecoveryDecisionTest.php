@@ -41,8 +41,8 @@ class ArgusAgentStallRecoveryDecisionTest extends UnitTestCase
         $decision->residentToolNames = array_map(static fn (int $i): string => 'tool' . $i, range(1, 40));
         $decision->offeredMoves = [AgentStallRecoveryDecision::MOVE_END_THE_TURN_WITH_TEXT, AgentStallRecoveryDecision::MOVE_NONE];
         $state = $decision->buildState();
-        self::assertSame(300, mb_strlen($state['lastAssistantText']));
-        self::assertSame(600, mb_strlen($state['ownerMessage']));
+        self::assertSame('[… 200 characters cut at the start] ' . str_repeat('x', 300), $state['lastAssistantText']);
+        self::assertSame(str_repeat('o', 600) . ' [… 300 characters cut at the end]', $state['ownerMessage']);
         self::assertCount(30, $state['residentToolNames']);
 
         $applyAnswers = new ReflectionMethod(ArgusAgentStallRecoveryDecision::class, 'applyAnswers');

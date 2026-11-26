@@ -144,6 +144,7 @@ class AgentDecisionStatisticsService extends Service
             AgentDecisionModelSettings::SITE_REASONING_EFFORT => $this->addReasoningEffortSections($statistics, $connection, $from, $to, $evalClause),
             AgentDecisionModelSettings::SITE_STALL_RECOVERY => $this->addStallRecoverySections($statistics, $connection, $from, $to, $evalClause),
             AgentDecisionModelSettings::SITE_SKILL_PRELOAD => $this->addSkillPreloadSections($statistics, $connection, $request, $evalClause),
+            AgentDecisionModelSettings::SITE_OWNER_CONSENT => $this->addOwnerConsentSections($statistics, $connection, $from, $to, $evalClause),
             default => null,
         };
         return $statistics;
@@ -536,6 +537,53 @@ class AgentDecisionStatisticsService extends Service
             ['from' => $from, 'to' => $to, 'nudgeSource' => AIConversationSignalSource::LOOP_NUDGE->value]
         );
         $statistics->addSection(AgentDecisionStatisticsSection::withTable('Stall nudges per arm (per run)', ['arm', 'nudges', 'runs', 'perRun'], $nudgeRows));
+    }
+
+    /**
+     * The owner-consent site: decisions per cut dialogue × second-pass reason × consent, and the refusals whose owner
+     * answer was clear (owner-agreed reached its threshold) while the step was not recognised (step-explained stayed
+     * below its threshold) — the cases to read when a genuine yes is refused for want of context.
+     */
+    protected function addOwnerConsentSections(AgentDecisionStatistics $statistics, Connection $connection, string $from, string $to, string $evalClause): void
+    {
+        $eventsTable = DBAIConversationTurnEventModel::getTableName();
+        $conversationsTable = DBAIConversationModel::getTableName();
+        $wasCutSql = 'COALESCE(' . $this->buildPayloadTextSql('dialogueWasCut') . ", 'false')";
+        $secondPassReasonSql = 'COALESCE(' . $this->buildPayloadTextSql('secondPassReason') . ", '(none)')";
+        $consentedSql = 'COALESCE(' . $this->buildPayloadTextSql('consented') . ", 'false')";
+        $passRows = $connection->fetchAllAssociative(
+            "SELECT {$wasCutSql} AS `dialogueWasCut`, {$secondPassReasonSql} AS `secondPassReason`, {$consentedSql} AS `consented`, COUNT(*) AS `n`
+             FROM `$eventsTable` `e` JOIN `$conversationsTable` `c` ON `c`.`id` = `e`.`aiConversationId`
+             WHERE `e`.`kind` = :kind AND `e`.`site` = :site AND `e`.`created` >= :from AND `e`.`created` < :to{$evalClause}
+             GROUP BY 1, 2, 3 ORDER BY `n` DESC",
+            ['kind' => AIConversationTurnEvent::KIND_DECISION, 'site' => AgentDecisionModelSettings::SITE_OWNER_CONSENT, 'from' => $from, 'to' => $to]
+        );
+        $statistics->addSection(AgentDecisionStatisticsSection::withTable(
+            'Owner-consent decisions per cut dialogue × second-pass reason × consent',
+            ['dialogueWasCut', 'secondPassReason', 'consented', 'n'],
+            $passRows
+        ));
+
+        $stepExplainedSql = 'CAST(' . $this->buildPayloadTextSql('stepExplainedProbability') . ' AS DECIMAL(6,4))';
+        $ownerAgreedSql = 'CAST(' . $this->buildPayloadTextSql('ownerAgreedProbability') . ' AS DECIMAL(6,4))';
+        $minimumStepExplainedSql = 'CAST(' . $this->buildPayloadTextSql('minimumStepExplainedProbability') . ' AS DECIMAL(6,4))';
+        $minimumOwnerAgreedSql = 'CAST(' . $this->buildPayloadTextSql('minimumOwnerAgreedProbability') . ' AS DECIMAL(6,4))';
+        $firstStepExplainedSql = 'COALESCE(' . $this->buildPayloadTextSql('firstStepExplainedProbability') . ", '')";
+        $clearAnswerRows = $connection->fetchAllAssociative(
+            "SELECT `e`.`created` AS `created`, `e`.`aiConversationId` AS `conversationId`, `e`.`subject` AS `subject`,
+                    {$ownerAgreedSql} AS `ownerAgreed`, {$stepExplainedSql} AS `stepExplained`, {$firstStepExplainedSql} AS `firstStepExplained`,
+                    {$wasCutSql} AS `dialogueWasCut`, {$secondPassReasonSql} AS `secondPassReason`
+             FROM `$eventsTable` `e` JOIN `$conversationsTable` `c` ON `c`.`id` = `e`.`aiConversationId`
+             WHERE `e`.`kind` = :kind AND `e`.`site` = :site AND `e`.`created` >= :from AND `e`.`created` < :to{$evalClause}
+               AND {$consentedSql} = 'false' AND {$ownerAgreedSql} >= {$minimumOwnerAgreedSql} AND {$stepExplainedSql} < {$minimumStepExplainedSql}
+             ORDER BY `e`.`created` DESC LIMIT 50",
+            ['kind' => AIConversationTurnEvent::KIND_DECISION, 'site' => AgentDecisionModelSettings::SITE_OWNER_CONSENT, 'from' => $from, 'to' => $to]
+        );
+        $statistics->addSection(AgentDecisionStatisticsSection::withTable(
+            'Answer clear, step not recognised (refused; newest 50)',
+            ['created', 'conversationId', 'subject', 'ownerAgreed', 'stepExplained', 'firstStepExplained', 'dialogueWasCut', 'secondPassReason'],
+            $clearAnswerRows
+        ));
     }
 
     /** The message and turn queries have no event row to carry `evalRun` — the same exclusion off the conversation's row. */
