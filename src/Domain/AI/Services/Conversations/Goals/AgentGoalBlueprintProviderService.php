@@ -6,6 +6,7 @@ namespace DDD\Domain\AI\Services\Conversations\Goals;
 
 use DDD\Domain\AI\Entities\AgentSpaces\AgentSpace;
 use DDD\Domain\AI\Entities\Conversations\Goals\Blueprints\AgentGoalBlueprint;
+use DDD\Domain\AI\Entities\Conversations\Goals\Blueprints\AgentGoalBlueprintNode;
 use DDD\Domain\Common\Entities\Accounts\Account;
 use DDD\Infrastructure\Services\DDDService;
 use DDD\Infrastructure\Services\Service;
@@ -52,5 +53,21 @@ class AgentGoalBlueprintProviderService extends Service
     public function buildAssessedBlueprintForAgentSpace(Account $account, ?AgentSpace $agentSpace): ?AgentGoalBlueprint
     {
         return null;
+    }
+
+    /**
+     * One node of the standard tree by its key, for `addGoal` to take the node's done criterion as the success signal
+     * of a goal that names the node and has none. The default looks the key up in
+     * {@see buildAssessedBlueprintForAgentSpace()}; an application may answer from its static tree without the
+     * assessment. Null when there is no tree or no such node.
+     *
+     * @param Account $account the account the call acts for
+     * @param AgentSpace|null $agentSpace the space of the call
+     * @param string $nodeKey the node's key (`presence.photos`)
+     * @return AgentGoalBlueprintNode|null
+     */
+    public function findStandardNodeByKey(Account $account, ?AgentSpace $agentSpace, string $nodeKey): ?AgentGoalBlueprintNode
+    {
+        return $this->buildAssessedBlueprintForAgentSpace($account, $agentSpace)?->findNodeByKey($nodeKey);
     }
 }

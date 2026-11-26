@@ -267,6 +267,36 @@ class AgentGoalsToolsTest extends IntegrationTestCase
         self::assertFalse(AgentGoalBlueprintMCPPackage::isAvailable(), 'a bound provider is not offered while goals are off');
     }
 
+    public function testAGoalOfAStandardNodeWithoutASuccessSignalTakesTheNodesDoneCriterion(): void
+    {
+        $this->replaceService(AgentGoalBlueprintProviderService::class, new BakeryGoalBlueprintProviderService());
+        $cases = [
+            'the criterion of the node' => ['presence.photos', null, 'a photo in the last 30 days'],
+            'the own signal of the goal stays' => ['presence.hours', 'Sunday hours are listed too.', 'Sunday hours are listed too.'],
+            'an unknown node changes nothing' => ['presence.parking', null, null],
+            'a node without a criterion changes nothing' => ['presence', null, null],
+        ];
+        foreach ($cases as $caseName => [$blueprintKey, $successSignal, $expectedSuccessSignal]) {
+            $addRequestDto = new AgentGoalAddRequestDto();
+            $addRequestDto->statement = 'Goal of ' . $blueprintKey;
+            $addRequestDto->statedByOwner = false;
+            $addRequestDto->blueprintKey = $blueprintKey;
+            $addRequestDto->successSignal = $successSignal;
+            $responseDto = (new AgentGoalsMCPPackage())->addGoal($addRequestDto, new AgentGoalsService(), $this->buildCallProvenance());
+            self::assertSame($expectedSuccessSignal, $responseDto->goals->first()?->successSignal, $caseName);
+        }
+    }
+
+    public function testWithoutAProviderAGoalOfAStandardNodeKeepsAnEmptySuccessSignal(): void
+    {
+        $addRequestDto = new AgentGoalAddRequestDto();
+        $addRequestDto->statement = 'Fresh photos every month.';
+        $addRequestDto->statedByOwner = false;
+        $addRequestDto->blueprintKey = 'presence.photos';
+        $responseDto = (new AgentGoalsMCPPackage())->addGoal($addRequestDto, new AgentGoalsService(), $this->buildCallProvenance());
+        self::assertNull($responseDto->goals->first()?->successSignal);
+    }
+
     protected function addHostGoal(string $statement, ?int $agentSpaceId, int $priority = 0): AgentGoal
     {
         $agentGoal = AgentGoal::buildStated($statement, null, null, null, null, $priority, null);

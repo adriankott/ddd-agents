@@ -17,6 +17,7 @@ use DDD\Domain\AI\Entities\MCPPackages\MCPToolParallelSafe;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolReturnsTrustedContent;
 use DDD\Domain\AI\Entities\MCPPackages\MCPToolSummary;
 use DDD\Domain\AI\Services\AgentSpaces\AgentSpacesService;
+use DDD\Domain\AI\Services\Conversations\Goals\AgentGoalBlueprintProviderService;
 use DDD\Domain\AI\Services\Conversations\Goals\AgentGoalsService;
 use DDD\Domain\Common\Entities\Accounts\Account;
 use DDD\Infrastructure\Exceptions\BadRequestException;
@@ -134,6 +135,7 @@ class AgentGoalsMCPPackage extends MCPPackage
         $agentGoal->markHeldByOwnerOrAgent($requestDto->isStatedByOwner());
         $agentGoal->blueprintKey = $requestDto->toBlueprintKey();
         $agentGoal->sourceMessageId = $callProvenance->getSourceUserMessageId();
+        $this->applySuccessSignalOfStandardNode($agentGoal, $actingAccount, $agentSpace);
         $refusalReason = $this->findReasonToRefuseGoal($agentGoal, $requestDto, $callProvenance);
         if ($refusalReason !== null) {
             return AgentGoalsMcpResponseDto::forRefusedGoal($refusalReason);
@@ -180,6 +182,32 @@ class AgentGoalsMCPPackage extends MCPPackage
             ),
             AgentGoalsMcpResponseDto::NOTE_STATUS_UPDATED
         );
+    }
+
+    /**
+     * A goal that names a node of the standard tree and has no success signal takes the node's done criterion as its
+     * signal (`a photo in the last 30 days`), before the application's refusal hook sees the goal. Nothing changes
+     * without a bound provider, an unknown node or a node without a criterion.
+     *
+     * @param AgentGoal $agentGoal the goal about to be written
+     * @param Account $actingAccount the account the call acts for
+     * @param AgentSpace|null $agentSpace the space of the call
+     * @return void
+     */
+    protected function applySuccessSignalOfStandardNode(AgentGoal $agentGoal, Account $actingAccount, ?AgentSpace $agentSpace): void
+    {
+        if ($agentGoal->blueprintKey === null || $agentGoal->blueprintKey === '' || $agentGoal->successSignal !== null) {
+            return;
+        }
+        if (!AgentGoalBlueprintProviderService::isBlueprintProviderBound()) {
+            return;
+        }
+        /** @var AgentGoalBlueprintProviderService $agentGoalBlueprintProviderService */
+        $agentGoalBlueprintProviderService = DDDService::instance()->getService(AgentGoalBlueprintProviderService::class);
+        $doneCriterionDescription = trim((string)$agentGoalBlueprintProviderService->findStandardNodeByKey($actingAccount, $agentSpace, $agentGoal->blueprintKey)?->doneCriterionDescription);
+        if ($doneCriterionDescription !== '') {
+            $agentGoal->successSignal = $doneCriterionDescription;
+        }
     }
 
     /**

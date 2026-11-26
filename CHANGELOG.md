@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.2
+
+- **A goal of a standard node takes the node's done criterion as its success signal.** `addGoal` with a `blueprintKey`
+  and no `successSignal` sets the signal to the node's `doneCriterionDescription` before the refusal hook sees the
+  goal (`AgentGoalsMCPPackage::applySuccessSignalOfStandardNode()`); nothing changes without a bound provider, for an
+  unknown node or a node without a criterion. New `AgentGoalBlueprintProviderService::findStandardNodeByKey()`
+  (default: the node of `buildAssessedBlueprintForAgentSpace()`; an application may answer from its static tree
+  without the assessment). An application that did this in `findReasonToRefuseGoal()` drops its own step.
+
 ## 0.8.1
 
 - **New widget `ImageGallery`: pictures of any file source to look at or to pick from.** The block carries file

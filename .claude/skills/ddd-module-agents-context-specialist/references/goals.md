@@ -92,7 +92,9 @@ The package ships no tree. `AgentGoalBlueprintProviderService` is the port: its 
 nothing. An application binds one with a same-path subclass that answers `buildAssessedBlueprintForAgentSpace()`:
 build the tree, prune it to the space, assess every leaf (`assess()`). `AgentGoalBlueprintMCPPackage` is available
 while goals are on and `isBlueprintProviderBound()` (the container resolves the port to a subclass). An adopted node
-is a goal with the node's key as `blueprintKey`.
+is a goal with the node's key as `blueprintKey`; `addGoal` gives such a goal without a `successSignal` the node's
+`doneCriterionDescription` as its signal (`applySuccessSignalOfStandardNode()`, before the refusal hook), looked up
+with `findStandardNodeByKey()`.
 
 ## 6. The goal store as the host port
 
@@ -111,6 +113,7 @@ package's table; the installation check then does not require that table.
 | `areStatementsNearDuplicates()` of `AgentGoalsService` | `similar_text` against the threshold | compare by meaning |
 | `buildAgentSpaceLabelForTheModel()` of `AgentSpacesService` | `space:<id>` | name the space as its users know it |
 | `buildAssessedBlueprintForAgentSpace()` of `AgentGoalBlueprintProviderService` | null | bind its standard goal tree |
+| `findStandardNodeByKey()` of `AgentGoalBlueprintProviderService` | the node of the assessed tree | answer a node from the static tree without the assessment |
 
 ## 8. Host checklist
 
