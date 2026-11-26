@@ -47,11 +47,16 @@ trait AgentEvalArmOptionsTrait
     /** A COUNT arm (0 or more), validated like {@see ARM_PREVIOUS_REASONING_CAP_TOKENS}. */
     public const string ARM_PREVIOUS_REASONING_HEADROOM_TOKENS_AFTER_CUT = 'previous-reasoning-headroom-tokens-after-cut';
 
-    /** @var array<string, int> The count arms of the carry-over cut and the smallest value each accepts */
+    /**
+     * @var array<string, int> The count arms of the carry-over cut and the smallest value each accepts. The keys are the
+     * values of the ARM_PREVIOUS_REASONING_* constants written out: a trait constant read through `self::` cannot be
+     * evaluated when the trait itself is reflected (Symfony's debug resource tracking does), see
+     * TraitsReflectOnTheirOwnTest.
+     */
     public const array PREVIOUS_REASONING_CUT_COUNT_ARMS_MINIMUM_VALUES = [
-        self::ARM_PREVIOUS_REASONING_KEPT_TOKENS_AT_CUT => 0,
-        self::ARM_PREVIOUS_REASONING_KEPT_STEPS_AT_CUT => 1,
-        self::ARM_PREVIOUS_REASONING_HEADROOM_TOKENS_AFTER_CUT => 0,
+        'previous-reasoning-kept-tokens-at-cut' => 0,
+        'previous-reasoning-kept-steps-at-cut' => 1,
+        'previous-reasoning-headroom-tokens-after-cut' => 0,
     ];
     public const string ARM_SKILL_LOADING_STRATEGY = 'skill-loading-strategy';
     public const string ARM_REBUILD_EPOCH_ON_SITUATION_CHANGE = 'rebuild-epoch-on-situation-change';

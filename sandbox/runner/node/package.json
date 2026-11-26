@@ -1,0 +1,9 @@
+{
+  "name": "ddd-agents-sandbox-node-runtime",
+  "private": true,
+  "description": "The Node libraries of the sandbox image (installed at build time; nothing is installed at runtime).",
+  "dependencies": {
+    "exceljs": "4.4.0",
+    "tsx": "4.19.2"
+  }
+}

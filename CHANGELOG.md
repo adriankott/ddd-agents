@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.7.4
+
+- Fix: `AgentEvalArmOptionsTrait` reflects on its own. The keys of `PREVIOUS_REASONING_CUT_COUNT_ARMS_MINIMUM_VALUES`
+  read the trait's constants through `self::`, which PHP refuses when the trait itself is reflected ("Cannot access
+  trait constant self::ARM_PREVIOUS_REASONING_KEPT_TOKENS_AT_CUT directly"); Symfony's debug resource tracking does that
+  when the package lies outside the application's vendor directory (a path repository, a linked checkout, a worktree
+  whose package directories are links), and the container build died with debug on. The keys are literals now
+  (unchanged values); `TraitsReflectOnTheirOwnTest` reflects every trait of the package. npm 0.7.4 in lockstep, no
+  web change.
+
 ## 0.7.3
 
 **Memory curation: the model calls behind its results.** No table change, no web change; npm `@mgamadeus/ddd-agents` 0.7.3 in lockstep.
