@@ -60,6 +60,13 @@ export interface ConversationWidgetEntry {
    * is nothing but such widgets shows no bubble at all.
    */
   customerMessagePlacement?: "insideBubble" | "aboveBubble";
+  /**
+   * An app's entry that takes the place of the PACKAGE's widget of the same wire name (an app that used the name before
+   * the package shipped one, or renders it its own way) — the web twin of the PHP rule that a subclass of a package
+   * widget wins. Only for `registerConversationWidgets`; without it a name the package registers throws, and an app's
+   * name registered twice by the app always throws. Default false.
+   */
+  replacesPackageWidget?: boolean;
 }
 
 /**
@@ -134,9 +141,17 @@ export const getConversationWidgetRegistryRevision = (): number => registryRevis
 
 /**
  * Adds an app's widgets to the registry. Runs outside React, before the first render; throws when a wire name is
- * registered twice (with the package's own or an earlier registration).
+ * registered twice (with the package's own or an earlier registration). An entry with `replacesPackageWidget` first
+ * removes the package's entry of its name; it never replaces an app's earlier registration.
  */
 export const registerConversationWidgets = (widgets: readonly ConversationWidgetEntry[]): void => {
+  for (const widget of widgets) {
+    if (widget.replacesPackageWidget !== true) continue;
+    const packageEntryIndex = conversationWidgetRegistry.widgets.findIndex(
+      (entry) => entry.name === widget.name && packageConversationWidgets.includes(entry),
+    );
+    if (packageEntryIndex >= 0) conversationWidgetRegistry.widgets.splice(packageEntryIndex, 1);
+  }
   assertUniqueConversationWidgetNames([...conversationWidgetRegistry.widgets, ...widgets]);
   conversationWidgetRegistry.widgets.push(...widgets);
   registryRevision += 1;

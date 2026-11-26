@@ -103,7 +103,8 @@ class AgentGoalStoreService extends EntitiesService
 
     /**
      * Writes the goal row as it is (insert or update); the rules ran before ({@see AgentGoalsService::persistGoal()},
-     * {@see AgentGoalsService::transitionGoalStatus()}).
+     * {@see AgentGoalsService::transitionGoalStatus()}). Returns the written goal with the row's id; `persistGoal()` puts
+     * that id on the goal it passed, so a host store need not set it there.
      *
      * @param AgentGoal $agentGoal
      * @return AgentGoal

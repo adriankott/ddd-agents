@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.3
+
+- **An app keeps its own widget of a wire name the package now ships.** `ConversationWidgetEntry.replacesPackageWidget`
+  (web): an app's entry with the flag takes the place of the package's entry of its name in
+  `registerConversationWidgets()`; without it a name the package registers still throws, an app's own name registered
+  twice always throws. The PHP side already lets a subclass of the package widget win; an app that used `ImageGallery`
+  or `AttachedFiles` before 0.8.1 extends the package class there and sets the flag here.
+- **Fix: `addGoal` answered a new goal as "already in the register" over a host store that does not set the id on the
+  goal it gets.** `AgentGoalsService::persistGoal()` now puts the written row's id on the passed goal
+  (`writeGoalCarryingItsId()`); the port docblock of `AgentGoalStoreService::writeGoal()` says so.
+
 ## 0.8.2
 
 - **A goal of a standard node takes the node's done criterion as its success signal.** `addGoal` with a `blueprintKey`

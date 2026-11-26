@@ -95,7 +95,7 @@ class AgentGoalsService extends Service
         $agentGoal->prepareForPersistence();
         $agentGoalStoreService = $this->getAgentGoalStoreService();
         if (isset($agentGoal->id) && $agentGoal->id) {
-            return $agentGoalStoreService->writeGoal($agentGoal);
+            return $this->writeGoalCarryingItsId($agentGoalStoreService, $agentGoal);
         }
         $agentGoal->status = $agentGoal->deriveInitialStatus();
         $this->assertParentRules($agentGoal);
@@ -109,17 +109,34 @@ class AgentGoalsService extends Service
                     return $currentGoal;
                 }
                 $agentGoalStoreService->closeValidityWindow((int)$currentGoal->id, null, new DateTime('now'));
-                $writtenGoal = $agentGoalStoreService->writeGoal($agentGoal);
+                $writtenGoal = $this->writeGoalCarryingItsId($agentGoalStoreService, $agentGoal);
                 $agentGoalStoreService->recordSuccessorOfClosedGoal((int)$currentGoal->id, (int)$writtenGoal->id);
                 return $writtenGoal;
             }
             if ($this->areStatementsNearDuplicates($currentGoal->statement, $agentGoal->statement)) {
-                $writtenGoal = $agentGoalStoreService->writeGoal($agentGoal);
+                $writtenGoal = $this->writeGoalCarryingItsId($agentGoalStoreService, $agentGoal);
                 $this->closeGoalValidityWindow($currentGoal, $writtenGoal);
                 return $writtenGoal;
             }
         }
-        return $agentGoalStoreService->writeGoal($agentGoal);
+        return $this->writeGoalCarryingItsId($agentGoalStoreService, $agentGoal);
+    }
+
+    /**
+     * Writes the goal and puts the written row's id on the goal that was passed: a caller tells a new write from an
+     * unchanged restatement by that id (`addGoal`), whether or not the store sets it on the object it got.
+     *
+     * @param AgentGoalStoreService $agentGoalStoreService
+     * @param AgentGoal $agentGoal
+     * @return AgentGoal The written goal
+     */
+    protected function writeGoalCarryingItsId(AgentGoalStoreService $agentGoalStoreService, AgentGoal $agentGoal): AgentGoal
+    {
+        $writtenGoal = $agentGoalStoreService->writeGoal($agentGoal);
+        if (isset($writtenGoal->id) && $writtenGoal->id) {
+            $agentGoal->id = $writtenGoal->id;
+        }
+        return $writtenGoal;
     }
 
     /**

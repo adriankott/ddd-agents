@@ -111,6 +111,12 @@ The registry, not the container, resolves widget classes, so a same-path subclas
 the folder Domain/AI/Entities/AI/Conversations/Widgets of the host) with the same short name, extending the package class: of two classes
 with one wire name, the one that extends the other wins (`ComposedViewFolderClassFinder::resolveOverridingClassName()`).
 
+The web twin: an app's entry for `registerConversationWidgets()` with `replacesPackageWidget: true` takes the place of
+the package's entry of its name (without the flag a name the package registers throws; an app's own name registered
+twice always throws). An app that used a wire name before the package shipped a widget of that name keeps its own
+fields and component this way: its PHP class extends the package class (empty `SUMMARY` and `WHEN_TO_USE` keep it out of
+the catalog, as before), its web entry sets the flag.
+
 ## The package's own widgets
 
 | Wire name | Class | Kind |
