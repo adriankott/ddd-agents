@@ -255,6 +255,34 @@ an optional `agentSpaceId`) and switches memory on; it needs no package table. T
 
 Details: the context skill, reference "Memories and standing directives", section 8.
 
+## Goals: the register is a host port too
+
+`AI.agentGoals.enabled` (`config/app/AI/agentGoals.php`, off by default) switches the goal register on: the owner's
+goals and the agent's commitments in their service, each with a holder (`OWNER`, `AGENT`), a horizon (`VISION`,
+`LONG_TERM`, `SHORT_TERM`), a status and a provenance. The skill `Agent.Goals` binds `AgentGoalsMCPPackage`
+(`getGoals`, `addGoal`, `updateGoalStatus`) and `AgentGoalBlueprintMCPPackage` (`getGoalBlueprint`, offered only while
+the application binds a standard goal tree); both require the right `useAgentGoals`. The rules (dedup of a restatement,
+initial status, parents, transitions) live in `AgentGoalsService`; every read and write goes through
+`AgentGoalStoreService` (`DDD\Domain\AI\Services\Conversations\Goals`), whose default keeps its rows in the
+package's table `AgentGoals`. Code before schema: with goals on and the table missing, the tools answer "not
+available" and nothing fails; the installation check names the table as a warning. A host with goals in rows of its
+own puts a same-path subclass of the store under its root namespace:
+
+| Method | Answers |
+|---|---|
+| `isGoalStoreAvailable()` | whether the store can read and write now |
+| `findCurrentGoalsForScope(int $accountId, ?int $agentSpaceId, bool $heldOnly, ?int $limit)` | the current goals of a scope, the highest priority first |
+| `find(int $goalId)` | one goal by id, under the caller's rights |
+| `writeGoal(AgentGoal)` | the write of a goal row (the rules ran before) |
+| `closeValidityWindow(int $targetGoalId, ?int $successorGoalId, DateTime $validTo, ?DateTime $invalidatedAt)`, `recordSuccessorOfClosedGoal(int $closedGoalId, int $successorGoalId)` | close a row; point a closed row at its successor |
+| `invalidateCurrentGoalsOfScope(int $accountId, ?int $agentSpaceId)` | close every current goal of one scope |
+| `getColumnsNotPurgedByEvalPurge()` | `table.column` => reason for the evaluation purge |
+
+The standard goal tree is a port without content: a same-path subclass of `AgentGoalBlueprintProviderService` answers
+`buildAssessedBlueprintForAgentSpace(Account, ?AgentSpace)` with an `AgentGoalBlueprint`. A host refuses a goal before
+the write with a same-path subclass of `AgentGoalsMCPPackage` (`findReasonToRefuseGoal()`). Details: the context skill,
+reference "The goal register".
+
 ## Environment of the package test kernel (`tests/Support/kernel`)
 
 No env file is committed. `tests/Support/PackageTestEnvironment.php` sets every variable where the kernel is built

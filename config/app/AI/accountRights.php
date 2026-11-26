@@ -13,7 +13,7 @@ use DDD\Domain\Common\Entities\Roles\Role;
  * acts for. A right this file does not name is not held, also a right of another package.
  *
  * Defaults: the operator rights (the platform, the texts, the sandbox, the browser) to the superadmins; the everyday
- * rights (tasks, memory, web, UI, drive) to every account. These defaults apply ONLY to a host on the package's
+ * rights (tasks, memory, goals, web, UI, drive) to every account. These defaults apply ONLY to a host on the package's
  * role-mapped rights. An application ships its own file at this path, which REPLACES this one whole: copy it, then
  * change it. An application with its own rights object (it overrides `findAccountRightsOfConversation()` /
  * `findAccountRightsOfCurrentAccount()`) gets the package rights its object does not answer from ITS OWN file at this
@@ -27,6 +27,7 @@ return [
     AgentAccountRights::USE_BROWSER => [Role::SUPERADMIN],
     AgentAccountRights::SCHEDULE_AGENT_TASKS => [AgentRoleMappedAccountRights::EVERY_ACCOUNT],
     AgentAccountRights::USE_AGENT_MEMORY => [AgentRoleMappedAccountRights::EVERY_ACCOUNT],
+    AgentAccountRights::USE_AGENT_GOALS => [AgentRoleMappedAccountRights::EVERY_ACCOUNT],
     AgentAccountRights::USE_WEB => [AgentRoleMappedAccountRights::EVERY_ACCOUNT],
     AgentAccountRights::USE_UI => [AgentRoleMappedAccountRights::EVERY_ACCOUNT],
     'useDrive' => [AgentRoleMappedAccountRights::EVERY_ACCOUNT],

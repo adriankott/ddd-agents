@@ -70,6 +70,11 @@ class AISkillFilesLintServiceTest extends TestCase
         self::assertSame([], AISkillFilesLintService::findPackageIdProblems('ddd.system.health', null, 'System.Health'));
         self::assertSame([], AISkillFilesLintService::findPackageIdProblems('rb.challenges.campaigns', 'rb', 'Challenges.Campaigns'));
         self::assertSame([], AISkillFilesLintService::findPackageIdProblems('agent.tasks', null, 'Agent.Tasks'));
+        // a further package of the same skill adds one feature word
+        self::assertSame([], AISkillFilesLintService::findPackageIdProblems('agent.goals.blueprint', null, 'Agent.Goals'));
+        self::assertSame([], AISkillFilesLintService::findPackageIdProblems('agent.ui.window', null, 'Agent.UI'));
+        self::assertSame([], AISkillFilesLintService::findPackageIdProblems('rb.challenges.campaigns.reports', 'rb', 'Challenges.Campaigns'));
+        self::assertNotSame([], AISkillFilesLintService::findPackageIdProblems('agent.goalsBlueprint', null, 'Agent.Goals'));
         self::assertNotSame([], AISkillFilesLintService::findPackageIdProblems('admin.challenges.campaigns', null, null));
         self::assertNotSame([], AISkillFilesLintService::findPackageIdProblems('rc.challenges.campaigns', 'rb', null));
         self::assertNotSame([], AISkillFilesLintService::findPackageIdProblems('agent.memories', null, 'Agent.Memory'));

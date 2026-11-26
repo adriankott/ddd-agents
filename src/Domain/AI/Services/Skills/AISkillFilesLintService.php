@@ -127,8 +127,11 @@ class AISkillFilesLintService extends Service
         }
         if ($onlyBindingSkillName !== null) {
             $skillWords = self::buildPackageIdWordsOfSkillName($onlyBindingSkillName);
-            if ($packageId !== $skillWords && $packageId !== $provider . '.' . $skillWords) {
-                $problems[] = "package id '$packageId' is bound by the one skill '$onlyBindingSkillName' and does not carry its words ('$skillWords' or '<provider>.$skillWords')";
+            // a further package of the same skill adds one feature word (`agent.goals.blueprint` beside `agent.goals`)
+            $carriesSkillWords = $packageId === $skillWords || $packageId === $provider . '.' . $skillWords
+                || str_starts_with($packageId, $skillWords . '.') || str_starts_with($packageId, $provider . '.' . $skillWords . '.');
+            if (!$carriesSkillWords) {
+                $problems[] = "package id '$packageId' is bound by the one skill '$onlyBindingSkillName' and does not carry its words ('$skillWords', '<provider>.$skillWords' or either with one more feature word)";
             }
         }
         return $problems;

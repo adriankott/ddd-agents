@@ -33,6 +33,7 @@ use DDD\Domain\AI\Repo\DB\Voice\Calls\DBAgentVoiceCallModel;
 use DDD\Domain\AI\Services\Conversations\Agent\AgentEvalAccountsService;
 use DDD\Domain\AI\Services\Conversations\Agent\AgentToolCallImageStoreService;
 use DDD\Domain\AI\Services\Conversations\AIConversationMessagesService;
+use DDD\Domain\AI\Services\Conversations\Goals\AgentGoalStoreService;
 use DDD\Domain\AI\Services\Conversations\Memories\AgentMemoryStoreService;
 use DDD\Domain\Base\Repo\DB\Dialect\Json\JsonPath;
 use DDD\Domain\AI\Repo\DB\Conversations\Subjects\DBAIConversationSubjectBindingModel;
@@ -198,7 +199,8 @@ class AIConversationEvalPurgeService extends Service
     /**
      * Columns pointing at a conversation or its rows that are deliberately NOT a purge step, with the reason. An
      * application adds the columns of its own tables (`array_merge` with the parent's). The memory columns come from the
-     * memory store ({@see AgentMemoryStoreService::getColumnsNotPurgedByEvalPurge()}): a host store names its own.
+     * memory store ({@see AgentMemoryStoreService::getColumnsNotPurgedByEvalPurge()}), the goal columns from the goal
+     * store ({@see AgentGoalStoreService::getColumnsNotPurgedByEvalPurge()}): a host store names its own.
      * The two columns of the voice call table are listed while that table is not in use, and are steps while it is
      * ({@see getVoiceCallColumnsNotPurged()}).
      *
@@ -211,6 +213,7 @@ class AIConversationEvalPurgeService extends Service
         $toolCallBatchTableName = (string)DBAIConversationToolCallBatchModel::getTableName();
         return [
             ...$this->getAgentMemoryStoreService()->getColumnsNotPurgedByEvalPurge(),
+            ...$this->getAgentGoalStoreService()->getColumnsNotPurgedByEvalPurge(),
             ...$this->getVoiceCallColumnsNotPurged(),
             "{$conversationTableName}.rootConversationId" => 'inside the tree: the tree expansion follows it',
             "{$conversationTableName}.supervisedConversationId" => 'inside the tree: the tree expansion follows it',
@@ -1253,5 +1256,13 @@ class AIConversationEvalPurgeService extends Service
         /** @var AgentMemoryStoreService $agentMemoryStoreService */
         $agentMemoryStoreService = DDDService::instance()->getService(AgentMemoryStoreService::class);
         return $agentMemoryStoreService;
+    }
+
+    /** The goal store, the host port that names the goal columns ({@see getColumnsNotPurged()}). */
+    protected function getAgentGoalStoreService(): AgentGoalStoreService
+    {
+        /** @var AgentGoalStoreService $agentGoalStoreService */
+        $agentGoalStoreService = DDDService::instance()->getService(AgentGoalStoreService::class);
+        return $agentGoalStoreService;
     }
 }

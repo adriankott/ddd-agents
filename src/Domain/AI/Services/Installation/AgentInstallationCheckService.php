@@ -7,6 +7,7 @@ namespace DDD\Domain\AI\Services\Installation;
 use DDD\Domain\AI\Entities\Conversations\Entitlements\AgentDeclaredAccountRight;
 use DDD\Domain\AI\Entities\Conversations\Entitlements\AgentRoleMappedAccountRights;
 use DDD\Domain\AI\Entities\Discovery\AgentSourceRoot;
+use DDD\Domain\AI\Entities\Conversations\Goals\AgentGoal;
 use DDD\Domain\AI\Entities\Conversations\Subjects\AIConversationSubjectBinding;
 use DDD\Domain\AI\Entities\Installation\AgentFeatureTableConditions;
 use DDD\Domain\AI\Entities\Installation\AgentInstallationDatabaseProbe;
@@ -800,7 +801,7 @@ class AgentInstallationCheckService extends Service
      */
     protected function getEntityClassesWhoseMissingTableTheCodeTolerates(): array
     {
-        return [AIConversationSubjectBinding::class];
+        return [AIConversationSubjectBinding::class, AgentGoal::class];
     }
 
     /**

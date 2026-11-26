@@ -1,5 +1,56 @@
 # Changelog
 
+## 0.8.0
+
+**The goal register** (built by RC against 0.7.8, released on 0.7.9). Off by default (`AI.agentGoals.enabled`); new
+table `AgentGoals` only when a host switches it on and uses the package's store.
+
+- New: the goal register. `AgentGoal` / `AgentGoals` hold what the owner wants to reach (holder `OWNER`) and what
+  the agent pursues for them (holder `AGENT`), scoped like memory: an account, optionally one agent space. Horizon
+  (`VISION`, `LONG_TERM`, `SHORT_TERM`), status (`PROPOSED`, `ACTIVE`, `ACHIEVED`, `DROPPED`, `PAUSED`, `BLOCKED`)
+  and provenance (`USER_STATED`, `AGENT_DERIVED`, `CONFIRMED`, `PRODUCT_DEFAULT`, `LEARNED`) are typed constants
+  validated with `Choice`. The goal carries its own rules: initial status from the provenance, reachable statuses
+  (a `VISION` is never achieved, only an agent goal is blocked), parent rules (an owner goal never hangs under an
+  agent goal, at most 3 levels), bitemporal versions (`validTo`, `invalidatedAt`, `supersededByGoalId`) and its line
+  for the model, which names the space through `AgentSpacesService::buildAgentSpaceLabelForTheModel()`.
+- New: `AgentGoalsService::persistGoal()` is the one write path of a goal. An exact restatement writes nothing unless
+  it corrects the horizon, the target day or a dropped goal (then the old row is closed first, the new one written and
+  the old one pointed at it); a near-duplicate (`areStatementsNearDuplicates()`, threshold
+  `NEAR_DUPLICATE_SIMILARITY_PERCENT`) is written first and then supersedes the old row. Also
+  `transitionGoalStatus()`, `findCurrentGoalsForScope()`, `findGoal()`, `invalidateCurrentGoalsOfScope()` and
+  `closeGoalValidityWindow()`.
+- New: `AgentGoalStoreService` is the host port of the register, like the memory store. Its default stores the goals
+  in the package's table `AgentGoals` (read rights like memory); a host that keeps goals in rows of its own registers a
+  subclass at the same path. A generated unique key keeps one current row per scope and statement.
+- New: the switch `config/app/AI/agentGoals.php` (`AI.agentGoals.enabled`, default `false`). Code before schema: with
+  the switch on and the table missing, every goal tool answers "not available" and nothing throws (a missing table
+  is looked up again at most once a minute); `app:agent:check-installation` reports the missing table as a WARNING, and only
+  while the switch is on and the package's own store answers.
+- New: the tools of `agent.goals` (`AgentGoalsMCPPackage`, right `useAgentGoals`, an everyday right): `getGoals`
+  (read, parallel-safe), `addGoal` (write; a goal the agent derives is stored as `PROPOSED` with a plain note asking the
+  owner to confirm it; the marker `NOT SAVED AS THE OWNER'S GOAL` opens only a goal the application refused and the
+  answer "not available") and `updateGoalStatus` (write). Each takes
+  an optional `agentSpaceId` like the memory tools. The override point `findReasonToRefuseGoal()` lets an application
+  refuse a goal before the write (default: accept).
+- New: the standard goal tree. `AgentGoalBlueprint`, `AgentGoalBlueprintNode` (criterion, weight, assessment ✅ / ⬜ /
+  ❔) and the set `AgentGoalBlueprintNodes`, keyed by the node key. The port `AgentGoalBlueprintProviderService` has one
+  method, `buildAssessedBlueprintForAgentSpace()`; the package binds no tree. The tool `getGoalBlueprint` (package
+  `agent.goals.blueprint`, read, parallel-safe) is offered only while an application registers a provider.
+- New: the agent skill `Agent.Goals` (`config/app/AI/Skills/Agent/Goals.md`), bound in `skillPackages.php` to both
+  packages; it is offered only while the switch is on. Developer reference: the context specialist's
+  `references/goals.md`, the README section "Goals: the register is a host port too" and the config map.
+- Adopting it in an application: (1) create the table `AgentGoals` from the package's model
+  (`app:entity:show-sql` for `AgentGoal`) or register a store of your own at the path of `AgentGoalStoreService`;
+  (2) set `AI.agentGoals.enabled` to `true` in the application's `config/app/AI/agentGoals.php`; (3) grant the right
+  `useAgentGoals` (in the package's default `accountRights.php` every account has it; an application with its own
+  `AI.accountRights` adds it); optionally register a provider at the path of `AgentGoalBlueprintProviderService` and
+  override `findReasonToRefuseGoal()` or `areStatementsNearDuplicates()`.
+
+- Changed: the skill binding lint accepts a further package of the same skill that adds one feature word to the
+  skill's words (`agent.goals.blueprint` beside `agent.goals`, `agent.ui.window` beside `agent.ui`); before, such a
+  package was a warning of `app:agent:check-installation`.
+- npm 0.8.0 in lockstep (no web change).
+
 ## 0.7.9
 
 - **`saveDriveFile` never asks the owner for a copy that is refused anyway.** New optional port

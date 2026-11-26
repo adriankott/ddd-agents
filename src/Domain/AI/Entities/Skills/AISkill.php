@@ -65,6 +65,10 @@ class AISkill extends Entity
     // recall of what was SAID in this or a past chat. The always-on directive injection is not gated on it.
     public const string AGENT_MEMORY = 'Agent.Memory';
 
+    // The goal register: the owner's goals and the agent's commitments in their service (read, add, change status), and
+    // the standard goal tree while the application binds one. Offered only while AI.agentGoals.enabled is on.
+    public const string AGENT_GOALS = 'Agent.Goals';
+
     // The pictures of the conversation's earlier tool results that left the context at a turn change
     // (AI.toolCallImageStore retention): `viewEarlierToolImage` attaches one again from the picture store.
     public const string AGENT_IMAGES = 'Agent.Images';

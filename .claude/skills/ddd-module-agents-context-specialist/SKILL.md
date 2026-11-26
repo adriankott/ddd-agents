@@ -1,6 +1,6 @@
 ---
 name: ddd-module-agents-context-specialist
-description: "Explains and tunes what the ddd-agents model sees per call and how it stays small, stable and cached: the model input (AgentModelInput segments, volatile tail, core prompts, Character.md), trimming it (agentModelInputOptions.php), prompt cache and stable prefix (breakpoints, wire APIs, append-only loading, epochs), the tool picture store (toolCallImageStore.php: L1/L2/L3, Redis or Valkey, object store, wire profile, retention, viewEarlierToolImage), context reduction (compaction, stubbing), skill and tool eviction, recall and search, embeddings, memories and the memory store, owner presence, device, time zones, client context, call_tool delivery, tool-call efficiency, contextRetention.php. Use when cached tokens drop to zero, a load costs the whole prompt, meta tools cost too much, pictures vanish after a turn or a resume, the context grows, compaction never fires or loses an id, a skill unloads too early, the agent repeats a read, the zone is off, search fails, or a host adds memory."
+description: "Explains and tunes what the ddd-agents model sees per call and how it stays small, stable and cached: the model input (AgentModelInput segments, volatile tail, core prompts, Character.md), trimming it (agentModelInputOptions.php), prompt cache and stable prefix (breakpoints, wire APIs, append-only loading, epochs), the tool picture store (toolCallImageStore.php: L1/L2/L3, Redis or Valkey, object store, wire profile, retention, viewEarlierToolImage), context reduction (compaction, stubbing), skill and tool eviction, recall and search, embeddings, memories, the memory store and goals, owner presence, device, time zones, client context, call_tool delivery, tool-call efficiency, contextRetention.php. Use when cached tokens drop to zero, a load costs the whole prompt, meta tools cost too much, pictures vanish after a turn or a resume, the context grows, compaction never fires or loses an id, a skill unloads too early, the agent repeats a read, the zone is off, search fails, or a host adds memory or goals."
 metadata:
   author: mgamadeus
   version: "0.1.0"
@@ -27,6 +27,7 @@ the tools and their results to the tools skill.
 | Volatile context delivered once per change | `AgentStateEpoch`, `AgentStateDelivery`, `AgentStateDelta`, `AgentSpaceContextFields` |
 | Recall, conversation search, embeddings | `SemanticSearchService`, `AIConversationMessageEmbeddingsService`, `AITextEmbeddingsService` |
 | Memories, standing directives, day context, local situation; the package's memory store and its curation | `AgentMemoriesService`, `AgentStandingDirectives`, `AgentSituationalContextService`, `AgentMemory`, `AgentMemoryStoreService`, `AgentMemoryCurationService`, `AgentMemoriesMCPPackage` |
+| The goal register: the owner's goals and the agent's commitments, the goal store (host port), the standard goal tree port | `AgentGoal`, `AgentGoalsService`, `AgentGoalStoreService`, `AgentGoalBlueprintProviderService`, `AgentGoalsMCPPackage` |
 | Owner presence, device, time | `OwnerPresence`, `OwnerDevice`, `AgentClock` |
 | The knobs | `ContextRetentionSettings`, `CompactionSettings`, `config/app/AI/contextRetention.php` |
 
@@ -220,6 +221,7 @@ Details, the section rule and replacing `Character.md`: [what-the-model-sees.md]
 | Phone vs chat vs unattended run; the device bracket; time zones in tools | [owner-presence-device-and-time.md](references/owner-presence-device-and-time.md) |
 | The agent re-loads a skill, repeats a read, or calls a tool three times | [tool-call-efficiency.md](references/tool-call-efficiency.md) |
 | Memories, standing directives, episodic history; switching on the package's memory store, its curation and tools | [memories-and-standing-directives.md](references/memories-and-standing-directives.md) |
+| The goal register: switching on goals, the table or a host goal store, the tools, the standard goal tree, the refusal hook | [goals.md](references/goals.md) |
 
 **Package maintainer**
 

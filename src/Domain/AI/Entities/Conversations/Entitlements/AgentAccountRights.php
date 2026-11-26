@@ -26,6 +26,9 @@ class AgentAccountRights
     /** @var string Keep and recall the agent's long-term memory (`Agent.Memory`) */
     public const string USE_AGENT_MEMORY = 'useAgentMemory';
 
+    /** @var string Keep the owner's goals and the agent's commitments (`Agent.Goals`) */
+    public const string USE_AGENT_GOALS = 'useAgentGoals';
+
     /** @var string Research the live web (`Agent.Web.Search`) */
     public const string USE_WEB = 'useWeb';
 
@@ -45,7 +48,7 @@ class AgentAccountRights
     public const array OPERATOR_RIGHTS = [self::OPERATE_PLATFORM];
 
     /** @var string[] The rights of this package's everyday tools: every account that may talk to the agent */
-    public const array EVERYDAY_RIGHTS = [self::SCHEDULE_AGENT_TASKS, self::USE_AGENT_MEMORY, self::USE_WEB, self::USE_UI];
+    public const array EVERYDAY_RIGHTS = [self::SCHEDULE_AGENT_TASKS, self::USE_AGENT_MEMORY, self::USE_AGENT_GOALS, self::USE_WEB, self::USE_UI];
 
     /** @var string[] Rights other packages declare that the default mapping gives to the platform operators */
     public const array PLATFORM_RIGHTS_OF_OTHER_PACKAGES = [self::MANAGE_TEXTS, self::USE_SANDBOX, self::USE_BROWSER];
