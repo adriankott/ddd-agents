@@ -110,6 +110,26 @@ class AgentToolCallProvenance extends ValueObject implements MCPServerProvidedIn
     public bool $isEvalHarnessCall = false;
 
     /**
+     * True for a call whose caller passed NO agent context: the executor injected an empty provenance
+     * ({@see \DDD\Presentation\Mcp\Services\MCPToolExecutorService}) — the HTTP-MCP server of the authenticated owner,
+     * executor-direct code of the host, an operator's console call ({@see forDirectCallWithoutAgent()}). Such a caller
+     * is the consent-giver itself: the owner-consent step does not gate it. A provenance the agent loop builds never
+     * carries it, and a provenance without a conversation that does not carry it is refused by the consent step.
+     */
+    public bool $isDirectCallWithoutAgent = false;
+
+    /**
+     * The provenance of a call a person makes directly, without an agent (an operator's console call on one space):
+     * {@see $isDirectCallWithoutAgent}.
+     */
+    public static function forDirectCallWithoutAgent(?AgentSpace $agentSpace = null): static
+    {
+        $provenance = new static(agentSpace: $agentSpace);
+        $provenance->isDirectCallWithoutAgent = true;
+        return $provenance;
+    }
+
+    /**
      * @var string|null The workspace a WORKSPACE tool works in for this call
      * ({@see \DDD\Domain\AI\Entities\MCPPackages\MCPToolEffect::WORKSPACE}): the conversation's
      * {@see \DDD\Domain\AI\Entities\Conversations\Messages\RunSettings::$workspaceKey} — an evaluation sets one per

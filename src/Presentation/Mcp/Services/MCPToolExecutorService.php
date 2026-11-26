@@ -2484,6 +2484,10 @@ class MCPToolExecutorService extends Service
             // the declared type; otherwise an empty instance (the HTTP-MCP path provides nothing → null fields).
             if (is_a($className, MCPServerProvidedInput::class, true)) {
                 $providedInput = ($serverProvidedInput instanceof $className) ? $serverProvidedInput : new $className();
+                if ($providedInput instanceof AgentToolCallProvenance && !$serverProvidedInput instanceof AgentToolCallProvenance) {
+                    // no agent context passed: the caller itself (the HTTP-MCP owner, executor-direct code) is the consent-giver
+                    $providedInput->isDirectCallWithoutAgent = true;
+                }
                 if ($providedInput instanceof AgentToolCallProvenance) {
                     // the call's arguments for the tool's own resolvers (an argument no DTO declares included)
                     $providedInput->toolArguments = $data;

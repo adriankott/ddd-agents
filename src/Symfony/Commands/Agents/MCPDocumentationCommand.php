@@ -306,7 +306,8 @@ class MCPDocumentationCommand extends AgentConsoleCommand
         $this->actAsAccount($ownerAccount);
         try {
             $mCPToolExecutorService = $this->getMCPToolExecutorService();
-            $agentToolCallProvenance = new AgentToolCallProvenance(agentSpace: $agentSpace);
+            // the operator calls the tool as the owner, without an agent
+            $agentToolCallProvenance = AgentToolCallProvenance::forDirectCallWithoutAgent($agentSpace);
             $this->startToolCallMeasurement($toolName);
             $toolResult = $mCPToolExecutorService->execute($toolName, $toolArguments, $mCPClassCatalog->packageClassNames, null, $agentToolCallProvenance);
             $this->reportToolCallMeasurement($toolName, $output);

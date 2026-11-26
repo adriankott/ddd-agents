@@ -23,8 +23,10 @@ check consent; it only turns an `OwnerConsentMissingException` thrown by the too
 
 | Call | Result |
 |---|---|
-| no conversation in the provenance (an MCP client of the authenticated owner over HTTP gets an empty `AgentToolCallProvenance`) | ungated: the owner is the consent-giver |
+| a direct call without an agent: the executor injected the provenance because its caller passed none (the HTTP-MCP server of the authenticated owner, executor-direct host code) or an operator's console call (`AgentToolCallProvenance::forDirectCallWithoutAgent()`); marked `$isDirectCallWithoutAgent`, no conversation | ungated: the caller is the consent-giver — unless the host's hook `isDirectCallerTheConsentGiver()` answers no (HTTP-MCP clients that are other agents), then refused `noConversation` |
 | an evaluation harness's direct executor call (`AgentToolCallProvenance::$isEvalHarnessCall`) | ungated |
+| no provenance at all, or a provenance without a conversation that is not marked as above | refused (`noConversation`): fail-closed |
+| a conversation without an id (a transient eval run, an eval replay of a schedule firing) | decided like a stored one (a standing mandate and the host's `decideMandateCoverage()` first; a replayed schedule run finds no owner); no turn event and no use record — a consent there is not single-use |
 | a delegation child | refused: only the root conversation can ask the owner |
 | site `ownerConsent` not `on` (global `off`, site `off` or `shadow`, the kill switch) | refused |
 | a run without the owner present, or a purpose that writes its own owner text | refused |
@@ -35,7 +37,7 @@ check consent; it only turns an `OwnerConsentMissingException` thrown by the too
 
 A refusal is either the model's own no (decided, `failure` null, `consented` false) or one of the failures on
 `OwnerConsentVerdict` (`FAILURE_SITE_OFF`, `FAILURE_NO_OWNER_ROW`, `FAILURE_NO_LIVE_OWNER`, `FAILURE_DELEGATION_CHILD`,
-`FAILURE_BREAKER`, `FAILURE_TRANSPORT`, `FAILURE_REFUSED`, `FAILURE_UNPARSABLE`, `FAILURE_ERROR`).
+`FAILURE_BREAKER`, `FAILURE_TRANSPORT`, `FAILURE_REFUSED`, `FAILURE_UNPARSABLE`, `FAILURE_ERROR`, `FAILURE_NO_CONVERSATION`).
 
 ## What the tool must call
 
@@ -123,7 +125,7 @@ A tool package that must rebuild requests for historical calls (for a replay com
 
 | Outcome | Meaning | `isWriteAllowed()` |
 |---|---|---|
-| `OUTCOME_UNGATED` | no consent applies (no conversation, harness call) | true |
+| `OUTCOME_UNGATED` | no consent applies (a marked direct call without an agent, harness call) | true |
 | `OUTCOME_RESERVED` | this call holds the owner's consent; `reservedUse` is set | true |
 | `OUTCOME_NOT_RESERVED` | no consent this call may use; write nothing | false |
 

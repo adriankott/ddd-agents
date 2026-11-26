@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.10.3
+
+- **Security — the owner-consent step fails closed.** Before, every call whose provenance named no stored
+  conversation ran ungated: no consent, no standing-mandate lookup, no `decideMandateCoverage()` — also an agent's call
+  in a transient conversation (an eval replay of a schedule firing executed a gated write that the host's hook refuses
+  in production). Now `OwnerConsentsService` ungates ONLY an eval harness step (`$isEvalHarnessCall`) and a direct call
+  without an agent: the executor marks the provenance it injects for a caller that passed none
+  (`AgentToolCallProvenance::$isDirectCallWithoutAgent` — the HTTP-MCP server of the authenticated owner,
+  executor-direct host code; `forDirectCallWithoutAgent()` for an operator's console call, used by
+  the tool call of `app:mcp:documentation`). No provenance, or one without a conversation that is not marked, is refused
+  (`OwnerConsentVerdict::FAILURE_NO_CONVERSATION`, "NOT DONE").
+- New hook `OwnerConsentsService::isDirectCallerTheConsentGiver()` (default yes): a host whose HTTP-MCP clients are
+  other agents answers no, and their gated calls are refused.
+- A conversation without an id is decided like a stored one: the standing mandate and the host's hook run first, a
+  replayed schedule run finds no owner (`noLiveOwner`), a transient chat case is asked of the decision model. It
+  writes no turn event and no use record (a consent there is not single-use). Eval cases with gated tools that passed
+  ungated before now meet the gate as in production.
+- Real runs are unaffected: a schedule run, a delegation child and a background operation always carry a stored
+  conversation (a child is refused as before: only the root can ask the owner).
+
 ## 0.10.2
 
 - **A schedule may start its runs with a purpose of its own** (a pinned model, preloaded skills, a seeded task plan)

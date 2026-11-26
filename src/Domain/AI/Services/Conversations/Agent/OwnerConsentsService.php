@@ -119,6 +119,13 @@ class OwnerConsentsService extends Service
             ) {
                 return OwnerConsentReservation::notReserved($request, $verdict);
             }
+            if (!isset($conversation->id)) {
+                // a transient conversation (an eval run) has no row to record the use on: the yes is decided and the
+                // step may run, but it is not single-use there
+                return $verdict->consented && $toolCallId !== null
+                    ? OwnerConsentReservation::reserved($request, $verdict, OwnerConsentUse::reservedFor($request, $verdict->consentingOwnerMessageIndex, $windowStart, $toolCallId))
+                    : OwnerConsentReservation::notReserved($request, $verdict);
+            }
             $runToken = $this->runClaimsService()->getRunTokenClaimedInThisProcess($conversation);
             if (!$verdict->consented) {
                 $this->recordOwnerConsentRefusal($conversation, OwnerConsentUse::refusedFor($request, $verdict->consentingOwnerMessageIndex, $windowStart, $toolCallId), $runToken);
@@ -151,7 +158,8 @@ class OwnerConsentsService extends Service
     {
         $actionClass = $callProvenance?->ownerConsentCoveringMandateActionClass;
         $conversation = $callProvenance?->conversation;
-        if ($actionClass === null || $callProvenance->isEvalHarnessCall || !$conversation instanceof AIConversation || !isset($conversation->id)) {
+        // a conversation without an id (a transient eval run) is covered like a stored one: the account is its owner's
+        if ($actionClass === null || $callProvenance->isEvalHarnessCall || !$conversation instanceof AIConversation) {
             return null;
         }
         $startedAt = hrtime(true);
@@ -230,7 +238,7 @@ class OwnerConsentsService extends Service
     public function markConsentUsed(?AgentToolCallProvenance $callProvenance, OwnerConsentReservation $reservation): void
     {
         $conversation = $callProvenance?->conversation;
-        if ($reservation->reservedUse !== null && $conversation instanceof AIConversation) {
+        if ($reservation->reservedUse !== null && $conversation instanceof AIConversation && isset($conversation->id)) {
             $this->markOwnerConsentUseUsed($conversation, $reservation->reservedUse, $this->runClaimsService()->getRunTokenClaimedInThisProcess($conversation));
         }
     }
@@ -244,7 +252,7 @@ class OwnerConsentsService extends Service
     public function releaseConsent(?AgentToolCallProvenance $callProvenance, OwnerConsentReservation $reservation): void
     {
         $conversation = $callProvenance?->conversation;
-        if ($reservation->reservedUse !== null && $conversation instanceof AIConversation) {
+        if ($reservation->reservedUse !== null && $conversation instanceof AIConversation && isset($conversation->id)) {
             $this->releaseOwnerConsentUse($conversation, $reservation->reservedUse, $this->runClaimsService()->getRunTokenClaimedInThisProcess($conversation));
         }
     }
@@ -543,16 +551,37 @@ class OwnerConsentsService extends Service
     }
 
     /**
-     * The check itself for {@see reserveOwnerConsentForStep()}: ungated without agent provenance, else the decision and
-     * one turn event.
+     * Hook: whether a direct call without an agent ({@see AgentToolCallProvenance::$isDirectCallWithoutAgent}: the
+     * HTTP-MCP server, executor-direct code, an operator's console call) is ungated because its authenticated caller is
+     * the consent-giver. Default yes. A host whose HTTP-MCP clients are other software agents answers no: such a call
+     * is then refused (`noConversation`), as there is no dialogue to read a yes from.
+     */
+    protected function isDirectCallerTheConsentGiver(AgentToolCallProvenance $callProvenance, OwnerConsentRequest $request): bool
+    {
+        return true;
+    }
+
+    /**
+     * The check itself for {@see reserveOwnerConsentForStep()}. Ungated ONLY for a caller that is the consent-giver
+     * itself or no agent: an eval harness step ({@see AgentToolCallProvenance::$isEvalHarnessCall}) and a direct call
+     * without an agent ({@see AgentToolCallProvenance::$isDirectCallWithoutAgent}, no conversation). Every other call
+     * without a conversation — no provenance at all, or one that names none — is refused (fail-closed); a conversation
+     * without an id (a transient eval run) is decided like a stored one, its turn event is not written. Else the
+     * decision and one turn event.
      *
      * @throws AgentRunClaimLostException
      */
     protected function runConsentCheck(?AgentToolCallProvenance $callProvenance, OwnerConsentRequest $request, int $afterOwnerMessageIndex): OwnerConsentVerdict
     {
         $conversation = $callProvenance?->conversation;
-        if ($callProvenance === null || $callProvenance->isEvalHarnessCall || !$conversation instanceof AIConversation || !isset($conversation->id)) {
+        if ($callProvenance !== null && ($callProvenance->isEvalHarnessCall
+            || ($callProvenance->isDirectCallWithoutAgent && !$conversation instanceof AIConversation
+                && $this->isDirectCallerTheConsentGiver($callProvenance, $request)))
+        ) {
             return OwnerConsentVerdict::ungated();
+        }
+        if ($callProvenance === null || !$conversation instanceof AIConversation) {
+            return OwnerConsentVerdict::failed(OwnerConsentVerdict::FAILURE_NO_CONVERSATION);
         }
         $startedAt = hrtime(true);
         try {
@@ -862,6 +891,10 @@ class OwnerConsentsService extends Service
         int $elapsedMs,
         ?OwnerConsentDecisionResult $ownerConsentDecisionResult = null
     ): void {
+        // a conversation without an id (a transient eval run) has no row to hang an event on
+        if (!isset($conversation->id)) {
+            return;
+        }
         try {
             $event = AIConversationTurnEvent::newInstance();
             $event->aiConversationId = (int)$conversation->id;

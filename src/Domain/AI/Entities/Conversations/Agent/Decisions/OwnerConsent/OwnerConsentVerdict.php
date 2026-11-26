@@ -34,6 +34,9 @@ class OwnerConsentVerdict extends ValueObject
     public const string FAILURE_REFUSED = 'refused';
     public const string FAILURE_UNPARSABLE = 'unparsable';
     public const string FAILURE_ERROR = 'error';
+
+    /** No agent context: a call without provenance, or with one that names no conversation and no direct caller */
+    public const string FAILURE_NO_CONVERSATION = 'noConversation';
     /** A standing mandate covered the step and the host refused it for this call (unsure, a trigger): nothing runs */
     public const string FAILURE_REFUSED_UNDER_MANDATE = 'refusedUnderMandate';
 
@@ -166,6 +169,10 @@ class OwnerConsentVerdict extends ValueObject
         if ($this->failure === self::FAILURE_DELEGATION_CHILD) {
             return 'NOT DONE — this step needs the owner\'s explicit confirmation, which only the main conversation can obtain. '
                 . 'Report back that the owner must confirm: ' . $request->targetLine . '. Do not retry.';
+        }
+        if ($this->failure === self::FAILURE_NO_CONVERSATION) {
+            return 'NOT DONE — nothing was changed. This step needs the owner\'s explicit confirmation, and this call carries no '
+                . 'conversation to read it from. Do not retry.';
         }
         if ($this->failure === self::FAILURE_NO_LIVE_OWNER) {
             return 'NOT DONE — this step needs the owner\'s explicit confirmation, and no owner takes part in this run. Report '

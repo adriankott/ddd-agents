@@ -23,6 +23,9 @@ class OwnerConsentsServiceWithScriptedMandateDouble extends OwnerConsentsService
     /** The host's answer; null = the package default (covered) */
     public ?OwnerConsentMandateCoverage $scriptedCoverage = null;
 
+    /** The host's answer whether a direct call without an agent is its own consent-giver */
+    public bool $directCallerIsTheConsentGiver = true;
+
     /** @var string[] the action classes the lookup was asked for, in call order */
     public array $lookedUpActionClasses = [];
 
@@ -35,6 +38,11 @@ class OwnerConsentsServiceWithScriptedMandateDouble extends OwnerConsentsService
     protected function decideMandateCoverage(AgentMandate $agentMandate, AgentToolCallProvenance $callProvenance, OwnerConsentRequest $request): OwnerConsentMandateCoverage
     {
         return $this->scriptedCoverage ?? parent::decideMandateCoverage($agentMandate, $callProvenance, $request);
+    }
+
+    protected function isDirectCallerTheConsentGiver(AgentToolCallProvenance $callProvenance, OwnerConsentRequest $request): bool
+    {
+        return $this->directCallerIsTheConsentGiver;
     }
 
     public function findOwnerConsentWindowStart(AIConversation $conversation, string $toolName): int
