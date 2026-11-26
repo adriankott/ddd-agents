@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.4
+
+- **An app's widget replaces the package's widget of its wire name without extending it.**
+  `ConversationWidget::REPLACES_PACKAGE_WIDGET` (PHP twin of the web field `replacesPackageWidget` of 0.8.3): of two
+  classes of one wire name, the application's class with the flag stays and the package's is dropped, in either order
+  of discovery; two application classes stay a build error. For an app whose widget of that name must not take the
+  package class's behaviour (the package's `ImageGallery` is answerable, an app's own gallery may not be).
+  `ConversationWidgetClasses::resolvePackageWidgetReplacingClassName()`, `isPackageWidgetClass()`.
+
 ## 0.8.3
 
 - **An app keeps its own widget of a wire name the package now ships.** `ConversationWidgetEntry.replacesPackageWidget`

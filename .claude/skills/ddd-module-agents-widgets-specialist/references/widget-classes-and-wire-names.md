@@ -114,8 +114,13 @@ with one wire name, the one that extends the other wins (`ComposedViewFolderClas
 The web twin: an app's entry for `registerConversationWidgets()` with `replacesPackageWidget: true` takes the place of
 the package's entry of its name (without the flag a name the package registers throws; an app's own name registered
 twice always throws). An app that used a wire name before the package shipped a widget of that name keeps its own
-fields and component this way: its PHP class extends the package class (empty `SUMMARY` and `WHEN_TO_USE` keep it out of
-the catalog, as before), its web entry sets the flag.
+fields, answer rules and component this way. In PHP its class either extends the package class (empty `SUMMARY` and
+`WHEN_TO_USE` keep it out of the catalog) or, when it must not inherit the package's behaviour (the package class is
+`AnswerableConversationWidget` and the app's is not), declares `REPLACES_PACKAGE_WIDGET = true` without extending it:
+the registry keeps the app's class and drops the package's, in either order of discovery
+(`ConversationWidgetClasses::resolvePackageWidgetReplacingClassName()`; a package widget is a class in the namespace
+of `ConversationWidget`). Two application classes of one wire name stay a build error, flag or not. Its web entry sets
+`replacesPackageWidget`.
 
 ## The package's own widgets
 

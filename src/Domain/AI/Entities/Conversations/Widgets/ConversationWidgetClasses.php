@@ -292,7 +292,8 @@ class ConversationWidgetClasses
             $widgetType = $className::WIDGET_TYPE;
             if (isset($widgetClassesByWidgetType[$widgetType])) {
                 // an application or module subclass of a discovered widget class replaces it (override before duplicate)
-                $overridingClassName = ComposedViewFolderClassFinder::resolveOverridingClassName($widgetClassesByWidgetType[$widgetType], $className);
+                $overridingClassName = ComposedViewFolderClassFinder::resolveOverridingClassName($widgetClassesByWidgetType[$widgetType], $className)
+                    ?? static::resolvePackageWidgetReplacingClassName($widgetClassesByWidgetType[$widgetType], $className);
                 if ($overridingClassName === null) {
                     static::handleBuildError(sprintf('Two widget classes declare the WIDGET_TYPE "%s": %s and %s.', $widgetType, $widgetClassesByWidgetType[$widgetType], $className));
                     continue;
@@ -313,6 +314,39 @@ class ConversationWidgetClasses
         }
         ksort($widgetClassesByWidgetType);
         return $widgetClassesByWidgetType;
+    }
+
+    /**
+     * Of two classes of one wire name, the application's class that declares
+     * {@see ConversationWidget::REPLACES_PACKAGE_WIDGET} when the other is a widget of the package (its namespace is the
+     * package's widget namespace), in either order; null otherwise (two application classes, or no flag).
+     *
+     * @param class-string<ConversationWidget> $registeredClassName
+     * @param class-string<ConversationWidget> $candidateClassName
+     * @return string|null The class that stays
+     */
+    public static function resolvePackageWidgetReplacingClassName(string $registeredClassName, string $candidateClassName): ?string
+    {
+        $registeredIsPackageWidget = static::isPackageWidgetClass($registeredClassName);
+        $candidateIsPackageWidget = static::isPackageWidgetClass($candidateClassName);
+        if ($registeredIsPackageWidget && !$candidateIsPackageWidget && $candidateClassName::REPLACES_PACKAGE_WIDGET) {
+            return $candidateClassName;
+        }
+        if ($candidateIsPackageWidget && !$registeredIsPackageWidget && $registeredClassName::REPLACES_PACKAGE_WIDGET) {
+            return $registeredClassName;
+        }
+        return null;
+    }
+
+    /**
+     * Whether a widget class is one of the package's own: it sits in the namespace of {@see ConversationWidget}.
+     *
+     * @param string $className
+     * @return bool
+     */
+    public static function isPackageWidgetClass(string $className): bool
+    {
+        return (new ReflectionClass($className))->getNamespaceName() === (new ReflectionClass(ConversationWidget::class))->getNamespaceName();
     }
 
     /**

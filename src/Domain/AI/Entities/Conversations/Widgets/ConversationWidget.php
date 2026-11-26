@@ -67,6 +67,15 @@ abstract class ConversationWidget extends ValueObject
     public const bool IS_WRITABLE_WITHOUT_A_SKILL = false;
 
     /**
+     * @var bool An application's widget that takes the place of the PACKAGE's widget of the same wire name without
+     * extending it (an application that used the name before the package shipped a widget of that name, with fields,
+     * answer rules and reaction sentences of its own). The registry keeps the declaring class and drops the package's;
+     * two application classes of one wire name stay a build error, flag or not. The web twin is the entry field
+     * `replacesPackageWidget`. A subclass of the package widget needs no flag: it wins anyway.
+     */
+    public const bool REPLACES_PACKAGE_WIDGET = false;
+
+    /**
      * @var string The line a model-facing example answer starts with (English, `<…>` where the model fills in), for a
      * widget {@see IS_WRITABLE_WITHOUT_A_SKILL}: the kit shows it with the block of {@see EXAMPLE_FIELDS}
      * ({@see buildExampleAnswer()}); empty = no example.
